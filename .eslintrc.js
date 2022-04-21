@@ -72,6 +72,7 @@ module.exports = {
         '@typescript-eslint/no-unused-vars': ERROR,
         '@typescript-eslint/no-use-before-define': ERROR,
         '@typescript-eslint/unbound-method': ERROR,
+        '@typescript-eslint/require-await': OFF, // Fastify requires async functions everywhere?
 
         'jest/no-commented-out-tests': ERROR,
     },

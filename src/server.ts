@@ -1,23 +1,26 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
+import health from 'routes/health';
+import config from 'config';
 
-const PORT = process.env.PORT || 4000;
+const buildServer = async (): Promise<FastifyInstance> => {
+    const fastify = Fastify({
+        logger: {
+            level: config.LOG_LEVEL,
+        },
+    });
+    await fastify.register(health);
+    return fastify;
+};
 
 const start = async (): Promise<void> => {
-    const fastify = Fastify();
-
-    fastify.get('/health', async () => {
-        return { hello: 'world' };
-        await new Promise((res) => res(123));
-    });
+    const fastify = await buildServer();
 
     try {
-        await fastify.listen(PORT);
+        await fastify.listen(config.PORT);
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
     }
 };
 
-start()
-    .then(() => console.log(`Server running on port ${PORT}`))
-    .catch((error) => console.error(error));
+void start();
