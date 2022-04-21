@@ -26,7 +26,6 @@ module.exports = {
                 root: [baseUrl],
             },
         ],
-        '@babel/plugin-syntax-top-level-await',
     ],
     ignore: ['node_modules'],
 };

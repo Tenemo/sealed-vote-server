@@ -7,7 +7,7 @@ const start = async (): Promise<void> => {
 
     fastify.get('/health', async () => {
         return { hello: 'world' };
-        // await new Promise((res) => res(123));
+        await new Promise((res) => res(123));
     });
 
     try {
@@ -18,4 +18,6 @@ const start = async (): Promise<void> => {
     }
 };
 
-start().catch((error) => console.error(error));
+start()
+    .then(() => console.log(`Server running on port ${PORT}`))
+    .catch((error) => console.error(error));
