@@ -79,7 +79,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 )}
             `;
             await fastify.pg.query(sqlInsertVotes);
-            return `Voted successfully in poll ${pollId}.`;
+            return `Voted successfully in vote ${pollId}.`;
         },
     );
 };

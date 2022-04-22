@@ -46,7 +46,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             if (!polls.length) {
                 throw createError(
                     400,
-                    `Poll with ID ${pollId} does not exist.`,
+                    `Vote with ID ${pollId} does not exist.`,
                 );
             }
             const sqlSelectPollsChoicesVotes = SQL`
