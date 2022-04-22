@@ -22,6 +22,11 @@ CREATE TABLE choices (
 CREATE TABLE votes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     voter_name text NOT NULL,
+    score integer NOT NULL,
+    CHECK (
+        score BETWEEN 1
+        AND 10
+    ),
     created_at timestamp NOT NULL DEFAULT NOW(),
     poll_id uuid NOT NULL,
     CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id),

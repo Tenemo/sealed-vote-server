@@ -21,7 +21,7 @@ const PollResponse = Type.Object({
     createdAt: Type.String(),
 });
 
-type PollResponse = Static<typeof PollResponse>;
+export type PollResponse = Static<typeof PollResponse>;
 
 const schema = {
     body: PollRequest,
@@ -36,49 +36,47 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         async (
             req: FastifyRequest<{ Body: PollRequest }>,
         ): Promise<PollResponse> => {
-            try {
-                const { choices, pollName, maxParticipants = 100 } = req.body;
-                const db = await fastify.pg.connect();
+            const { choices, pollName, maxParticipants = 100 } = req.body;
+            const db = await fastify.pg.connect();
 
-                const sqlFindExisting = SQL`SELECT id, poll_name FROM polls where poll_name = ${pollName}`;
-                const { rows: polls } = await fastify.pg.query(sqlFindExisting);
-                if (polls.length) {
-                    throw createError(
-                        400,
-                        'Poll with that name already exists',
-                    );
-                }
-                const creatorToken = crypto.randomBytes(32).toString('hex');
+            const sqlFindExisting = SQL`
+                SELECT id, poll_name
+                FROM polls
+                WHERE poll_name = ${pollName}`;
+            const { rows: polls } = await fastify.pg.query(sqlFindExisting);
+            if (polls.length) {
+                throw createError(400, 'Poll with that name already exists');
+            }
+            const creatorToken = crypto.randomBytes(32).toString('hex');
 
-                const sqlInsertPoll = SQL`INSERT into polls (poll_name, creator_token, max_participants)
+            const sqlInsertPoll = SQL`
+                INSERT into polls (poll_name, creator_token, max_participants)
                 VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
-                RETURNING *`;
-                const { rows: createdPolls } = await fastify.pg.query<
-                    PollResponse & { created_at: string }
-                >(sqlInsertPoll);
-                const { id, created_at: createdAt } = createdPolls[0];
+                RETURNING *
+                `;
+            const { rows: createdPolls } = await fastify.pg.query<
+                PollResponse & { created_at: string }
+            >(sqlInsertPoll);
+            const { id, created_at: createdAt } = createdPolls[0];
 
-                const sqlInsertChoices = SQL`INSERT into choices (choice_name, poll_id)
+            const sqlInsertChoices = SQL`
+                INSERT into choices (choice_name, poll_id)
                 VALUES ${SQL.glue(
                     choices.map((choice) => SQL`(${choice},${id})`),
                     ',',
                 )}`;
-                await fastify.pg.query(sqlInsertChoices);
+            await fastify.pg.query(sqlInsertChoices);
 
-                db.release();
+            db.release();
 
-                return {
-                    pollName,
-                    creatorToken,
-                    choices,
-                    maxParticipants,
-                    id,
-                    createdAt,
-                };
-            } catch (error) {
-                fastify.log.error(error);
-                throw error;
-            }
+            return {
+                pollName,
+                creatorToken,
+                choices,
+                maxParticipants,
+                id,
+                createdAt,
+            };
         },
     );
 };
