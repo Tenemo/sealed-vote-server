@@ -44,15 +44,31 @@ if (process.env.NOPE === 'NOPE') {
     void start();
 }
 
-import express from 'express';
-const app = express();
+// import express from 'express';
+// const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.get('/', (req, res) => {
-    console.log(req);
-    res.send('Hello World!');
-});
+// app.get('/', (req, res) => {
+//     console.log(req);
+//     res.send('Hello World!');
+// });
 
-app.listen(PORT, () => {
-    console.log(`Example app listening on port ${PORT}`);
-});
+// app.listen(PORT, () => {
+//     console.log(`Example app listening on port ${PORT}`);
+// });
+const start2 = async function (): Promise<void> {
+    const fastify = Fastify();
+
+    fastify.get('/', async () => {
+        return { hello: 'world' };
+    });
+
+    try {
+        await fastify.listen(PORT);
+    } catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+};
+
+void start2();
