@@ -13,7 +13,7 @@ module.exports = {
         'prettier',
         'plugin:prettier/recommended',
     ],
-    plugins: ['@typescript-eslint', 'import', 'prettier', 'jest'],
+    plugins: ['@typescript-eslint', 'import', 'prettier', 'jest', 'sql'],
     parser: '@typescript-eslint/parser',
     parserOptions: {
         project: './tsconfig.json',
@@ -75,6 +75,21 @@ module.exports = {
         '@typescript-eslint/require-await': OFF, // Fastify requires async functions everywhere?
 
         'jest/no-commented-out-tests': ERROR,
+
+        'sql/format': [
+            ERROR,
+            {
+                ignoreExpressions: false,
+                ignoreInline: true,
+                ignoreTagless: true,
+            },
+        ],
+        'sql/no-unsafe-query': [
+            ERROR,
+            {
+                allowLiteral: false,
+            },
+        ],
     },
     overrides: [
         {

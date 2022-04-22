@@ -1,14 +1,24 @@
 import Fastify, { FastifyInstance } from 'fastify';
-import health from 'routes/health';
+import FastifyPostgres from 'fastify-postgres';
+
+import vote from 'routes/vote';
+import createVote from 'routes/create-poll';
+import results from 'routes/poll';
 import config from 'config';
 
 const buildServer = async (): Promise<FastifyInstance> => {
     const fastify = Fastify({
         logger: {
             level: config.LOG_LEVEL,
+            prettyPrint: config.PRETTY_PRINT,
         },
     });
-    await fastify.register(health);
+    await fastify.register(FastifyPostgres, {
+        connectionString: `postgres://${config.PG_USER}:${config.PG_PASSWORD}@${config.PG_HOST}:${config.PG_PORT}/${config.PG_DB}`,
+    });
+    await fastify.register(vote, { prefix: '/api' });
+    await fastify.register(createVote, { prefix: '/api' });
+    await fastify.register(results, { prefix: '/api' });
     return fastify;
 };
 
