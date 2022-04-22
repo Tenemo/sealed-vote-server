@@ -7,3 +7,4 @@ Server Fastify application for [sealed.vote](https://sealed.vote).
 -   restrict the amount of participants
 -   allow creator to update the polls
 -   allow creator to close polls
+-   rate limiting
