@@ -1,9 +1,12 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import FastifyPostgres from 'fastify-postgres';
+import dotenv from 'dotenv';
 
 import vote from 'routes/vote';
 import createVote from 'routes/create-poll';
 import results from 'routes/poll';
+
+dotenv.config();
 
 const buildServer = async (): Promise<FastifyInstance> => {
     const fastify = Fastify({
