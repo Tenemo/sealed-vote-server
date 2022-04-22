@@ -4,15 +4,15 @@ import SQL from '@nearform/sql';
 import crypto from 'crypto';
 import createError from 'http-errors';
 
-const PollRequest = Type.Object({
+const CreatePollRequest = Type.Object({
     choices: Type.Array(Type.String()),
     pollName: Type.String(),
     maxParticipants: Type.Optional(Type.Number()),
 });
 
-export type PollRequest = Static<typeof PollRequest>;
+export type CreatePollRequest = Static<typeof CreatePollRequest>;
 
-const PollResponse = Type.Object({
+const CreatePollResponse = Type.Object({
     pollName: Type.String(),
     creatorToken: Type.String(),
     choices: Type.Array(Type.String()),
@@ -21,12 +21,12 @@ const PollResponse = Type.Object({
     createdAt: Type.String(),
 });
 
-export type PollResponse = Static<typeof PollResponse>;
+export type CreatePollResponse = Static<typeof CreatePollResponse>;
 
 const schema = {
-    body: PollRequest,
+    body: CreatePollRequest,
     response: {
-        200: PollResponse,
+        200: CreatePollResponse,
     },
 };
 const vote = async (fastify: FastifyInstance): Promise<void> => {
@@ -34,13 +34,13 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         '/polls/create',
         { schema },
         async (
-            req: FastifyRequest<{ Body: PollRequest }>,
-        ): Promise<PollResponse> => {
+            req: FastifyRequest<{ Body: CreatePollRequest }>,
+        ): Promise<CreatePollResponse> => {
             const { choices, pollName, maxParticipants = 100 } = req.body;
             const db = await fastify.pg.connect();
 
             const sqlFindExisting = SQL`
-                SELECT id, poll_name
+                SELECT id
                 FROM polls
                 WHERE poll_name = ${pollName}`;
             const { rows: polls } = await fastify.pg.query(sqlFindExisting);
@@ -55,7 +55,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 RETURNING *
                 `;
             const { rows: createdPolls } = await fastify.pg.query<
-                PollResponse & { created_at: string }
+                CreatePollResponse & { created_at: string }
             >(sqlInsertPoll);
             const { id, created_at: createdAt } = createdPolls[0];
 

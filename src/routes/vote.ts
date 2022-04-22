@@ -30,7 +30,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             const { votes, voterName } = req.body;
             const pollId = (req.params as { pollId: string }).pollId;
             const sqlFindExisting = SQL`
-                SELECT id, poll_name
+                SELECT id
                 FROM polls
                 WHERE id = ${pollId}`;
             const { rows: polls } = await fastify.pg.query(sqlFindExisting);
@@ -41,7 +41,8 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 );
             }
             const sqlSelectChoices = SQL`
-                SELECT id, choice_name from choices
+                SELECT id, choice_name
+                FROM choices
                 WHERE choice_name IN (${SQL.glue(
                     Object.keys(votes).map((choiceName) => SQL`${choiceName}`),
                     ',',
