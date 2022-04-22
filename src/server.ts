@@ -26,7 +26,7 @@ const start = async (): Promise<void> => {
     const fastify = await buildServer();
 
     try {
-        await fastify.listen(config.PORT);
+        await fastify.listen(process.env.PORT ?? 4000);
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);

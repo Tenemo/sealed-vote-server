@@ -1,10 +1,8 @@
 import envSchema from 'env-schema';
 import S from 'fluent-json-schema';
 
-const NODE_ENV = process.env.ENV_VARIABLE;
-
 const schema = S.object()
-    .prop('PORT', S.string().default(NODE_ENV === 'development' ? 4000 : 80))
+    .prop('PORT', S.string())
     .prop(
         'DATABASE_URL',
         S.string().default('postgres://postgres:postgres@localhost:5432/sv-db'),
