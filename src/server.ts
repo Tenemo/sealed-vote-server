@@ -4,17 +4,18 @@ import FastifyPostgres from 'fastify-postgres';
 import vote from 'routes/vote';
 import createVote from 'routes/create-poll';
 import results from 'routes/poll';
-import config from 'config';
 
 const buildServer = async (): Promise<FastifyInstance> => {
     const fastify = Fastify({
         logger: {
-            level: config.LOG_LEVEL,
-            prettyPrint: config.PRETTY_PRINT,
+            level: process.env.LOG_LEVEL ?? 'info',
+            prettyPrint: !!(process.env.PRETTY_PRINT === 'true'),
         },
     });
     await fastify.register(FastifyPostgres, {
-        connectionString: config.DATABASE_URL,
+        connectionString:
+            process.env.DATABASE_URL ??
+            'postgres://postgres:postgres@localhost:5432/sv-db',
     });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(createVote, { prefix: '/api' });
