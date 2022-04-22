@@ -19,6 +19,9 @@ const buildServer = async (): Promise<FastifyInstance> => {
         connectionString:
             process.env.DATABASE_URL ??
             'postgres://postgres:postgres@localhost:5432/sv-db',
+        ssl: {
+            rejectUnauthorized: false,
+        },
     });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(createVote, { prefix: '/api' });
