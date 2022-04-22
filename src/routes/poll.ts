@@ -42,17 +42,18 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 poll_name: string;
                 created_at: string;
             }>(sqlFindExisting);
-            const { poll_name: pollName, created_at: createdAt } = polls[0];
             if (!polls.length) {
                 throw createError(
                     400,
                     `Vote with ID ${pollId} does not exist.`,
                 );
             }
+            const { poll_name: pollName, created_at: createdAt } = polls[0];
             const sqlSelectPollsChoicesVotes = SQL`
                 SELECT
                     choices.choice_name,
-                    votes.voter_name, votes.score
+                    votes.voter_name,
+                    votes.score
                 FROM polls
                 JOIN choices
                     ON polls.id = choices.poll_id
@@ -66,9 +67,6 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 voter_name: string;
                 score: number;
             }>(sqlSelectPollsChoicesVotes);
-            const choices = [
-                ...new Set(rows.map(({ choice_name }) => choice_name)),
-            ];
             const voters: string[] = [];
             const resultsWithScores = rows.reduce(
                 (
@@ -94,6 +92,21 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 {},
             );
 
+            const sqlSelectPollsChoices = SQL`
+                SELECT
+                    choices.choice_name
+                FROM polls
+                JOIN choices
+                    ON polls.id = choices.poll_id
+                WHERE polls.id = ${pollId}
+            `;
+            const { rows: choiceRows } = await fastify.pg.query<{
+                choice_name: string;
+            }>(sqlSelectPollsChoices);
+            fastify.log.warn(choiceRows);
+            const choices = [
+                ...new Set(choiceRows.map(({ choice_name }) => choice_name)),
+            ];
             if (voters.length < 2) {
                 return {
                     pollName,
