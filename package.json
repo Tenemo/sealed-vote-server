@@ -37,6 +37,7 @@
     },
     "dependencies": {
         "@nearform/sql": "^1.9.2",
+        "@sinclair/typebox": "^0.23.4",
         "cross-env": "^7.0.3",
         "env-schema": "^4.0.0",
         "fastify": "^3.28.0",
@@ -53,7 +54,6 @@
         "@babel/node": "^7.16.8",
         "@babel/preset-env": "^7.16.11",
         "@babel/preset-typescript": "^7.16.7",
-        "@sinclair/typebox": "^0.23.4",
         "@types/eslint": "^8.4.1",
         "@types/eslint-plugin-prettier": "^3.1.0",
         "@types/http-errors": "^1.8.2",
