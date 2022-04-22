@@ -22,7 +22,7 @@
         "docker:up": "docker compose up -d",
         "docker:destroy": "docker compose down -v",
         "docker:refresh": "npm run docker:destroy && npm run docker:up",
-        "heroku": "git push heroku master",
+        "deploy": "git push heroku master",
         "nodemon": "nodemon",
         "lint": "eslint . --ext js,ts",
         "lint:fix": "eslint . --ext js,ts --fix",
