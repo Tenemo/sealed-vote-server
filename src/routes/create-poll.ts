@@ -39,13 +39,16 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             const { choices, pollName, maxParticipants = 100 } = req.body;
             const db = await fastify.pg.connect();
 
+            if (choices.length < 2) {
+                throw createError(400, 'Not enough choices.');
+            }
             const sqlFindExisting = SQL`
                 SELECT id
                 FROM polls
                 WHERE poll_name = ${pollName}`;
             const { rows: polls } = await fastify.pg.query(sqlFindExisting);
             if (polls.length) {
-                throw createError(400, 'Vote with that name already exists');
+                throw createError(400, 'Vote with that name already exists.');
             }
             const creatorToken = crypto.randomBytes(32).toString('hex');
 
