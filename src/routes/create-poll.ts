@@ -39,9 +39,9 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             try {
                 const { choices, pollName, maxParticipants = 100 } = req.body;
                 const db = await fastify.pg.connect();
-                const { rows: polls } = await fastify.pg.query(
-                    SQL`SELECT id, poll_name FROM polls where poll_name = ${pollName}`,
-                );
+
+                const sqlFindExisting = SQL`SELECT id, poll_name FROM polls where poll_name = ${pollName}`;
+                const { rows: polls } = await fastify.pg.query(sqlFindExisting);
                 if (polls.length) {
                     throw createError(
                         400,
@@ -49,16 +49,21 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                     );
                 }
                 const creatorToken = crypto.randomBytes(32).toString('hex');
+
+                const sqlInsertPoll = SQL`INSERT into polls (poll_name, creator_token, max_participants)
+                VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
+                RETURNING *`;
                 const { rows: createdPolls } = await fastify.pg.query<
                     PollResponse & { created_at: string }
-                >(
-                    SQL`INSERT into polls (poll_name, creator_token, max_participants)
-                        VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
-                        RETURNING *`,
-                );
+                >(sqlInsertPoll);
                 const { id, created_at: createdAt } = createdPolls[0];
 
-                fastify.log.warn(createdPolls);
+                const sqlInsertChoices = SQL`INSERT into choices (choice_name, poll_id)
+                VALUES ${SQL.glue(
+                    choices.map((choice) => SQL`(${choice},${id})`),
+                    ',',
+                )}`;
+                await fastify.pg.query(sqlInsertChoices);
 
                 db.release();
 
