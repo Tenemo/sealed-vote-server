@@ -13,7 +13,7 @@
     },
     "homepage": "https://github.com/Tenemo/sealed-vote-server#readme",
     "scripts": {
-        "start": "npm run build:skip && node dist/server.js",
+        "start": "node dist/server.js",
         "prebuild": "npm run lint && npm run tsc && npm test && npm run cleanDist",
         "build": "cross-env NODE_ENV=production babel src --out-dir dist",
         "build:skip": "npm run cleanDist && cross-env NODE_ENV=production babel --extensions '.ts' src --out-dir dist",
@@ -22,6 +22,7 @@
         "docker:up": "docker compose up -d",
         "docker:destroy": "docker compose down -v",
         "docker:refresh": "npm run docker:destroy && npm run docker:up",
+        "heroku": "git push heroku master",
         "nodemon": "nodemon",
         "lint": "eslint . --ext js,ts",
         "lint:fix": "eslint . --ext js,ts --fix",

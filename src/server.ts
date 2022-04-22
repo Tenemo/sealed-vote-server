@@ -14,7 +14,7 @@ const buildServer = async (): Promise<FastifyInstance> => {
         },
     });
     await fastify.register(FastifyPostgres, {
-        connectionString: `postgres://${config.PG_USER}:${config.PG_PASSWORD}@${config.PG_HOST}:${config.PG_PORT}/${config.PG_DB}`,
+        connectionString: config.DATABASE_URL,
     });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(createVote, { prefix: '/api' });
