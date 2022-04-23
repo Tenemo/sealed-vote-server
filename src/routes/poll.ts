@@ -32,7 +32,6 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Body: PollRequest }>,
         ): Promise<PollResponse> => {
             const pollId = (req.params as { pollId: string }).pollId;
-            const db = await fastify.pg.connect();
             const sqlFindExisting = SQL`
                 SELECT id, poll_name, created_at
                 FROM polls
@@ -115,7 +114,6 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                     voters,
                 };
             }
-            db.release();
 
             return {
                 pollName,

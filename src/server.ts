@@ -8,6 +8,8 @@ import results from 'routes/poll';
 
 dotenv.config();
 
+const TIMEOUT = 30 * 1000;
+
 const buildServer = async (): Promise<FastifyInstance> => {
     const fastify = Fastify({
         logger: {
@@ -22,8 +24,10 @@ const buildServer = async (): Promise<FastifyInstance> => {
         ssl: {
             rejectUnauthorized: false,
         },
-        statement_timeout: 30 * 1000,
-        query_timeout: 30 * 1000,
+        statement_timeout: TIMEOUT,
+        query_timeout: TIMEOUT,
+        idle_in_transaction_session_timeout: TIMEOUT,
+        connectionTimeoutMillis: TIMEOUT,
     });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(createVote, { prefix: '/api' });

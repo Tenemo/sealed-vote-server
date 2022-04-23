@@ -37,7 +37,6 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Body: CreatePollRequest }>,
         ): Promise<CreatePollResponse> => {
             const { choices, pollName, maxParticipants = 100 } = req.body;
-            const db = await fastify.pg.connect();
 
             if (choices.length < 2) {
                 throw createError(400, 'Not enough choices.');
@@ -69,8 +68,6 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                     ',',
                 )}`;
             await fastify.pg.query(sqlInsertChoices);
-
-            db.release();
 
             return {
                 pollName,
