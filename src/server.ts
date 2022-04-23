@@ -22,6 +22,8 @@ const buildServer = async (): Promise<FastifyInstance> => {
         ssl: {
             rejectUnauthorized: false,
         },
+        statement_timeout: 30 * 1000,
+        query_timeout: 30 * 1000,
     });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(createVote, { prefix: '/api' });
