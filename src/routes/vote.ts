@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { Type, Static } from '@sinclair/typebox';
-import SQL from '@nearform/sql';
+import sql from '@nearform/sql';
 import createError from 'http-errors';
 
 export const VoteRequest = Type.Object({
@@ -29,7 +29,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         ): Promise<VoteResponse> => {
             const { votes, voterName } = req.body;
             const pollId = (req.params as { pollId: string }).pollId;
-            const sqlFindExisting = SQL`
+            const sqlFindExisting = sql`
                 SELECT id
                 FROM polls
                 WHERE id = ${pollId}`;
@@ -40,11 +40,11 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                     `Poll with ID ${pollId} does not exist.`,
                 );
             }
-            const sqlSelectChoices = SQL`
+            const sqlSelectChoices = sql`
                 SELECT id, choice_name
                 FROM choices
-                WHERE choice_name IN (${SQL.glue(
-                    Object.keys(votes).map((choiceName) => SQL`${choiceName}`),
+                WHERE choice_name IN (${sql.glue(
+                    Object.keys(votes).map((choiceName) => sql`${choiceName}`),
                     ',',
                 )})
                 AND poll_id = ${pollId}
@@ -68,12 +68,12 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 },
                 {},
             );
-            const sqlInsertVotes = SQL`
+            const sqlInsertVotes = sql`
                 INSERT into votes (voter_name, score, poll_id, choice_id)
-                VALUES ${SQL.glue(
+                VALUES ${sql.glue(
                     Object.entries(correctVotes).map(
                         ([id, score]) =>
-                            SQL`(${voterName}, ${score}, ${pollId}, ${id})`,
+                            sql`(${voterName}, ${score}, ${pollId}, ${id})`,
                     ),
                     ',',
                 )}

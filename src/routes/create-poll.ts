@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { Type, Static } from '@sinclair/typebox';
-import SQL from '@nearform/sql';
+import sql from '@nearform/sql';
 import crypto from 'crypto';
 import createError from 'http-errors';
 
@@ -41,7 +41,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             if (choices.length < 2) {
                 throw createError(400, 'Not enough choices.');
             }
-            const sqlFindExisting = SQL`
+            const sqlFindExisting = sql`
                 SELECT id
                 FROM polls
                 WHERE poll_name = ${pollName}`;
@@ -51,7 +51,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             }
             const creatorToken = crypto.randomBytes(32).toString('hex');
 
-            const sqlInsertPoll = SQL`
+            const sqlInsertPoll = sql`
                 INSERT into polls (poll_name, creator_token, max_participants)
                 VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
                 RETURNING *
@@ -61,10 +61,10 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             >(sqlInsertPoll);
             const { id, created_at: createdAt } = createdPolls[0];
 
-            const sqlInsertChoices = SQL`
+            const sqlInsertChoices = sql`
                 INSERT into choices (choice_name, poll_id)
-                VALUES ${SQL.glue(
-                    choices.map((choice) => SQL`(${choice},${id})`),
+                VALUES ${sql.glue(
+                    choices.map((choice) => sql`(${choice},${id})`),
                     ',',
                 )}`;
             await fastify.pg.query(sqlInsertChoices);

@@ -1,21 +1,36 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import FastifyPostgres from 'fastify-postgres';
+import Fastify, {
+    FastifyBaseLogger,
+    FastifyInstance,
+    FastifyTypeProviderDefault,
+} from 'fastify';
+import FastifyPostgres from '@fastify/postgres';
 import dotenv from 'dotenv';
 
 import vote from 'routes/vote';
 import createVote from 'routes/create-poll';
 import results from 'routes/poll';
 import healthCheck from 'routes/health-check';
+import { IncomingMessage, Server, ServerResponse } from 'http';
 
 dotenv.config();
 
 const TIMEOUT = 30 * 1000;
 
-const buildServer = async (): Promise<FastifyInstance> => {
+const buildServer = async (): Promise<
+    FastifyInstance<
+        Server<typeof IncomingMessage, typeof ServerResponse>,
+        IncomingMessage,
+        ServerResponse<IncomingMessage>,
+        FastifyBaseLogger,
+        FastifyTypeProviderDefault
+    >
+> => {
     const fastify = Fastify({
         logger: {
             level: process.env.LOG_LEVEL ?? 'info',
-            prettyPrint: !!(process.env.PRETTY_PRINT === 'true'),
+            transport: {
+                target: 'pino-pretty',
+            },
         },
     });
     await fastify.register(FastifyPostgres, {

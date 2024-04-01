@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
 
- const healthCheck = async (fastify: FastifyInstance) => {
-  fastify.get('/health-check', async (_request, reply) => {
-    reply.send('OK');
-  });
+const healthCheck = async (fastify: FastifyInstance): Promise<void> => {
+    fastify.get('/health-check', async (_request, reply) => {
+        void reply.send('OK');
+    });
 };
 
 export default healthCheck;
