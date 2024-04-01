@@ -77,20 +77,14 @@ module.exports = {
 
         'jest/no-commented-out-tests': ERROR,
 
-        'sql/format': [
-            ERROR,
-            {
-                ignoreExpressions: false,
-                ignoreInline: true,
-                ignoreTagless: true,
-            },
-        ],
         'sql/no-unsafe-query': [
             ERROR,
             {
                 allowLiteral: false,
             },
         ],
+
+        'security/detect-object-injection': OFF,
     },
     overrides: [
         {

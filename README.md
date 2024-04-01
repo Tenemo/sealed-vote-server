@@ -22,20 +22,6 @@ This is the backend server for the [sealed.vote](https://sealed.vote) applicatio
 -   tests
 -   fix 500 when a voter already voted
 
-## Dependencies
-
-This project has a few system dependencies that need to be installed for all features to work correctly:
-
--   **Perl**: Used for SQL formatting scripts. Ensure Perl is installed on your system to utilize to use the `sql/format` ESLint rule.
-
-To check if Perl is installed on your system, run:
-
-```bash
-perl -v
-```
-
-This command should output the version of Perl if it's installed. If Perl is not installed, please refer to the Perl documentation for installation instructions on your operating system.
-
 ## Installation and running
 
 First, clone the repository and install the dependencies:

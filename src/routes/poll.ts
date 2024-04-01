@@ -4,9 +4,11 @@ import sql from '@nearform/sql';
 import createError from 'http-errors';
 import gmean from 'gmean';
 
-const PollRequest = Type.Null();
+const PollParams = Type.Object({
+    pollId: Type.String(),
+});
 
-type PollRequest = Static<typeof PollRequest>;
+type PollParams = Static<typeof PollParams>;
 
 const PollResponse = Type.Object({
     pollName: Type.String(),
@@ -19,7 +21,7 @@ const PollResponse = Type.Object({
 type PollResponse = Static<typeof PollResponse>;
 
 const schema = {
-    body: PollRequest,
+    params: PollParams,
     response: {
         200: PollResponse,
     },
@@ -29,7 +31,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         '/polls/:pollId',
         { schema },
         async (
-            req: FastifyRequest<{ Body: PollRequest }>,
+            req: FastifyRequest<{ Params: PollParams }>,
         ): Promise<PollResponse> => {
             const pollId = (req.params as { pollId: string }).pollId;
             const sqlFindExisting = sql`

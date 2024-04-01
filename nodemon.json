@@ -6,6 +6,6 @@
         "tsconfig.json",
         "package.json"
     ],
-    "exec": "npm run dev",
+    "exec": "npm run start:dev",
     "ignore": ["dist/", "tmp/"]
 }
