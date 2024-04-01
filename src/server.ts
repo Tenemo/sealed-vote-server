@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import vote from 'routes/vote';
 import createVote from 'routes/create-poll';
 import results from 'routes/poll';
+import healthCheck from 'routes/health-check';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ const buildServer = async (): Promise<FastifyInstance> => {
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(createVote, { prefix: '/api' });
     await fastify.register(results, { prefix: '/api' });
+    await fastify.register(healthCheck, { prefix: '/api' });
     return fastify;
 };
 
