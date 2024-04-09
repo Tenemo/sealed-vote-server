@@ -1,13 +1,10 @@
-import { FastifyInstance } from 'fastify';
 import { buildServer } from '../../buildServer';
-import { getUniquePollName } from '../../testUtils';
-
-import { CreatePollResponse } from './create';
+import type { FastifyInstance } from 'fastify';
+import { createPoll, deletePoll, getUniquePollName } from '../../testUtils';
 import { PollResponse } from './fetch';
 
-describe('Polls Endpoint', () => {
+describe('GET /polls/:pollId', () => {
     let fastify: FastifyInstance;
-    let pollId: string;
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -17,41 +14,26 @@ describe('Polls Endpoint', () => {
         await fastify.close();
     });
 
-    const createPoll = async (): Promise<string> => {
-        const pollName = getUniquePollName('Test Poll');
-        const response = await fastify.inject({
-            method: 'POST',
-            url: '/api/polls/create',
-            payload: {
-                choices: ['Option 1', 'Option 2'],
-                pollName,
-            },
-        });
-        const responseBody: CreatePollResponse = JSON.parse(
-            response.body,
-        ) as CreatePollResponse;
-        return responseBody.id;
-    };
+    test('Retrieve poll details successfully', async () => {
+        const pollName = getUniquePollName('GET poll');
+        const { pollId, creatorToken } = await createPoll(fastify, pollName, [
+            'Option 1',
+            'Option 2',
+        ]);
 
-    test('Create a poll for testing', async () => {
-        pollId = await createPoll();
-        expect(pollId).toBeTruthy();
-    });
-
-    test('Retrieve poll details', async () => {
         const response = await fastify.inject({
             method: 'GET',
             url: `/api/polls/${pollId}`,
         });
 
         expect(response.statusCode).toBe(200);
-        const pollDetails: PollResponse = JSON.parse(
-            response.body,
-        ) as PollResponse;
+        const pollDetails = JSON.parse(response.body) as PollResponse;
 
         expect(pollDetails).toHaveProperty('pollName');
-        expect(pollDetails).toHaveProperty('createdAt');
-        expect(pollDetails.choices.length).toBeGreaterThan(0);
+        expect(pollDetails.pollName).toEqual(pollName);
+        expect(pollDetails.choices).toEqual(
+            expect.arrayContaining(['Option 1', 'Option 2']),
+        );
         expect(pollDetails.voters).toEqual([]);
         expect(pollDetails.isOpen).toBe(true);
         expect(pollDetails.publicKeyShares).toEqual([]);
@@ -60,7 +42,24 @@ describe('Polls Endpoint', () => {
         expect(pollDetails.encryptedTallies).toEqual([]);
         expect(pollDetails.decryptionShares).toEqual([]);
         expect(pollDetails.results).toEqual([]);
-    });
 
-    // Add more tests as necessary...
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+    test('Return 400 for non-uuid poll ID', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/polls/non-uuid-poll-id',
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
+    test('Return 404 for non-existing poll', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/48a16d54-1a44-4738-b95e-67083a00e107`,
+        });
+
+        expect(response.statusCode).toBe(404);
+    });
 });

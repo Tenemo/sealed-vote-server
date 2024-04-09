@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { FastifyInstance } from 'fastify';
 import { buildServer } from '../../buildServer';
-import { getUniquePollName } from '../../testUtils';
+import { createPoll, deletePoll, getUniquePollName } from '../../testUtils';
 import { CreatePollResponse } from './create';
 
-describe('CreatePoll Endpoint', () => {
+describe('POST /polls/create', () => {
     let fastify: FastifyInstance;
 
     beforeAll(async () => {
@@ -15,33 +14,29 @@ describe('CreatePoll Endpoint', () => {
         await fastify.close();
     });
 
-    test('Should create a new poll successfully', async () => {
-        const pollName = getUniquePollName('Favorite pet');
-        const response = await fastify.inject({
-            method: 'POST',
-            url: '/api/polls/create',
-            payload: {
-                choices: ['Dog', 'Cat'],
-                pollName,
-            },
+    test('Should create a new poll successfully and then delete it', async () => {
+        const pollName = getUniquePollName('Create poll');
+        const { pollId, creatorToken } = await createPoll(fastify, pollName, [
+            'Dog',
+            'Cat',
+        ]);
+
+        const getResponse = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
         });
 
-        expect(response.statusCode).toBe(200);
-        const responseBody = JSON.parse(response.body) as CreatePollResponse;
+        expect(getResponse.statusCode).toBe(200);
+        const pollDetails = JSON.parse(getResponse.body) as CreatePollResponse;
+        expect(pollDetails.pollName).toContain(pollName);
+        expect(pollDetails.choices).toEqual(['Dog', 'Cat']);
 
-        expect(responseBody.pollName).toBe(pollName);
-        expect(responseBody.choices).toEqual(['Dog', 'Cat']);
-        expect(responseBody.maxParticipants).toBe(20);
-        expect(responseBody.publicKeyShares).toEqual([]);
-        expect(responseBody.commonPublicKey).toBeNull();
-        expect(responseBody.encryptedVotes).toEqual([]);
-        expect(responseBody.encryptedTallies).toEqual([]);
-        expect(responseBody.decryptionShares).toEqual([]);
-        expect(responseBody.results).toEqual([]);
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
     });
 
     test('Should return an error for insufficient choices', async () => {
-        const pollName = getUniquePollName('Insufficient choices');
+        const pollName = getUniquePollName('Create poll');
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
@@ -56,9 +51,14 @@ describe('CreatePoll Endpoint', () => {
         expect(responseBody.message).toBe('Not enough choices.');
     });
 
-    test('Should handle duplicate poll names', async () => {
-        const pollName = getUniquePollName('Favorite beverage');
-        await fastify.inject({
+    test('Should handle duplicate poll names correctly and clean up', async () => {
+        const pollName = getUniquePollName('Create poll');
+        const { pollId, creatorToken } = await createPoll(fastify, pollName, [
+            'Coffee',
+            'Tea',
+        ]);
+
+        const duplicateResponse = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
             payload: {
@@ -67,19 +67,15 @@ describe('CreatePoll Endpoint', () => {
             },
         });
 
-        const response = await fastify.inject({
-            method: 'POST',
-            url: '/api/polls/create',
-            payload: {
-                choices: ['Coffee', 'Tea'],
-                pollName,
-            },
-        });
-
-        expect(response.statusCode).toBe(400);
-        const responseBody = JSON.parse(response.body) as { message: string };
-        expect(responseBody.message).toBe(
+        expect(duplicateResponse.statusCode).toBe(400);
+        const duplicateResponseBody = JSON.parse(duplicateResponse.body) as {
+            message: string;
+        };
+        expect(duplicateResponseBody.message).toBe(
             'Vote with that name already exists.',
         );
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
     });
 });

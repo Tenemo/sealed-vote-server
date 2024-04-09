@@ -8,7 +8,9 @@ import dotenv from 'dotenv';
 
 import vote from './routes/polls/vote';
 import { create } from './routes/polls/create';
-import results from './routes/polls/fetch';
+import { fetch } from './routes/polls/fetch';
+import { deletePoll } from './routes/polls/delete';
+import { register } from './routes/polls/register';
 import healthCheck from './routes/health-check';
 import { IncomingMessage, Server, ServerResponse } from 'http';
 
@@ -20,7 +22,16 @@ const dbConnectionString =
 
 const TIMEOUT = 30 * 1000;
 
-export const buildServer = async (): Promise<
+const logger = {
+    level: process.env.LOG_LEVEL ?? 'info',
+    transport: {
+        target: 'pino-pretty',
+    },
+};
+
+export const buildServer = async (
+    isLoggingEnabled: boolean = false,
+): Promise<
     FastifyInstance<
         Server<typeof IncomingMessage, typeof ServerResponse>,
         IncomingMessage,
@@ -29,17 +40,11 @@ export const buildServer = async (): Promise<
         FastifyTypeProviderDefault
     >
 > => {
-    const logger =
-        process.env.NODE_ENV === 'test'
-            ? false
-            : {
-                  level: process.env.LOG_LEVEL ?? 'info',
-                  transport: {
-                      target: 'pino-pretty',
-                  },
-              };
+    if (!isLoggingEnabled) {
+        isLoggingEnabled = process.env.NODE_ENV !== 'test';
+    }
     const fastify = Fastify({
-        logger,
+        logger: isLoggingEnabled ? logger : false,
     });
     await fastify.register(FastifyPostgres, {
         connectionString: dbConnectionString,
@@ -57,7 +62,9 @@ export const buildServer = async (): Promise<
     });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(create, { prefix: '/api' });
-    await fastify.register(results, { prefix: '/api' });
+    await fastify.register(fetch, { prefix: '/api' });
+    await fastify.register(deletePoll, { prefix: '/api' });
+    await fastify.register(register, { prefix: '/api' });
     await fastify.register(healthCheck, { prefix: '/api' });
     return fastify;
 };

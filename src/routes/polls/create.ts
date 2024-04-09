@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
 import crypto from 'crypto';
@@ -54,6 +54,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
         { schema },
         async (
             req: FastifyRequest<{ Body: CreatePollRequest }>,
+            reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
             const { choices, pollName, maxParticipants = 20 } = req.body;
 
@@ -89,6 +90,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                     ',',
                 )}`;
             await fastify.pg.query(sqlInsertChoices);
+            void reply.code(201);
 
             return {
                 pollName,

@@ -36,7 +36,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             const { rows: polls } = await fastify.pg.query(sqlFindExisting);
             if (!polls.length) {
                 throw createError(
-                    400,
+                    404,
                     `Poll with ID ${pollId} does not exist.`,
                 );
             }

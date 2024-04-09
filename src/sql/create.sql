@@ -18,14 +18,14 @@ CREATE TABLE public_key_shares (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     poll_id uuid NOT NULL,
     public_key_share text NOT NULL,
-    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id)
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE
 );
 
 CREATE TABLE choices (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     choice_name text NOT NULL,
     poll_id uuid NOT NULL,
-    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id),
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE,
     UNIQUE (poll_id, choice_name)
 );
 
@@ -34,7 +34,7 @@ CREATE TABLE voters (
     voter_name text NOT NULL,
     voter_index integer NOT NULL,
     poll_id uuid NOT NULL,
-    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id),
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE,
     UNIQUE (poll_id, voter_name)
 );
 
@@ -43,14 +43,14 @@ CREATE TABLE encrypted_votes (
     c1 text NOT NULL,
     c2 text NOT NULL,
     poll_id uuid NOT NULL,
-    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id)
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE
 );
 
 CREATE TABLE decryption_shares (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     decryption_share text NOT NULL,
     poll_id uuid NOT NULL,
-    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id)
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE
 );
 
 COMMIT;

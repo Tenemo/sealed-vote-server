@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
 import createError from 'http-errors';
+import { uuidRegex } from '../../constants';
 
 const PollParams = Type.Object({
     pollId: Type.String(),
@@ -44,7 +45,7 @@ const schema = {
     },
 };
 
-const vote = async (fastify: FastifyInstance): Promise<void> => {
+export const fetch = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get(
         '/polls/:pollId',
         { schema },
@@ -52,6 +53,9 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Params: PollParams }>,
         ): Promise<PollResponse> => {
             const pollId = (req.params as { pollId: string }).pollId;
+            if (!uuidRegex.test(pollId)) {
+                throw createError(400, 'Invalid poll ID');
+            }
             const sqlFindExisting = sql`
                 SELECT
                     id,
@@ -72,9 +76,10 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 encrypted_tallies: { c1: string; c2: string }[];
                 results: number[];
             }>(sqlFindExisting);
+
             if (!polls.length) {
                 throw createError(
-                    400,
+                    404,
                     `Vote with ID ${pollId} does not exist.`,
                 );
             }
@@ -159,5 +164,3 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         },
     );
 };
-
-export default vote;
