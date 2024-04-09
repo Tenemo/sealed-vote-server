@@ -20,7 +20,7 @@ const schema = {
         200: VoteResponse,
     },
 };
-const vote = async (fastify: FastifyInstance): Promise<void> => {
+export const vote = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
         '/polls/:pollId/vote',
         { schema },
@@ -83,5 +83,3 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         },
     );
 };
-
-export default vote;

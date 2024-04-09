@@ -20,6 +20,9 @@ const schema = {
     body: RegisterRequest,
     response: {
         201: RegisterResponse,
+        400: Type.Object({
+            message: Type.String(),
+        }),
         409: Type.Object({
             message: Type.String(),
         }),
@@ -43,6 +46,28 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                 throw createError(400, 'Invalid poll ID');
             }
 
+            // Check if the poll is open for registration
+            const sqlCheckPollOpen = sql`
+                SELECT is_open
+                FROM polls
+                WHERE id = ${pollId}
+            `;
+            const { rows: pollStatus } = await fastify.pg.query<{
+                is_open: boolean;
+            }>(sqlCheckPollOpen);
+
+            if (pollStatus.length === 0) {
+                throw createError(
+                    404,
+                    `Poll with ID ${pollId} does not exist.`,
+                );
+            }
+
+            if (!pollStatus[0].is_open) {
+                throw createError(400, 'Poll is closed for new registrations.');
+            }
+
+            // Check if the voter name already exists for this poll
             const sqlFindExistingVoter = sql`
                 SELECT id
                 FROM voters
@@ -57,22 +82,21 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                     `Voter name "${voterName}" has already been taken for this vote`,
                 );
             }
-
-            const sqlGetVoterCount = sql`
-                SELECT COUNT(*) AS voter_count
-                FROM voters
-                WHERE poll_id = ${pollId}
-            `;
+            // Calculate the new voter index
             const { rows: voterCounts } = await fastify.pg.query<{
-                voter_count: number;
-            }>(sqlGetVoterCount);
-            const voterIndex = voterCounts[0].voter_count + 1;
+                count: number;
+            }>(sql`
+                SELECT COUNT(*) AS count FROM voters WHERE poll_id = ${pollId}
+            `);
 
-            const sqlInsertVoter = sql`
-                INSERT INTO voters (voter_name, voter_index, poll_id)
-                VALUES (${voterName}, ${voterIndex}, ${pollId})
-            `;
-            await fastify.pg.query(sqlInsertVoter);
+            const voterIndex = voterCounts[0].count + 1; // Assuming the count starts from 0
+
+            // Insert the new voter with voterIndex
+            await fastify.pg.query(sql`
+                INSERT INTO voters (voter_name, poll_id, voter_index)
+                VALUES (${voterName}, ${pollId}, ${voterIndex})
+            `);
+
             void reply.code(201);
 
             return { message: 'Voter registered successfully' };

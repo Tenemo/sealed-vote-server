@@ -1,7 +1,7 @@
 import { buildServer } from './buildServer';
-import dotenv from 'dotenv';
+import { config } from 'dotenv';
 
-dotenv.config();
+config();
 
 const dbConnectionString =
     process.env.DATABASE_URL ??

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 
-const healthCheck = async (fastify: FastifyInstance): Promise<void> => {
+export const healthCheck = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get('/health-check', async (_request, reply) => {
         try {
             await fastify.pg.query('SELECT 1');
@@ -10,5 +10,3 @@ const healthCheck = async (fastify: FastifyInstance): Promise<void> => {
         }
     });
 };
-
-export default healthCheck;

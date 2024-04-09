@@ -4,17 +4,19 @@ import Fastify, {
     FastifyTypeProviderDefault,
 } from 'fastify';
 import FastifyPostgres from '@fastify/postgres';
-import dotenv from 'dotenv';
+import { config } from 'dotenv';
 
-import vote from './routes/polls/vote';
+import { healthCheck } from './routes/health-check';
+import { vote } from './routes/polls/vote';
 import { create } from './routes/polls/create';
 import { fetch } from './routes/polls/fetch';
 import { deletePoll } from './routes/polls/delete';
 import { register } from './routes/polls/register';
-import healthCheck from './routes/health-check';
+import { close } from './routes/polls/close';
+import { publicKeyShare } from './routes/polls/publicKeyShare';
 import { IncomingMessage, Server, ServerResponse } from 'http';
 
-dotenv.config();
+config();
 
 const dbConnectionString =
     process.env.DATABASE_URL ??
@@ -60,11 +62,13 @@ export const buildServer = async (
         idle_in_transaction_session_timeout: TIMEOUT,
         connectionTimeoutMillis: TIMEOUT,
     });
+    await fastify.register(healthCheck, { prefix: '/api' });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(create, { prefix: '/api' });
     await fastify.register(fetch, { prefix: '/api' });
     await fastify.register(deletePoll, { prefix: '/api' });
     await fastify.register(register, { prefix: '/api' });
-    await fastify.register(healthCheck, { prefix: '/api' });
+    await fastify.register(close, { prefix: '/api' });
+    await fastify.register(publicKeyShare, { prefix: '/api' });
     return fastify;
 };

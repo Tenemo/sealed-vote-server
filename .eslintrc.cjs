@@ -26,8 +26,7 @@ module.exports = {
     },
     settings: {
         'import/resolver': {
-            'babel-module': {},
-            typescript: {},
+            typescript: {}, // eslint-import-resolver-typescript
         },
     },
     rules: {
@@ -61,6 +60,7 @@ module.exports = {
                 tsx: 'never',
             },
         ],
+        'import/no-named-as-default-member': OFF,
 
         '@typescript-eslint/explicit-function-return-type': [
             ERROR,

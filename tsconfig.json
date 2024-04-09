@@ -2,9 +2,10 @@
     "compilerOptions": {
         "baseUrl": "./src/",
         "target": "esnext",
-        "module": "commonjs",
+        "module": "esnext",
         "esModuleInterop": true,
         "moduleResolution": "node",
+        "allowArbitraryExtensions": true,
         "removeComments": true,
         "declaration": false,
         "allowSyntheticDefaultImports": true,
@@ -25,8 +26,8 @@
     "include": [
         "src/**/*",
         "config/**/*",
-        ".eslintrc.js",
+        ".eslintrc.cjs",
         "temp/**/*",
-        "jest.config.ts"
+        "vitest.config.ts"
     ]
 }
