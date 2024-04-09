@@ -6,9 +6,9 @@ import Fastify, {
 import FastifyPostgres from '@fastify/postgres';
 import dotenv from 'dotenv';
 
-import vote from 'routes/vote';
-import createVote from 'routes/create-poll';
-import results from 'routes/poll';
+import vote from 'routes/polls/vote';
+import createVote from 'routes/polls/create';
+import results from 'routes/polls/fetch';
 import healthCheck from 'routes/health-check';
 import { IncomingMessage, Server, ServerResponse } from 'http';
 

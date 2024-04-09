@@ -1,38 +1,56 @@
 BEGIN;
 
-CREATE EXTENSION pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE polls (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    poll_name text NOT NULL UNIQUE,
-    creator_token text NOT NULL,
-    max_participants integer NOT NULL DEFAULT 100,
+    poll_name text NOT NULL,
+    creator_token char(64) NOT NULL,
+    max_participants integer NOT NULL DEFAULT 20,
+    is_open boolean NOT NULL DEFAULT true,
+    common_public_key text,
+    encrypted_tallies jsonb[] DEFAULT '{}',
+    results integer[] DEFAULT '{}',
     created_at timestamp NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE public_key_shares (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    poll_id uuid NOT NULL,
+    public_key_share text NOT NULL,
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id)
 );
 
 CREATE TABLE choices (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     choice_name text NOT NULL,
-    created_at timestamp NOT NULL DEFAULT NOW(),
     poll_id uuid NOT NULL,
     CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id),
     UNIQUE (poll_id, choice_name)
 );
 
-CREATE TABLE votes (
+CREATE TABLE voters (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     voter_name text NOT NULL,
-    score integer NOT NULL,
-    CHECK (
-        score BETWEEN 1
-        AND 10
-    ),
-    created_at timestamp NOT NULL DEFAULT NOW(),
+    voter_index integer NOT NULL,
     poll_id uuid NOT NULL,
     CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id),
-    choice_id uuid NOT NULL,
-    CONSTRAINT fk_choice_id FOREIGN KEY (choice_id) REFERENCES choices (id),
-    UNIQUE (poll_id, choice_id, voter_name)
+    UNIQUE (poll_id, voter_name)
+);
+
+CREATE TABLE encrypted_votes (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    c1 text NOT NULL,
+    c2 text NOT NULL,
+    poll_id uuid NOT NULL,
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id)
+);
+
+CREATE TABLE decryption_shares (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    decryption_share text NOT NULL,
+    poll_id uuid NOT NULL,
+    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id)
 );
 
 COMMIT;

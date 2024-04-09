@@ -36,7 +36,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
         async (
             req: FastifyRequest<{ Body: CreatePollRequest }>,
         ): Promise<CreatePollResponse> => {
-            const { choices, pollName, maxParticipants = 100 } = req.body;
+            const { choices, pollName, maxParticipants = 20 } = req.body;
 
             if (choices.length < 2) {
                 throw createError(400, 'Not enough choices.');

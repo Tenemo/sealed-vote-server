@@ -2,6 +2,8 @@
 
 This is the backend server for the [sealed.vote](https://sealed.vote) application, built using Fastify. It is designed to handle the creation and management of polls, where users can vote on various options, and the results are calculated using geometric mean for fairness and anonymity.
 
+[Endpoint documentation](docs/endpoints.md)
+
 ## Features
 
 -   Creation of polls with a customizable number of choices.
