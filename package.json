@@ -30,7 +30,7 @@
         "lint:fix": "eslint . --ext js,ts --fix",
         "postinstall": "husky install",
         "tsc": "tsc",
-        "test": "cross-env NODE_ENV=test jest --config=jest.config.ts",
+        "test": "cross-env NODE_ENV=test jest --verbose",
         "test:coverage": "npm run test -- --coverage",
         "test:watch": "npm run test -- --watch"
     },

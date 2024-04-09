@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FastifyInstance } from 'fastify';
 import { buildServer } from '../../buildServer';
-
-const uniquePollName = (baseName: string): string =>
-    `${baseName}-${Date.now()}`;
+import { getUniquePollName } from '../../testUtils';
+import { CreatePollResponse } from './create';
 
 describe('CreatePoll Endpoint', () => {
     let fastify: FastifyInstance;
@@ -17,7 +16,7 @@ describe('CreatePoll Endpoint', () => {
     });
 
     test('Should create a new poll successfully', async () => {
-        const pollName = uniquePollName('Favorite pet'); // Generate unique name
+        const pollName = getUniquePollName('Favorite pet');
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
@@ -28,21 +27,11 @@ describe('CreatePoll Endpoint', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const responseBody = JSON.parse(response.body) as {
-            pollName: string;
-            choices: string[];
-            maxParticipants: number;
-            publicKeyShares: string[];
-            commonPublicKey: string | null;
-            encryptedVotes: any[];
-            encryptedTallies: any[];
-            decryptionShares: any[];
-            results: any[];
-        };
+        const responseBody = JSON.parse(response.body) as CreatePollResponse;
 
         expect(responseBody.pollName).toBe(pollName);
         expect(responseBody.choices).toEqual(['Dog', 'Cat']);
-        expect(responseBody.maxParticipants).toBe(20); // default value
+        expect(responseBody.maxParticipants).toBe(20);
         expect(responseBody.publicKeyShares).toEqual([]);
         expect(responseBody.commonPublicKey).toBeNull();
         expect(responseBody.encryptedVotes).toEqual([]);
@@ -52,7 +41,7 @@ describe('CreatePoll Endpoint', () => {
     });
 
     test('Should return an error for insufficient choices', async () => {
-        const pollName = uniquePollName('Insufficient choices');
+        const pollName = getUniquePollName('Insufficient choices');
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
@@ -68,7 +57,7 @@ describe('CreatePoll Endpoint', () => {
     });
 
     test('Should handle duplicate poll names', async () => {
-        const pollName = uniquePollName('Favorite beverage');
+        const pollName = getUniquePollName('Favorite beverage');
         await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',

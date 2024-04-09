@@ -35,7 +35,7 @@ const PollResponse = Type.Object({
     results: Type.Array(Type.Number()),
 });
 
-type PollResponse = Static<typeof PollResponse>;
+export type PollResponse = Static<typeof PollResponse>;
 
 const schema = {
     params: PollParams,
