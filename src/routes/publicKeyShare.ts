@@ -3,7 +3,7 @@ import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
 import createError from 'http-errors';
 import { combinePublicKeys } from 'threshold-elgamal';
-import { uuidRegex } from '../../constants';
+import { uuidRegex } from '../constants';
 
 const PublicKeyShareRequest = Type.Object({
     publicKeyShare: Type.String(),
@@ -94,11 +94,11 @@ export const publicKeyShare = async (
                 WHERE poll_id = ${pollId}
             `;
             const { rows: votersCounts } = await fastify.pg.query<{
-                voters_count: number;
+                voters_count: string;
             }>(sqlGetVotersCount);
             const votersCount = votersCounts[0].voters_count;
 
-            if (publicKeyShares.length === votersCount) {
+            if (publicKeyShares.length === Number(votersCount)) {
                 const publicKeySharesBigInt = publicKeyShares.map(
                     ({ public_key_share }) => BigInt(public_key_share),
                 );

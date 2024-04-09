@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { buildServer } from '../../buildServer';
-import { createPoll, deletePoll } from '../../testUtils';
+import { buildServer } from '../buildServer';
+import { createPoll, deletePoll } from '../testUtils';
 import { ClosePollResponse } from './close';
 import { PollResponse } from './fetch';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';

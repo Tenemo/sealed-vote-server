@@ -1,14 +1,10 @@
 import { FastifyInstance } from 'fastify';
-import { buildServer } from '../../buildServer';
-import {
-    createPoll,
-    deletePoll,
-    registerVoter,
-    closePoll,
-} from '../../testUtils';
+import { buildServer } from '../buildServer';
+import { createPoll, deletePoll, registerVoter, closePoll } from '../testUtils';
 import { PublicKeyShareResponse } from './publicKeyShare';
 import { generateKeys } from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { PollResponse } from './fetch';
 
 describe('POST /polls/:pollId/public-key-share', () => {
     let fastify: FastifyInstance;
@@ -86,7 +82,7 @@ describe('POST /polls/:pollId/public-key-share', () => {
         );
     });
 
-    test('should combine public keys when all voters have submitted in a closed poll', async () => {
+    test('should combine public keys when all voters have submitted in a closed poll, and verify combined public key', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         await registerVoter(fastify, pollId, 'Alice');
         await registerVoter(fastify, pollId, 'Bob');
@@ -105,7 +101,7 @@ describe('POST /polls/:pollId/public-key-share', () => {
             },
         });
 
-        const response = await fastify.inject({
+        await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/public-key-share`,
             payload: {
@@ -113,13 +109,18 @@ describe('POST /polls/:pollId/public-key-share', () => {
             },
         });
 
-        expect(response.statusCode).toBe(201);
-        const responseBody = JSON.parse(
-            response.body,
-        ) as PublicKeyShareResponse;
-        expect(responseBody.message).toBe(
-            'Public key share submitted successfully',
-        );
+        // Fetch the poll to check for the combined public key
+        const getPollResponse = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
+        });
+
+        expect(getPollResponse.statusCode).toBe(200);
+        const getPollResponseBody = JSON.parse(
+            getPollResponse.body,
+        ) as PollResponse;
+        expect(getPollResponseBody.commonPublicKey).not.toBeNull();
+        expect(getPollResponseBody.commonPublicKey).toBeDefined();
 
         await deletePoll(fastify, pollId, creatorToken);
     });

@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { buildServer } from '../../buildServer';
+import { buildServer } from '../buildServer';
 import {
     createPoll,
     deletePoll,
     closePoll,
     registerVoter,
     getUniquePollName,
-} from '../../testUtils';
+} from '../testUtils';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 describe('Register voter endpoint', () => {

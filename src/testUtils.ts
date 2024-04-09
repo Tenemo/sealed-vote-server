@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import type { CreatePollResponse } from 'routes/polls/create';
-import type { RegisterResponse } from 'routes/polls/register';
-import type { PublicKeyShareResponse } from 'routes/polls/publicKeyShare';
+import type { CreatePollResponse } from 'routes/create';
+import type { RegisterResponse } from 'routes/register';
+import type { PublicKeyShareResponse } from 'routes/publicKeyShare';
 
 export const getUniquePollName = (baseName?: string): string => {
     const randomHex = Math.random().toString(16).slice(2, 10);

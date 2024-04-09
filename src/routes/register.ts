@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
 import createError from 'http-errors';
-import { uuidRegex } from '../../constants';
+import { uuidRegex } from '../constants';
 
 const RegisterRequest = Type.Object({
     voterName: Type.String(),

@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
 import createError from 'http-errors';
-import { uuidRegex } from '../../constants';
+import { uuidRegex } from '../constants';
 
 const ClosePollParams = Type.Object({
     pollId: Type.String(),

@@ -1,6 +1,6 @@
-import { buildServer } from '../../buildServer';
+import { buildServer } from '../buildServer';
 import type { FastifyInstance } from 'fastify';
-import { createPoll, deletePoll, getUniquePollName } from '../../testUtils';
+import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
 import { PollResponse } from './fetch';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 

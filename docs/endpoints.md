@@ -21,7 +21,7 @@
             "maxParticipants": 20,
             "id": "Poll Unique ID",
             "publicKeyShares": [],
-            "publicKey": null,
+            "commonPublicKey": null,
             "encryptedVotes": [],
             "encryptedTallies": [],
             "decryptionShares": [],
