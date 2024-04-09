@@ -19,6 +19,24 @@ const CreatePollResponse = Type.Object({
     maxParticipants: Type.Number(),
     id: Type.String(),
     createdAt: Type.String(),
+    publicKeyShares: Type.Array(Type.String()),
+    commonPublicKey: Type.Union([Type.String(), Type.Null()]),
+    encryptedVotes: Type.Array(
+        Type.Array(
+            Type.Object({
+                c1: Type.String(),
+                c2: Type.String(),
+            }),
+        ),
+    ),
+    encryptedTallies: Type.Array(
+        Type.Object({
+            c1: Type.String(),
+            c2: Type.String(),
+        }),
+    ),
+    decryptionShares: Type.Array(Type.Array(Type.String())),
+    results: Type.Array(Type.Number()),
 });
 
 export type CreatePollResponse = Static<typeof CreatePollResponse>;
@@ -29,6 +47,7 @@ const schema = {
         200: CreatePollResponse,
     },
 };
+
 const vote = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
         '/polls/create',
@@ -41,6 +60,7 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             if (choices.length < 2) {
                 throw createError(400, 'Not enough choices.');
             }
+
             const sqlFindExisting = sql`
                 SELECT id
                 FROM polls
@@ -49,13 +69,14 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
             if (polls.length) {
                 throw createError(400, 'Vote with that name already exists.');
             }
+
             const creatorToken = crypto.randomBytes(32).toString('hex');
 
             const sqlInsertPoll = sql`
                 INSERT into polls (poll_name, creator_token, max_participants)
                 VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
                 RETURNING *
-                `;
+            `;
             const { rows: createdPolls } = await fastify.pg.query<
                 CreatePollResponse & { created_at: string }
             >(sqlInsertPoll);
@@ -76,6 +97,12 @@ const vote = async (fastify: FastifyInstance): Promise<void> => {
                 maxParticipants,
                 id,
                 createdAt,
+                publicKeyShares: [],
+                commonPublicKey: null,
+                encryptedVotes: [],
+                encryptedTallies: [],
+                decryptionShares: [],
+                results: [],
             };
         },
     );

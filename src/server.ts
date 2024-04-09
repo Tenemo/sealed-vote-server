@@ -14,6 +14,10 @@ import { IncomingMessage, Server, ServerResponse } from 'http';
 
 dotenv.config();
 
+const dbConnectionString =
+    process.env.DATABASE_URL ??
+    'postgres://postgres:postgres@localhost:5432/sv-db';
+
 const TIMEOUT = 30 * 1000;
 
 const buildServer = async (): Promise<
@@ -34,12 +38,13 @@ const buildServer = async (): Promise<
         },
     });
     await fastify.register(FastifyPostgres, {
-        connectionString:
-            process.env.DATABASE_URL ??
-            'postgres://postgres:postgres@localhost:5432/sv-db',
-        ssl: {
-            rejectUnauthorized: false,
-        },
+        connectionString: dbConnectionString,
+        ssl:
+            process.env.NODE_ENV === 'development'
+                ? false
+                : {
+                      rejectUnauthorized: false,
+                  },
         statement_timeout: TIMEOUT,
         query_timeout: TIMEOUT,
         idle_in_transaction_session_timeout: TIMEOUT,
@@ -57,8 +62,16 @@ const start = async (): Promise<void> => {
 
     try {
         await fastify.listen(process.env.PORT ?? 4000, '0.0.0.0');
+        fastify.log.info('Server started successfully.');
+        fastify.log.info(`Connected to database: ${dbConnectionString}`);
+
+        const dbClient = await fastify.pg.connect();
+        dbClient.release();
+        fastify.log.info('Database connection successful.');
     } catch (err) {
-        fastify.log.error(err);
+        if (err instanceof Error) {
+            fastify.log.error(`Server start error: ${err.message}`);
+        }
         process.exit(1);
     }
 };
