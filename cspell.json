@@ -1,0 +1,33 @@
+{
+    "version": "0.2",
+    "ignorePaths": [
+        "node_modules",
+        ".git"
+    ],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "asvetliakov",
+        "autoinstaller",
+        "coenraad",
+        "dbaeumer",
+        "eamodio",
+        "esbenp",
+        "formulahendry",
+        "gitlens",
+        "gmean",
+        "jpoissonnier",
+        "jvitor",
+        "kohler",
+        "msjsdiag",
+        "pgcrypto",
+        "pmmmwh",
+        "psql",
+        "sourcemap",
+        "streetsidesoftware",
+        "teamsupercell",
+        "wojtekmaj"
+    ],
+    "ignoreWords": [],
+    "import": []
+}

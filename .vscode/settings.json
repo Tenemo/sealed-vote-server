@@ -38,27 +38,5 @@
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "never"
     },
-
-    "workbench.iconTheme": "vscode-icons",
-    "cSpell.ignorePaths": ["node_modules", ".git"],
-    "cSpell.words": [
-        "asvetliakov",
-        "autoinstaller",
-        "coenraad",
-        "dbaeumer",
-        "eamodio",
-        "esbenp",
-        "formulahendry",
-        "gitlens",
-        "gmean",
-        "jpoissonnier",
-        "jvitor",
-        "kohler",
-        "msjsdiag",
-        "pmmmwh",
-        "sourcemap",
-        "streetsidesoftware",
-        "teamsupercell",
-        "wojtekmaj"
-    ]
+    "workbench.iconTheme": "vscode-icons"
 }
