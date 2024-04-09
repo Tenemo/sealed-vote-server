@@ -94,7 +94,7 @@ module.exports = {
             },
         },
         {
-            files: '*.spec.tsx',
+            files: '*.test.ts',
             rules: {
                 '@typescript-eslint/ban-ts-comment': OFF,
             },

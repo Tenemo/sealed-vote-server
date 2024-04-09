@@ -22,5 +22,11 @@
     "ts-node": {
         "require": ["tsconfig-paths/register"]
     },
-    "include": ["src/**/*", "config/**/*", ".eslintrc.js", "temp/**/*"]
+    "include": [
+        "src/**/*",
+        "config/**/*",
+        ".eslintrc.js",
+        "temp/**/*",
+        "jest.config.ts"
+    ]
 }
