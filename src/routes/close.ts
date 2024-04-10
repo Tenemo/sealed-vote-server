@@ -72,7 +72,7 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                 if (rows.length === 0 || rows[0].voter_count <= 1) {
                     throw createError(
                         400,
-                        'Poll not found, unauthorized access, or not enough voters to close the poll.',
+                        'Not enough voters to close the poll.',
                     );
                 }
 

@@ -62,9 +62,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(400);
         expect(
             (JSON.parse(closeResponse.body) as ClosePollResponse).message,
-        ).toBe(
-            'Poll not found, unauthorized access, or not enough voters to close the poll.',
-        );
+        ).toBe('Not enough voters to close the poll.');
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -83,9 +81,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(400);
         expect(
             (JSON.parse(closeResponse.body) as ClosePollResponse).message,
-        ).toBe(
-            'Poll not found, unauthorized access, or not enough voters to close the poll.',
-        );
+        ).toBe('Not enough voters to close the poll.');
 
         await deletePoll(fastify, pollId, creatorToken);
     });
