@@ -1,5 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import { generateKeys, encrypt } from 'threshold-elgamal';
+import {
+    generateKeys,
+    encrypt,
+    serializeEncryptedMessage,
+} from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
@@ -11,7 +15,6 @@ import {
     publicKeyShare,
     getUniquePollName,
 } from '../testUtils';
-import { serializeEncryptedMessage } from '../utils';
 
 import { PollResponse } from './fetch';
 

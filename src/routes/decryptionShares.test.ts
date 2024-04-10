@@ -3,6 +3,8 @@ import {
     createDecryptionShare,
     encrypt,
     generateKeys,
+    serializeEncryptedMessage,
+    deserializeEncryptedMessage,
 } from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -17,10 +19,6 @@ import {
     decryptionShares,
     getUniquePollName,
 } from '../testUtils';
-import {
-    serializeEncryptedMessage,
-    deserializeEncryptedMessage,
-} from '../utils';
 
 import { PollResponse } from './fetch';
 

@@ -2,10 +2,13 @@ import sql from '@nearform/sql';
 import { Type, Static } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
-import { thresholdDecrypt, combineDecryptionShares } from 'threshold-elgamal';
+import {
+    thresholdDecrypt,
+    combineDecryptionShares,
+    deserializeEncryptedMessage,
+} from 'threshold-elgamal';
 
 import { uuidRegex } from '../constants';
-import { deserializeEncryptedMessage } from '../utils';
 
 const calculateAndStoreResults = async (
     fastify: FastifyInstance,
