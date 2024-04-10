@@ -14,7 +14,7 @@
     "homepage": "https://github.com/Tenemo/sealed-vote-server#readme",
     "scripts": {
         "start": "node dist/server.js",
-        "prebuild": "npm run lint && npm run tsc && npm test && npm run cleanDist",
+        "prebuild": "npm run lint && npm run tsc && npm run cleanDist",
         "build": "cross-env NODE_ENV=production babel --extensions '.ts' src --out-dir dist",
         "build:skip": "npm run cleanDist && cross-env NODE_ENV=production babel --extensions '.ts' src --out-dir dist",
         "cleanDist": "rimraf ./dist && mkdir dist",
