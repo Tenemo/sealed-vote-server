@@ -214,7 +214,7 @@ describe('E2E voting test', () => {
             bobChosenScores.length,
         );
     });
-    test('Should calculate the final results and compare with expected ones', async () => {
+    test('The final results match with the expected, plaintext ones', async () => {
         const response = await fastify.inject({
             method: 'GET',
             url: `/api/polls/${pollId}`,

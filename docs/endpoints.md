@@ -1,25 +1,26 @@
 # Sealed Vote Server API Endpoints
 
-## Create Vote
+## Create Poll
 
--   **POST** `/polls/create`
-    -   **Description**: Create a new poll with given options.
+-   **POST** `/api/polls/create`
+    -   **Description**: Create a new poll with the specified options.
     -   **Request Body**:
         ```json
         {
             "choices": ["Option1", "Option2", "Option3"],
-            "pollName": "Poll Name"
+            "pollName": "Poll Name",
+            "maxParticipants": 20
         }
         ```
     -   **Response**:
         ```json
         {
-            "createdAt": "Timestamp",
             "pollName": "Poll Name",
             "creatorToken": "Creator's Unique Token",
             "choices": ["Option1", "Option2", "Option3"],
             "maxParticipants": 20,
             "id": "Poll Unique ID",
+            "createdAt": "Timestamp",
             "publicKeyShares": [],
             "commonPublicKey": null,
             "encryptedVotes": [],
@@ -31,84 +32,87 @@
 
 ## Register Voter
 
--   **POST** `/polls/{pollId}/register`
-    -   **Description**: Register a voter for a poll.
+-   **POST** `/api/polls/:pollId/register`
+    -   **Description**: Register a voter for the specified poll.
     -   **Request Body**:
         ```json
         {
             "voterName": "Voter Name"
         }
         ```
-    -   **Response**: `201 Created` or `409 Conflict`
+    -   **Response**: `201 Created` on success.
 
-## Close Vote
+## Close Poll
 
--   **POST** `/polls/{pollId}/close`
-    -   **Description**: Close the voting period for a poll.
+-   **POST** `/api/polls/:pollId/close`
+    -   **Description**: Close the poll for new votes.
     -   **Request Body**:
         ```json
         {
-            "creatorToken": "creatorToken"
+            "creatorToken": "Creator's Unique Token"
         }
         ```
-    -   **Response**: Status indicating the poll has been closed.
+    -   **Response**: `200 OK` on success.
 
-## Get Poll
+## Fetch Poll Details
 
--   **GET** `/polls/{pollId}`
-    -   **Description**: Retrieve poll details and current state.
+-   **GET** `/api/polls/:pollId`
+    -   **Description**: Retrieve details of a specific poll.
     -   **Response**:
         ```json
         {
             "pollName": "Poll Name",
             "createdAt": "Timestamp",
             "choices": ["Option1", "Option2", "Option3"],
-            "voters": ["Voter1", "Voter2"],
+            "voters": ["Alice", "Bob"],
             "isOpen": false,
-            "publicKeyShares": [],
-            "commonPublicKey": null,
-            "encryptedVotes": [],
-            "encryptedTallies": [],
-            "decryptionShares": [],
-            "results": []
+            "publicKeyShares": ["PublicKeyShare1", "PublicKeyShare2"],
+            "commonPublicKey": "CommonPublicKey",
+            "encryptedVotes": [["Vote1", "Vote2"]],
+            "encryptedTallies": ["Tally1", "Tally2"],
+            "decryptionShares": [["Share1", "Share2"]],
+            "results": [10, 20, 30]
         }
         ```
 
 ## Submit Public Key Share
 
--   **POST** `/polls/{pollId}/public-key-share`
-    -   **Description**: Submit a public key share for threshold decryption.
+-   **POST** `/api/polls/:pollId/public-key-share`
+    -   **Description**: Submit a public key share for the poll.
     -   **Request Body**:
         ```json
         {
-            "publicKeyShare": "21398178914123...n"
+            "publicKeyShare": "PublicKeyShare"
         }
         ```
-    -   **Response**: Acknowledgement of submission.
+    -   **Response**: `201 Created` on success.
 
 ## Vote
 
--   **POST** `/polls/{pollId}/vote`
+-   **POST** `/api/polls/:pollId/vote`
     -   **Description**: Submit encrypted votes for a poll.
     -   **Request Body**:
         ```json
         {
             "votes": [
-                { "c1": "Encrypted Value", "c2": "Encrypted Value" },
-                { "c1": "Encrypted Value", "c2": "Encrypted Value" }
+                { "c1": "EncryptedValue1", "c2": "EncryptedValue2" },
+                { "c1": "EncryptedValue3", "c2": "EncryptedValue4" }
             ]
         }
         ```
-    -   **Response**: Acknowledgement of vote submission.
+    -   **Response**: `200 OK` on success.
 
-## Submit Decryption Share
+## Submit Decryption Shares
 
--   **POST** `/polls/{pollId}/decryption-shares`
-    -   **Description**: Submit decryption shares for tally decryption.
+-   **POST** `/api/polls/:pollId/decryption-shares`
+    -   **Description**: Submit decryption shares for vote tallying.
     -   **Request Body**:
         ```json
         {
-            "decryptionShares": ["Decryption Share", "Decryption Share"]
+            "decryptionShares": [
+                ["Share1", "Share2"],
+                ["Share3", "Share4"]
+            ]
         }
         ```
-    -   **Response**: Acknowledgement of submission.
+    -   **Response**: `201 Created` on success.
