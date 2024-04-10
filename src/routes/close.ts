@@ -66,10 +66,10 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
             `;
                 const { rows } = await fastify.pg.query<{
                     id: string;
-                    voter_count: number;
+                    voter_count: string;
                 }>(sqlVerifyPollAndCountVoters);
 
-                if (rows.length === 0 || rows[0].voter_count <= 1) {
+                if (rows.length === 0 || Number(rows[0].voter_count) <= 1) {
                     throw createError(
                         400,
                         'Not enough voters to close the poll.',

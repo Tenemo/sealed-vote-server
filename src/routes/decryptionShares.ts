@@ -63,7 +63,7 @@ const calculateAndStoreResults = async (
 };
 
 const DecryptionSharesRequest = Type.Object({
-    decryptionShares: Type.Array(Type.Array(Type.String())),
+    decryptionShares: Type.Array(Type.String()),
 });
 
 type DecryptionSharesRequest = Static<typeof DecryptionSharesRequest>;

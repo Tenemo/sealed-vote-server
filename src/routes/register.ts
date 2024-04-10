@@ -92,12 +92,12 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                 }
                 // Calculate the new voter index
                 const { rows: voterCounts } = await fastify.pg.query<{
-                    count: number;
+                    count: string;
                 }>(sql`
                 SELECT COUNT(*) AS count FROM voters WHERE poll_id = ${pollId}
             `);
 
-                const voterIndex = voterCounts[0].count + 1; // Assuming the count starts from 0
+                const voterIndex = Number(voterCounts[0].count) + 1; // Assuming the count starts from 0
 
                 // Insert the new voter with voterIndex
                 await fastify.pg.query(sql`
