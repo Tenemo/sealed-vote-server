@@ -15,7 +15,7 @@
     "scripts": {
         "prepare": "husky install && ts-patch install -s",
         "start": "node dist/server",
-        "prebuild": "npm run lint && npm run tsc && npm run del-cli dist",
+        "prebuild": "npm run lint && npm run tsc && del-cli dist",
         "build": "tsc --project tsconfig.build.json",
         "build:skip": "del-cli dist && tsc --project tsconfig.build.json",
         "cleanDist": "rimraf ./dist && mkdir dist",
