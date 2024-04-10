@@ -1,6 +1,6 @@
 {
     "name": "sealed-vote-server",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "description": "sealed-vote-server",
     "repository": {
         "type": "git",
@@ -13,10 +13,11 @@
     },
     "homepage": "https://github.com/Tenemo/sealed-vote-server#readme",
     "scripts": {
-        "start": "node dist/server.js",
-        "prebuild": "npm run lint && npm run tsc && npm run cleanDist",
-        "build": "cross-env NODE_ENV=production babel --extensions '.ts' src --out-dir dist",
-        "build:skip": "npm run cleanDist && cross-env NODE_ENV=production babel --extensions '.ts' src --out-dir dist",
+        "prepare": "husky install && ts-patch install -s",
+        "start": "node dist/server",
+        "prebuild": "npm run lint && npm run tsc && npm run del-cli dist",
+        "build": "tsc --project tsconfig.build.json",
+        "build:skip": "del-cli dist && tsc --project tsconfig.build.json",
         "cleanDist": "rimraf ./dist && mkdir dist",
         "start:dev": "cross-env NODE_ENV=development tsx src/server.ts",
         "dev": "cross-env NODE_ENV=development nodemon",
@@ -28,7 +29,6 @@
         "deploy": "git push heroku master",
         "lint": "eslint . --ext js,ts",
         "lint:fix": "eslint . --ext js,ts --fix",
-        "postinstall": "husky install",
         "tsc": "tsc",
         "test": "cross-env NODE_ENV=test vitest run --reporter verbose",
         "test:watch": "vitest watch --clearScreen"
@@ -48,15 +48,9 @@
         "fluent-json-schema": "^4.2.1",
         "http-errors": "^2.0.0",
         "pino-pretty": "^11.0.0",
-        "rimraf": "^5.0.5",
         "threshold-elgamal": "^0.1.33"
     },
     "devDependencies": {
-        "@babel/cli": "^7.24.1",
-        "@babel/core": "^7.24.4",
-        "@babel/node": "^7.23.9",
-        "@babel/preset-env": "^7.24.4",
-        "@babel/preset-typescript": "^7.24.1",
         "@types/eslint": "^8.56.7",
         "@types/eslint-plugin-prettier": "^3.1.3",
         "@types/http-errors": "^2.0.4",
@@ -66,8 +60,8 @@
         "@types/prettier": "^2.7.3",
         "@typescript-eslint/eslint-plugin": "^7.6.0",
         "@typescript-eslint/parser": "^7.6.0",
-        "babel-plugin-module-resolver": "^5.0.0",
         "core-js": "^3.36.1",
+        "del-cli": "^5.1.0",
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-import-resolver-typescript": "^3.6.1",
@@ -78,9 +72,11 @@
         "eslint-plugin-sql": "2.5.0",
         "husky": "^9.0.11",
         "nodemon": "^3.1.0",
+        "ts-patch": "^3.1.2",
         "tsconfig-paths": "^4.2.0",
         "tsx": "^4.7.2",
         "typescript": "^5.4.4",
+        "typescript-transformer-esm": "^1.1.0",
         "vitest": "^1.4.0",
         "wait-on": "^7.2.0"
     }

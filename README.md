@@ -79,7 +79,6 @@ This will set up the PostgreSQL database and the application in containers.
     -   `typings/`: Custom type definitions.
         -   `gmean.d.ts`: Type definitions for the `gmean` package.
 -   `config/`: Configuration files for various tools used in the project.
-    -   `.babelrc.js`: Babel configuration for transpiling TypeScript.
     -   `.editorconfig`: Maintains consistent coding styles for various editors and IDEs.
     -   `.eslintrc.js`: ESLint configuration for linting and code quality checks.
     -   `.eslintignore`: Specifies files and directories that ESLint should ignore.
