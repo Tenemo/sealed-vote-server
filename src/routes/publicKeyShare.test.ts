@@ -41,7 +41,8 @@ describe('POST /polls/:pollId/public-key-share', () => {
             'Public key share submitted successfully',
         );
 
-        await deletePoll(fastify, pollId, creatorToken);
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
     });
 
     test('should return 400 for invalid poll ID after poll closure', async () => {
@@ -122,6 +123,7 @@ describe('POST /polls/:pollId/public-key-share', () => {
         expect(getPollResponseBody.commonPublicKey).not.toBeNull();
         expect(getPollResponseBody.commonPublicKey).toBeDefined();
 
-        await deletePoll(fastify, pollId, creatorToken);
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
     });
 });

@@ -35,31 +35,38 @@ export const deletePoll = async (fastify: FastifyInstance): Promise<void> => {
                 Body: DeletePollBody;
             }>,
         ) => {
-            const { pollId } = req.params;
-            const { creatorToken } = req.body;
-            if (!uuidRegex.test(pollId)) {
-                throw createError(400, 'Invalid poll ID');
-            }
+            try {
+                const { pollId } = req.params;
+                const { creatorToken } = req.body;
+                if (!uuidRegex.test(pollId)) {
+                    throw createError(400, 'Invalid poll ID');
+                }
 
-            const sqlVerifyPoll = sql`
+                const sqlVerifyPoll = sql`
             SELECT id FROM polls
             WHERE id = ${pollId} AND creator_token = ${creatorToken}
         `;
-            const { rowCount: pollExists } =
-                await fastify.pg.query(sqlVerifyPoll);
-            if (!pollExists) {
-                throw createError(
-                    404,
-                    'Poll not found or unauthorized access.',
-                );
-            }
+                const { rowCount: pollExists } =
+                    await fastify.pg.query(sqlVerifyPoll);
+                if (!pollExists) {
+                    throw createError(
+                        404,
+                        'Poll not found or unauthorized access.',
+                    );
+                }
 
-            const sqlDeletePoll = sql`
+                const sqlDeletePoll = sql`
             DELETE FROM polls WHERE id = ${pollId}
         `;
-            await fastify.pg.query(sqlDeletePoll);
+                await fastify.pg.query(sqlDeletePoll);
 
-            return { message: 'Poll deleted successfully' };
+                return { message: 'Poll deleted successfully' };
+            } catch (error) {
+                if (!(error instanceof createError.HttpError)) {
+                    console.error(error);
+                }
+                throw error;
+            }
         },
     );
 };

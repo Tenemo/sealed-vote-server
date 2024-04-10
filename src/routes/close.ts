@@ -35,33 +35,39 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                 Body: ClosePollBody;
             }>,
         ): Promise<ClosePollResponse> => {
-            const { pollId } = req.params;
-            const { creatorToken } = req.body;
+            try {
+                const { pollId } = req.params;
+                const { creatorToken } = req.body;
 
-            if (!uuidRegex.test(pollId)) {
-                throw createError(400, 'Invalid poll ID');
-            }
+                if (!uuidRegex.test(pollId)) {
+                    throw createError(400, 'Invalid poll ID');
+                }
 
-            const sqlVerifyPoll = sql`
+                const sqlVerifyPoll = sql`
                 SELECT id FROM polls
                 WHERE id = ${pollId} AND creator_token = ${creatorToken}
             `;
-            const { rowCount: pollExists } =
-                await fastify.pg.query(sqlVerifyPoll);
-            if (!pollExists) {
-                throw createError(
-                    404,
-                    'Poll not found or unauthorized access.',
-                );
-            }
+                const { rowCount: pollExists } =
+                    await fastify.pg.query(sqlVerifyPoll);
+                if (!pollExists) {
+                    throw createError(
+                        404,
+                        'Poll not found or unauthorized access.',
+                    );
+                }
 
-            const sqlClosePoll = sql`
+                const sqlClosePoll = sql`
                 UPDATE polls SET is_open = false
                 WHERE id = ${pollId}
             `;
-            await fastify.pg.query(sqlClosePoll);
+                await fastify.pg.query(sqlClosePoll);
 
-            return { message: 'Poll closed successfully' };
+                return { message: 'Poll closed successfully' };
+            } catch (error) {
+                if (!(error instanceof createError.HttpError))
+                    console.error(error);
+                throw error;
+            }
         },
     );
 };

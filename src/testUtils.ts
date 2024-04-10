@@ -23,7 +23,7 @@ export const createPoll = async (
         url: 'api/polls/create',
         payload: {
             choices: choices ?? ['Option 1', 'Option 2'],
-            pollName: pollName ?? `Test poll ${Date.now()}`,
+            pollName: pollName ?? `Test poll ${getUniquePollName()}`,
             maxParticipants: 10,
         },
     });
@@ -125,6 +125,29 @@ export const publicKeyShare = async (
             response.body,
         ) as PublicKeyShareResponse;
         return { success: true, message: responseBody.message };
+    } else {
+        const responseBody = JSON.parse(response.body) as { message: string };
+        return { success: false, message: responseBody.message };
+    }
+};
+export const vote = async (
+    fastify: FastifyInstance,
+    pollId: string,
+    votes: Array<{ c1: string; c2: string }>,
+): Promise<{
+    success: boolean;
+    message?: string;
+}> => {
+    const response = await fastify.inject({
+        method: 'POST',
+        url: `/api/polls/${pollId}/vote`,
+        payload: {
+            votes,
+        },
+    });
+
+    if (response.statusCode === 200) {
+        return { success: true, message: 'Vote submitted successfully' };
     } else {
         const responseBody = JSON.parse(response.body) as { message: string };
         return { success: false, message: responseBody.message };
