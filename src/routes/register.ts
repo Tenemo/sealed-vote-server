@@ -13,6 +13,9 @@ type RegisterRequest = Static<typeof RegisterRequest>;
 
 const RegisterResponse = Type.Object({
     message: Type.String(),
+    voterIndex: Type.Number(),
+    voterName: Type.String(),
+    pollId: Type.String(),
 });
 
 export type RegisterResponse = Static<typeof RegisterResponse>;
@@ -104,7 +107,12 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
 
                 void reply.code(201);
 
-                return { message: 'Voter registered successfully' };
+                return {
+                    message: 'Voter registered successfully',
+                    voterIndex: voterIndex,
+                    voterName: voterName,
+                    pollId: pollId,
+                };
             } catch (error) {
                 if (!(error instanceof createError.HttpError)) {
                     console.error(error);

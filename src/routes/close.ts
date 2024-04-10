@@ -57,6 +57,25 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                     );
                 }
 
+                const sqlVerifyPollAndCountVoters = sql`
+                SELECT polls.id, COUNT(voters.id) AS voter_count
+                FROM polls
+                LEFT JOIN voters ON polls.id = voters.poll_id
+                WHERE polls.id = ${pollId} AND polls.creator_token = ${creatorToken}
+                GROUP BY polls.id
+            `;
+                const { rows } = await fastify.pg.query<{
+                    id: string;
+                    voter_count: number;
+                }>(sqlVerifyPollAndCountVoters);
+
+                if (rows.length === 0 || rows[0].voter_count <= 1) {
+                    throw createError(
+                        400,
+                        'Poll not found, unauthorized access, or not enough voters to close the poll.',
+                    );
+                }
+
                 const sqlClosePoll = sql`
                 UPDATE polls SET is_open = false
                 WHERE id = ${pollId}

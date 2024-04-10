@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
-import { createPoll, deletePoll } from '../testUtils';
+import { createPoll, deletePoll, registerVoter } from '../testUtils';
 
 import { ClosePollResponse } from './close';
 import { PollResponse } from './fetch';
@@ -20,6 +20,8 @@ describe('POST /polls/:pollId/close', () => {
 
     test('should close the poll successfully', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
 
         const closeResponse = await fastify.inject({
             method: 'POST',
@@ -40,6 +42,49 @@ describe('POST /polls/:pollId/close', () => {
         });
         expect((JSON.parse(getResponse.body) as PollResponse).isOpen).toBe(
             false,
+        );
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+    test('should not close the poll with only one registered voter', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        await registerVoter(fastify, pollId, 'SingleVoter');
+
+        const closeResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+
+        expect(closeResponse.statusCode).toBe(400);
+        expect(
+            (JSON.parse(closeResponse.body) as ClosePollResponse).message,
+        ).toBe(
+            'Poll not found, unauthorized access, or not enough voters to close the poll.',
+        );
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+
+    test('should not close the poll with zero registered voters', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const closeResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+
+        expect(closeResponse.statusCode).toBe(400);
+        expect(
+            (JSON.parse(closeResponse.body) as ClosePollResponse).message,
+        ).toBe(
+            'Poll not found, unauthorized access, or not enough voters to close the poll.',
         );
 
         await deletePoll(fastify, pollId, creatorToken);

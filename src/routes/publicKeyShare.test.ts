@@ -21,7 +21,8 @@ describe('POST /polls/:pollId/public-key-share', () => {
 
     test('should submit a public key share successfully to a closed poll', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
-        await registerVoter(fastify, pollId, 'John Doe');
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
 
         // Close the poll before submitting the public key share
         await closePoll(fastify, pollId, creatorToken);

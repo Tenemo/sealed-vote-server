@@ -70,13 +70,14 @@ describe('Register voter endpoint', () => {
             fastify,
             getUniquePollName('RegisteringClosedPoll'),
         );
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
         await closePoll(fastify, pollId, creatorToken);
 
-        const voterName = 'New Voter';
         const registrationResult = await registerVoter(
             fastify,
             pollId,
-            voterName,
+            'New Voter',
         );
 
         expect(registrationResult.success).toBeFalsy();
