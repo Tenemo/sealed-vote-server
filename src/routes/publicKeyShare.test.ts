@@ -1,10 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { buildServer } from '../buildServer';
-import { createPoll, deletePoll, registerVoter, closePoll } from '../testUtils';
-import { PublicKeyShareResponse } from './publicKeyShare';
 import { generateKeys } from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
+import { buildServer } from '../buildServer';
+import { createPoll, deletePoll, registerVoter, closePoll } from '../testUtils';
+
 import { PollResponse } from './fetch';
+import { PublicKeyShareResponse } from './publicKeyShare';
 
 describe('POST /polls/:pollId/public-key-share', () => {
     let fastify: FastifyInstance;

@@ -1,9 +1,10 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
-import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
+import { Type, Static } from '@sinclair/typebox';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
-import { uuidRegex } from '../constants';
 import { multiplyEncryptedValues } from 'threshold-elgamal';
+
+import { uuidRegex } from '../constants';
 import { serializeEncryptedMessage } from '../utils';
 
 export const VoteRequest = Type.Object({

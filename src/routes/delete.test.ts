@@ -1,7 +1,8 @@
-import { buildServer } from '../buildServer';
 import type { FastifyInstance } from 'fastify';
-import { createPoll, deletePoll } from '../testUtils';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
+import { buildServer } from '../buildServer';
+import { createPoll, deletePoll } from '../testUtils';
 
 describe('DELETE /polls/:pollId', () => {
     let fastify: FastifyInstance;

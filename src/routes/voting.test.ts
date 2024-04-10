@@ -1,4 +1,11 @@
 import { FastifyInstance } from 'fastify';
+import {
+    createDecryptionShare,
+    encrypt,
+    generateKeys,
+} from 'threshold-elgamal';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
 import { buildServer } from '../buildServer';
 import {
     createPoll,
@@ -11,23 +18,17 @@ import {
     decryptionShares,
 } from '../testUtils';
 import {
-    createDecryptionShare,
-    encrypt,
-    generateKeys,
-} from 'threshold-elgamal';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { PollResponse } from './fetch';
-import {
     serializeEncryptedMessage,
     deserializeEncryptedMessage,
 } from '../utils';
+
+import { PollResponse } from './fetch';
 
 describe('E2E voting test', () => {
     let fastify: FastifyInstance;
     let pollId: string;
     let creatorToken: string;
     let commonPublicKey: bigint;
-    let choices: { name: string; score: number }[];
     let aliceKeys: { publicKey: bigint; privateKey: bigint };
     let bobKeys: { publicKey: bigint; privateKey: bigint };
     let charlieKeys: { publicKey: bigint; privateKey: bigint };
@@ -41,16 +42,24 @@ describe('E2E voting test', () => {
     });
 
     const pollName = getUniquePollName('Which animal should we get?');
-    const choiceNames = ['Dog', 'Cat', 'Cow', 'Goat'];
+    const choices = ['Dog', 'Cat', 'Cow', 'Goat'];
     const threshold = 3;
+    const aliceChosenScores = [10, 2, 3, 9];
+    const bobChosenScores = [5, 6, 7, 8];
+    const charlieChosenScores = [9, 10, 1, 4];
+
+    const expectedResults = aliceChosenScores.map(
+        (score, index) =>
+            score * bobChosenScores[index] * charlieChosenScores[index],
+    );
 
     test('Should create a new poll with 4 options successfully', async () => {
-        const pollData = await createPoll(fastify, pollName, choiceNames);
+        const pollData = await createPoll(fastify, pollName, choices);
         pollId = pollData.pollId;
         creatorToken = pollData.creatorToken;
 
         expect(pollData.pollName).toBe(pollName);
-        expect(pollData.choices).toEqual(choiceNames);
+        expect(pollData.choices).toEqual(choices);
     });
 
     test('Should allow 3 voters to register for the poll', async () => {
@@ -124,21 +133,17 @@ describe('E2E voting test', () => {
         expect(pollData.commonPublicKey).not.toBeNull();
 
         commonPublicKey = BigInt(pollData.commonPublicKey!);
-        choices = pollData.choices.map((name) => ({
-            name,
-            score: Math.floor(Math.random() * 10) + 1,
-        }));
     });
 
     test('Should allow voters to submit votes after public key shares are submitted', async () => {
-        const votesAlice = choices.map((choice) =>
-            serializeEncryptedMessage(encrypt(choice.score, commonPublicKey)),
+        const votesAlice = aliceChosenScores.map((score) =>
+            serializeEncryptedMessage(encrypt(score, commonPublicKey)),
         );
-        const votesBob = choices.map((choice) =>
-            serializeEncryptedMessage(encrypt(choice.score, commonPublicKey)),
+        const votesBob = bobChosenScores.map((score) =>
+            serializeEncryptedMessage(encrypt(score, commonPublicKey)),
         );
-        const votesCharlie = choices.map((choice) =>
-            serializeEncryptedMessage(encrypt(choice.score, commonPublicKey)),
+        const votesCharlie = charlieChosenScores.map((score) =>
+            serializeEncryptedMessage(encrypt(score, commonPublicKey)),
         );
 
         await vote(fastify, pollId, votesAlice);
@@ -154,7 +159,7 @@ describe('E2E voting test', () => {
         expect(response.statusCode).toBe(200);
         const pollData = JSON.parse(response.body) as PollResponse;
         expect(pollData.encryptedVotes.length).toBe(threshold);
-        expect(pollData.encryptedTallies.length).toBe(choices.length);
+        expect(pollData.encryptedTallies.length).toBe(aliceChosenScores.length);
     });
 
     test('Should generate and submit decryption shares once votes are tallied', async () => {
@@ -187,9 +192,9 @@ describe('E2E voting test', () => {
                 charlieKeys.privateKey,
             ).toString(),
         );
-        expect(decryptionSharesAlice.length).toBe(choices.length);
-        expect(decryptionSharesBob.length).toBe(choices.length);
-        expect(decryptionSharesCharlie.length).toBe(choices.length);
+        expect(decryptionSharesAlice.length).toBe(aliceChosenScores.length);
+        expect(decryptionSharesBob.length).toBe(bobChosenScores.length);
+        expect(decryptionSharesCharlie.length).toBe(charlieChosenScores.length);
         await decryptionShares(fastify, pollId, decryptionSharesAlice);
         await decryptionShares(fastify, pollId, decryptionSharesBob);
         await decryptionShares(fastify, pollId, decryptionSharesCharlie);
@@ -205,7 +210,24 @@ describe('E2E voting test', () => {
         expect(pollData.decryptionShares.length).toBeGreaterThan(0);
 
         expect(Array.isArray(pollData.decryptionShares[0])).toBeTruthy();
-        expect(pollData.decryptionShares[0].length).toBe(choices.length);
+        expect(pollData.decryptionShares[0].length).toBe(
+            bobChosenScores.length,
+        );
+    });
+    test('Should calculate the final results and compare with expected ones', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
+        });
+        expect(response.statusCode).toBe(200);
+
+        const pollData = JSON.parse(response.body) as PollResponse;
+
+        expect(pollData.results).toBeDefined();
+        expect(pollData.results.length).toBe(choices.length);
+        pollData.results.forEach((result, index) => {
+            expect(result).toBe(expectedResults[index]);
+        });
     });
 
     test('Should delete the poll after the voting process is complete', async () => {

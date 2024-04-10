@@ -1,21 +1,22 @@
+import { IncomingMessage, Server, ServerResponse } from 'http';
+
+import FastifyPostgres from '@fastify/postgres';
+import { config } from 'dotenv';
 import Fastify, {
     FastifyBaseLogger,
     FastifyInstance,
     FastifyTypeProviderDefault,
 } from 'fastify';
-import FastifyPostgres from '@fastify/postgres';
-import { config } from 'dotenv';
 
-import { healthCheck } from './routes/health-check';
-import { vote } from './routes/vote';
-import { create } from './routes/create';
-import { fetch } from './routes/fetch';
-import { deletePoll } from './routes/delete';
-import { register } from './routes/register';
 import { close } from './routes/close';
-import { publicKeyShare } from './routes/publicKeyShare';
-import { IncomingMessage, Server, ServerResponse } from 'http';
+import { create } from './routes/create';
 import { decryptionShares } from './routes/decryptionShares';
+import { deletePoll } from './routes/delete';
+import { fetch } from './routes/fetch';
+import { healthCheck } from './routes/health-check';
+import { publicKeyShare } from './routes/publicKeyShare';
+import { register } from './routes/register';
+import { vote } from './routes/vote';
 
 config();
 

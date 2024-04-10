@@ -1,7 +1,8 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { Type, Static } from '@sinclair/typebox';
-import sql from '@nearform/sql';
 import crypto from 'crypto';
+
+import sql from '@nearform/sql';
+import { Type, Static } from '@sinclair/typebox';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 const CreatePollRequest = Type.Object({

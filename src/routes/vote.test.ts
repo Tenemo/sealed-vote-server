@@ -1,4 +1,7 @@
 import { FastifyInstance } from 'fastify';
+import { generateKeys, encrypt } from 'threshold-elgamal';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
 import { buildServer } from '../buildServer';
 import {
     createPoll,
@@ -8,10 +11,9 @@ import {
     publicKeyShare,
     getUniquePollName,
 } from '../testUtils';
-import { generateKeys, encrypt } from 'threshold-elgamal';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { PollResponse } from './fetch';
 import { serializeEncryptedMessage } from '../utils';
+
+import { PollResponse } from './fetch';
 
 describe('POST /polls/:pollId/vote', () => {
     let fastify: FastifyInstance;

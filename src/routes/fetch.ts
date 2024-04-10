@@ -1,7 +1,8 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
-import { Type, Static } from '@sinclair/typebox';
 import sql from '@nearform/sql';
+import { Type, Static } from '@sinclair/typebox';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
+
 import { uuidRegex } from '../constants';
 
 const PollParams = Type.Object({

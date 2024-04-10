@@ -1,8 +1,10 @@
-import { buildServer } from '../buildServer';
 import type { FastifyInstance } from 'fastify';
-import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
-import { PollResponse } from './fetch';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
+import { buildServer } from '../buildServer';
+import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
+
+import { PollResponse } from './fetch';
 
 describe('GET /polls/:pollId', () => {
     let fastify: FastifyInstance;

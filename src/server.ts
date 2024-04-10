@@ -1,5 +1,6 @@
-import { buildServer } from './buildServer';
 import { config } from 'dotenv';
+
+import { buildServer } from './buildServer';
 
 config();
 

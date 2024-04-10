@@ -1,4 +1,11 @@
 import { FastifyInstance } from 'fastify';
+import {
+    createDecryptionShare,
+    encrypt,
+    generateKeys,
+} from 'threshold-elgamal';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
 import { buildServer } from '../buildServer';
 import {
     createPoll,
@@ -11,16 +18,11 @@ import {
     getUniquePollName,
 } from '../testUtils';
 import {
-    createDecryptionShare,
-    encrypt,
-    generateKeys,
-} from 'threshold-elgamal';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { PollResponse } from './fetch';
-import {
     serializeEncryptedMessage,
     deserializeEncryptedMessage,
 } from '../utils';
+
+import { PollResponse } from './fetch';
 
 describe('POST /polls/:pollId/decryption-shares', () => {
     let fastify: FastifyInstance;
