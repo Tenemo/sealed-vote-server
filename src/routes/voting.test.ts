@@ -8,6 +8,7 @@ import {
     publicKeyShare,
     getUniquePollName,
     vote,
+    decryptionShares,
 } from '../testUtils';
 import {
     createDecryptionShare,
@@ -157,17 +158,15 @@ describe('E2E voting test', () => {
     });
 
     test('Should generate and submit decryption shares once votes are tallied', async () => {
-        const response = await fastify.inject({
+        let response = await fastify.inject({
             method: 'GET',
             url: `/api/polls/${pollId}`,
         });
-        const pollData = JSON.parse(response.body) as PollResponse;
+        let pollData = JSON.parse(response.body) as PollResponse;
 
-        // Check if encrypted tallies are available
         if (pollData.encryptedTallies.length === 0) {
-            // If no encrypted tallies, this means something went wrong in vote tallying
             throw new Error(
-                'Encrypted tallies are not available. The test cannot proceed.',
+                'Encrypted tallies are not there. Nothing to create shares for.',
             );
         }
         const decryptionSharesAlice = pollData.encryptedTallies.map((tally) =>
@@ -191,16 +190,31 @@ describe('E2E voting test', () => {
         expect(decryptionSharesAlice.length).toBe(choices.length);
         expect(decryptionSharesBob.length).toBe(choices.length);
         expect(decryptionSharesCharlie.length).toBe(choices.length);
-    });
-
-    test('Should delete the poll after the voting process is complete', async () => {
-        await deletePoll(fastify, pollId, creatorToken);
-
-        const response = await fastify.inject({
+        await decryptionShares(fastify, pollId, decryptionSharesAlice);
+        await decryptionShares(fastify, pollId, decryptionSharesBob);
+        await decryptionShares(fastify, pollId, decryptionSharesCharlie);
+        response = await fastify.inject({
             method: 'GET',
             url: `/api/polls/${pollId}`,
         });
 
+        expect(response.statusCode).toBe(200);
+        pollData = JSON.parse(response.body) as PollResponse;
+
+        expect(pollData.decryptionShares).toBeDefined();
+        expect(pollData.decryptionShares.length).toBeGreaterThan(0);
+
+        expect(Array.isArray(pollData.decryptionShares[0])).toBeTruthy();
+        expect(pollData.decryptionShares[0].length).toBe(choices.length);
+    });
+
+    test('Should delete the poll after the voting process is complete', async () => {
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+        const response = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
+        });
         expect(response.statusCode).toBe(404);
     });
 });

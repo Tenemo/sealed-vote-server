@@ -24,7 +24,7 @@ const PollResponse = Type.Object({
     publicKeyShares: Type.Array(Type.String()),
     commonPublicKey: Type.Union([Type.String(), Type.Null()]),
     encryptedVotes: Type.Array(Type.Array(EncryptedMessage)),
-    encryptedTallies: Type.Array(EncryptedMessage, { minItems: 0 }), // Adjusted for your requirement
+    encryptedTallies: Type.Array(EncryptedMessage, { minItems: 0 }),
     decryptionShares: Type.Array(Type.Array(Type.String())),
     results: Type.Array(Type.Number()),
 });
@@ -58,6 +58,7 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     is_open,
                     common_public_key,
                     encrypted_tallies,
+                    decryption_shares,
                     results
                 FROM polls
                 WHERE id = ${pollId}`;
@@ -70,6 +71,7 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     is_open: boolean;
                     common_public_key: string | null;
                     encrypted_tallies: { c1: string; c2: string }[];
+                    decryption_shares: string[][];
                     results: number[];
                 }>(sqlFindExisting);
 
@@ -127,19 +129,6 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     (row) => row.votes,
                 );
 
-                const sqlSelectDecryptionShares = sql`
-                SELECT array_agg(decryption_share) AS shares
-                FROM decryption_shares
-                WHERE poll_id = ${pollId}
-                GROUP BY poll_id
-            `;
-                const { rows: decryptionShareRows } = await fastify.pg.query<{
-                    shares: string[];
-                }>(sqlSelectDecryptionShares);
-                const decryptionShares = decryptionShareRows.map(
-                    ({ shares }) => shares,
-                );
-
                 return {
                     pollName: poll.poll_name,
                     createdAt: poll.created_at,
@@ -150,7 +139,7 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     commonPublicKey: poll.common_public_key,
                     encryptedVotes,
                     encryptedTallies: poll.encrypted_tallies || [],
-                    decryptionShares,
+                    decryptionShares: poll.decryption_shares || [],
                     results: poll.results,
                 };
             } catch (error) {

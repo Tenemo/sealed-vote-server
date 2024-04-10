@@ -15,6 +15,7 @@ import { register } from './routes/register';
 import { close } from './routes/close';
 import { publicKeyShare } from './routes/publicKeyShare';
 import { IncomingMessage, Server, ServerResponse } from 'http';
+import { decryptionShares } from './routes/decryptionShares';
 
 config();
 
@@ -70,5 +71,6 @@ export const buildServer = async (
     await fastify.register(register, { prefix: '/api' });
     await fastify.register(close, { prefix: '/api' });
     await fastify.register(publicKeyShare, { prefix: '/api' });
+    await fastify.register(decryptionShares, { prefix: '/api' });
     return fastify;
 };

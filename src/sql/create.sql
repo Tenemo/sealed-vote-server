@@ -10,6 +10,7 @@ CREATE TABLE polls (
     is_open boolean NOT NULL DEFAULT true,
     common_public_key text,
     encrypted_tallies jsonb DEFAULT '[]',
+    decryption_shares jsonb DEFAULT '[]',
     results integer[] DEFAULT '{}',
     created_at timestamp NOT NULL DEFAULT NOW()
 );
@@ -43,13 +44,6 @@ CREATE TABLE voters (
 CREATE TABLE encrypted_votes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     votes jsonb NOT NULL,
-    poll_id uuid NOT NULL,
-    CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE
-);
-
-CREATE TABLE decryption_shares (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    decryption_share text NOT NULL,
     poll_id uuid NOT NULL,
     CONSTRAINT fk_poll_id FOREIGN KEY (poll_id) REFERENCES polls (id) ON DELETE CASCADE
 );
