@@ -50,6 +50,10 @@ const calculateAndStoreResults = async (
             combinedShares,
         );
     });
+    if (!results.every((result) => Number.isFinite(result))) {
+        throw new Error('Failed to calculate results.');
+    }
+
     const resultsParams = results.map((result) => sql`${result}`);
     const resultsList = sql.glue(resultsParams, ', ');
 
