@@ -17,7 +17,7 @@ const calculateAndStoreResults = async (
     const encryptedTalliesQuery = sql`
         SELECT encrypted_tallies FROM polls WHERE id = ${pollId}
     `;
-    const encryptedTallies = await fastify.pg.query<{
+    const { rows: encryptedTalliesRows } = await fastify.pg.query<{
         encrypted_tallies: {
             c1: string;
             c2: string;
@@ -27,21 +27,19 @@ const calculateAndStoreResults = async (
     const decryptionSharesQuery = sql`
         SELECT decryption_shares FROM polls WHERE id = ${pollId}
     `;
-    const decryptionSharesResponse = await fastify.pg.query<{
+    const { rows: decryptionSharesRows } = await fastify.pg.query<{
         decryption_shares: string[][];
     }>(decryptionSharesQuery);
 
     if (
-        !encryptedTallies.rows.length ||
-        !decryptionSharesResponse.rows.length
+        encryptedTalliesRows.length === 0 ||
+        decryptionSharesRows.length === 0
     ) {
         throw new Error('Poll data is incomplete.');
     }
 
-    const { encrypted_tallies: encryptedTalliesData } =
-        encryptedTallies.rows[0];
-    const { decryption_shares: decryptionSharesData } =
-        decryptionSharesResponse.rows[0];
+    const encryptedTalliesData = encryptedTalliesRows[0].encrypted_tallies;
+    const decryptionSharesData = decryptionSharesRows[0].decryption_shares;
 
     const results: number[] = encryptedTalliesData.map((tally, index) => {
         const combinedShares = combineDecryptionShares(
@@ -52,12 +50,13 @@ const calculateAndStoreResults = async (
             combinedShares,
         );
     });
+    const resultsParams = results.map((result) => sql`${result}`);
+    const resultsList = sql.glue(resultsParams, ', ');
 
-    // eslint-disable-next-line sql/no-unsafe-query
-    const updateResultsQuery = `
+    const updateResultsQuery = sql`
         UPDATE polls
-        SET results = ARRAY [${results.join(', ')}]
-        WHERE id = '${pollId}';
+        SET results = ARRAY[${resultsList}]::int[]
+        WHERE id = ${pollId};
     `;
     await fastify.pg.query(updateResultsQuery);
 };
@@ -101,30 +100,30 @@ export const decryptionShares = async (
             reply: FastifyReply,
         ): Promise<DecryptionSharesResponse> => {
             try {
-                const { decryptionShares } = req.body;
                 const { pollId } = req.params;
 
                 if (!uuidRegex.test(pollId)) {
                     throw createError(400, 'Invalid poll ID');
                 }
 
-                // Fetch the existing decryption shares
-                const sqlFetchExistingShares = sql`
-                    SELECT decryption_shares
+                const pollStateQuery = sql`
+                    SELECT polls.decryption_shares
                     FROM polls
-                    WHERE id = ${pollId}
+                    WHERE polls.id = ${pollId}
                 `;
-                const existingSharesResult = await fastify.pg.query<{
-                    decryption_shares: string[][][];
-                    voters: string[];
-                }>(sqlFetchExistingShares);
+                const { rows: pollStateRows } = await fastify.pg.query<{
+                    decryption_shares: string[][];
+                }>(pollStateQuery);
 
-                if (existingSharesResult.rows.length === 0) {
+                if (pollStateRows.length === 0) {
                     throw createError(
                         404,
                         `Poll with ID ${pollId} does not exist.`,
                     );
                 }
+
+                const existingDecryptionShares =
+                    pollStateRows[0].decryption_shares;
 
                 const sqlSelectVoters = sql`
                 SELECT voter_name
@@ -136,27 +135,26 @@ export const decryptionShares = async (
                 }>(sqlSelectVoters);
                 const voters = voterRows.map(({ voter_name }) => voter_name);
 
-                let updatedShares = [];
-                if (
-                    existingSharesResult.rows.length > 0 &&
-                    existingSharesResult.rows[0].decryption_shares
-                ) {
-                    const existingShares =
-                        existingSharesResult.rows[0].decryption_shares;
-                    updatedShares = [...existingShares, decryptionShares];
-                } else {
-                    updatedShares = [decryptionShares];
+                if (!voters || voters.length === 0) {
+                    throw createError(404, 'No voters found for this poll.');
+                }
+                if (existingDecryptionShares.length >= voters.length) {
+                    throw createError(
+                        400,
+                        'All decryption shares have already been submitted.',
+                    );
                 }
 
-                const decryptionSharesJson = JSON.stringify(
-                    updatedShares,
-                ).replace(/'/g, "''");
+                const { decryptionShares } = req.body;
+                const updatedShares = [
+                    ...existingDecryptionShares,
+                    decryptionShares,
+                ];
 
-                // eslint-disable-next-line sql/no-unsafe-query
-                const sqlUpdateDecryptionShare = `
+                const sqlUpdateDecryptionShare = sql`
                     UPDATE polls
-                    SET decryption_shares = '${decryptionSharesJson}'::jsonb
-                    WHERE id = '${pollId}';
+                    SET decryption_shares = ${JSON.stringify(updatedShares)}::jsonb
+                    WHERE id = ${pollId};
                 `;
                 await fastify.pg.query(sqlUpdateDecryptionShare);
 
