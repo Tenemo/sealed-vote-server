@@ -53,10 +53,10 @@ export const publicKeyShare = async (
                 }
 
                 const sqlFindPoll = sql`
-                SELECT id, is_open
-                FROM polls
-                WHERE id = ${pollId}
-            `;
+                    SELECT id, is_open
+                    FROM polls
+                    WHERE id = ${pollId}
+                `;
                 const { rows } = await fastify.pg.query<{
                     id: string;
                     is_open: boolean;
@@ -76,25 +76,25 @@ export const publicKeyShare = async (
                 }
 
                 const sqlInsertPublicKeyShare = sql`
-                INSERT INTO public_key_shares (poll_id, public_key_share)
-                VALUES (${pollId}, ${publicKeyShare})
-            `;
+                    INSERT INTO public_key_shares (poll_id, public_key_share)
+                    VALUES (${pollId}, ${publicKeyShare})
+                `;
                 await fastify.pg.query(sqlInsertPublicKeyShare);
 
                 const sqlGetPublicKeyShares = sql`
-                SELECT public_key_share
-                FROM public_key_shares
-                WHERE poll_id = ${pollId}
-            `;
+                    SELECT public_key_share
+                    FROM public_key_shares
+                    WHERE poll_id = ${pollId}
+                `;
                 const { rows: publicKeyShares } = await fastify.pg.query<{
                     public_key_share: string;
                 }>(sqlGetPublicKeyShares);
 
                 const sqlGetVotersCount = sql`
-                SELECT COUNT(*) AS voters_count
-                FROM voters
-                WHERE poll_id = ${pollId}
-            `;
+                    SELECT COUNT(*) AS voters_count
+                    FROM voters
+                    WHERE poll_id = ${pollId}
+                `;
                 const { rows: votersCounts } = await fastify.pg.query<{
                     voters_count: string;
                 }>(sqlGetVotersCount);

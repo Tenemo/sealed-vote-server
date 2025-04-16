@@ -75,7 +75,11 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
 
                 const creatorToken = crypto.randomBytes(32).toString('hex');
 
-                const sqlInsertPoll = sql`INSERT into polls (poll_name, creator_token, max_participants) VALUES (${pollName}, ${creatorToken}, ${maxParticipants}) RETURNING *`;
+                const sqlInsertPoll = sql`
+                    INSERT into polls(poll_name, creator_token, max_participants)
+                    VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
+                    RETURNING *
+                `;
                 const { rows: createdPolls } = await fastify.pg.query<
                     CreatePollResponse & { created_at: string }
                 >(sqlInsertPoll);

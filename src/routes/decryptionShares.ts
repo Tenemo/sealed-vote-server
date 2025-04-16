@@ -130,10 +130,10 @@ export const decryptionShares = async (
                     pollStateRows[0].decryption_shares;
 
                 const sqlSelectVoters = sql`
-                SELECT voter_name
-                FROM voters
-                WHERE poll_id = ${pollId}
-            `;
+                    SELECT voter_name
+                    FROM voters
+                    WHERE poll_id = ${pollId}
+                `;
                 const { rows: voterRows } = await fastify.pg.query<{
                     voter_name: string;
                 }>(sqlSelectVoters);
@@ -155,12 +155,12 @@ export const decryptionShares = async (
                     decryptionShares,
                 ];
 
-                const sqlUpdateDecryptionShare = sql`
+                const sqlUpdateDecryptionShares = sql`
                     UPDATE polls
                     SET decryption_shares = ${JSON.stringify(updatedShares)}::jsonb
                     WHERE id = ${pollId};
                 `;
-                await fastify.pg.query(sqlUpdateDecryptionShare);
+                await fastify.pg.query(sqlUpdateDecryptionShares);
 
                 if (updatedShares.length === voters.length) {
                     await calculateAndStoreResults(fastify, pollId);
