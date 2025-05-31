@@ -1,6 +1,6 @@
-# Sealed Vote Server
+# sealed.vote server
 
-This is the backend server for the [sealed.vote](https://sealed.vote) application, built using Fastify. It is designed to handle the creation and management of polls, where users can vote on various options, and the results are calculated using geometric mean for fairness and anonymity.
+This is the backend for the [sealed.vote](https://sealed.vote) application, built using Fastify. Uses the [threshold-elgamal](https://www.npmjs.com/package/threshold-elgamal) package to provide REST API endpoints for managing a homomorphic encryption-based vote.
 
 [Endpoint documentation](docs/endpoints.md)
 
