@@ -1,4 +1,3 @@
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     MessageResponse,
@@ -7,10 +6,12 @@ import type {
 } from '@sealed-vote/contracts';
 import { canVote, computeEncryptedTallies } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
+import { asc, eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
+import { encryptedVotes, polls, voters } from '../db/schema';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { authenticateVoter } from '../utils/voterAuth';
 
@@ -64,13 +65,13 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                 }
 
                 return await withTransaction(fastify, async (client) => {
-                    const pollQuery = sql`
+                    const pollResult = await client.execute(sql`
                         SELECT
                             id,
                             is_open,
                             common_public_key,
-                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count,
-                            COALESCE(array_length(results, 1), 0) AS result_count,
+                            jsonb_array_length(encrypted_tallies)::int AS encrypted_tally_count,
+                            COALESCE(array_length(results, 1), 0)::int AS result_count,
                             (
                                 SELECT COUNT(*)::int
                                 FROM voters
@@ -79,17 +80,17 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
-                    `;
-                    const { rows: polls } = await client.query<{
+                    `);
+                    const pollRows = pollResult.rows as Array<{
                         id: string;
                         is_open: boolean;
                         common_public_key: string | null;
                         encrypted_tally_count: number;
                         result_count: number;
                         voter_count: number;
-                    }>(pollQuery);
+                    }>;
 
-                    const poll = polls[0];
+                    const poll = pollRows[0];
                     if (!poll) {
                         throw createError(
                             404,
@@ -125,14 +126,14 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    const choiceCountQuery = sql`
+                    const choiceCountResult = await client.execute(sql`
                         SELECT COUNT(*) AS choice_count
                         FROM choices
                         WHERE poll_id = ${pollId}
-                    `;
-                    const { rows: choiceCounts } = await client.query<{
-                        choice_count: string;
-                    }>(choiceCountQuery);
+                    `);
+                    const choiceCounts = choiceCountResult.rows as Array<{
+                        choice_count: string | number;
+                    }>;
                     const choiceCount = Number(choiceCounts[0].choice_count);
 
                     if (votes.length !== choiceCount) {
@@ -142,42 +143,42 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    const insertVoteQuery = sql`
-                        INSERT INTO encrypted_votes (poll_id, voter_id, votes)
-                        VALUES (${pollId}, ${voter.id}, ${JSON.stringify(votes)}::jsonb)
-                    `;
-                    await client.query(insertVoteQuery);
+                    await client.insert(encryptedVotes).values({
+                        pollId,
+                        voterId: voter.id,
+                        votes,
+                    });
 
-                    const updateVoterQuery = sql`
-                        UPDATE voters
-                        SET has_voted = true
-                        WHERE id = ${voter.id}
-                    `;
-                    await client.query(updateVoterQuery);
+                    await client
+                        .update(voters)
+                        .set({ hasVoted: true })
+                        .where(eq(voters.id, voter.id));
 
-                    const votesQuery = sql`
-                        SELECT encrypted_votes.votes
-                        FROM encrypted_votes
-                        INNER JOIN voters ON voters.id = encrypted_votes.voter_id
-                        WHERE encrypted_votes.poll_id = ${pollId}
-                        ORDER BY voters.voter_index
-                    `;
-                    const { rows: encryptedVoteRows } = await client.query<{
-                        votes: { c1: string; c2: string }[];
-                    }>(votesQuery);
+                    const encryptedVoteRows = await client
+                        .select({
+                            votes: encryptedVotes.votes,
+                        })
+                        .from(encryptedVotes)
+                        .innerJoin(
+                            voters,
+                            eq(voters.id, encryptedVotes.voterId),
+                        )
+                        .where(eq(encryptedVotes.pollId, pollId))
+                        .orderBy(asc(voters.voterIndex));
 
                     if (encryptedVoteRows.length === poll.voter_count) {
                         const encryptedTallies = computeEncryptedTallies(
                             encryptedVoteRows.map(
-                                ({ votes: encryptedVotes }) => encryptedVotes,
+                                ({ votes: encryptedVoteSet }) =>
+                                    encryptedVoteSet,
                             ),
                         );
-                        const updateTalliesQuery = sql`
-                            UPDATE polls
-                            SET encrypted_tallies = ${JSON.stringify(encryptedTallies)}::jsonb
-                            WHERE id = ${pollId}
-                        `;
-                        await client.query(updateTalliesQuery);
+                        await client
+                            .update(polls)
+                            .set({
+                                encryptedTallies,
+                            })
+                            .where(eq(polls.id, pollId));
                     }
 
                     return `Voted successfully in poll ${pollId}.`;

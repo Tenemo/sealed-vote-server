@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { sql } from 'drizzle-orm';
 import createError from 'http-errors';
-import type { PoolClient } from 'pg';
+
+import type { DatabaseTransaction } from '../db/client';
 
 export type AuthenticatedVoter = {
     id: string;
@@ -21,12 +22,12 @@ export const hashSecureToken = (value: string): string =>
     crypto.createHash('sha256').update(value).digest('hex');
 
 export const authenticateVoter = async (
-    client: PoolClient,
+    tx: DatabaseTransaction,
     pollId: string,
     voterToken: string,
 ): Promise<AuthenticatedVoter> => {
     const voterTokenHash = hashSecureToken(voterToken);
-    const query = sql`
+    const queryResult = await tx.execute(sql`
         SELECT
             id,
             voter_name,
@@ -37,16 +38,16 @@ export const authenticateVoter = async (
         FROM voters
         WHERE poll_id = ${pollId} AND voter_token_hash = ${voterTokenHash}
         FOR UPDATE
-    `;
+    `);
 
-    const { rows } = await client.query<{
+    const rows = queryResult.rows as Array<{
         id: string;
         voter_name: string;
         voter_index: number;
         has_submitted_public_key_share: boolean;
         has_voted: boolean;
         has_submitted_decryption_shares: boolean;
-    }>(query);
+    }>;
 
     const voter = rows[0];
     if (!voter) {

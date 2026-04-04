@@ -1,4 +1,3 @@
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     DecryptionSharesRequest as DecryptionSharesRequestContract,
@@ -9,10 +8,16 @@ import {
     decryptTallies,
 } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
+import { asc, eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
+import {
+    decryptionShares as decryptionSharesTable,
+    polls,
+    voters,
+} from '../db/schema';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { authenticateVoter } from '../utils/voterAuth';
 
@@ -60,132 +65,119 @@ export const decryptionShares = async (
                     throw createError(400, ERROR_MESSAGES.invalidPollId);
                 }
 
-                const response = await withTransaction(
-                    fastify,
-                    async (client) => {
-                        const pollQuery = sql`
+                const response = await withTransaction(fastify, async (tx) => {
+                    const pollResult = await tx.execute(sql`
                         SELECT
                             is_open,
                             common_public_key,
                             encrypted_tallies,
-                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count,
-                            COALESCE(array_length(results, 1), 0) AS result_count
+                            jsonb_array_length(encrypted_tallies)::int AS encrypted_tally_count,
+                            COALESCE(array_length(results, 1), 0)::int AS result_count
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
-                    `;
-                        const { rows: polls } = await client.query<{
-                            is_open: boolean;
-                            common_public_key: string | null;
-                            encrypted_tallies: { c1: string; c2: string }[];
-                            encrypted_tally_count: number;
-                            result_count: number;
-                        }>(pollQuery);
+                    `);
+                    const pollRows = pollResult.rows as Array<{
+                        is_open: boolean;
+                        common_public_key: string | null;
+                        encrypted_tallies: { c1: string; c2: string }[];
+                        encrypted_tally_count: number;
+                        result_count: number;
+                    }>;
 
-                        const poll = polls[0];
-                        if (!poll) {
-                            throw createError(
-                                404,
-                                `Poll with ID ${pollId} does not exist.`,
-                            );
-                        }
-
-                        if (
-                            !canSubmitDecryptionShares({
-                                isOpen: poll.is_open,
-                                commonPublicKey: poll.common_public_key,
-                                voterCount: 0,
-                                encryptedVoteCount: 0,
-                                encryptedTallyCount: poll.encrypted_tally_count,
-                                resultCount: poll.result_count,
-                            })
-                        ) {
-                            throw createError(
-                                400,
-                                ERROR_MESSAGES.decryptionPhaseClosed,
-                            );
-                        }
-
-                        const voter = await authenticateVoter(
-                            client,
-                            pollId,
-                            voterToken,
+                    const poll = pollRows[0];
+                    if (!poll) {
+                        throw createError(
+                            404,
+                            `Poll with ID ${pollId} does not exist.`,
                         );
-                        if (voter.hasSubmittedDecryptionShares) {
-                            throw createError(
-                                409,
-                                ERROR_MESSAGES.decryptionSharesAlreadySubmitted,
-                            );
-                        }
+                    }
 
-                        if (shares.length !== poll.encrypted_tallies.length) {
-                            throw createError(
-                                400,
-                                ERROR_MESSAGES.decryptionVectorLengthMismatch,
-                            );
-                        }
+                    if (
+                        !canSubmitDecryptionShares({
+                            isOpen: poll.is_open,
+                            commonPublicKey: poll.common_public_key,
+                            voterCount: 0,
+                            encryptedVoteCount: 0,
+                            encryptedTallyCount: poll.encrypted_tally_count,
+                            resultCount: poll.result_count,
+                        })
+                    ) {
+                        throw createError(
+                            400,
+                            ERROR_MESSAGES.decryptionPhaseClosed,
+                        );
+                    }
 
-                        const insertSharesQuery = sql`
-                        INSERT INTO decryption_shares (poll_id, voter_id, shares)
-                        VALUES (${pollId}, ${voter.id}, ${JSON.stringify(shares)}::jsonb)
-                    `;
-                        await client.query(insertSharesQuery);
+                    const voter = await authenticateVoter(
+                        tx,
+                        pollId,
+                        voterToken,
+                    );
+                    if (voter.hasSubmittedDecryptionShares) {
+                        throw createError(
+                            409,
+                            ERROR_MESSAGES.decryptionSharesAlreadySubmitted,
+                        );
+                    }
 
-                        const updateVoterQuery = sql`
-                        UPDATE voters
-                        SET has_submitted_decryption_shares = true
-                        WHERE id = ${voter.id}
-                    `;
-                        await client.query(updateVoterQuery);
+                    if (shares.length !== poll.encrypted_tallies.length) {
+                        throw createError(
+                            400,
+                            ERROR_MESSAGES.decryptionVectorLengthMismatch,
+                        );
+                    }
 
-                        const allSharesQuery = sql`
-                        SELECT decryption_shares.shares
-                        FROM decryption_shares
-                        INNER JOIN voters ON voters.id = decryption_shares.voter_id
-                        WHERE decryption_shares.poll_id = ${pollId}
-                        ORDER BY voters.voter_index
-                    `;
-                        const { rows: decryptionShareRows } =
-                            await client.query<{
-                                shares: string[];
-                            }>(allSharesQuery);
+                    await tx.insert(decryptionSharesTable).values({
+                        pollId,
+                        voterId: voter.id,
+                        shares,
+                    });
 
-                        const voterCountQuery = sql`
+                    await tx
+                        .update(voters)
+                        .set({ hasSubmittedDecryptionShares: true })
+                        .where(eq(voters.id, voter.id));
+
+                    const decryptionShareRows = await tx
+                        .select({
+                            shares: decryptionSharesTable.shares,
+                        })
+                        .from(decryptionSharesTable)
+                        .innerJoin(
+                            voters,
+                            eq(voters.id, decryptionSharesTable.voterId),
+                        )
+                        .where(eq(decryptionSharesTable.pollId, pollId))
+                        .orderBy(asc(voters.voterIndex));
+
+                    const voterCountResult = await tx.execute(sql`
                         SELECT COUNT(*) AS voters_count
                         FROM voters
                         WHERE poll_id = ${pollId}
-                    `;
-                        const { rows: voterCounts } = await client.query<{
-                            voters_count: string;
-                        }>(voterCountQuery);
-                        const votersCount = Number(voterCounts[0].voters_count);
+                    `);
+                    const voterCounts = voterCountResult.rows as Array<{
+                        voters_count: string | number;
+                    }>;
+                    const votersCount = Number(voterCounts[0].voters_count);
 
-                        if (decryptionShareRows.length === votersCount) {
-                            const results = decryptTallies(
-                                poll.encrypted_tallies,
-                                decryptionShareRows.map(
-                                    ({ shares: voterShares }) => voterShares,
-                                ),
-                            );
-                            const resultItems = sql.glue(
-                                results.map((result) => sql`${result}`),
-                                ', ',
-                            );
+                    if (decryptionShareRows.length === votersCount) {
+                        const results = decryptTallies(
+                            poll.encrypted_tallies,
+                            decryptionShareRows.map(
+                                ({ shares: voterShares }) => voterShares,
+                            ),
+                        );
+                        await tx
+                            .update(polls)
+                            .set({ results })
+                            .where(eq(polls.id, pollId));
+                    }
 
-                            const updateResultsQuery = sql`
-                            UPDATE polls
-                            SET results = ARRAY[${resultItems}]::int[]
-                            WHERE id = ${pollId}
-                        `;
-                            await client.query(updateResultsQuery);
-                        }
-
-                        return {
-                            message:
-                                'Decryption shares submitted successfully.',
-                        };
-                    },
-                );
+                    return {
+                        message: 'Decryption shares submitted successfully.',
+                    };
+                });
 
                 void reply.code(201);
                 return response;

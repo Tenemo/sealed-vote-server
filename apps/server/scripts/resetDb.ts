@@ -1,4 +1,4 @@
-import { resetDatabase } from '../src/test/resetDatabase';
+import { resetDatabase } from '../src/db/admin';
 
 void resetDatabase().catch((error) => {
     console.error(error);

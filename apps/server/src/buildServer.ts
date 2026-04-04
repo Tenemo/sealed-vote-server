@@ -1,6 +1,5 @@
 import { IncomingMessage, Server, ServerResponse } from 'http';
 
-import FastifyPostgres from '@fastify/postgres';
 import { config } from 'dotenv';
 import Fastify, {
     FastifyBaseLogger,
@@ -8,7 +7,7 @@ import Fastify, {
     FastifyTypeProviderDefault,
 } from 'fastify';
 
-import { getDatabaseUrl, shouldUseDatabaseSsl } from './config';
+import { databasePlugin } from './db/plugin';
 import { close } from './routes/close';
 import { create } from './routes/create';
 import { decryptionShares } from './routes/decryptionShares';
@@ -21,8 +20,6 @@ import { vote } from './routes/vote';
 
 config();
 
-const TIMEOUT = 30 * 1000;
-
 const logger = {
     level: process.env.LOG_LEVEL ?? 'info',
     transport: {
@@ -31,7 +28,7 @@ const logger = {
 };
 
 export const buildServer = async (
-    isLoggingEnabled: boolean = false,
+    isLoggingEnabled?: boolean,
 ): Promise<
     FastifyInstance<
         Server<typeof IncomingMessage, typeof ServerResponse>,
@@ -41,25 +38,12 @@ export const buildServer = async (
         FastifyTypeProviderDefault
     >
 > => {
-    if (!isLoggingEnabled) {
-        isLoggingEnabled = process.env.NODE_ENV !== 'test';
-    }
-    const databaseUrl = getDatabaseUrl();
+    const shouldEnableLogging =
+        isLoggingEnabled ?? process.env.NODE_ENV !== 'test';
     const fastify = Fastify({
-        logger: isLoggingEnabled ? logger : false,
+        logger: shouldEnableLogging ? logger : false,
     });
-    await fastify.register(FastifyPostgres, {
-        connectionString: databaseUrl,
-        ssl: shouldUseDatabaseSsl(databaseUrl)
-            ? {
-                  rejectUnauthorized: false,
-              }
-            : false,
-        statement_timeout: TIMEOUT,
-        query_timeout: TIMEOUT,
-        idle_in_transaction_session_timeout: TIMEOUT,
-        connectionTimeoutMillis: TIMEOUT,
-    });
+    await databasePlugin(fastify);
     await fastify.register(healthCheck, { prefix: '/api' });
     await fastify.register(vote, { prefix: '/api' });
     await fastify.register(create, { prefix: '/api' });

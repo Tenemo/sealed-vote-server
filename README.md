@@ -16,12 +16,16 @@ Monorepo for the sealed.vote backend, frontend, shared protocol packages, and en
 pnpm install
 pnpm docker:reset
 pnpm db:reset
+pnpm db:seed
 pnpm dev
 ```
+
+Use `pnpm db:setup` to reset and seed in one step. `pnpm db:seed` is optional and intended for manual local smoke checks.
 
 ## verification
 
 ```bash
+pnpm db:migrate
 pnpm lint
 pnpm typecheck
 pnpm test

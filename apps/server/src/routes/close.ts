@@ -1,4 +1,3 @@
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     ClosePollRequest as ClosePollRequestContract,
@@ -6,10 +5,12 @@ import type {
 } from '@sealed-vote/contracts';
 import { canClose } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
+import { eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
+import { polls } from '../db/schema';
 import { withTransaction } from '../utils/db';
 
 const ClosePollParamsSchema = Type.Object({
@@ -59,16 +60,16 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                 }
 
                 return await withTransaction(fastify, async (client) => {
-                    const pollQuery = sql`
+                    const pollResult = await client.execute(sql`
                         SELECT id, is_open
                         FROM polls
                         WHERE id = ${pollId} AND creator_token = ${creatorToken}
                         FOR UPDATE
-                    `;
-                    const { rows } = await client.query<{
+                    `);
+                    const rows = pollResult.rows as Array<{
                         id: string;
                         is_open: boolean;
-                    }>(pollQuery);
+                    }>;
 
                     const poll = rows[0];
                     if (!poll) {
@@ -85,14 +86,14 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    const voterCountQuery = sql`
+                    const voterCountResult = await client.execute(sql`
                         SELECT COUNT(*) AS voter_count
                         FROM voters
                         WHERE poll_id = ${pollId}
-                    `;
-                    const { rows: voterCounts } = await client.query<{
-                        voter_count: string;
-                    }>(voterCountQuery);
+                    `);
+                    const voterCounts = voterCountResult.rows as Array<{
+                        voter_count: string | number;
+                    }>;
 
                     const voterCount = Number(voterCounts[0].voter_count);
 
@@ -112,12 +113,10 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    const closePollQuery = sql`
-                        UPDATE polls
-                        SET is_open = false
-                        WHERE id = ${pollId}
-                    `;
-                    await client.query(closePollQuery);
+                    await client
+                        .update(polls)
+                        .set({ isOpen: false })
+                        .where(eq(polls.id, pollId));
 
                     return { message: 'Poll closed successfully' };
                 });

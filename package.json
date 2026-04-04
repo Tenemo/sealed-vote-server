@@ -18,7 +18,11 @@
         "docker:destroy": "docker compose down -v --remove-orphans",
         "docker:wipe": "pnpm docker:destroy && pnpm docker:up",
         "docker:reset": "pnpm docker:wipe",
+        "db:generate": "pnpm --filter @sealed-vote/server db:generate",
+        "db:migrate": "pnpm --filter @sealed-vote/server db:migrate",
         "db:reset": "pnpm --filter @sealed-vote/server db:reset",
+        "db:seed": "pnpm --filter @sealed-vote/server db:seed",
+        "db:setup": "pnpm --filter @sealed-vote/server db:setup",
         "prepare": "husky",
         "postinstall": "pnpm --filter @sealed-vote/server exec ts-patch install -s"
     },

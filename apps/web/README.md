@@ -10,8 +10,11 @@ Run the monorepo from the repository root:
 pnpm install
 pnpm docker:up
 pnpm db:reset
+pnpm db:seed
 pnpm --filter @sealed-vote/web dev
 ```
+
+`pnpm db:seed` is optional and only useful when you want sample polls for manual local testing.
 
 To run the full stack together from the root:
 

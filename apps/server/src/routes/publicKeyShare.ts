@@ -1,4 +1,3 @@
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     MessageResponse,
@@ -6,11 +5,13 @@ import type {
 } from '@sealed-vote/contracts';
 import { canSubmitPublicKeyShare } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
+import { asc, eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 import { combinePublicKeys } from 'threshold-elgamal';
 
 import { uuidRegex } from '../constants';
+import { polls, publicKeyShares, voters } from '../db/schema';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { authenticateVoter } from '../utils/voterAuth';
 
@@ -58,16 +59,14 @@ export const publicKeyShare = async (
                     throw createError(400, ERROR_MESSAGES.invalidPollId);
                 }
 
-                const response = await withTransaction(
-                    fastify,
-                    async (client) => {
-                        const pollQuery = sql`
+                const response = await withTransaction(fastify, async (tx) => {
+                    const pollResult = await tx.execute(sql`
                         SELECT
                             id,
                             is_open,
                             common_public_key,
-                            COALESCE(array_length(results, 1), 0) AS result_count,
-                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count,
+                            COALESCE(array_length(results, 1), 0)::int AS result_count,
+                            jsonb_array_length(encrypted_tallies)::int AS encrypted_tally_count,
                             (
                                 SELECT COUNT(*)::int
                                 FROM voters
@@ -76,96 +75,95 @@ export const publicKeyShare = async (
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
-                    `;
-                        const { rows: polls } = await client.query<{
-                            id: string;
-                            is_open: boolean;
-                            common_public_key: string | null;
-                            result_count: number;
-                            encrypted_tally_count: number;
-                            voter_count: number;
-                        }>(pollQuery);
+                    `);
+                    const pollRows = pollResult.rows as Array<{
+                        id: string;
+                        is_open: boolean;
+                        common_public_key: string | null;
+                        result_count: number;
+                        encrypted_tally_count: number;
+                        voter_count: number;
+                    }>;
 
-                        const poll = polls[0];
-                        if (!poll) {
-                            throw createError(
-                                404,
-                                `Poll with ID ${pollId} does not exist.`,
-                            );
-                        }
-
-                        if (
-                            !canSubmitPublicKeyShare({
-                                isOpen: poll.is_open,
-                                commonPublicKey: poll.common_public_key,
-                                voterCount: poll.voter_count,
-                                encryptedVoteCount: 0,
-                                encryptedTallyCount: poll.encrypted_tally_count,
-                                resultCount: poll.result_count,
-                            })
-                        ) {
-                            throw createError(
-                                400,
-                                ERROR_MESSAGES.publicKeyPhaseClosed,
-                            );
-                        }
-
-                        const voter = await authenticateVoter(
-                            client,
-                            pollId,
-                            voterToken,
+                    const poll = pollRows[0];
+                    if (!poll) {
+                        throw createError(
+                            404,
+                            `Poll with ID ${pollId} does not exist.`,
                         );
-                        if (voter.hasSubmittedPublicKeyShare) {
-                            throw createError(
-                                409,
-                                ERROR_MESSAGES.publicKeyAlreadySubmitted,
-                            );
-                        }
+                    }
 
-                        const insertShareQuery = sql`
-                        INSERT INTO public_key_shares (poll_id, voter_id, public_key_share)
-                        VALUES (${pollId}, ${voter.id}, ${share})
-                    `;
-                        await client.query(insertShareQuery);
+                    if (
+                        !canSubmitPublicKeyShare({
+                            isOpen: poll.is_open,
+                            commonPublicKey: poll.common_public_key,
+                            voterCount: poll.voter_count,
+                            encryptedVoteCount: 0,
+                            encryptedTallyCount: poll.encrypted_tally_count,
+                            resultCount: poll.result_count,
+                        })
+                    ) {
+                        throw createError(
+                            400,
+                            ERROR_MESSAGES.publicKeyPhaseClosed,
+                        );
+                    }
 
-                        const updateVoterQuery = sql`
-                        UPDATE voters
-                        SET has_submitted_public_key_share = true
-                        WHERE id = ${voter.id}
-                    `;
-                        await client.query(updateVoterQuery);
+                    const voter = await authenticateVoter(
+                        tx,
+                        pollId,
+                        voterToken,
+                    );
+                    if (voter.hasSubmittedPublicKeyShare) {
+                        throw createError(
+                            409,
+                            ERROR_MESSAGES.publicKeyAlreadySubmitted,
+                        );
+                    }
 
-                        const sharesQuery = sql`
-                        SELECT public_key_shares.public_key_share
-                        FROM public_key_shares
-                        INNER JOIN voters ON voters.id = public_key_shares.voter_id
-                        WHERE public_key_shares.poll_id = ${pollId}
-                        ORDER BY voters.voter_index
-                    `;
-                        const { rows: publicKeyShares } = await client.query<{
-                            public_key_share: string;
-                        }>(sharesQuery);
+                    await tx.insert(publicKeyShares).values({
+                        pollId,
+                        voterId: voter.id,
+                        publicKeyShare: share,
+                    });
 
-                        if (publicKeyShares.length === poll.voter_count) {
-                            const combinedPublicKey = combinePublicKeys(
-                                publicKeyShares.map(({ public_key_share }) =>
-                                    BigInt(public_key_share),
-                                ),
-                            );
+                    await tx
+                        .update(voters)
+                        .set({ hasSubmittedPublicKeyShare: true })
+                        .where(eq(voters.id, voter.id));
 
-                            const updatePollQuery = sql`
-                            UPDATE polls
-                            SET common_public_key = ${combinedPublicKey.toString()}
-                            WHERE id = ${pollId}
-                        `;
-                            await client.query(updatePollQuery);
-                        }
+                    const publicKeyShareRows = await tx
+                        .select({
+                            publicKeyShare: publicKeyShares.publicKeyShare,
+                        })
+                        .from(publicKeyShares)
+                        .innerJoin(
+                            voters,
+                            eq(voters.id, publicKeyShares.voterId),
+                        )
+                        .where(eq(publicKeyShares.pollId, pollId))
+                        .orderBy(asc(voters.voterIndex));
 
-                        return {
-                            message: 'Public key share submitted successfully',
-                        };
-                    },
-                );
+                    if (publicKeyShareRows.length === poll.voter_count) {
+                        const combinedPublicKey = combinePublicKeys(
+                            publicKeyShareRows.map(
+                                ({ publicKeyShare: keyShare }) =>
+                                    BigInt(keyShare),
+                            ),
+                        );
+
+                        await tx
+                            .update(polls)
+                            .set({
+                                commonPublicKey: combinedPublicKey.toString(),
+                            })
+                            .where(eq(polls.id, pollId));
+                    }
+
+                    return {
+                        message: 'Public key share submitted successfully',
+                    };
+                });
 
                 void reply.code(201);
                 return response;

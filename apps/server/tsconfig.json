@@ -29,5 +29,5 @@
     "ts-node": {
         "require": ["tsconfig-paths/register"]
     },
-    "include": ["src/**/*", "scripts/**/*", "vitest.config.ts"]
+    "include": ["src/**/*", "scripts/**/*", "vitest.config.ts", "drizzle.config.ts"]
 }

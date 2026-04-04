@@ -33,8 +33,11 @@ The only redirect kept in `apps/web/public/_redirects` is the single-page-app fa
 pnpm install
 pnpm docker:reset
 pnpm db:reset
+pnpm db:seed
 pnpm dev
 ```
+
+`pnpm db:setup` is the combined reset-plus-seed shortcut for local development. CI and Playwright should continue using `pnpm db:reset` only.
 
 ## note on platform wiring
 

@@ -1,4 +1,3 @@
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     CreatePollRequest as CreatePollRequestContract,
@@ -9,7 +8,12 @@ import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { isConstraintViolation, withTransaction } from '../utils/db';
+import { choices as choicesTable, polls } from '../db/schema';
+import {
+    isConstraintViolation,
+    normalizeDatabaseTimestamp,
+    withTransaction,
+} from '../utils/db';
 import { generateSecureToken } from '../utils/voterAuth';
 
 const EncryptedMessageSchema = Type.Object({
@@ -82,39 +86,37 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
 
                 const createdPoll = await withTransaction(
                     fastify,
-                    async (client) => {
-                        const insertPollQuery = sql`
-                        INSERT INTO polls (poll_name, creator_token, max_participants)
-                        VALUES (${pollName}, ${creatorToken}, ${maxParticipants})
-                        RETURNING id, created_at, max_participants
-                    `;
-                        const { rows } = await client.query<{
-                            id: string;
-                            created_at: string;
-                            max_participants: number;
-                        }>(insertPollQuery);
+                    async (tx) => {
+                        const [poll] = await tx
+                            .insert(polls)
+                            .values({
+                                pollName,
+                                creatorToken,
+                                maxParticipants,
+                            })
+                            .returning({
+                                id: polls.id,
+                                createdAt: polls.createdAt,
+                                maxParticipants: polls.maxParticipants,
+                            });
 
-                        const poll = rows[0];
-                        const insertChoicesQuery = sql`
-                        INSERT INTO choices (choice_name, poll_id, index)
-                        VALUES ${sql.glue(
-                            normalizedChoices.map(
-                                (choice, index) =>
-                                    sql`(${choice}, ${poll.id}, ${index})`,
-                            ),
-                            ',',
-                        )}
-                    `;
-
-                        await client.query(insertChoicesQuery);
+                        await tx.insert(choicesTable).values(
+                            normalizedChoices.map((choice, index) => ({
+                                choiceName: choice,
+                                pollId: poll.id,
+                                choiceIndex: index,
+                            })),
+                        );
 
                         return {
                             pollName,
                             creatorToken,
                             choices: normalizedChoices,
-                            maxParticipants: poll.max_participants,
+                            maxParticipants: poll.maxParticipants,
                             id: poll.id,
-                            createdAt: poll.created_at,
+                            createdAt: normalizeDatabaseTimestamp(
+                                poll.createdAt,
+                            ),
                             publicKeyShares: [],
                             commonPublicKey: null,
                             encryptedVotes: [],

@@ -1,4 +1,3 @@
-import sql from '@nearform/sql';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     MessageResponse,
@@ -6,10 +5,12 @@ import type {
     RegisterVoterResponse as RegisterVoterResponseContract,
 } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
+import { sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
+import { voters } from '../db/schema';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { generateSecureToken, hashSecureToken } from '../utils/voterAuth';
 
@@ -69,76 +70,64 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                 const voterToken = generateSecureToken();
                 const voterTokenHash = hashSecureToken(voterToken);
 
-                const response = await withTransaction(
-                    fastify,
-                    async (client) => {
-                        const pollQuery = sql`
+                const response = await withTransaction(fastify, async (tx) => {
+                    const pollResult = await tx.execute(sql`
                         SELECT id, is_open, max_participants
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
-                    `;
-                        const { rows: polls } = await client.query<{
-                            id: string;
-                            is_open: boolean;
-                            max_participants: number;
-                        }>(pollQuery);
+                    `);
+                    const pollRows = pollResult.rows as Array<{
+                        id: string;
+                        is_open: boolean;
+                        max_participants: number;
+                    }>;
 
-                        const poll = polls[0];
-                        if (!poll) {
-                            throw createError(
-                                404,
-                                `Poll with ID ${pollId} does not exist.`,
-                            );
-                        }
+                    const poll = pollRows[0];
+                    if (!poll) {
+                        throw createError(
+                            404,
+                            `Poll with ID ${pollId} does not exist.`,
+                        );
+                    }
 
-                        if (!poll.is_open) {
-                            throw createError(400, ERROR_MESSAGES.pollClosed);
-                        }
+                    if (!poll.is_open) {
+                        throw createError(400, ERROR_MESSAGES.pollClosed);
+                    }
 
-                        const voterCountQuery = sql`
+                    const voterCountResult = await tx.execute(sql`
                         SELECT COUNT(*) AS count
                         FROM voters
                         WHERE poll_id = ${pollId}
-                    `;
-                        const { rows: voterCounts } = await client.query<{
-                            count: string;
-                        }>(voterCountQuery);
-                        const voterCount = Number(voterCounts[0].count);
+                    `);
+                    const voterCounts = voterCountResult.rows as Array<{
+                        count: string | number;
+                    }>;
+                    const voterCount = Number(voterCounts[0].count);
 
-                        if (voterCount >= poll.max_participants) {
-                            throw createError(
-                                400,
-                                ERROR_MESSAGES.maxParticipantsReached,
-                            );
-                        }
+                    if (voterCount >= poll.max_participants) {
+                        throw createError(
+                            400,
+                            ERROR_MESSAGES.maxParticipantsReached,
+                        );
+                    }
 
-                        const voterIndex = voterCount + 1;
-                        const insertVoterQuery = sql`
-                        INSERT INTO voters (
-                            voter_name,
-                            voter_index,
-                            poll_id,
-                            voter_token_hash
-                        )
-                        VALUES (
-                            ${voterName},
-                            ${voterIndex},
-                            ${pollId},
-                            ${voterTokenHash}
-                        )
-                    `;
-                        await client.query(insertVoterQuery);
+                    const voterIndex = voterCount + 1;
+                    await tx.insert(voters).values({
+                        voterName,
+                        voterIndex,
+                        pollId,
+                        voterTokenHash,
+                    });
 
-                        return {
-                            message: 'Voter registered successfully',
-                            voterIndex,
-                            voterName,
-                            pollId,
-                            voterToken,
-                        } satisfies RegisterResponse;
-                    },
-                );
+                    return {
+                        message: 'Voter registered successfully',
+                        voterIndex,
+                        voterName,
+                        pollId,
+                        voterToken,
+                    } satisfies RegisterResponse;
+                });
 
                 void reply.code(201);
                 return response;

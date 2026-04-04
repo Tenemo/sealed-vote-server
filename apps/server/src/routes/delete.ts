@@ -1,10 +1,11 @@
-import sql from '@nearform/sql';
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
+import { and, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
+import { polls } from '../db/schema';
 
 const DeletePollParams = Type.Object({
     pollId: Type.String(),
@@ -44,23 +45,25 @@ export const deletePoll = async (fastify: FastifyInstance): Promise<void> => {
                     throw createError(400, 'Invalid poll ID');
                 }
 
-                const sqlVerifyPoll = sql`
-            SELECT id FROM polls
-            WHERE id = ${pollId} AND creator_token = ${creatorToken}
-        `;
-                const { rowCount: pollExists } =
-                    await fastify.pg.query(sqlVerifyPoll);
-                if (!pollExists) {
+                const [poll] = await fastify.db
+                    .select({
+                        id: polls.id,
+                    })
+                    .from(polls)
+                    .where(
+                        and(
+                            eq(polls.id, pollId),
+                            eq(polls.creatorToken, creatorToken),
+                        ),
+                    );
+                if (!poll) {
                     throw createError(
                         404,
                         'Poll not found or unauthorized access.',
                     );
                 }
 
-                const sqlDeletePoll = sql`
-            DELETE FROM polls WHERE id = ${pollId}
-        `;
-                await fastify.pg.query(sqlDeletePoll);
+                await fastify.db.delete(polls).where(eq(polls.id, pollId));
 
                 return { message: 'Poll deleted successfully' };
             } catch (error) {
