@@ -1,10 +1,10 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { canRegister } from '@sealed-vote/protocol';
 
 import { decryptResults } from './decryptResults';
 import { encryptVotesGenerateShares } from './encryptVotesGenerateShares';
 import { processPublicPrivateKeys } from './processPublicPrivateKeys';
 
-import { canRegister } from '@sealed-vote/protocol';
 import { RootState } from 'app/store';
 import { pollsApi } from 'features/Polls/pollsApi';
 import {

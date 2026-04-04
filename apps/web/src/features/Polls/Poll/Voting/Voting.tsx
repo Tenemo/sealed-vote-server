@@ -1,9 +1,9 @@
 import { Button, TextField, Box, List, Typography } from '@mui/material';
+import { canRegister } from '@sealed-vote/protocol';
 import React, { useEffect, useState } from 'react';
 
 import VoteItem from './VoteItem';
 
-import { canRegister } from '@sealed-vote/protocol';
 import { useAppSelector } from 'app/hooks';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';

@@ -1,9 +1,0 @@
-import { createWorkspaceConfig } from '../../tooling/eslint/create-workspace-config.mjs';
-
-export default createWorkspaceConfig({
-    configFileUrl: import.meta.url,
-    environment: 'browser',
-    includeReact: true,
-    includeJest: true,
-    extraIgnores: ['temp/*'],
-});

@@ -1,4 +1,5 @@
 import { Typography, Alert, CircularProgress } from '@mui/material';
+import { derivePollPhase } from '@sealed-vote/protocol';
 import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
@@ -7,7 +8,6 @@ import PollHeader from './PollHeader';
 import VoteResults from './VoteResults';
 import Voting from './Voting/Voting';
 
-import { derivePollPhase } from '@sealed-vote/protocol';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';

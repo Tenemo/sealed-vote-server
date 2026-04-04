@@ -1,4 +1,10 @@
 import sql from '@nearform/sql';
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import type {
+    MessageResponse,
+    RegisterVoterRequest as RegisterVoterRequestContract,
+    RegisterVoterResponse as RegisterVoterResponseContract,
+} from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -6,13 +12,6 @@ import createError from 'http-errors';
 import { uuidRegex } from '../constants';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { generateSecureToken, hashSecureToken } from '../utils/voterAuth';
-
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
-import type {
-    MessageResponse,
-    RegisterVoterRequest as RegisterVoterRequestContract,
-    RegisterVoterResponse as RegisterVoterResponseContract,
-} from '@sealed-vote/contracts';
 
 const RegisterRequestSchema = Type.Object({
     voterName: Type.String({ minLength: 1, maxLength: 32 }),

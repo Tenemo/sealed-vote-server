@@ -19,8 +19,8 @@
         "start:dev": "cross-env NODE_ENV=development tsx src/server.ts",
         "dev": "cross-env NODE_ENV=development nodemon",
         "db:reset": "tsx scripts/resetDb.ts",
-        "lint": "pnpm exec eslint .",
-        "lint:fix": "pnpm exec eslint . --fix",
+        "lint": "pnpm --workspace-root exec eslint apps/server",
+        "lint:fix": "pnpm --workspace-root exec eslint apps/server --fix",
         "typecheck": "tsc",
         "test": "cross-env NODE_ENV=test vitest run --reporter verbose",
         "test:watch": "vitest watch --clearScreen"
@@ -50,7 +50,6 @@
         "@types/npm": "^7.19.3",
         "@types/pg": "^8.20.0",
         "@types/prettier": "^3.0.0",
-        "eslint": "^9.39.4",
         "del-cli": "^7.0.0",
         "nodemon": "^3.1.14",
         "pg": "^8.20.0",

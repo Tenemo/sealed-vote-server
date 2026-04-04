@@ -1,17 +1,16 @@
 import sql from '@nearform/sql';
-import { Type } from '@sinclair/typebox';
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import createError from 'http-errors';
-
-import { isConstraintViolation, withTransaction } from '../utils/db';
-import { generateSecureToken } from '../utils/voterAuth';
-
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     CreatePollRequest as CreatePollRequestContract,
     CreatePollResponse as CreatePollResponseContract,
     MessageResponse,
 } from '@sealed-vote/contracts';
+import { Type } from '@sinclair/typebox';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import createError from 'http-errors';
+
+import { isConstraintViolation, withTransaction } from '../utils/db';
+import { generateSecureToken } from '../utils/voterAuth';
 
 const EncryptedMessageSchema = Type.Object({
     c1: Type.String(),

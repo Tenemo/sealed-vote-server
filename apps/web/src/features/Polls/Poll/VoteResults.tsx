@@ -11,10 +11,10 @@ import {
     Typography,
     Box,
 } from '@mui/material';
+import { computeGeometricMean } from '@sealed-vote/protocol';
 import React from 'react';
 import { useParams } from 'react-router-dom';
 
-import { computeGeometricMean } from '@sealed-vote/protocol';
 import { useAppSelector } from 'app/hooks';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';

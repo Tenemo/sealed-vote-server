@@ -32,7 +32,6 @@
         "temp/**/*",
         "tests/**/*",
         "tests-examples/**/*",
-        "eslint.config.js",
         ".babelrc.cjs"
     ],
     "exclude": ["**/*.snap"]
