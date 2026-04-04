@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 
-import { buildServer } from './buildServer';
-import { getDatabaseUrl } from './config';
+import { buildServer } from './buildServer.js';
+import { getDatabaseUrl } from './config.js';
 
 config();
 

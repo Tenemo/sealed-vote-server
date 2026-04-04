@@ -13,13 +13,7 @@
         "declaration": true,
         "sourceMap": false,
         "removeComments": false,
-        "esModuleInterop": false,
-        "plugins": [
-            {
-                "transform": "typescript-transformer-esm",
-                "after": true
-            }
-        ]
+        "esModuleInterop": false
     },
     "include": ["src/**/*"],
     "exclude": [

@@ -6,9 +6,9 @@ import {
 } from 'drizzle-orm/node-postgres';
 import { Client, Pool, type PoolConfig } from 'pg';
 
-import { getDatabaseUrl, shouldUseDatabaseSsl } from '../config';
+import { getDatabaseUrl, shouldUseDatabaseSsl } from '../config.js';
 
-import { schema, type DatabaseSchema } from './schema';
+import { schema, type DatabaseSchema } from './schema.js';
 
 const TIMEOUT = 30 * 1000;
 

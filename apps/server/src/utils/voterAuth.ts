@@ -4,7 +4,7 @@ import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { sql } from 'drizzle-orm';
 import createError from 'http-errors';
 
-import type { DatabaseTransaction } from '../db/client';
+import type { DatabaseTransaction } from '../db/client.js';
 
 export type AuthenticatedVoter = {
     id: string;

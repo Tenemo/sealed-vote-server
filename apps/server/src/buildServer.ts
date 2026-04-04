@@ -7,16 +7,16 @@ import Fastify, {
     FastifyTypeProviderDefault,
 } from 'fastify';
 
-import { databasePlugin } from './db/plugin';
-import { close } from './routes/close';
-import { create } from './routes/create';
-import { decryptionShares } from './routes/decryptionShares';
-import { deletePoll } from './routes/delete';
-import { fetch } from './routes/fetch';
-import { healthCheck } from './routes/health-check';
-import { publicKeyShare } from './routes/publicKeyShare';
-import { register } from './routes/register';
-import { vote } from './routes/vote';
+import { databasePlugin } from './db/plugin.js';
+import { close } from './routes/close.js';
+import { create } from './routes/create.js';
+import { decryptionShares } from './routes/decryptionShares.js';
+import { deletePoll } from './routes/delete.js';
+import { fetch } from './routes/fetch.js';
+import { healthCheck } from './routes/health-check.js';
+import { publicKeyShare } from './routes/publicKeyShare.js';
+import { register } from './routes/register.js';
+import { vote } from './routes/vote.js';
 
 config();
 

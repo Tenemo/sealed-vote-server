@@ -4,7 +4,7 @@ import { asc, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants';
+import { uuidRegex } from '../constants.js';
 import {
     choices,
     decryptionShares,
@@ -12,8 +12,8 @@ import {
     polls,
     publicKeyShares,
     voters,
-} from '../db/schema';
-import { normalizeDatabaseTimestamp } from '../utils/db';
+} from '../db/schema.js';
+import { normalizeDatabaseTimestamp } from '../utils/db.js';
 
 const PollParamsSchema = Type.Object({
     pollId: Type.String(),

@@ -10,10 +10,10 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 import { combinePublicKeys } from 'threshold-elgamal';
 
-import { uuidRegex } from '../constants';
-import { polls, publicKeyShares, voters } from '../db/schema';
-import { isConstraintViolation, withTransaction } from '../utils/db';
-import { authenticateVoter } from '../utils/voterAuth';
+import { uuidRegex } from '../constants.js';
+import { polls, publicKeyShares, voters } from '../db/schema.js';
+import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { authenticateVoter } from '../utils/voterAuth.js';
 
 const PublicKeyShareRequestSchema = Type.Object({
     publicKeyShare: Type.String(),

@@ -9,9 +9,9 @@ import { eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants';
-import { polls } from '../db/schema';
-import { withTransaction } from '../utils/db';
+import { uuidRegex } from '../constants.js';
+import { polls } from '../db/schema.js';
+import { withTransaction } from '../utils/db.js';
 
 const ClosePollParamsSchema = Type.Object({
     pollId: Type.String(),

@@ -9,10 +9,10 @@ import { sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants';
-import { voters } from '../db/schema';
-import { isConstraintViolation, withTransaction } from '../utils/db';
-import { generateSecureToken, hashSecureToken } from '../utils/voterAuth';
+import { uuidRegex } from '../constants.js';
+import { voters } from '../db/schema.js';
+import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
 
 const RegisterRequestSchema = Type.Object({
     voterName: Type.String({ minLength: 1, maxLength: 32 }),

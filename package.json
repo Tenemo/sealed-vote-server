@@ -25,8 +25,7 @@
         "db:reset": "pnpm --filter @sealed-vote/server db:reset",
         "db:seed": "pnpm --filter @sealed-vote/server db:seed",
         "db:setup": "pnpm --filter @sealed-vote/server db:setup",
-        "prepare": "husky",
-        "postinstall": "pnpm --filter @sealed-vote/server exec ts-patch install -s"
+        "prepare": "husky"
     },
     "devDependencies": {
         "@eslint/compat": "^2.0.4",
@@ -48,5 +47,13 @@
         "typescript": "catalog:",
         "typescript-eslint": "^8.58.0",
         "turbo": "^2.9.3"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "@parcel/watcher",
+            "esbuild",
+            "multiline-ts",
+            "unrs-resolver"
+        ]
     }
 }

@@ -2,7 +2,7 @@ import { TestPollBuilder, type TestPollContext } from '@sealed-vote/testkit';
 import { inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
-import { polls } from './schema';
+import { polls } from './schema.js';
 
 type SeedPhase = 'registration' | 'voting' | 'results';
 

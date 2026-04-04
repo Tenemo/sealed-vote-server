@@ -12,14 +12,14 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants';
+import { uuidRegex } from '../constants.js';
 import {
     decryptionShares as decryptionSharesTable,
     polls,
     voters,
-} from '../db/schema';
-import { isConstraintViolation, withTransaction } from '../utils/db';
-import { authenticateVoter } from '../utils/voterAuth';
+} from '../db/schema.js';
+import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { authenticateVoter } from '../utils/voterAuth.js';
 
 const DecryptionSharesRequestSchema = Type.Object({
     decryptionShares: Type.Array(Type.String()),

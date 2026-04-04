@@ -10,10 +10,10 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants';
-import { encryptedVotes, polls, voters } from '../db/schema';
-import { isConstraintViolation, withTransaction } from '../utils/db';
-import { authenticateVoter } from '../utils/voterAuth';
+import { uuidRegex } from '../constants.js';
+import { encryptedVotes, polls, voters } from '../db/schema.js';
+import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { authenticateVoter } from '../utils/voterAuth.js';
 
 const EncryptedMessageSchema = Type.Object({
     c1: Type.String(),

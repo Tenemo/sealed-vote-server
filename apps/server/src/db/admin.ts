@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Client } from 'pg';
 
-import { getDatabaseUrl } from '../config';
+import { getDatabaseUrl } from '../config.js';
 
 import {
     createDatabase,
     createDatabaseClient,
     createDatabasePool,
-} from './client';
+} from './client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

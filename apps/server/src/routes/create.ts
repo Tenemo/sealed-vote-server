@@ -8,13 +8,13 @@ import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { choices as choicesTable, polls } from '../db/schema';
+import { choices as choicesTable, polls } from '../db/schema.js';
 import {
     isConstraintViolation,
     normalizeDatabaseTimestamp,
     withTransaction,
-} from '../utils/db';
-import { generateSecureToken } from '../utils/voterAuth';
+} from '../utils/db.js';
+import { generateSecureToken } from '../utils/voterAuth.js';
 
 const EncryptedMessageSchema = Type.Object({
     c1: Type.String(),

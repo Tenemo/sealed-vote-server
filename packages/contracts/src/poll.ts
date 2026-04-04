@@ -1,4 +1,4 @@
-import type { EncryptedMessage } from './vote';
+import type { EncryptedMessage } from './vote.js';
 
 export type CreatePollRequest = {
     choices: string[];

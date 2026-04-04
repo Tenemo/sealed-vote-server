@@ -1,7 +1,7 @@
 import type { FastifyInstance as BaseFastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 
-import { createDatabase, createDatabasePool, type Database } from './client';
+import { createDatabase, createDatabasePool, type Database } from './client.js';
 
 declare module 'fastify' {
     // Fastify decorations require interface merging.

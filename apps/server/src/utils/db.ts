@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import type { DatabaseTransaction } from '../db/client';
+import type { DatabaseTransaction } from '../db/client.js';
 
 type DatabaseErrorLike = {
     code?: string;

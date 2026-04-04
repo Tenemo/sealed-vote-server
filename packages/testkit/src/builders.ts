@@ -14,13 +14,13 @@ import {
     publicKeyShare,
     registerVoter,
     vote,
-} from './api';
+} from './api.js';
 import {
     createScoreMatrix,
     DEFAULT_TEST_CHOICES,
     DEFAULT_TEST_VOTERS,
     type ScoreMatrix,
-} from './fixtures';
+} from './fixtures.js';
 
 export type TestPollVoter = {
     voterName: string;

@@ -4,8 +4,8 @@ import { and, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants';
-import { polls } from '../db/schema';
+import { uuidRegex } from '../constants.js';
+import { polls } from '../db/schema.js';
 
 const DeletePollParams = Type.Object({
     pollId: Type.String(),
