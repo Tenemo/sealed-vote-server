@@ -81,6 +81,7 @@ const PollCreationPage = (): React.JSX.Element => {
                 sx={{
                     display: 'flex',
                     justifyContent: 'center',
+                    width: '100%',
                 }}
             >
                 <Grid

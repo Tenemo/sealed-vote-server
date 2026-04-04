@@ -2,6 +2,10 @@
 
 Monorepo for the sealed.vote backend, frontend, shared protocol packages, and end-to-end tests.
 
+## license
+
+This repository is licensed under AGPL-3.0-only. See the top-level `LICENSE` file for the full text.
+
 ## workspace layout
 
 - `apps/server` fastify backend

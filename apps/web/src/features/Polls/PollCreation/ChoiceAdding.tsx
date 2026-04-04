@@ -50,6 +50,7 @@ const ChoiceAdding = ({
             sx={{
                 display: 'flex',
                 justifyContent: 'center',
+                width: '100%',
             }}
         >
             <Grid
