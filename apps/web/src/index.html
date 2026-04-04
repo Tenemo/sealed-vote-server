@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta name="author" content="piotr@piech.dev" />
+    <meta name="description"
+        content="A browser-based application relying on homomorphic encryption allowing for ranked-choice voting with ranking choices from 1 to 10 in a way such that nobody, including the server, can know what the individual choices were! Only the result is publicly known. If it sounds like magic, you might enjoy reading up on what homomorphic encryption is and how it works." />
+
+    <meta property="og:title" content="sealed.vote" />
+    <meta property="og:description"
+        content="A browser-based application relying on homomorphic encryption allowing for ranked-choice voting with ranking choices from 1 to 10 in a way such that nobody, including the server, can know what the individual choices were!">
+    <meta property="og:url" content="https://sealed.vote">
+
+    <meta name="keywords"
+        content="react, redux, cryptography, typescript, encryption, material-ui, homomorphic-encryption, secure-computation, threshold-cryptography, elgamal, elgamal-encryption">
+
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta property="og:title" content="sealed.vote" />
+    <meta property="og:description" content="Ranked-choice voting" />
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="sealed.vote" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
+    <base href="/" />
+    <title>
+        <%= htmlWebpackPlugin.options.title %>
+    </title>
+    <script>
+        if (window.MSCompatibleInfo) {
+            var error =
+                "Internet Explorer is not supported. Please use a modern browser instead.";
+            document.querySelector("html").innerHTML = error;
+            throw new Error(error);
+        }
+
+    </script>
+</head>
+
+<body>
+    <noscript>You need to enable JavaScript to run this app. </noscript>
+    <div id="root"></div>
+</body>
+
+</html>

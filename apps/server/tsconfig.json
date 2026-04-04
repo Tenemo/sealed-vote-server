@@ -1,0 +1,32 @@
+{
+    "compilerOptions": {
+        "baseUrl": "./src/",
+        "paths": {
+            "@sealed-vote/contracts": ["../../../packages/contracts/src/index.ts"],
+            "@sealed-vote/protocol": ["../../../packages/protocol/src/index.ts"],
+            "@sealed-vote/testkit": ["../../../packages/testkit/src/index.ts"]
+        },
+        "target": "esnext",
+        "module": "esnext",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "allowArbitraryExtensions": true,
+        "removeComments": true,
+        "declaration": false,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "strict": true,
+        "sourceMap": true,
+        "allowJs": true,
+        "noEmit": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "noUnusedParameters": true,
+        "noUnusedLocals": true
+    },
+    "ts-node": {
+        "require": ["tsconfig-paths/register"]
+    },
+    "include": ["src/**/*", "scripts/**/*", ".eslintrc.cjs", "vitest.config.ts"]
+}

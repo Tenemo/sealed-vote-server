@@ -1,0 +1,162 @@
+import sql from '@nearform/sql';
+import {
+    ERROR_MESSAGES,
+    MessageResponse,
+    RegisterVoterRequest as RegisterVoterRequestContract,
+    RegisterVoterResponse as RegisterVoterResponseContract,
+} from '@sealed-vote/contracts';
+import { Type } from '@sinclair/typebox';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import createError from 'http-errors';
+
+import { uuidRegex } from '../constants';
+import { isConstraintViolation, withTransaction } from '../utils/db';
+import { generateSecureToken, hashSecureToken } from '../utils/voterAuth';
+
+const RegisterRequestSchema = Type.Object({
+    voterName: Type.String({ minLength: 1, maxLength: 32 }),
+});
+
+const RegisterResponseSchema = Type.Object({
+    message: Type.String(),
+    voterIndex: Type.Number(),
+    voterName: Type.String(),
+    pollId: Type.String(),
+    voterToken: Type.String(),
+});
+
+const MessageResponseSchema = Type.Object({
+    message: Type.String(),
+});
+
+const schema = {
+    body: RegisterRequestSchema,
+    response: {
+        201: RegisterResponseSchema,
+        400: MessageResponseSchema,
+        404: MessageResponseSchema,
+        409: MessageResponseSchema,
+    },
+};
+
+export type RegisterRequest = RegisterVoterRequestContract;
+export type RegisterResponse = RegisterVoterResponseContract;
+export type RegisterErrorResponse = MessageResponse;
+
+export const register = async (fastify: FastifyInstance): Promise<void> => {
+    fastify.post(
+        '/polls/:pollId/register',
+        { schema },
+        async (
+            req: FastifyRequest<{
+                Body: RegisterRequest;
+                Params: { pollId: string };
+            }>,
+            reply: FastifyReply,
+        ): Promise<RegisterResponse> => {
+            try {
+                const voterName = req.body.voterName.trim();
+                const { pollId } = req.params;
+
+                if (!uuidRegex.test(pollId)) {
+                    throw createError(400, ERROR_MESSAGES.invalidPollId);
+                }
+
+                if (!voterName) {
+                    throw createError(400, 'Voter name is required.');
+                }
+
+                const voterToken = generateSecureToken();
+                const voterTokenHash = hashSecureToken(voterToken);
+
+                const response = await withTransaction(
+                    fastify,
+                    async (client) => {
+                        const pollQuery = sql`
+                        SELECT id, is_open, max_participants
+                        FROM polls
+                        WHERE id = ${pollId}
+                        FOR UPDATE
+                    `;
+                        const { rows: polls } = await client.query<{
+                            id: string;
+                            is_open: boolean;
+                            max_participants: number;
+                        }>(pollQuery);
+
+                        const poll = polls[0];
+                        if (!poll) {
+                            throw createError(
+                                404,
+                                `Poll with ID ${pollId} does not exist.`,
+                            );
+                        }
+
+                        if (!poll.is_open) {
+                            throw createError(400, ERROR_MESSAGES.pollClosed);
+                        }
+
+                        const voterCountQuery = sql`
+                        SELECT COUNT(*) AS count
+                        FROM voters
+                        WHERE poll_id = ${pollId}
+                    `;
+                        const { rows: voterCounts } = await client.query<{
+                            count: string;
+                        }>(voterCountQuery);
+                        const voterCount = Number(voterCounts[0].count);
+
+                        if (voterCount >= poll.max_participants) {
+                            throw createError(
+                                400,
+                                ERROR_MESSAGES.maxParticipantsReached,
+                            );
+                        }
+
+                        const voterIndex = voterCount + 1;
+                        const insertVoterQuery = sql`
+                        INSERT INTO voters (
+                            voter_name,
+                            voter_index,
+                            poll_id,
+                            voter_token_hash
+                        )
+                        VALUES (
+                            ${voterName},
+                            ${voterIndex},
+                            ${pollId},
+                            ${voterTokenHash}
+                        )
+                    `;
+                        await client.query(insertVoterQuery);
+
+                        return {
+                            message: 'Voter registered successfully',
+                            voterIndex,
+                            voterName,
+                            pollId,
+                            voterToken,
+                        } satisfies RegisterResponse;
+                    },
+                );
+
+                void reply.code(201);
+                return response;
+            } catch (error) {
+                if (
+                    isConstraintViolation(error, 'unique_voter_name_per_poll')
+                ) {
+                    throw createError(409, ERROR_MESSAGES.duplicateVoterName);
+                }
+
+                if (!(error instanceof createError.HttpError)) {
+                    console.error(error);
+                }
+
+                throw error;
+            }
+        },
+    );
+};
+
+export default register;

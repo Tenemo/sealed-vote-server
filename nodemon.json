@@ -1,5 +1,0 @@
-{
-    "watch": ["src/**/*.*", "server.ts", "tsconfig.json", "package.json"],
-    "exec": "npm run start:dev",
-    "ignore": ["dist/", "tmp/"]
-}

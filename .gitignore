@@ -1,21 +1,28 @@
-# NPM
+# Dependencies
 node_modules/
 *.tgz
 npm-debug.log
-.tmp/
-sh.exe.stackdump
-debug.log
+.pnpm-store/
 
 # Build
 dist/
+.turbo/
 
 # Testing
 coverage/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/tests-examples/
 
 # Miscellaneous
 .DS_Store
+.tmp/
+debug.log
+sh.exe.stackdump
 temp/
 temp.*
 
-# env
+# Environment
 .env
