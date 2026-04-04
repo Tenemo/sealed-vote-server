@@ -20,6 +20,7 @@
         "docker:destroy": "docker compose down -v --remove-orphans",
         "docker:wipe": "pnpm docker:destroy && pnpm docker:up",
         "docker:reset": "pnpm docker:wipe",
+        "local:reset": "pnpm docker:reset && pnpm db:setup",
         "db:generate": "pnpm --filter @sealed-vote/server db:generate",
         "db:migrate": "pnpm --filter @sealed-vote/server db:migrate",
         "db:reset": "pnpm --filter @sealed-vote/server db:reset",

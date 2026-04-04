@@ -18,13 +18,11 @@ This repository is licensed under AGPL-3.0-only. See the top-level `LICENSE` fil
 
 ```bash
 pnpm install
-pnpm docker:reset
-pnpm db:reset
-pnpm db:seed
+pnpm local:reset
 pnpm dev
 ```
 
-Use `pnpm db:setup` to reset and seed in one step. `pnpm db:seed` is optional and intended for manual local smoke checks.
+Use `pnpm local:reset` to recreate docker services, rebuild the database, and seed local sample data in one step. `pnpm db:setup` is still available when the containers are already running.
 
 ## verification
 

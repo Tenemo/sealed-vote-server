@@ -8,13 +8,11 @@ Run the monorepo from the repository root:
 
 ```bash
 pnpm install
-pnpm docker:up
-pnpm db:reset
-pnpm db:seed
+pnpm local:reset
 pnpm --filter @sealed-vote/web dev
 ```
 
-`pnpm db:seed` is optional and only useful when you want sample polls for manual local testing.
+`pnpm local:reset` recreates docker services and rebuilds plus seeds the local database. `pnpm db:seed` is still optional and only useful when you want sample polls for manual local testing without resetting the database first.
 
 To run the full stack together from the root:
 
