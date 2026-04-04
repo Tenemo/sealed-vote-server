@@ -55,7 +55,7 @@ const PollCreationPage = (): React.JSX.Element => {
             choices: form.choices,
             // @ts-expect-error
         }).then(({ data: { id } }) => {
-            navigate(`/votes/${id}`);
+            void navigate(`/votes/${id}`);
         });
     };
 
@@ -83,12 +83,8 @@ const PollCreationPage = (): React.JSX.Element => {
                 }}
             >
                 <Grid
-                    item
-                    lg={6}
-                    md={8}
-                    sm={10}
+                    size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
                     sx={{ width: '100%', p: 1 }}
-                    xl={4}
                 >
                     <TextField
                         autoComplete="off"

@@ -10,6 +10,7 @@
         "target": "esnext",
         "module": "esnext",
         "moduleResolution": "node",
+        "ignoreDeprecations": "6.0",
         "removeComments": true,
         "declaration": false,
         "allowSyntheticDefaultImports": true,

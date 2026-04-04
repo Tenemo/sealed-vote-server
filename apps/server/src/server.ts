@@ -7,9 +7,14 @@ config();
 
 const start = async (): Promise<void> => {
     const fastify = await buildServer();
+    const port = Number.parseInt(process.env.PORT ?? '4000', 10);
 
     try {
-        await fastify.listen(process.env.PORT ?? 4000, '0.0.0.0');
+        if (Number.isNaN(port)) {
+            throw new TypeError('PORT must be a valid integer.');
+        }
+
+        await fastify.listen({ port, host: '0.0.0.0' });
         fastify.log.info('Server started successfully.');
 
         const dbClient = await fastify.pg.connect();

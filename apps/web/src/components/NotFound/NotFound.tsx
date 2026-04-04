@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 const NotFound = (): React.JSX.Element => {
     const navigate = useNavigate();
     const onClick = (): void => {
-        navigate('/');
+        void navigate('/');
     };
 
     return (

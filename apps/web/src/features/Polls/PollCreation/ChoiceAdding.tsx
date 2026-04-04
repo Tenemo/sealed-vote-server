@@ -53,17 +53,13 @@ const ChoiceAdding = ({
             }}
         >
             <Grid
-                item
-                lg={6}
-                md={8}
-                sm={10}
+                size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
                 sx={{
                     width: '100%',
                     p: 1,
                     backgroundColor: theme.palette.action.hover,
                     borderRadius: 1,
                 }}
-                xl={4}
             >
                 <Box
                     sx={{

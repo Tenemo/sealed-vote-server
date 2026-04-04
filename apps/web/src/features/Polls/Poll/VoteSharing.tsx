@@ -25,12 +25,8 @@ const VoteSharing = (): React.JSX.Element => {
             }}
         >
             <Grid
-                item
-                lg={6}
-                md={8}
-                sm={10}
+                size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
                 sx={{ width: '100%', p: 2 }}
-                xl={4}
             >
                 <FormControl
                     sx={{

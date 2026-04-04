@@ -23,7 +23,7 @@
         "@sealed-vote/protocol": "workspace:*"
     },
     "devDependencies": {
-        "fastify": "^4.26.2",
+        "fastify": "^5.8.4",
         "rimraf": "catalog:",
         "typescript": "catalog:"
     }
