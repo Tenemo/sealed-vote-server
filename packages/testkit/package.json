@@ -15,7 +15,8 @@
         "build": "tsc -p tsconfig.json",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "clean": "rimraf dist",
-        "lint": "echo \"No lint task for testkit\"",
+        "lint": "pnpm exec eslint .",
+        "lint:fix": "pnpm exec eslint . --fix",
         "test": "echo \"No standalone tests for testkit\""
     },
     "dependencies": {
@@ -23,6 +24,7 @@
         "@sealed-vote/protocol": "workspace:*"
     },
     "devDependencies": {
+        "eslint": "^9.39.4",
         "fastify": "^5.8.4",
         "rimraf": "catalog:",
         "typescript": "catalog:"

@@ -1,10 +1,11 @@
 import sql from '@nearform/sql';
-import { PollResponse as PollResponseContract } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
+
+import type { PollResponse as PollResponseContract } from '@sealed-vote/contracts';
 
 const PollParamsSchema = Type.Object({
     pollId: Type.String(),

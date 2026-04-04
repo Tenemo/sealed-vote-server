@@ -53,10 +53,11 @@ const PollCreationPage = (): React.JSX.Element => {
         void createPoll({
             pollName: form.pollName,
             choices: form.choices,
-            // @ts-expect-error
-        }).then(({ data: { id } }) => {
-            void navigate(`/votes/${id}`);
-        });
+        })
+            .unwrap()
+            .then(({ id }) => {
+                void navigate(`/votes/${id}`);
+            });
     };
 
     const isFormValid = pollName.trim() && choices.length > 1 && !isLoading;

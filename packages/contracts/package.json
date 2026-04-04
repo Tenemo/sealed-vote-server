@@ -15,10 +15,12 @@
         "build": "tsc -p tsconfig.json",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "clean": "rimraf dist",
-        "lint": "echo \"No lint task for contracts\"",
+        "lint": "pnpm exec eslint .",
+        "lint:fix": "pnpm exec eslint . --fix",
         "test": "echo \"No tests for contracts\""
     },
     "devDependencies": {
+        "eslint": "^9.39.4",
         "rimraf": "catalog:",
         "typescript": "catalog:"
     }

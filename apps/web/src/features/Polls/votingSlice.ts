@@ -1,9 +1,9 @@
-import { PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 
 import { pollsApi } from './pollsApi';
 
 import { createAppSlice } from 'app/createAppSlice';
-import { RootState } from 'app/store';
+import type { RootState } from 'app/store';
 
 export type VoteState = {
     creatorToken: string | null;

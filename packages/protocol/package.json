@@ -15,7 +15,8 @@
         "build": "tsc -p tsconfig.json",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "clean": "rimraf dist",
-        "lint": "echo \"No lint task for protocol\"",
+        "lint": "pnpm exec eslint .",
+        "lint:fix": "pnpm exec eslint . --fix",
         "test": "vitest run --reporter verbose"
     },
     "dependencies": {
@@ -23,6 +24,7 @@
         "threshold-elgamal": "catalog:"
     },
     "devDependencies": {
+        "eslint": "^9.39.4",
         "rimraf": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",

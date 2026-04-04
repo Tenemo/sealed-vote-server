@@ -1,10 +1,4 @@
 import sql from '@nearform/sql';
-import {
-    DecryptionSharesRequest as DecryptionSharesRequestContract,
-    ERROR_MESSAGES,
-    MessageResponse,
-} from '@sealed-vote/contracts';
-import { decryptTallies } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -12,6 +6,13 @@ import createError from 'http-errors';
 import { uuidRegex } from '../constants';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { authenticateVoter } from '../utils/voterAuth';
+
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import type {
+    DecryptionSharesRequest as DecryptionSharesRequestContract,
+    MessageResponse,
+} from '@sealed-vote/contracts';
+import { decryptTallies } from '@sealed-vote/protocol';
 
 const DecryptionSharesRequestSchema = Type.Object({
     decryptionShares: Type.Array(Type.String()),

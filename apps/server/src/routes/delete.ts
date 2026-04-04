@@ -1,5 +1,6 @@
 import sql from '@nearform/sql';
-import { Type, Static } from '@sinclair/typebox';
+import { Type } from '@sinclair/typebox';
+import type { Static } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 

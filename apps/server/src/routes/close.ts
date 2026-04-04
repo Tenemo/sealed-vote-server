@@ -1,15 +1,16 @@
 import sql from '@nearform/sql';
-import {
-    ClosePollRequest as ClosePollRequestContract,
-    ERROR_MESSAGES,
-    MessageResponse,
-} from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants';
 import { withTransaction } from '../utils/db';
+
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import type {
+    ClosePollRequest as ClosePollRequestContract,
+    MessageResponse,
+} from '@sealed-vote/contracts';
 
 const ClosePollParamsSchema = Type.Object({
     pollId: Type.String(),

@@ -80,7 +80,8 @@ export const API_PREFIX = '/api';
 export const POLL_ROUTES = {
     create: `${API_PREFIX}/polls/create`,
     poll: (pollId: string): string => `${API_PREFIX}/polls/${pollId}`,
-    register: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/register`,
+    register: (pollId: string): string =>
+        `${API_PREFIX}/polls/${pollId}/register`,
     close: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/close`,
     publicKeyShare: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/public-key-share`,

@@ -1,12 +1,12 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+
+import { POLLING_DELAY } from './constants';
+
 import {
     canSubmitDecryptionShares,
     createDecryptionSharesForTallies,
     serializeVotes,
 } from '@sealed-vote/protocol';
-
-import { POLLING_DELAY } from './constants';
-
 import { RootState } from 'app/store';
 import { PollResponse, pollsApi } from 'features/Polls/pollsApi';
 import {

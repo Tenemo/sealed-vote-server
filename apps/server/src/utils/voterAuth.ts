@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 
 import sql from '@nearform/sql';
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import createError from 'http-errors';
 import type { PoolClient } from 'pg';
+
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 
 export type AuthenticatedVoter = {
     id: string;

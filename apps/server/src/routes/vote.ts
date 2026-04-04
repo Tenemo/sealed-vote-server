@@ -1,11 +1,4 @@
 import sql from '@nearform/sql';
-import {
-    ERROR_MESSAGES,
-    MessageResponse,
-    VoteRequest as VoteRequestContract,
-    VoteResponse as VoteResponseContract,
-} from '@sealed-vote/contracts';
-import { computeEncryptedTallies } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -13,6 +6,14 @@ import createError from 'http-errors';
 import { uuidRegex } from '../constants';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { authenticateVoter } from '../utils/voterAuth';
+
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import type {
+    MessageResponse,
+    VoteRequest as VoteRequestContract,
+    VoteResponse as VoteResponseContract,
+} from '@sealed-vote/contracts';
+import { computeEncryptedTallies } from '@sealed-vote/protocol';
 
 const EncryptedMessageSchema = Type.Object({
     c1: Type.String(),

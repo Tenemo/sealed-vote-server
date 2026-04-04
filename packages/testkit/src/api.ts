@@ -1,8 +1,8 @@
-import {
+import { POLL_ROUTES } from '@sealed-vote/contracts';
+import type {
     CreatePollResponse,
     DecryptionSharesRequest,
     MessageResponse,
-    POLL_ROUTES,
     PublicKeyShareRequest,
     RegisterVoterResponse,
     VoteRequest,

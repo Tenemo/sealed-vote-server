@@ -1,9 +1,4 @@
 import sql from '@nearform/sql';
-import {
-    ERROR_MESSAGES,
-    MessageResponse,
-    PublicKeyShareRequest as PublicKeyShareRequestContract,
-} from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -12,6 +7,12 @@ import { combinePublicKeys } from 'threshold-elgamal';
 import { uuidRegex } from '../constants';
 import { isConstraintViolation, withTransaction } from '../utils/db';
 import { authenticateVoter } from '../utils/voterAuth';
+
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import type {
+    MessageResponse,
+    PublicKeyShareRequest as PublicKeyShareRequestContract,
+} from '@sealed-vote/contracts';
 
 const PublicKeyShareRequestSchema = Type.Object({
     publicKeyShare: Type.String(),

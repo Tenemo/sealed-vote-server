@@ -34,7 +34,10 @@ export const derivePollPhase = (poll: PollResponse): PollPhase => {
         return 'decryption';
     }
 
-    if (poll.encryptedVotes.length > 0 && poll.encryptedVotes.length >= poll.voters.length) {
+    if (
+        poll.encryptedVotes.length > 0 &&
+        poll.encryptedVotes.length >= poll.voters.length
+    ) {
         return 'tallying';
     }
 
@@ -44,8 +47,10 @@ export const derivePollPhase = (poll: PollResponse): PollPhase => {
 export const canRegister = (poll: PollResponse): boolean =>
     derivePollPhase(poll) === 'registration';
 
-export const canClose = (poll: PollResponse, voterCount = poll.voters.length): boolean =>
-    poll.isOpen && voterCount > 1;
+export const canClose = (
+    poll: PollResponse,
+    voterCount = poll.voters.length,
+): boolean => poll.isOpen && voterCount > 1;
 
 export const canSubmitPublicKeyShare = (poll: PollResponse): boolean =>
     derivePollPhase(poll) === 'key-generation';

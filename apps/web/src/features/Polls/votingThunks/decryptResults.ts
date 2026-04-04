@@ -1,9 +1,8 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { derivePollPhase } from '@sealed-vote/protocol';
-// import { combineDecryptionShares, thresholdDecrypt } from 'threshold-elgamal';
 
 import { POLLING_DELAY } from './constants';
 
+import { derivePollPhase } from '@sealed-vote/protocol';
 import { PollResponse, pollsApi } from 'features/Polls/pollsApi';
 import { setProgressMessage, setResults } from 'features/Polls/votingSlice';
 
