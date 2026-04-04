@@ -30,4 +30,4 @@ pnpm --filter @sealed-vote/server test
 pnpm --filter @sealed-vote/server build
 ```
 
-API details live in [docs/endpoints.md](./docs/endpoints.md).
+Canonical docs live at [../../docs/endpoints.md](../../docs/endpoints.md) and [../../docs/deployment.md](../../docs/deployment.md).

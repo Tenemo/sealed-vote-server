@@ -1,15 +1,15 @@
-const mockedCanRegister = jest.fn();
-const mockedGetPollInitiate = jest.fn();
-const mockedRegisterVoterInitiate = jest.fn();
-const mockedProcessPublicPrivateKeys = jest.fn();
-const mockedEncryptVotesGenerateShares = jest.fn();
-const mockedDecryptResults = jest.fn();
+const mockedCanRegister = vi.fn();
+const mockedGetPollInitiate = vi.fn();
+const mockedRegisterVoterInitiate = vi.fn();
+const mockedProcessPublicPrivateKeys = vi.fn();
+const mockedEncryptVotesGenerateShares = vi.fn();
+const mockedDecryptResults = vi.fn();
 
-jest.mock('@sealed-vote/protocol', () => ({
+vi.mock('@sealed-vote/protocol', () => ({
     canRegister: (...args: unknown[]) => mockedCanRegister(...args),
 }));
 
-jest.mock('features/Polls/pollsApi', () => ({
+vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
         endpoints: {
             getPollSkipCache: {
@@ -24,17 +24,17 @@ jest.mock('features/Polls/pollsApi', () => ({
     },
 }));
 
-jest.mock('./processPublicPrivateKeys', () => ({
+vi.mock('./processPublicPrivateKeys', () => ({
     processPublicPrivateKeys: (...args: unknown[]) =>
         mockedProcessPublicPrivateKeys(...args),
 }));
 
-jest.mock('./encryptVotesGenerateShares', () => ({
+vi.mock('./encryptVotesGenerateShares', () => ({
     encryptVotesGenerateShares: (...args: unknown[]) =>
         mockedEncryptVotesGenerateShares(...args),
 }));
 
-jest.mock('./decryptResults', () => ({
+vi.mock('./decryptResults', () => ({
     decryptResults: (...args: unknown[]) => mockedDecryptResults(...args),
 }));
 
@@ -70,7 +70,7 @@ describe('vote thunk', () => {
         });
         mockedDecryptResults.mockReturnValue({ type: 'decryptResults' });
 
-        const dispatch = jest.fn((action) => {
+        const dispatch = vi.fn((action) => {
             switch (action.type) {
                 case 'getPoll':
                     return {

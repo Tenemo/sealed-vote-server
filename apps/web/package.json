@@ -6,22 +6,20 @@
     "license": "UNLICENSED",
     "description": "sealed.vote web application",
     "scripts": {
-        "start": "cross-env NODE_ENV=development pnpm run open:src",
-        "dev": "pnpm start",
-        "build": "cross-env NODE_ENV=production webpack --config config/webpack/webpack.prod.babel.ts",
-        "build:analyze": "pnpm run clean && cross-env NODE_ENV=production ANALYZE=true webpack --config config/webpack/webpack.prod.babel.ts",
-        "clean": "rimraf ./dist && mkdir dist",
+        "start": "vite",
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "clean": "rimraf ./dist",
         "eslint": "pnpm --workspace-root exec eslint apps/web",
         "eslint:fix": "pnpm --workspace-root exec eslint apps/web --fix",
         "stylelint": "stylelint **/*.scss **/*.css",
         "lint": "pnpm run eslint && pnpm run stylelint",
-        "open:dist": "http-server dist --port 4000 --proxy http://localhost:4000?",
-        "open:src": "cross-env PORT=3000 webpack serve --config config/webpack/webpack.dev.babel.ts",
         "typecheck": "tsc",
-        "test": "cross-env NODE_ENV=test jest --passWithNoTests",
-        "test:update": "pnpm run test -- --update",
-        "test:coverage": "pnpm run test -- --coverage",
-        "test:watch": "pnpm run test -- --watch"
+        "test": "vitest run --reporter verbose",
+        "test:update": "vitest run --update",
+        "test:coverage": "vitest run --coverage",
+        "test:watch": "vitest watch"
     },
     "browserslist": [
         "> 0.5%",
@@ -30,13 +28,7 @@
         "not op_mini all"
     ],
     "type": "module",
-    "overrides": {
-        "@pmmmwh/react-refresh-webpack-plugin": {
-            "webpack-dev-server": "^5.0.4"
-        }
-    },
     "dependencies": {
-        "@babel/runtime-corejs3": "^7.29.2",
         "@emotion/react": "^11.14.0",
         "@emotion/styled": "^11.14.1",
         "@mui/icons-material": "^7.3.9",
@@ -48,7 +40,6 @@
         "@sentry/react": "^10.47.0",
         "axios": "^1.14.0",
         "copy-to-clipboard": "^3.3.3",
-        "core-js": "^3.49.0",
         "history": "^5.3.0",
         "normalize.css": "^8.0.1",
         "react": "^19.2.4",
@@ -66,110 +57,40 @@
         "uuid": "^13.0.0"
     },
     "devDependencies": {
-        "@babel/core": "^7.29.0",
-        "@babel/node": "^7.29.0",
-        "@babel/plugin-proposal-class-properties": "^7.18.6",
-        "@babel/preset-env": "^7.29.2",
-        "@babel/preset-react": "^7.28.5",
-        "@babel/preset-typescript": "^7.28.5",
-        "@babel/register": "^7.28.6",
-        "@pmmmwh/react-refresh-webpack-plugin": "^0.6.2",
-        "@teamsupercell/typings-for-css-modules-loader": "^2.5.2",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^16.3.2",
         "@testing-library/user-event": "^14.6.1",
-        "@types/circular-dependency-plugin": "^5.0.8",
-        "@types/core-js": "^2.5.8",
         "@types/eslint": "^9.6.1",
         "@types/eslint-plugin-prettier": "^3.1.3",
-        "@types/history": "^5.0.0",
-        "@types/html-webpack-plugin": "^3.2.9",
-        "@types/http-server": "^0.12.4",
-        "@types/ip": "^1.1.3",
-        "@types/jest": "^30.0.0",
         "@types/jsdom": "^28.0.1",
-        "@types/mini-css-extract-plugin": "^2.5.1",
         "@types/node": "^25.5.2",
         "@types/npm": "^7.19.3",
         "@types/prettier": "^3.0.0",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@types/react-redux": "^7.1.34",
-        "@types/react-router": "^5.1.20",
-        "@types/react-router-dom": "^5.3.3",
         "@types/redux-logger": "^3.0.13",
         "@types/redux-mock-store": "^1.5.0",
-        "@types/sass": "^1.45.0",
         "@types/uuid": "^11.0.0",
-        "@types/webpack-bundle-analyzer": "^4.7.0",
-        "@types/webpack-env": "^1.18.8",
+        "@vitejs/plugin-react": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "autoprefixer": "^10.4.27",
-        "babel-jest": "^30.3.0",
-        "babel-loader": "^10.1.1",
-        "babel-plugin-module-resolver": "^5.0.3",
-        "circular-dependency-plugin": "^5.2.2",
-        "copy-webpack-plugin": "^14.0.0",
-        "cross-env": "^10.1.0",
-        "css-loader": "^7.1.4",
-        "css-minimizer-webpack-plugin": "^8.0.0",
-        "html-webpack-plugin": "^5.6.6",
-        "http-server": "^14.1.1",
-        "ip": "^2.0.1",
-        "jest": "^30.3.0",
-        "jest-cli": "^30.3.0",
-        "jest-environment-jsdom": "^30.3.0",
         "jsdom": "^29.0.1",
-        "mini-css-extract-plugin": "^2.10.2",
         "postcss": "^8.5.8",
-        "postcss-flexbugs-fixes": "^5.0.2",
         "postcss-html": "^1.8.1",
-        "postcss-loader": "^8.2.1",
         "prettier-eslint": "^16.4.2",
         "prettier-stylelint": "^0.4.2",
-        "react-refresh": "^0.18.0",
         "redux-logger": "^3.0.6",
         "redux-mock-store": "^1.5.5",
         "rimraf": "catalog:",
         "sass": "^1.99.0",
-        "sass-loader": "^16.0.7",
-        "style-loader": "^4.0.0",
         "stylelint": "^17.6.0",
         "stylelint-config-recommended": "^18.0.0",
         "stylelint-config-recommended-scss": "^17.0.0",
         "stylelint-scss": "^7.0.0",
         "typescript": "catalog:",
-        "webpack": "^5.105.4",
-        "webpack-bundle-analyzer": "^5.3.0",
-        "webpack-cli": "^7.0.2",
-        "webpack-dev-server": "^5.2.3",
-        "webpack-merge": "^6.0.1"
-    },
-    "jest": {
-        "collectCoverageFrom": [
-            "<rootDir>/src/**/*{js,jsx,ts,tsx}"
-        ],
-        "coveragePathIgnorePatterns": [
-            "<rootDir>/src/main.tsx"
-        ],
-        "setupFilesAfterEnv": [
-            "<rootDir>/config/testSetup.ts"
-        ],
-        "moduleNameMapper": {
-            "\\.(jpg|jpeg|png|gif|ico|woff|woff2|svg|ttf|eot)$": "<rootDir>/config/assetsTransformer.ts",
-            "^.+\\.(css|scss)$": "<rootDir>/config/assetsTransformer.ts",
-            "^@sealed-vote/contracts$": "<rootDir>/../../packages/contracts/src/index.ts",
-            "^@sealed-vote/protocol$": "<rootDir>/../../packages/protocol/src/index.ts",
-            "^@sealed-vote/testkit$": "<rootDir>/../../packages/testkit/src/index.ts"
-        },
-        "transform": {
-            "^.+\\.[jt]sx?$": [
-                "babel-jest",
-                {
-                    "configFile": "./.babelrc.cjs"
-                }
-            ]
-        },
-        "testEnvironment": "jsdom"
+        "vite": "catalog:",
+        "vitest": "catalog:"
     }
 }

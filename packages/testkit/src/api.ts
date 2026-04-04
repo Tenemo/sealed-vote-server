@@ -3,6 +3,7 @@ import type {
     CreatePollResponse,
     DecryptionSharesRequest,
     MessageResponse,
+    PollResponse,
     PublicKeyShareRequest,
     RegisterVoterResponse,
     VoteRequest,
@@ -18,6 +19,7 @@ export const createPoll = async (
     fastify: FastifyInstance,
     pollName?: string,
     choices?: string[],
+    maxParticipants: number = 10,
 ): Promise<{
     pollId: string;
     creatorToken: string;
@@ -30,7 +32,7 @@ export const createPoll = async (
         payload: {
             choices: choices ?? ['Option 1', 'Option 2'],
             pollName: pollName ?? `Test poll ${getUniquePollName()}`,
-            maxParticipants: 10,
+            maxParticipants,
         },
     });
     const createResponseBody = JSON.parse(
@@ -42,6 +44,18 @@ export const createPoll = async (
         pollId: createResponseBody.id,
         creatorToken: createResponseBody.creatorToken,
     };
+};
+
+export const fetchPoll = async (
+    fastify: FastifyInstance,
+    pollId: string,
+): Promise<PollResponse> => {
+    const response = await fastify.inject({
+        method: 'GET',
+        url: POLL_ROUTES.poll(pollId),
+    });
+
+    return JSON.parse(response.body) as PollResponse;
 };
 
 export const deletePoll = async (

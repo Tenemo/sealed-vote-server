@@ -1,11 +1,11 @@
-const mockedGetPollInitiate = jest.fn();
-const mockedVoteInitiate = jest.fn();
-const mockedSubmitDecryptionSharesInitiate = jest.fn();
-const mockedSerializeVotes = jest.fn();
-const mockedCreateDecryptionSharesForTallies = jest.fn();
-const mockedCanSubmitDecryptionShares = jest.fn();
+const mockedGetPollInitiate = vi.fn();
+const mockedVoteInitiate = vi.fn();
+const mockedSubmitDecryptionSharesInitiate = vi.fn();
+const mockedSerializeVotes = vi.fn();
+const mockedCreateDecryptionSharesForTallies = vi.fn();
+const mockedCanSubmitDecryptionShares = vi.fn();
 
-jest.mock('@sealed-vote/protocol', () => ({
+vi.mock('@sealed-vote/protocol', () => ({
     canSubmitDecryptionShares: (...args: unknown[]) =>
         mockedCanSubmitDecryptionShares(...args),
     createDecryptionSharesForTallies: (...args: unknown[]) =>
@@ -13,7 +13,7 @@ jest.mock('@sealed-vote/protocol', () => ({
     serializeVotes: (...args: unknown[]) => mockedSerializeVotes(...args),
 }));
 
-jest.mock('features/Polls/pollsApi', () => ({
+vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
         endpoints: {
             getPollSkipCache: {
@@ -58,7 +58,7 @@ describe('encryptVotesGenerateShares thunk', () => {
         );
 
         let pollFetchCount = 0;
-        const dispatch = jest.fn((action) => {
+        const dispatch = vi.fn((action) => {
             switch (action.type) {
                 case 'getPoll':
                     pollFetchCount += 1;

@@ -30,4 +30,6 @@ pnpm --filter @sealed-vote/web test
 pnpm --filter @sealed-vote/web build
 ```
 
-Voting protocol details are documented in [docs/voting.md](./docs/voting.md).
+For deployed builds, set `VITE_API_BASE_URL` to the backend origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
+
+Canonical docs live at [../../docs/voting.md](../../docs/voting.md) and [../../docs/deployment.md](../../docs/deployment.md).

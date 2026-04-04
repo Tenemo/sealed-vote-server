@@ -4,6 +4,7 @@ import type {
     MessageResponse,
     PublicKeyShareRequest as PublicKeyShareRequestContract,
 } from '@sealed-vote/contracts';
+import { canSubmitPublicKeyShare } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -65,8 +66,13 @@ export const publicKeyShare = async (
                             id,
                             is_open,
                             common_public_key,
-                            results,
-                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count
+                            COALESCE(array_length(results, 1), 0) AS result_count,
+                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count,
+                            (
+                                SELECT COUNT(*)::int
+                                FROM voters
+                                WHERE poll_id = ${pollId}
+                            ) AS voter_count
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
@@ -75,8 +81,9 @@ export const publicKeyShare = async (
                             id: string;
                             is_open: boolean;
                             common_public_key: string | null;
-                            results: number[];
+                            result_count: number;
                             encrypted_tally_count: number;
+                            voter_count: number;
                         }>(pollQuery);
 
                         const poll = polls[0];
@@ -88,10 +95,14 @@ export const publicKeyShare = async (
                         }
 
                         if (
-                            poll.is_open ||
-                            poll.common_public_key ||
-                            poll.results.length > 0 ||
-                            poll.encrypted_tally_count > 0
+                            !canSubmitPublicKeyShare({
+                                isOpen: poll.is_open,
+                                commonPublicKey: poll.common_public_key,
+                                voterCount: poll.voter_count,
+                                encryptedVoteCount: 0,
+                                encryptedTallyCount: poll.encrypted_tally_count,
+                                resultCount: poll.result_count,
+                            })
                         ) {
                             throw createError(
                                 400,
@@ -135,17 +146,7 @@ export const publicKeyShare = async (
                             public_key_share: string;
                         }>(sharesQuery);
 
-                        const voterCountQuery = sql`
-                        SELECT COUNT(*) AS voters_count
-                        FROM voters
-                        WHERE poll_id = ${pollId}
-                    `;
-                        const { rows: voterCounts } = await client.query<{
-                            voters_count: string;
-                        }>(voterCountQuery);
-                        const votersCount = Number(voterCounts[0].voters_count);
-
-                        if (publicKeyShares.length === votersCount) {
+                        if (publicKeyShares.length === poll.voter_count) {
                             const combinedPublicKey = combinePublicKeys(
                                 publicKeyShares.map(({ public_key_share }) =>
                                     BigInt(public_key_share),

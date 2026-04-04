@@ -1,6 +1,5 @@
 import { ThemeProvider } from '@mui/material';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import VoteResults from './VoteResults';
@@ -9,21 +8,21 @@ import { useAppSelector } from 'app/hooks';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import { darkTheme } from 'styles/theme';
 
-jest.mock('@sealed-vote/protocol', () => ({
+vi.mock('@sealed-vote/protocol', () => ({
     computeGeometricMean: (results: number[], voterCount: number) =>
         results.map((result) => result ** (1 / voterCount)),
 }));
 
-jest.mock('app/hooks', () => ({
-    useAppSelector: jest.fn(),
+vi.mock('app/hooks', () => ({
+    useAppSelector: vi.fn(),
 }));
 
-jest.mock('features/Polls/pollsApi', () => ({
-    useGetPollQuery: jest.fn(),
+vi.mock('features/Polls/pollsApi', () => ({
+    useGetPollQuery: vi.fn(),
 }));
 
-const mockedUseAppSelector = jest.mocked(useAppSelector);
-const mockedUseGetPollQuery = jest.mocked(useGetPollQuery);
+const mockedUseAppSelector = vi.mocked(useAppSelector);
+const mockedUseGetPollQuery = vi.mocked(useGetPollQuery);
 
 describe('VoteResults', () => {
     it('renders geometric means using the voter count', () => {

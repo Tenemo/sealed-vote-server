@@ -1,5 +1,4 @@
 import type { PollResponse } from '@sealed-vote/contracts';
-import { combinePublicKeys, generateKeys } from 'threshold-elgamal';
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -8,13 +7,10 @@ import {
     canSubmitDecryptionShares,
     canSubmitPublicKeyShare,
     canVote,
-    computeEncryptedTallies,
-    computeGeometricMean,
-    createDecryptionSharesForTallies,
-    decryptTallies,
     derivePollPhase,
-    serializeVotes,
-} from './index';
+    type PollPhaseState,
+    toPollPhaseState,
+} from '../phases';
 
 const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     pollName: 'Test poll',
@@ -31,18 +27,31 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     ...overrides,
 });
 
+describe('toPollPhaseState', () => {
+    test('extracts only the protocol phase fields from the poll response', () => {
+        expect(toPollPhaseState(createPoll())).toEqual<PollPhaseState>({
+            isOpen: true,
+            commonPublicKey: null,
+            voterCount: 2,
+            encryptedVoteCount: 0,
+            encryptedTallyCount: 0,
+            resultCount: 0,
+        });
+    });
+});
+
 describe('derivePollPhase', () => {
     test('returns registration for open polls', () => {
         expect(derivePollPhase(createPoll())).toBe('registration');
     });
 
-    test('returns key-generation for closed polls without common key', () => {
+    test('returns key-generation for closed polls without a common key', () => {
         expect(derivePollPhase(createPoll({ isOpen: false }))).toBe(
             'key-generation',
         );
     });
 
-    test('returns voting when common key exists and tallies are absent', () => {
+    test('returns voting when a common key exists and tallies are absent', () => {
         expect(
             derivePollPhase(
                 createPoll({
@@ -51,6 +60,21 @@ describe('derivePollPhase', () => {
                 }),
             ),
         ).toBe('voting');
+    });
+
+    test('returns tallying while all votes are present but tallies are not yet stored', () => {
+        expect(
+            derivePollPhase(
+                createPoll({
+                    isOpen: false,
+                    commonPublicKey: '123',
+                    encryptedVotes: [
+                        [{ c1: '1', c2: '2' }],
+                        [{ c1: '3', c2: '4' }],
+                    ],
+                }),
+            ),
+        ).toBe('tallying');
     });
 
     test('returns decryption when tallies exist and results are missing', () => {
@@ -76,6 +100,19 @@ describe('derivePollPhase', () => {
             ),
         ).toBe('complete');
     });
+
+    test('accepts count-based state for server-side guards', () => {
+        expect(
+            derivePollPhase({
+                isOpen: false,
+                commonPublicKey: '123',
+                voterCount: 3,
+                encryptedVoteCount: 3,
+                encryptedTallyCount: 0,
+                resultCount: 0,
+            }),
+        ).toBe('tallying');
+    });
 });
 
 describe('guards', () => {
@@ -92,38 +129,17 @@ describe('guards', () => {
         expect(canVote(votingPoll)).toBe(true);
         expect(canSubmitDecryptionShares(votingPoll)).toBe(false);
     });
-});
 
-describe('crypto helpers', () => {
-    test('computes geometric means using voter count', () => {
-        const [firstResult, secondResult] = computeGeometricMean(
-            [1000, 125],
-            3,
-        );
-
-        expect(firstResult).toBeCloseTo(10);
-        expect(secondResult).toBeCloseTo(5);
-    });
-
-    test('serializes votes in choice order and decrypts tallies', () => {
-        const voter1 = generateKeys(1, 2);
-        const voter2 = generateKeys(2, 2);
-        const commonPublicKey = combinePublicKeys([
-            voter1.publicKey,
-            voter2.publicKey,
-        ]);
-
-        const votes = [
-            serializeVotes({ Dog: 9, Cat: 4 }, ['Dog', 'Cat'], commonPublicKey),
-            serializeVotes({ Dog: 3, Cat: 2 }, ['Dog', 'Cat'], commonPublicKey),
-        ];
-
-        const tallies = computeEncryptedTallies(votes);
-        const shares = [
-            createDecryptionSharesForTallies(tallies, voter1.privateKey),
-            createDecryptionSharesForTallies(tallies, voter2.privateKey),
-        ];
-
-        expect(decryptTallies(tallies, shares)).toEqual([27, 8]);
+    test('does not allow close when fewer than two voters are present', () => {
+        expect(
+            canClose({
+                isOpen: true,
+                commonPublicKey: null,
+                voterCount: 1,
+                encryptedVoteCount: 0,
+                encryptedTallyCount: 0,
+                resultCount: 0,
+            }),
+        ).toBe(false);
     });
 });

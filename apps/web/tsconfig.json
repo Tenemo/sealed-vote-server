@@ -6,10 +6,11 @@
             "@sealed-vote/protocol": ["../../../packages/protocol/src/index.ts"],
             "@sealed-vote/testkit": ["../../../packages/testkit/src/index.ts"]
         },
-        "jsx": "react",
+        "jsx": "react-jsx",
         "target": "esnext",
         "module": "esnext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
+        "types": ["vite/client", "vitest/globals"],
         "ignoreDeprecations": "6.0",
         "removeComments": true,
         "declaration": false,
@@ -29,10 +30,10 @@
     "include": [
         "src/**/*",
         "config/**/*",
-        "temp/**/*",
         "tests/**/*",
         "tests-examples/**/*",
-        ".babelrc.cjs"
+        "vite.config.ts",
+        "vitest.config.ts"
     ],
     "exclude": ["**/*.snap"]
 }

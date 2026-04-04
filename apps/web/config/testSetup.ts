@@ -1,6 +1,7 @@
 import { TextDecoder, TextEncoder } from 'util';
 
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
 Object.defineProperty(globalThis, 'TextEncoder', {
     configurable: true,
@@ -17,7 +18,7 @@ Object.defineProperty(globalThis, 'TextDecoder', {
 if (typeof globalThis.fetch === 'undefined') {
     Object.defineProperty(globalThis, 'fetch', {
         configurable: true,
-        value: jest.fn(() =>
+        value: vi.fn(() =>
             Promise.reject(new Error('Unexpected fetch call in tests.')),
         ),
         writable: true,

@@ -4,6 +4,7 @@ import type {
     ClosePollRequest as ClosePollRequestContract,
     MessageResponse,
 } from '@sealed-vote/contracts';
+import { canClose } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -93,7 +94,18 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                         voter_count: string;
                     }>(voterCountQuery);
 
-                    if (Number(voterCounts[0].voter_count) <= 1) {
+                    const voterCount = Number(voterCounts[0].voter_count);
+
+                    if (
+                        !canClose({
+                            isOpen: poll.is_open,
+                            commonPublicKey: null,
+                            voterCount,
+                            encryptedVoteCount: 0,
+                            encryptedTallyCount: 0,
+                            resultCount: 0,
+                        })
+                    ) {
                         throw createError(
                             400,
                             ERROR_MESSAGES.notEnoughVotersToClose,

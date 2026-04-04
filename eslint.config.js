@@ -2,7 +2,6 @@ const { fixupConfigRules } = require('@eslint/compat');
 const eslint = require('@eslint/js');
 const { defineConfig } = require('eslint/config');
 const { flatConfigs: importConfigs } = require('eslint-plugin-import');
-const jestPlugin = require('eslint-plugin-jest');
 const jsxA11yPlugin = require('eslint-plugin-jsx-a11y');
 const prettierPlugin = require('eslint-plugin-prettier');
 const prettierRecommended = require('eslint-plugin-prettier/recommended');
@@ -82,7 +81,6 @@ const sharedRules = {
 };
 
 const frontendRules = {
-    'react/jsx-uses-react': ERROR,
     'react/jsx-uses-vars': ERROR,
     'react/destructuring-assignment': [ERROR, 'always'],
     'react/jsx-filename-extension': [
@@ -173,6 +171,10 @@ module.exports = defineConfig(
         files: frontendFiles,
     },
     {
+        ...reactPlugin.configs.flat['jsx-runtime'],
+        files: frontendFiles,
+    },
+    {
         ...jsxA11yPlugin.flatConfigs.strict,
         files: frontendFiles,
     },
@@ -212,27 +214,23 @@ module.exports = defineConfig(
         files: allTestFiles,
         languageOptions: {
             globals: {
-                ...globals.jest,
+                ...globals.vitest,
+                ...globals.browser,
                 ...globals.node,
                 ...globals.es2021,
             },
         },
     },
     {
-        ...jestPlugin.configs['flat/recommended'],
-        files: ['apps/web/**/*.{spec,test}.{js,jsx,ts,tsx}'],
-    },
-    {
-        files: ['apps/web/**/*.{spec,test}.{js,jsx,ts,tsx}'],
+        files: ['**/*.d.ts'],
         rules: {
-            'jest/no-commented-out-tests': ERROR,
+            '@typescript-eslint/consistent-type-definitions': OFF,
         },
     },
     {
         files: ['**/*.scss.d.ts'],
         rules: {
             'prettier/prettier': OFF,
-            '@typescript-eslint/consistent-type-definitions': OFF,
             '@typescript-eslint/no-empty-object-type': OFF,
         },
     },

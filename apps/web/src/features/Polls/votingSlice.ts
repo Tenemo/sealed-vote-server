@@ -66,18 +66,34 @@ const applyRegistration = (
     voteState.hasSubmittedDecryptionShares = false;
 };
 
+const clearCompletedSensitiveFields = (voteState: VoteState): VoteState => ({
+    ...voteState,
+    creatorToken: null,
+    selectedScores: null,
+    voterToken: null,
+    privateKey: null,
+    publicKey: null,
+    progressMessage: null,
+    isVotingInProgress: false,
+});
+
 export const sanitizeVotingStateForPersistence = (
     state: VotingState,
 ): VotingState =>
     Object.fromEntries(
         Object.entries(state).map(([pollId, voteState]) => [
             pollId,
-            {
-                ...initialVoteState,
-                ...voteState,
-                isVotingInProgress: false,
-                progressMessage: null,
-            },
+            voteState.results
+                ? {
+                      ...initialVoteState,
+                      ...clearCompletedSensitiveFields(voteState),
+                  }
+                : {
+                      ...initialVoteState,
+                      ...voteState,
+                      isVotingInProgress: false,
+                      progressMessage: null,
+                  },
         ]),
     );
 
@@ -162,7 +178,9 @@ export const votingSlice = createAppSlice({
             }>,
         ) => {
             const { pollId, results } = action.payload;
-            ensureVoteState(state, pollId).results = results;
+            const voteState = ensureVoteState(state, pollId);
+            voteState.results = results;
+            Object.assign(voteState, clearCompletedSensitiveFields(voteState));
         },
         setSubmissionStatus: (
             state,

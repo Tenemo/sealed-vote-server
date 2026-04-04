@@ -1,2 +1,9 @@
-declare module 'react-refresh';
-declare module 'react-refresh/babel';
+declare module '*.module.css' {
+    const classes: Record<string, string>;
+    export default classes;
+}
+
+declare module '*.module.scss' {
+    const classes: Record<string, string>;
+    export default classes;
+}

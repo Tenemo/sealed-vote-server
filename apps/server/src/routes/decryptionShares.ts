@@ -4,7 +4,10 @@ import type {
     DecryptionSharesRequest as DecryptionSharesRequestContract,
     MessageResponse,
 } from '@sealed-vote/contracts';
-import { decryptTallies } from '@sealed-vote/protocol';
+import {
+    canSubmitDecryptionShares,
+    decryptTallies,
+} from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -61,14 +64,22 @@ export const decryptionShares = async (
                     fastify,
                     async (client) => {
                         const pollQuery = sql`
-                        SELECT encrypted_tallies, results
+                        SELECT
+                            is_open,
+                            common_public_key,
+                            encrypted_tallies,
+                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count,
+                            COALESCE(array_length(results, 1), 0) AS result_count
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
                     `;
                         const { rows: polls } = await client.query<{
+                            is_open: boolean;
+                            common_public_key: string | null;
                             encrypted_tallies: { c1: string; c2: string }[];
-                            results: number[];
+                            encrypted_tally_count: number;
+                            result_count: number;
                         }>(pollQuery);
 
                         const poll = polls[0];
@@ -80,8 +91,14 @@ export const decryptionShares = async (
                         }
 
                         if (
-                            poll.encrypted_tallies.length === 0 ||
-                            poll.results.length > 0
+                            !canSubmitDecryptionShares({
+                                isOpen: poll.is_open,
+                                commonPublicKey: poll.common_public_key,
+                                voterCount: 0,
+                                encryptedVoteCount: 0,
+                                encryptedTallyCount: poll.encrypted_tally_count,
+                                resultCount: poll.result_count,
+                            })
                         ) {
                             throw createError(
                                 400,

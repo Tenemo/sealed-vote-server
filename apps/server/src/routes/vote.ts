@@ -5,7 +5,7 @@ import type {
     VoteRequest as VoteRequestContract,
     VoteResponse as VoteResponseContract,
 } from '@sealed-vote/contracts';
-import { computeEncryptedTallies } from '@sealed-vote/protocol';
+import { canVote, computeEncryptedTallies } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -69,8 +69,13 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                             id,
                             is_open,
                             common_public_key,
-                            encrypted_tallies,
-                            results
+                            jsonb_array_length(encrypted_tallies) AS encrypted_tally_count,
+                            COALESCE(array_length(results, 1), 0) AS result_count,
+                            (
+                                SELECT COUNT(*)::int
+                                FROM voters
+                                WHERE poll_id = ${pollId}
+                            ) AS voter_count
                         FROM polls
                         WHERE id = ${pollId}
                         FOR UPDATE
@@ -79,8 +84,9 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         id: string;
                         is_open: boolean;
                         common_public_key: string | null;
-                        encrypted_tallies: { c1: string; c2: string }[];
-                        results: number[];
+                        encrypted_tally_count: number;
+                        result_count: number;
+                        voter_count: number;
                     }>(pollQuery);
 
                     const poll = polls[0];
@@ -92,10 +98,14 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                     }
 
                     if (
-                        poll.is_open ||
-                        !poll.common_public_key ||
-                        poll.encrypted_tallies.length > 0 ||
-                        poll.results.length > 0
+                        !canVote({
+                            isOpen: poll.is_open,
+                            commonPublicKey: poll.common_public_key,
+                            voterCount: poll.voter_count,
+                            encryptedVoteCount: 0,
+                            encryptedTallyCount: poll.encrypted_tally_count,
+                            resultCount: poll.result_count,
+                        })
                     ) {
                         throw createError(
                             400,
@@ -156,17 +166,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         votes: { c1: string; c2: string }[];
                     }>(votesQuery);
 
-                    const voterCountQuery = sql`
-                        SELECT COUNT(*) AS voters_count
-                        FROM voters
-                        WHERE poll_id = ${pollId}
-                    `;
-                    const { rows: voterCounts } = await client.query<{
-                        voters_count: string;
-                    }>(voterCountQuery);
-                    const votersCount = Number(voterCounts[0].voters_count);
-
-                    if (encryptedVoteRows.length === votersCount) {
+                    if (encryptedVoteRows.length === poll.voter_count) {
                         const encryptedTallies = computeEncryptedTallies(
                             encryptedVoteRows.map(
                                 ({ votes: encryptedVotes }) => encryptedVotes,

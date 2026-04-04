@@ -21,7 +21,8 @@
     },
     "dependencies": {
         "@sealed-vote/contracts": "workspace:*",
-        "@sealed-vote/protocol": "workspace:*"
+        "@sealed-vote/protocol": "workspace:*",
+        "threshold-elgamal": "catalog:"
     },
     "devDependencies": {
         "fastify": "^5.8.4",

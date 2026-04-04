@@ -1,0 +1,61 @@
+name: server artifact
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - '.github/workflows/server-artifact.yml'
+            - '.nvmrc'
+            - '.npmrc'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+            - 'turbo.json'
+            - 'apps/server/**'
+            - 'packages/contracts/**'
+            - 'packages/protocol/**'
+
+jobs:
+    build-server-artifact:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build server workspace
+              run: pnpm turbo run build --filter=@sealed-vote/server
+
+            - name: Prepare deployment artifact
+              run: |
+                  mkdir -p release/apps/server release/packages/contracts release/packages/protocol
+                  cp package.json release/package.json
+                  cp pnpm-lock.yaml release/pnpm-lock.yaml
+                  cp pnpm-workspace.yaml release/pnpm-workspace.yaml
+                  cp .npmrc release/.npmrc
+                  cp apps/server/package.json release/apps/server/package.json
+                  cp apps/server/.env.sample release/apps/server/.env.sample
+                  cp apps/server/Procfile release/apps/server/Procfile
+                  cp -r apps/server/dist release/apps/server/dist
+                  cp packages/contracts/package.json release/packages/contracts/package.json
+                  cp -r packages/contracts/dist release/packages/contracts/dist
+                  cp packages/protocol/package.json release/packages/protocol/package.json
+                  cp -r packages/protocol/dist release/packages/protocol/dist
+
+            - name: Upload server artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: sealed-vote-server-artifact
+                  path: release

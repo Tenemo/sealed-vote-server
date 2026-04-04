@@ -13,10 +13,15 @@ import {
     type VoteResponse,
 } from '@sealed-vote/contracts';
 
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const apiBaseUrl = configuredApiBaseUrl
+    ? configuredApiBaseUrl.replace(/\/+$/, '')
+    : '/';
+
 export const pollsApi = createApi({
     reducerPath: 'polls',
     baseQuery: fetchBaseQuery({
-        baseUrl: '/',
+        baseUrl: apiBaseUrl,
     }),
     tagTypes: ['Poll'],
     endpoints: (build) => ({
