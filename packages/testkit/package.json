@@ -1,0 +1,36 @@
+{
+    "name": "@sealed-vote/testkit",
+    "private": true,
+    "version": "2.0.0",
+    "license": "AGPL-3.0-only",
+    "engines": {
+        "node": ">=24.14.1"
+    },
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "clean": "rimraf dist",
+        "lint": "pnpm --workspace-root exec eslint packages/testkit",
+        "lint:fix": "pnpm --workspace-root exec eslint packages/testkit --fix",
+        "test": "echo \"No standalone tests for testkit\""
+    },
+    "dependencies": {
+        "@sealed-vote/contracts": "workspace:*",
+        "@sealed-vote/protocol": "workspace:*",
+        "threshold-elgamal": "catalog:"
+    },
+    "devDependencies": {
+        "fastify": "^5.8.4",
+        "rimraf": "catalog:",
+        "typescript": "catalog:"
+    }
+}

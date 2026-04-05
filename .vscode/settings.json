@@ -3,7 +3,7 @@
     "files.insertFinalNewline": true,
     "editor.linkedEditing": true,
     "files.autoSave": "off",
-    "javascript.updateImportsOnFileMove.enabled": "prompt",
+    "javascript.updateImportsOnFileMove.enabled": "always",
     "typescript.tsdk": "node_modules\\typescript\\lib",
     "editor.bracketPairColorization.enabled": true,
     "editor.guides.bracketPairs": true,
@@ -13,6 +13,7 @@
     "javascript.validate.enable": false,
 
     "eslint.format.enable": true,
+    "eslint.experimental.useFlatConfig": true,
     "[javascript]": {
         "editor.defaultFormatter": "dbaeumer.vscode-eslint"
     },
@@ -28,6 +29,9 @@
     "[html]": {
         "editor.defaultFormatter": "vscode.html-language-features"
     },
+    "[scss]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
     "prettier.htmlWhitespaceSensitivity": "ignore",
     "eslint.validate": [
         "javascript",
@@ -38,5 +42,6 @@
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "never"
     },
+
     "workbench.iconTheme": "vscode-icons"
 }

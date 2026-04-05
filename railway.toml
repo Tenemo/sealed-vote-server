@@ -1,0 +1,11 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "pnpm turbo run build --filter=@sealed-vote/api"
+
+[deploy]
+startCommand = "pnpm --filter @sealed-vote/api start"
+preDeployCommand = "pnpm --filter @sealed-vote/api db:migrate"
+healthcheckPath = "/api/health-check"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

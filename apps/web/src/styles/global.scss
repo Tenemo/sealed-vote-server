@@ -1,0 +1,36 @@
+html,
+body,
+#root {
+    height: 100%;
+    font-size: 16px;
+}
+*,
+*:before,
+*:after {
+    box-sizing: border-box;
+}
+
+:root {
+    color-scheme: dark;
+}
+
+body {
+    color: #ddd;
+    background-color: #222;
+    @font-face {
+        font-family: "Roboto";
+        src: url("../fonts/Roboto-Regular.ttf") format("ttf"),
+    }
+    font-family: "Roboto", sans-serif;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+body.using-mouse {
+    :focus,
+    [class$="-is-focused"] {
+        outline: none;
+        box-shadow: initial;
+    }
+}
