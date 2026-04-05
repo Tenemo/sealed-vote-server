@@ -1,0 +1,39 @@
+{
+    "compilerOptions": {
+        "baseUrl": "./src/",
+        "paths": {
+            "@sealed-vote/contracts": ["../../../packages/contracts/src/index.ts"],
+            "@sealed-vote/protocol": ["../../../packages/protocol/src/index.ts"],
+            "@sealed-vote/testkit": ["../../../packages/testkit/src/index.ts"]
+        },
+        "jsx": "react-jsx",
+        "target": "esnext",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "types": ["vite/client", "vitest/globals"],
+        "ignoreDeprecations": "6.0",
+        "removeComments": true,
+        "declaration": false,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "strict": true,
+        "sourceMap": true,
+        "allowJs": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "noUnusedParameters": true,
+        "noUnusedLocals": true
+    },
+    "include": [
+        "src/**/*",
+        "config/**/*",
+        "tests/**/*",
+        "tests-examples/**/*",
+        "vite.config.ts",
+        "vitest.config.ts"
+    ],
+    "exclude": ["**/*.snap"]
+}

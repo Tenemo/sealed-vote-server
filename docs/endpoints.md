@@ -1,118 +1,252 @@
-# Sealed Vote Server API Endpoints
+# API endpoints
 
-## Create Poll
+The backend routes live under `/api`. The request and response payloads below match the shared contracts in `packages/contracts`.
 
--   **POST** `/api/polls/create`
-    -   **Description**: Create a new poll with the specified options.
-    -   **Request Body**:
-        ```json
-        {
-            "choices": ["Option1", "Option2", "Option3"],
-            "pollName": "Poll Name",
-            "maxParticipants": 20
-        }
-        ```
-    -   **Response**:
-        ```json
-        {
-            "pollName": "Poll Name",
-            "creatorToken": "Creator's Unique Token",
-            "choices": ["Option1", "Option2", "Option3"],
-            "maxParticipants": 20,
-            "id": "Poll Unique ID",
-            "createdAt": "Timestamp",
-            "publicKeyShares": [],
-            "commonPublicKey": null,
-            "encryptedVotes": [],
-            "encryptedTallies": [],
-            "decryptionShares": [],
-            "results": []
-        }
-        ```
+## Create poll
 
-## Register Voter
+- `POST /api/polls/create`
+- request body:
 
--   **POST** `/api/polls/:pollId/register`
-    -   **Description**: Register a voter for the specified poll.
-    -   **Request Body**:
-        ```json
-        {
-            "voterName": "Voter Name"
-        }
-        ```
-    -   **Response**: `201 Created` on success.
+```json
+{
+    "pollName": "Lunch vote",
+    "choices": ["Pizza", "Sushi", "Pasta"],
+    "maxParticipants": 20
+}
+```
 
-## Close Poll
+- success response: `201 Created`
 
--   **POST** `/api/polls/:pollId/close`
-    -   **Description**: Close the poll for new votes.
-    -   **Request Body**:
-        ```json
-        {
-            "creatorToken": "Creator's Unique Token"
-        }
-        ```
-    -   **Response**: `200 OK` on success.
+```json
+{
+    "pollName": "Lunch vote",
+    "creatorToken": "creator-token",
+    "choices": ["Pizza", "Sushi", "Pasta"],
+    "maxParticipants": 20,
+    "id": "poll-id",
+    "createdAt": "2026-04-04T12:00:00.000Z",
+    "publicKeyShares": [],
+    "commonPublicKey": null,
+    "encryptedVotes": [],
+    "encryptedTallies": [],
+    "decryptionShares": [],
+    "results": []
+}
+```
 
-## Fetch Poll Details
+- failure responses:
+- `400` for invalid input such as fewer than two choices or duplicate choice names
+- `409` when `pollName` is already taken
 
--   **GET** `/api/polls/:pollId`
-    -   **Description**: Retrieve details of a specific poll.
-    -   **Response**:
-        ```json
-        {
-            "pollName": "Poll Name",
-            "createdAt": "Timestamp",
-            "choices": ["Option1", "Option2", "Option3"],
-            "voters": ["Alice", "Bob"],
-            "isOpen": false,
-            "publicKeyShares": ["PublicKeyShare1", "PublicKeyShare2"],
-            "commonPublicKey": "CommonPublicKey",
-            "encryptedVotes": [["Vote1", "Vote2"]],
-            "encryptedTallies": ["Tally1", "Tally2"],
-            "decryptionShares": [["Share1", "Share2"]],
-            "results": [10, 20, 30]
-        }
-        ```
+## Fetch poll
 
-## Submit Public Key Share
+- `GET /api/polls/:pollId`
+- success response: `200 OK`
 
--   **POST** `/api/polls/:pollId/public-key-share`
-    -   **Description**: Submit a public key share for the poll.
-    -   **Request Body**:
-        ```json
-        {
-            "publicKeyShare": "PublicKeyShare"
-        }
-        ```
-    -   **Response**: `201 Created` on success.
+```json
+{
+    "pollName": "Lunch vote",
+    "createdAt": "2026-04-04T12:00:00.000Z",
+    "choices": ["Pizza", "Sushi", "Pasta"],
+    "voters": ["Alice", "Bob"],
+    "isOpen": false,
+    "publicKeyShares": ["pk-share-1", "pk-share-2"],
+    "commonPublicKey": "combined-public-key",
+    "encryptedVotes": [
+        [
+            { "c1": "1", "c2": "2" },
+            { "c1": "3", "c2": "4" },
+            { "c1": "5", "c2": "6" }
+        ]
+    ],
+    "encryptedTallies": [
+        { "c1": "7", "c2": "8" },
+        { "c1": "9", "c2": "10" },
+        { "c1": "11", "c2": "12" }
+    ],
+    "decryptionShares": [["13", "14", "15"]],
+    "results": [12, 19, 7]
+}
+```
 
-## Vote
+- failure responses:
+- `400` for an invalid poll id
+- `404` when the poll does not exist
 
--   **POST** `/api/polls/:pollId/vote`
-    -   **Description**: Submit encrypted votes for a poll.
-    -   **Request Body**:
-        ```json
-        {
-            "votes": [
-                { "c1": "EncryptedValue1", "c2": "EncryptedValue2" },
-                { "c1": "EncryptedValue3", "c2": "EncryptedValue4" }
-            ]
-        }
-        ```
-    -   **Response**: `200 OK` on success.
+## Register voter
 
-## Submit Decryption Shares
+- `POST /api/polls/:pollId/register`
+- request body:
 
--   **POST** `/api/polls/:pollId/decryption-shares`
-    -   **Description**: Submit decryption shares for vote tallying.
-    -   **Request Body**:
-        ```json
-        {
-            "decryptionShares": [
-                ["Share1", "Share2"],
-                ["Share3", "Share4"]
-            ]
-        }
-        ```
-    -   **Response**: `201 Created` on success.
+```json
+{
+    "voterName": "Alice"
+}
+```
+
+- success response: `201 Created`
+
+```json
+{
+    "message": "Voter registered successfully",
+    "voterIndex": 1,
+    "voterName": "Alice",
+    "pollId": "poll-id",
+    "voterToken": "voter-token"
+}
+```
+
+- notes:
+- `voterToken` is returned only once and is required for the secured phase endpoints below
+- voter names are unique per poll
+- failure responses:
+- `400` for invalid poll id, empty voter name, closed poll, or max participants reached
+- `404` when the poll does not exist
+- `409` when `voterName` is already taken in that poll
+
+## Close poll
+
+- `POST /api/polls/:pollId/close`
+- request body:
+
+```json
+{
+    "creatorToken": "creator-token"
+}
+```
+
+- success response: `200 OK`
+
+```json
+{
+    "message": "Poll closed successfully"
+}
+```
+
+- failure responses:
+- `400` for invalid poll id, already closed polls, or fewer than two registered voters
+- `403` for an invalid creator token
+- `404` when the poll does not exist
+
+## Submit public key share
+
+- `POST /api/polls/:pollId/public-key-share`
+- request body:
+
+```json
+{
+    "publicKeyShare": "public-key-share",
+    "voterToken": "voter-token"
+}
+```
+
+- success response: `201 Created`
+
+```json
+{
+    "message": "Public key share submitted successfully"
+}
+```
+
+- failure responses:
+- `400` for invalid poll id or wrong protocol phase
+- `403` for an invalid voter token
+- `404` when the poll does not exist
+- `409` when the same voter submits twice
+
+## Submit vote
+
+- `POST /api/polls/:pollId/vote`
+- request body:
+
+```json
+{
+    "voterToken": "voter-token",
+    "votes": [
+        { "c1": "ciphertext-1-a", "c2": "ciphertext-1-b" },
+        { "c1": "ciphertext-2-a", "c2": "ciphertext-2-b" }
+    ]
+}
+```
+
+- success response: `200 OK`
+
+```json
+"Vote submitted successfully"
+```
+
+- failure responses:
+- `400` for invalid poll id, wrong protocol phase, or vote vector length mismatch
+- `403` for an invalid voter token
+- `404` when the poll does not exist
+- `409` when the same voter submits twice
+
+## Submit decryption shares
+
+- `POST /api/polls/:pollId/decryption-shares`
+- request body:
+
+```json
+{
+    "voterToken": "voter-token",
+    "decryptionShares": ["share-1", "share-2"]
+}
+```
+
+- success response: `201 Created`
+
+```json
+{
+    "message": "Decryption shares submitted successfully."
+}
+```
+
+- failure responses:
+- `400` for invalid poll id, wrong protocol phase, or decryption share vector length mismatch
+- `403` for an invalid voter token
+- `404` when the poll does not exist
+- `409` when the same voter submits twice
+
+## Delete poll
+
+- `DELETE /api/polls/:pollId`
+- request body:
+
+```json
+{
+    "creatorToken": "creator-token"
+}
+```
+
+- success response: `200 OK`
+
+```json
+{
+    "message": "Poll deleted successfully"
+}
+```
+
+- failure responses:
+- `400` for invalid poll id
+- `404` when the poll does not exist or the token does not match
+
+## Health check
+
+- `GET /api/health-check`
+- success response: `200 OK`
+
+```json
+{
+    "service": "OK",
+    "database": "OK"
+}
+```
+
+- degraded response: `503 Service Unavailable`
+
+```json
+{
+    "service": "OK",
+    "database": "Failed"
+}
+```

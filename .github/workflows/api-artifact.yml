@@ -1,0 +1,62 @@
+name: API artifact
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - '.github/workflows/api-artifact.yml'
+            - '.nvmrc'
+            - '.npmrc'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+            - 'turbo.json'
+            - 'apps/api/**'
+            - 'packages/contracts/**'
+            - 'packages/protocol/**'
+            - 'packages/testkit/**'
+
+jobs:
+    build-api-artifact:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build API workspace
+              run: pnpm turbo run build --filter=@sealed-vote/api
+
+            - name: Prepare deployment artifact
+              run: |
+                  mkdir -p release/apps/api release/packages/contracts release/packages/protocol
+                  cp package.json release/package.json
+                  cp pnpm-lock.yaml release/pnpm-lock.yaml
+                  cp pnpm-workspace.yaml release/pnpm-workspace.yaml
+                  cp .npmrc release/.npmrc
+                  cp apps/api/package.json release/apps/api/package.json
+                  cp apps/api/.env.sample release/apps/api/.env.sample
+                  cp apps/api/Procfile release/apps/api/Procfile
+                  cp -r apps/api/dist release/apps/api/dist
+                  cp packages/contracts/package.json release/packages/contracts/package.json
+                  cp -r packages/contracts/dist release/packages/contracts/dist
+                  cp packages/protocol/package.json release/packages/protocol/package.json
+                  cp -r packages/protocol/dist release/packages/protocol/dist
+
+            - name: Upload API artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: sealed-vote-api-artifact
+                  path: release

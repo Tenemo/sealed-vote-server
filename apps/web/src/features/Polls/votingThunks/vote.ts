@@ -1,0 +1,1 @@
+export { vote } from '../votingSlice';
