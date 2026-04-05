@@ -15,6 +15,7 @@ import {
 import hardSet from 'redux-persist/lib/stateReconciler/hardSet';
 
 import { sessionPersistStorage } from './persistStorage';
+import { shouldEnableReduxDevTools } from './reduxDevTools';
 
 import { registerPollQueryStore } from 'features/Polls/pollQuery';
 import { pollsApi } from 'features/Polls/pollsApi';
@@ -53,7 +54,7 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
     reducer: persistedReducer,
-    devTools: true, // Leaving it on for prod on purpose
+    devTools: shouldEnableReduxDevTools(import.meta.env.MODE),
     middleware: (getDefaultMiddleware) => {
         const middleware = getDefaultMiddleware({
             serializableCheck: {
