@@ -22,13 +22,13 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v5
               with:
                   version: 10.33.0
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version-file: '.nvmrc'
                   cache: pnpm
@@ -56,7 +56,7 @@ jobs:
                   cp -r packages/protocol/dist release/packages/protocol/dist
 
             - name: Upload API artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: sealed-vote-api-artifact
                   path: release

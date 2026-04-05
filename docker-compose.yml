@@ -1,12 +1,11 @@
 services:
     postgres:
-        container_name: sv-postgres
         image: postgres:18.3
         restart: always
         volumes:
-            - sv-data:/var/lib/postgresql/data
+            - sv-data:/var/lib/postgresql
         ports:
-            - 5432:5432
+            - '${POSTGRES_PORT:-5432}:5432'
         environment:
             POSTGRES_USER: postgres
             POSTGRES_PASSWORD: postgres
