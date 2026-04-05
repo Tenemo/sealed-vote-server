@@ -1,10 +1,11 @@
 import crypto from 'crypto';
 
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
-import { sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import createError from 'http-errors';
 
 import type { DatabaseTransaction } from '../db/client.js';
+import { voters } from '../db/schema.js';
 
 export type AuthenticatedVoter = {
     id: string;
@@ -27,39 +28,27 @@ export const authenticateVoter = async (
     voterToken: string,
 ): Promise<AuthenticatedVoter> => {
     const voterTokenHash = hashSecureToken(voterToken);
-    const queryResult = await tx.execute(sql`
-        SELECT
-            id,
-            voter_name,
-            voter_index,
-            has_submitted_public_key_share,
-            has_voted,
-            has_submitted_decryption_shares
-        FROM voters
-        WHERE poll_id = ${pollId} AND voter_token_hash = ${voterTokenHash}
-        FOR UPDATE
-    `);
+    const [voter] = await tx
+        .select({
+            id: voters.id,
+            voterName: voters.voterName,
+            voterIndex: voters.voterIndex,
+            hasSubmittedPublicKeyShare: voters.hasSubmittedPublicKeyShare,
+            hasVoted: voters.hasVoted,
+            hasSubmittedDecryptionShares: voters.hasSubmittedDecryptionShares,
+        })
+        .from(voters)
+        .where(
+            and(
+                eq(voters.pollId, pollId),
+                eq(voters.voterTokenHash, voterTokenHash),
+            ),
+        )
+        .for('update');
 
-    const rows = queryResult.rows as Array<{
-        id: string;
-        voter_name: string;
-        voter_index: number;
-        has_submitted_public_key_share: boolean;
-        has_voted: boolean;
-        has_submitted_decryption_shares: boolean;
-    }>;
-
-    const voter = rows[0];
     if (!voter) {
         throw createError(403, ERROR_MESSAGES.invalidVoterToken);
     }
 
-    return {
-        id: voter.id,
-        voterName: voter.voter_name,
-        voterIndex: voter.voter_index,
-        hasSubmittedPublicKeyShare: voter.has_submitted_public_key_share,
-        hasVoted: voter.has_voted,
-        hasSubmittedDecryptionShares: voter.has_submitted_decryption_shares,
-    };
+    return voter;
 };

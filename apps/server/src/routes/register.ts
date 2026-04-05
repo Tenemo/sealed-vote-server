@@ -5,13 +5,13 @@ import type {
     RegisterVoterResponse as RegisterVoterResponseContract,
 } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
-import { sql } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
 import { voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { countPollVoters, lockPollById } from '../utils/polls.js';
 import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
 
 const RegisterRequestSchema = Type.Object({
@@ -71,19 +71,7 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                 const voterTokenHash = hashSecureToken(voterToken);
 
                 const response = await withTransaction(fastify, async (tx) => {
-                    const pollResult = await tx.execute(sql`
-                        SELECT id, is_open, max_participants
-                        FROM polls
-                        WHERE id = ${pollId}
-                        FOR UPDATE
-                    `);
-                    const pollRows = pollResult.rows as Array<{
-                        id: string;
-                        is_open: boolean;
-                        max_participants: number;
-                    }>;
-
-                    const poll = pollRows[0];
+                    const poll = await lockPollById(tx, pollId);
                     if (!poll) {
                         throw createError(
                             404,
@@ -91,21 +79,13 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    if (!poll.is_open) {
+                    if (!poll.isOpen) {
                         throw createError(400, ERROR_MESSAGES.pollClosed);
                     }
 
-                    const voterCountResult = await tx.execute(sql`
-                        SELECT COUNT(*) AS count
-                        FROM voters
-                        WHERE poll_id = ${pollId}
-                    `);
-                    const voterCounts = voterCountResult.rows as Array<{
-                        count: string | number;
-                    }>;
-                    const voterCount = Number(voterCounts[0].count);
+                    const voterCount = await countPollVoters(tx, pollId);
 
-                    if (voterCount >= poll.max_participants) {
+                    if (voterCount >= poll.maxParticipants) {
                         throw createError(
                             400,
                             ERROR_MESSAGES.maxParticipantsReached,

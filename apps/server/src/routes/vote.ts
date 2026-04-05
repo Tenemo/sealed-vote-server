@@ -6,13 +6,20 @@ import type {
 } from '@sealed-vote/contracts';
 import { canVote, computeEncryptedTallies } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
-import { asc, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
 import { encryptedVotes, polls, voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import {
+    countPollChoices,
+    countPollEncryptedVotes,
+    countPollVoters,
+    getOrderedPollEncryptedVotes,
+    lockPollById,
+} from '../utils/polls.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
 const EncryptedMessageSchema = Type.Object({
@@ -65,32 +72,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                 }
 
                 return await withTransaction(fastify, async (client) => {
-                    const pollResult = await client.execute(sql`
-                        SELECT
-                            id,
-                            is_open,
-                            common_public_key,
-                            jsonb_array_length(encrypted_tallies)::int AS encrypted_tally_count,
-                            COALESCE(array_length(results, 1), 0)::int AS result_count,
-                            (
-                                SELECT COUNT(*)::int
-                                FROM voters
-                                WHERE poll_id = ${pollId}
-                            ) AS voter_count
-                        FROM polls
-                        WHERE id = ${pollId}
-                        FOR UPDATE
-                    `);
-                    const pollRows = pollResult.rows as Array<{
-                        id: string;
-                        is_open: boolean;
-                        common_public_key: string | null;
-                        encrypted_tally_count: number;
-                        result_count: number;
-                        voter_count: number;
-                    }>;
-
-                    const poll = pollRows[0];
+                    const poll = await lockPollById(client, pollId);
                     if (!poll) {
                         throw createError(
                             404,
@@ -98,14 +80,19 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
+                    const [voterCount, encryptedVoteCount] = await Promise.all([
+                        countPollVoters(client, pollId),
+                        countPollEncryptedVotes(client, pollId),
+                    ]);
+
                     if (
                         !canVote({
-                            isOpen: poll.is_open,
-                            commonPublicKey: poll.common_public_key,
-                            voterCount: poll.voter_count,
-                            encryptedVoteCount: 0,
-                            encryptedTallyCount: poll.encrypted_tally_count,
-                            resultCount: poll.result_count,
+                            isOpen: poll.isOpen,
+                            commonPublicKey: poll.commonPublicKey,
+                            voterCount,
+                            encryptedVoteCount,
+                            encryptedTallyCount: poll.encryptedTallies.length,
+                            resultCount: poll.results.length,
                         })
                     ) {
                         throw createError(
@@ -126,15 +113,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    const choiceCountResult = await client.execute(sql`
-                        SELECT COUNT(*) AS choice_count
-                        FROM choices
-                        WHERE poll_id = ${pollId}
-                    `);
-                    const choiceCounts = choiceCountResult.rows as Array<{
-                        choice_count: string | number;
-                    }>;
-                    const choiceCount = Number(choiceCounts[0].choice_count);
+                    const choiceCount = await countPollChoices(client, pollId);
 
                     if (votes.length !== choiceCount) {
                         throw createError(
@@ -154,19 +133,10 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         .set({ hasVoted: true })
                         .where(eq(voters.id, voter.id));
 
-                    const encryptedVoteRows = await client
-                        .select({
-                            votes: encryptedVotes.votes,
-                        })
-                        .from(encryptedVotes)
-                        .innerJoin(
-                            voters,
-                            eq(voters.id, encryptedVotes.voterId),
-                        )
-                        .where(eq(encryptedVotes.pollId, pollId))
-                        .orderBy(asc(voters.voterIndex));
+                    const encryptedVoteRows =
+                        await getOrderedPollEncryptedVotes(client, pollId);
 
-                    if (encryptedVoteRows.length === poll.voter_count) {
+                    if (encryptedVoteRows.length === voterCount) {
                         const encryptedTallies = computeEncryptedTallies(
                             encryptedVoteRows.map(
                                 ({ votes: encryptedVoteSet }) =>

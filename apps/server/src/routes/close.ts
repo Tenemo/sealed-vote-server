@@ -5,13 +5,17 @@ import type {
 } from '@sealed-vote/contracts';
 import { canClose } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
 import { polls } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
+import {
+    countPollVoters,
+    lockPollByIdAndCreatorToken,
+} from '../utils/polls.js';
 
 const ClosePollParamsSchema = Type.Object({
     pollId: Type.String(),
@@ -60,18 +64,11 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                 }
 
                 return await withTransaction(fastify, async (client) => {
-                    const pollResult = await client.execute(sql`
-                        SELECT id, is_open
-                        FROM polls
-                        WHERE id = ${pollId} AND creator_token = ${creatorToken}
-                        FOR UPDATE
-                    `);
-                    const rows = pollResult.rows as Array<{
-                        id: string;
-                        is_open: boolean;
-                    }>;
-
-                    const poll = rows[0];
+                    const poll = await lockPollByIdAndCreatorToken(
+                        client,
+                        pollId,
+                        creatorToken,
+                    );
                     if (!poll) {
                         throw createError(
                             404,
@@ -79,27 +76,18 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                         );
                     }
 
-                    if (!poll.is_open) {
+                    if (!poll.isOpen) {
                         throw createError(
                             400,
                             ERROR_MESSAGES.pollAlreadyClosed,
                         );
                     }
 
-                    const voterCountResult = await client.execute(sql`
-                        SELECT COUNT(*) AS voter_count
-                        FROM voters
-                        WHERE poll_id = ${pollId}
-                    `);
-                    const voterCounts = voterCountResult.rows as Array<{
-                        voter_count: string | number;
-                    }>;
-
-                    const voterCount = Number(voterCounts[0].voter_count);
+                    const voterCount = await countPollVoters(client, pollId);
 
                     if (
                         !canClose({
-                            isOpen: poll.is_open,
+                            isOpen: poll.isOpen,
                             commonPublicKey: null,
                             voterCount,
                             encryptedVoteCount: 0,

@@ -5,7 +5,7 @@ import type {
 } from '@sealed-vote/contracts';
 import { canSubmitPublicKeyShare } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
-import { asc, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 import { combinePublicKeys } from 'threshold-elgamal';
@@ -13,6 +13,11 @@ import { combinePublicKeys } from 'threshold-elgamal';
 import { uuidRegex } from '../constants.js';
 import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import {
+    countPollVoters,
+    getOrderedPollPublicKeyShares,
+    lockPollById,
+} from '../utils/polls.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
 const PublicKeyShareRequestSchema = Type.Object({
@@ -60,32 +65,7 @@ export const publicKeyShare = async (
                 }
 
                 const response = await withTransaction(fastify, async (tx) => {
-                    const pollResult = await tx.execute(sql`
-                        SELECT
-                            id,
-                            is_open,
-                            common_public_key,
-                            COALESCE(array_length(results, 1), 0)::int AS result_count,
-                            jsonb_array_length(encrypted_tallies)::int AS encrypted_tally_count,
-                            (
-                                SELECT COUNT(*)::int
-                                FROM voters
-                                WHERE poll_id = ${pollId}
-                            ) AS voter_count
-                        FROM polls
-                        WHERE id = ${pollId}
-                        FOR UPDATE
-                    `);
-                    const pollRows = pollResult.rows as Array<{
-                        id: string;
-                        is_open: boolean;
-                        common_public_key: string | null;
-                        result_count: number;
-                        encrypted_tally_count: number;
-                        voter_count: number;
-                    }>;
-
-                    const poll = pollRows[0];
+                    const poll = await lockPollById(tx, pollId);
                     if (!poll) {
                         throw createError(
                             404,
@@ -93,14 +73,16 @@ export const publicKeyShare = async (
                         );
                     }
 
+                    const voterCount = await countPollVoters(tx, pollId);
+
                     if (
                         !canSubmitPublicKeyShare({
-                            isOpen: poll.is_open,
-                            commonPublicKey: poll.common_public_key,
-                            voterCount: poll.voter_count,
+                            isOpen: poll.isOpen,
+                            commonPublicKey: poll.commonPublicKey,
+                            voterCount,
                             encryptedVoteCount: 0,
-                            encryptedTallyCount: poll.encrypted_tally_count,
-                            resultCount: poll.result_count,
+                            encryptedTallyCount: poll.encryptedTallies.length,
+                            resultCount: poll.results.length,
                         })
                     ) {
                         throw createError(
@@ -132,19 +114,10 @@ export const publicKeyShare = async (
                         .set({ hasSubmittedPublicKeyShare: true })
                         .where(eq(voters.id, voter.id));
 
-                    const publicKeyShareRows = await tx
-                        .select({
-                            publicKeyShare: publicKeyShares.publicKeyShare,
-                        })
-                        .from(publicKeyShares)
-                        .innerJoin(
-                            voters,
-                            eq(voters.id, publicKeyShares.voterId),
-                        )
-                        .where(eq(publicKeyShares.pollId, pollId))
-                        .orderBy(asc(voters.voterIndex));
+                    const publicKeyShareRows =
+                        await getOrderedPollPublicKeyShares(tx, pollId);
 
-                    if (publicKeyShareRows.length === poll.voter_count) {
+                    if (publicKeyShareRows.length === voterCount) {
                         const combinedPublicKey = combinePublicKeys(
                             publicKeyShareRows.map(
                                 ({ publicKeyShare: keyShare }) =>
