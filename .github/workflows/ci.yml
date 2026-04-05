@@ -1,18 +1,65 @@
-name: CI
+name: ci
 
 on:
     push:
         branches: [main]
     pull_request:
         branches: [main]
+    merge_group:
 
 jobs:
-    quality:
+    lint:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: run lint
+              run: pnpm lint
+
+    typecheck:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: run typecheck
+              run: pnpm typecheck
+
+    test:
         runs-on: ubuntu-latest
 
         services:
             postgres:
-                image: postgres:16.2
+                image: postgres:18.3
                 env:
                     POSTGRES_USER: postgres
                     POSTGRES_PASSWORD: postgres
@@ -43,34 +90,44 @@ jobs:
                   node-version-file: '.nvmrc'
                   cache: pnpm
 
-            - name: Install dependencies
+            - name: install dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Reset database schema
+            - name: reset database schema
               run: pnpm db:reset
 
-            - name: Lint affected workspaces
-              run: pnpm turbo run lint --affected
+            - name: run tests
+              run: pnpm test
 
-            - name: Typecheck affected workspaces
-              run: pnpm turbo run typecheck --affected
+    build:
+        runs-on: ubuntu-latest
 
-            - name: Stylelint web workspace
-              run: pnpm --filter @sealed-vote/web stylelint
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-            - name: Test affected workspaces
-              run: pnpm turbo run test --affected
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.0
 
-            - name: Build affected workspaces
-              run: pnpm turbo run build --affected
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: run build
+              run: pnpm build
 
     e2e:
-        needs: quality
         runs-on: ubuntu-latest
 
         services:
             postgres:
-                image: postgres:16.2
+                image: postgres:18.3
                 env:
                     POSTGRES_USER: postgres
                     POSTGRES_PASSWORD: postgres
@@ -101,14 +158,14 @@ jobs:
                   node-version-file: '.nvmrc'
                   cache: pnpm
 
-            - name: Install dependencies
+            - name: install dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Reset database schema
+            - name: reset database schema
               run: pnpm db:reset
 
-            - name: Install Playwright browsers
+            - name: install Playwright browsers
               run: pnpm e2e:install
 
-            - name: Run browser E2E
+            - name: run browser e2e
               run: pnpm e2e

@@ -1,6 +1,6 @@
 {
     "name": "sealed-vote",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "private": true,
     "packageManager": "pnpm@10.33.0",
     "license": "AGPL-3.0-only",
@@ -10,9 +10,9 @@
     "scripts": {
         "dev": "turbo run dev",
         "build": "turbo run build",
-        "test": "turbo run test",
-        "lint": "turbo run lint",
-        "typecheck": "turbo run typecheck",
+        "test": "turbo run test --output-logs=errors-only --log-prefix=none",
+        "lint": "turbo run lint --output-logs=errors-only --log-prefix=none",
+        "typecheck": "turbo run typecheck --output-logs=errors-only --log-prefix=none",
         "e2e": "pnpm build && playwright test",
         "e2e:install": "playwright install --with-deps",
         "clean": "turbo run clean",

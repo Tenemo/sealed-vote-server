@@ -75,6 +75,13 @@ describe('vote thunk', () => {
     it('stores voter registration data and runs the voting workflow', async () => {
         const selectedScores = { Apples: 7 };
         const store = createTestStore();
+        const registerPayload = {
+            message: 'Registered successfully',
+            pollId: 'poll-1',
+            voterName: 'Alice',
+            voterIndex: 1,
+            voterToken: 'voter-token',
+        };
 
         mockedCanRegister.mockReturnValue(true);
         mockedFetchFreshPoll.mockResolvedValue({
@@ -92,13 +99,10 @@ describe('vote thunk', () => {
         });
         mockedRegisterVoterInitiate.mockReturnValue({
             type: 'registerVoter',
-            unwrap: async () => ({
-                message: 'Registered successfully',
-                pollId: 'poll-1',
-                voterName: 'Alice',
-                voterIndex: 1,
-                voterToken: 'voter-token',
-            }),
+            unwrap: async () => registerPayload,
+            then: (
+                resolve: (value: typeof registerPayload) => unknown,
+            ): Promise<unknown> => Promise.resolve(resolve(registerPayload)),
         });
         mockedRunProcessPublicPrivateKeys.mockResolvedValue(undefined);
         mockedRunEncryptVotesGenerateShares.mockResolvedValue(undefined);
