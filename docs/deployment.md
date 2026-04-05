@@ -1,31 +1,72 @@
 # deployment
 
-The monorepo no longer hardcodes a production backend host inside the frontend bundle. The web app should be built with `VITE_API_BASE_URL` set to the backend origin.
+Production is split across Netlify and Railway:
+
+- frontend hosting and DNS stay on Netlify
+- backend API runs on Railway
+- PostgreSQL runs on Railway
 
 ## frontend
 
 - Netlify configuration lives in `apps/web/netlify.toml`
 - build command: `pnpm turbo run build --filter=@sealed-vote/web`
 - publish directory: `apps/web/dist`
-- required environment variables:
-- `VITE_API_BASE_URL=https://your-backend.example.com`
+- production environment variable: `VITE_API_BASE_URL=https://api.sealed.vote`
+
+Leave `VITE_API_BASE_URL` empty in local `.env` files so Vite continues proxying `/api` to `http://127.0.0.1:4000` during local development.
 
 The only redirect kept in `apps/web/public/_redirects` is the single-page-app fallback to `index.html`.
 
 ## backend
 
-- `apps/server/Procfile` starts the built server with `node dist/server.js`
-- `.github/workflows/server-artifact.yml` builds a deployable artifact for the server plus shared runtime packages
-- required environment variables:
-- `DATABASE_URL`
-- `NODE_ENV`
-- `PORT`
-- `LOG_LEVEL`
+- Railway configuration lives in the repo root `railway.toml`
+- Railway service root directory should remain `/`, not `apps/server`
+- build command: `pnpm turbo run build --filter=@sealed-vote/server`
+- start command: `pnpm --filter @sealed-vote/server start`
+- pre-deploy migration: `pnpm --filter @sealed-vote/server db:migrate`
+- health check path: `/api/health-check`
+- required Railway variables:
+  - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+  - `NODE_ENV=production`
+  - `LOG_LEVEL=info`
+  - `HOST=::`
 
-## ci
+Keep `RAILPACK_PRUNE_DEPS` unset or false. The migration command depends on dev tools that must remain available at deploy time.
 
-- `.github/workflows/ci.yml` installs the monorepo with pnpm, resets the database, runs lint, typecheck, stylelint, tests, build, and browser e2e
-- the workflow uses PostgreSQL 16.2 and Node from the root `.nvmrc`
+Recommended Railway watch paths for the backend service:
+
+- `/apps/server/**`
+- `/packages/contracts/**`
+- `/packages/protocol/**`
+- `/packages/testkit/**`
+- `/package.json`
+- `/pnpm-workspace.yaml`
+- `/.nvmrc`
+- `/.npmrc`
+- `/pnpm-lock.yaml`
+- `/turbo.json`
+
+`apps/server/Procfile` and `.github/workflows/server-artifact.yml` are still kept during the rollback window for the Heroku deployment path.
+
+## database and cutover
+
+- provision a Railway PostgreSQL 16 service named `Postgres`
+- deploy the Railway API against a fresh Railway database first
+- confirm the pre-deploy migration succeeds and `GET /api/health-check` returns `{ "service": "OK", "database": "OK" }`
+- rehearse a restore from a recent Heroku backup into Railway before the production cutover
+- during cutover, enable Heroku maintenance, take one final backup, restore it into Railway, switch `api.sealed.vote` to Railway, update Netlify `VITE_API_BASE_URL`, and redeploy the frontend
+
+Keep the Heroku app, Heroku Postgres, and the final logical dump for 7 days after cutover to preserve a fast rollback path.
+
+## ci and verification
+
+- `.github/workflows/ci.yml` installs the monorepo with pnpm, resets PostgreSQL 16.2, runs lint, typecheck, stylelint, tests, build, and browser e2e
+- `.github/workflows/server-artifact.yml` still builds the Heroku-style server artifact during the rollback window
+- pre-merge verification for Railway changes:
+  - `pnpm turbo run build --filter=@sealed-vote/server`
+  - `pnpm --filter @sealed-vote/server test`
+
+`pnpm e2e` is currently failing because of a pre-existing browser session-storage issue in the frontend. Treat that as separate from the Railway migration.
 
 ## local smoke path
 
@@ -35,8 +76,4 @@ pnpm local:reset
 pnpm dev
 ```
 
-`pnpm local:reset` is the full local reset shortcut that recreates docker services and rebuilds plus seeds the database. CI and Playwright should continue using `pnpm db:reset` only.
-
-## note on platform wiring
-
-The repository now contains the monorepo-aware build configuration, but the final deployment target and secrets still have to be configured on the chosen hosting platforms. That part cannot be completed from source control alone.
+`pnpm local:reset` recreates docker services and rebuilds plus seeds the database. CI and Playwright should continue using `pnpm db:reset` only.

@@ -1,5 +1,6 @@
 import { IncomingMessage, Server, ServerResponse } from 'http';
 
+import cors from '@fastify/cors';
 import { config } from 'dotenv';
 import Fastify, {
     FastifyBaseLogger,
@@ -27,6 +28,28 @@ const logger = {
     },
 };
 
+const allowedProductionOrigins = new Set([
+    'https://sealed.vote',
+    'https://www.sealed.vote',
+]);
+
+const isAllowedLocalOrigin = (origin: string): boolean => {
+    try {
+        const url = new URL(origin);
+        return (
+            url.protocol === 'http:' &&
+            (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+        );
+    } catch {
+        return false;
+    }
+};
+
+const isAllowedCorsOrigin = (origin?: string): boolean =>
+    !origin ||
+    allowedProductionOrigins.has(origin) ||
+    isAllowedLocalOrigin(origin);
+
 export const buildServer = async (
     isLoggingEnabled?: boolean,
 ): Promise<
@@ -42,6 +65,14 @@ export const buildServer = async (
         isLoggingEnabled ?? process.env.NODE_ENV !== 'test';
     const fastify = Fastify({
         logger: shouldEnableLogging ? logger : false,
+    });
+    await fastify.register(cors, {
+        origin: (origin, callback) => {
+            callback(null, isAllowedCorsOrigin(origin));
+        },
+        methods: ['GET', 'HEAD', 'POST', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'sentry-trace', 'baggage'],
+        maxAge: 86_400,
     });
     await databasePlugin(fastify);
     await fastify.register(healthCheck, { prefix: '/api' });
