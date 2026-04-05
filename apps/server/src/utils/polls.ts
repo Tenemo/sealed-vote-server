@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 
 import type { DatabaseTransaction } from '../db/client.js';
 import {
@@ -6,7 +6,6 @@ import {
     decryptionShares,
     encryptedVotes,
     polls,
-    publicKeyShares,
     voters,
 } from '../db/schema.js';
 
@@ -35,6 +34,20 @@ export type OrderedEncryptedVoteRow = {
 export type OrderedPublicKeyShareRow = {
     publicKeyShare: string;
 };
+
+type OrderedRowWithVoter<T> = T & {
+    voter: {
+        voterIndex: number;
+    } | null;
+};
+
+const sortByVoterIndex = <T extends OrderedRowWithVoter<object>>(
+    rows: T[],
+): T[] =>
+    rows.sort(
+        (left, right) =>
+            (left.voter?.voterIndex ?? 0) - (right.voter?.voterIndex ?? 0),
+    );
 
 export const lockPollById = async (
     tx: DatabaseTransaction,
@@ -112,38 +125,64 @@ export const countPollVoters = async (
 export const getOrderedPollDecryptionShares = async (
     tx: DatabaseTransaction,
     pollId: string,
-): Promise<OrderedDecryptionShareRow[]> =>
-    tx
-        .select({
-            shares: decryptionShares.shares,
-        })
-        .from(decryptionShares)
-        .innerJoin(voters, eq(voters.id, decryptionShares.voterId))
-        .where(eq(decryptionShares.pollId, pollId))
-        .orderBy(asc(voters.voterIndex));
+): Promise<OrderedDecryptionShareRow[]> => {
+    const rows = await tx.query.decryptionShares.findMany({
+        where: (fields, { eq: isEqual }) => isEqual(fields.pollId, pollId),
+        columns: {
+            shares: true,
+        },
+        with: {
+            voter: {
+                columns: {
+                    voterIndex: true,
+                },
+            },
+        },
+    });
+
+    return sortByVoterIndex(rows).map(({ shares }) => ({ shares }));
+};
 
 export const getOrderedPollEncryptedVotes = async (
     tx: DatabaseTransaction,
     pollId: string,
-): Promise<OrderedEncryptedVoteRow[]> =>
-    tx
-        .select({
-            votes: encryptedVotes.votes,
-        })
-        .from(encryptedVotes)
-        .innerJoin(voters, eq(voters.id, encryptedVotes.voterId))
-        .where(eq(encryptedVotes.pollId, pollId))
-        .orderBy(asc(voters.voterIndex));
+): Promise<OrderedEncryptedVoteRow[]> => {
+    const rows = await tx.query.encryptedVotes.findMany({
+        where: (fields, { eq: isEqual }) => isEqual(fields.pollId, pollId),
+        columns: {
+            votes: true,
+        },
+        with: {
+            voter: {
+                columns: {
+                    voterIndex: true,
+                },
+            },
+        },
+    });
+
+    return sortByVoterIndex(rows).map(({ votes }) => ({ votes }));
+};
 
 export const getOrderedPollPublicKeyShares = async (
     tx: DatabaseTransaction,
     pollId: string,
-): Promise<OrderedPublicKeyShareRow[]> =>
-    tx
-        .select({
-            publicKeyShare: publicKeyShares.publicKeyShare,
-        })
-        .from(publicKeyShares)
-        .innerJoin(voters, eq(voters.id, publicKeyShares.voterId))
-        .where(eq(publicKeyShares.pollId, pollId))
-        .orderBy(asc(voters.voterIndex));
+): Promise<OrderedPublicKeyShareRow[]> => {
+    const rows = await tx.query.publicKeyShares.findMany({
+        where: (fields, { eq: isEqual }) => isEqual(fields.pollId, pollId),
+        columns: {
+            publicKeyShare: true,
+        },
+        with: {
+            voter: {
+                columns: {
+                    voterIndex: true,
+                },
+            },
+        },
+    });
+
+    return sortByVoterIndex(rows).map(({ publicKeyShare }) => ({
+        publicKeyShare,
+    }));
+};

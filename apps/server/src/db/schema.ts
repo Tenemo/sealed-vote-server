@@ -1,5 +1,5 @@
 import type { EncryptedMessage } from '@sealed-vote/contracts';
-import { sql } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
     boolean,
     char,
@@ -193,13 +193,83 @@ export const decryptionShares = pgTable(
     ],
 );
 
+export const pollsRelations = relations(polls, ({ many }) => ({
+    choices: many(choices),
+    voters: many(voters),
+    publicKeyShares: many(publicKeyShares),
+    encryptedVotes: many(encryptedVotes),
+    decryptionShares: many(decryptionShares),
+}));
+
+export const choicesRelations = relations(choices, ({ one }) => ({
+    poll: one(polls, {
+        fields: [choices.pollId],
+        references: [polls.id],
+    }),
+}));
+
+export const votersRelations = relations(voters, ({ many, one }) => ({
+    poll: one(polls, {
+        fields: [voters.pollId],
+        references: [polls.id],
+    }),
+    publicKeyShares: many(publicKeyShares),
+    encryptedVotes: many(encryptedVotes),
+    decryptionShares: many(decryptionShares),
+}));
+
+export const publicKeySharesRelations = relations(
+    publicKeyShares,
+    ({ one }) => ({
+        poll: one(polls, {
+            fields: [publicKeyShares.pollId],
+            references: [polls.id],
+        }),
+        voter: one(voters, {
+            fields: [publicKeyShares.voterId],
+            references: [voters.id],
+        }),
+    }),
+);
+
+export const encryptedVotesRelations = relations(encryptedVotes, ({ one }) => ({
+    poll: one(polls, {
+        fields: [encryptedVotes.pollId],
+        references: [polls.id],
+    }),
+    voter: one(voters, {
+        fields: [encryptedVotes.voterId],
+        references: [voters.id],
+    }),
+}));
+
+export const decryptionSharesRelations = relations(
+    decryptionShares,
+    ({ one }) => ({
+        poll: one(polls, {
+            fields: [decryptionShares.pollId],
+            references: [polls.id],
+        }),
+        voter: one(voters, {
+            fields: [decryptionShares.voterId],
+            references: [voters.id],
+        }),
+    }),
+);
+
 export const schema = {
     polls,
+    pollsRelations,
     choices,
+    choicesRelations,
     voters,
+    votersRelations,
     publicKeyShares,
+    publicKeySharesRelations,
     encryptedVotes,
+    encryptedVotesRelations,
     decryptionShares,
+    decryptionSharesRelations,
 };
 
 export type DatabaseSchema = typeof schema;

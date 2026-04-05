@@ -1,18 +1,9 @@
 import type { PollResponse as PollResponseContract } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
-import { asc, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
-import {
-    choices,
-    decryptionShares,
-    encryptedVotes,
-    polls,
-    publicKeyShares,
-    voters,
-} from '../db/schema.js';
 import { normalizeDatabaseTimestamp } from '../utils/db.js';
 
 const PollParamsSchema = Type.Object({
@@ -51,6 +42,20 @@ export type PollParams = {
 
 export type PollResponse = PollResponseContract;
 
+type RowWithVoterIndex<T> = T & {
+    voter: {
+        voterIndex: number;
+    } | null;
+};
+
+const sortByVoterIndex = <T extends RowWithVoterIndex<object>>(
+    rows: T[],
+): T[] =>
+    rows.sort(
+        (left, right) =>
+            (left.voter?.voterIndex ?? 0) - (right.voter?.voterIndex ?? 0),
+    );
+
 export const fetch = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get(
         '/polls/:pollId',
@@ -65,17 +70,70 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     throw createError(400, 'Invalid poll ID');
                 }
 
-                const [poll] = await fastify.db
-                    .select({
-                        pollName: polls.pollName,
-                        createdAt: polls.createdAt,
-                        isOpen: polls.isOpen,
-                        commonPublicKey: polls.commonPublicKey,
-                        encryptedTallies: polls.encryptedTallies,
-                        results: polls.results,
-                    })
-                    .from(polls)
-                    .where(eq(polls.id, pollId));
+                const poll = await fastify.db.query.polls.findFirst({
+                    where: (fields, { eq }) => eq(fields.id, pollId),
+                    columns: {
+                        pollName: true,
+                        createdAt: true,
+                        isOpen: true,
+                        commonPublicKey: true,
+                        encryptedTallies: true,
+                        results: true,
+                    },
+                    with: {
+                        choices: {
+                            columns: {
+                                choiceName: true,
+                            },
+                            orderBy: (fields, { asc }) =>
+                                asc(fields.choiceIndex),
+                        },
+                        voters: {
+                            columns: {
+                                voterName: true,
+                                voterIndex: true,
+                            },
+                            orderBy: (fields, { asc }) =>
+                                asc(fields.voterIndex),
+                        },
+                        publicKeyShares: {
+                            columns: {
+                                publicKeyShare: true,
+                            },
+                            with: {
+                                voter: {
+                                    columns: {
+                                        voterIndex: true,
+                                    },
+                                },
+                            },
+                        },
+                        encryptedVotes: {
+                            columns: {
+                                votes: true,
+                            },
+                            with: {
+                                voter: {
+                                    columns: {
+                                        voterIndex: true,
+                                    },
+                                },
+                            },
+                        },
+                        decryptionShares: {
+                            columns: {
+                                shares: true,
+                            },
+                            with: {
+                                voter: {
+                                    columns: {
+                                        voterIndex: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
                 if (!poll) {
                     throw createError(
                         404,
@@ -83,75 +141,31 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     );
                 }
 
-                const [
-                    choiceRows,
-                    voterRows,
-                    publicKeyShareRows,
-                    encryptedVoteRows,
-                    decryptionShareRows,
-                ] = await Promise.all([
-                    fastify.db
-                        .select({
-                            choiceName: choices.choiceName,
-                        })
-                        .from(choices)
-                        .where(eq(choices.pollId, pollId))
-                        .orderBy(asc(choices.choiceIndex)),
-                    fastify.db
-                        .select({
-                            voterName: voters.voterName,
-                        })
-                        .from(voters)
-                        .where(eq(voters.pollId, pollId))
-                        .orderBy(asc(voters.voterIndex)),
-                    fastify.db
-                        .select({
-                            publicKeyShare: publicKeyShares.publicKeyShare,
-                        })
-                        .from(publicKeyShares)
-                        .innerJoin(
-                            voters,
-                            eq(voters.id, publicKeyShares.voterId),
-                        )
-                        .where(eq(publicKeyShares.pollId, pollId))
-                        .orderBy(asc(voters.voterIndex)),
-                    fastify.db
-                        .select({
-                            votes: encryptedVotes.votes,
-                        })
-                        .from(encryptedVotes)
-                        .innerJoin(
-                            voters,
-                            eq(voters.id, encryptedVotes.voterId),
-                        )
-                        .where(eq(encryptedVotes.pollId, pollId))
-                        .orderBy(asc(voters.voterIndex)),
-                    fastify.db
-                        .select({
-                            shares: decryptionShares.shares,
-                        })
-                        .from(decryptionShares)
-                        .innerJoin(
-                            voters,
-                            eq(voters.id, decryptionShares.voterId),
-                        )
-                        .where(eq(decryptionShares.pollId, pollId))
-                        .orderBy(asc(voters.voterIndex)),
-                ]);
+                const orderedPublicKeyShares = sortByVoterIndex(
+                    poll.publicKeyShares,
+                );
+                const orderedEncryptedVotes = sortByVoterIndex(
+                    poll.encryptedVotes,
+                );
+                const orderedDecryptionShares = sortByVoterIndex(
+                    poll.decryptionShares,
+                );
 
                 return {
                     pollName: poll.pollName,
                     createdAt: normalizeDatabaseTimestamp(poll.createdAt),
-                    choices: choiceRows.map(({ choiceName }) => choiceName),
-                    voters: voterRows.map(({ voterName }) => voterName),
+                    choices: poll.choices.map(({ choiceName }) => choiceName),
+                    voters: poll.voters.map(({ voterName }) => voterName),
                     isOpen: poll.isOpen,
-                    publicKeyShares: publicKeyShareRows.map(
+                    publicKeyShares: orderedPublicKeyShares.map(
                         ({ publicKeyShare }) => publicKeyShare,
                     ),
                     commonPublicKey: poll.commonPublicKey,
-                    encryptedVotes: encryptedVoteRows.map(({ votes }) => votes),
+                    encryptedVotes: orderedEncryptedVotes.map(
+                        ({ votes }) => votes,
+                    ),
                     encryptedTallies: poll.encryptedTallies,
-                    decryptionShares: decryptionShareRows.map(
+                    decryptionShares: orderedDecryptionShares.map(
                         ({ shares }) => shares,
                     ),
                     results: poll.results,
