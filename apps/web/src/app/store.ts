@@ -13,7 +13,8 @@ import {
     REGISTER,
 } from 'redux-persist';
 import hardSet from 'redux-persist/lib/stateReconciler/hardSet';
-import storageSession from 'redux-persist/lib/storage/session';
+
+import { sessionPersistStorage } from './persistStorage';
 
 import { registerPollQueryStore } from 'features/Polls/pollQuery';
 import { pollsApi } from 'features/Polls/pollsApi';
@@ -36,7 +37,7 @@ const votingSessionTransform = createTransform(
 
 const persistConfig = {
     key: 'root',
-    storage: storageSession,
+    storage: sessionPersistStorage,
     stateReconciler: hardSet,
     blacklist: [pollsApi.reducerPath],
     transforms: [votingSessionTransform],

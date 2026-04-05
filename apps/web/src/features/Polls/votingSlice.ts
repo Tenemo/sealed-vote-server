@@ -377,14 +377,14 @@ export const votingSlice = createAppSlice({
                                 );
                             }
 
-                            const registerResult = (await dispatch(
+                            const registerResult = dispatch(
                                 pollsApi.endpoints.registerVoter.initiate({
                                     pollId,
                                     voterData: {
                                         voterName: normalizedVoterName,
                                     },
                                 }),
-                            )) as unknown as {
+                            ) as unknown as {
                                 unwrap: () => Promise<{
                                     pollId: string;
                                     voterName: string;
