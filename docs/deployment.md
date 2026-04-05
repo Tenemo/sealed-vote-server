@@ -1,4 +1,4 @@
-# deployment
+# Deployment
 
 Production is split across Netlify and Railway:
 
@@ -6,7 +6,7 @@ Production is split across Netlify and Railway:
 - backend API runs on Railway
 - PostgreSQL runs on Railway
 
-## frontend
+## Frontend
 
 - Netlify configuration lives in `apps/web/netlify.toml`
 - build command: `pnpm turbo run build --filter=@sealed-vote/web`
@@ -17,7 +17,7 @@ Leave `VITE_API_BASE_URL` empty in local `.env` files so Vite continues proxying
 
 The only redirect kept in `apps/web/public/_redirects` is the single-page-app fallback to `index.html`.
 
-## backend
+## Backend
 
 - Railway configuration lives in the repo root `railway.toml`
 - Railway service root directory should remain `/`, not `apps/server`
@@ -48,7 +48,7 @@ Recommended Railway watch paths for the backend service:
 
 `apps/server/Procfile` and `.github/workflows/server-artifact.yml` are still kept during the rollback window for the Heroku deployment path.
 
-## database and cutover
+## Database and cutover
 
 - provision a Railway PostgreSQL 16 service named `Postgres`
 - deploy the Railway API against a fresh Railway database first
@@ -58,7 +58,7 @@ Recommended Railway watch paths for the backend service:
 
 Keep the Heroku app, Heroku Postgres, and the final logical dump for 7 days after cutover to preserve a fast rollback path.
 
-## ci and verification
+## CI and verification
 
 - `.github/workflows/ci.yml` installs the monorepo with pnpm, resets PostgreSQL 16.2, runs lint, typecheck, stylelint, tests, build, and browser e2e
 - `.github/workflows/server-artifact.yml` still builds the Heroku-style server artifact during the rollback window
@@ -68,7 +68,7 @@ Keep the Heroku app, Heroku Postgres, and the final logical dump for 7 days afte
 
 `pnpm e2e` is currently failing because of a pre-existing browser session-storage issue in the frontend. Treat that as separate from the Railway migration.
 
-## local smoke path
+## Local smoke path
 
 ```bash
 pnpm install

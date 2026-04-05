@@ -1,8 +1,8 @@
-# api endpoints
+# API endpoints
 
 The backend routes live under `/api`. The request and response payloads below match the shared contracts in `packages/contracts`.
 
-## create poll
+## Create poll
 
 - `POST /api/polls/create`
 - request body:
@@ -38,7 +38,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `400` for invalid input such as fewer than two choices or duplicate choice names
 - `409` when `pollName` is already taken
 
-## fetch poll
+## Fetch poll
 
 - `GET /api/polls/:pollId`
 - success response: `200 OK`
@@ -73,7 +73,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `400` for an invalid poll id
 - `404` when the poll does not exist
 
-## register voter
+## Register voter
 
 - `POST /api/polls/:pollId/register`
 - request body:
@@ -104,7 +104,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `404` when the poll does not exist
 - `409` when `voterName` is already taken in that poll
 
-## close poll
+## Close poll
 
 - `POST /api/polls/:pollId/close`
 - request body:
@@ -128,7 +128,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `403` for an invalid creator token
 - `404` when the poll does not exist
 
-## submit public key share
+## Submit public key share
 
 - `POST /api/polls/:pollId/public-key-share`
 - request body:
@@ -154,7 +154,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `404` when the poll does not exist
 - `409` when the same voter submits twice
 
-## submit vote
+## Submit vote
 
 - `POST /api/polls/:pollId/vote`
 - request body:
@@ -181,7 +181,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `404` when the poll does not exist
 - `409` when the same voter submits twice
 
-## submit decryption shares
+## Submit decryption shares
 
 - `POST /api/polls/:pollId/decryption-shares`
 - request body:
@@ -207,7 +207,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `404` when the poll does not exist
 - `409` when the same voter submits twice
 
-## delete poll
+## Delete poll
 
 - `DELETE /api/polls/:pollId`
 - request body:
@@ -230,7 +230,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `400` for invalid poll id
 - `404` when the poll does not exist or the token does not match
 
-## health check
+## Health check
 
 - `GET /api/health-check`
 - success response: `200 OK`
