@@ -3,7 +3,7 @@ name: API artifact
 on:
     workflow_dispatch:
     push:
-        branches: [main]
+        branches: [master, main]
         paths:
             - '.github/workflows/api-artifact.yml'
             - '.nvmrc'
