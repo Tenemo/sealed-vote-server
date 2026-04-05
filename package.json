@@ -21,11 +21,11 @@
         "docker:wipe": "pnpm docker:destroy && pnpm docker:up",
         "docker:reset": "pnpm docker:wipe",
         "local:reset": "pnpm docker:reset && pnpm db:setup",
-        "db:generate": "pnpm --filter @sealed-vote/server db:generate",
-        "db:migrate": "pnpm --filter @sealed-vote/server db:migrate",
-        "db:reset": "pnpm --filter @sealed-vote/server db:reset",
-        "db:seed": "pnpm --filter @sealed-vote/server db:seed",
-        "db:setup": "pnpm --filter @sealed-vote/server db:setup",
+        "db:generate": "pnpm --filter @sealed-vote/api db:generate",
+        "db:migrate": "pnpm --filter @sealed-vote/api db:migrate",
+        "db:reset": "pnpm --filter @sealed-vote/api db:reset",
+        "db:seed": "pnpm --filter @sealed-vote/api db:seed",
+        "db:setup": "pnpm --filter @sealed-vote/api db:setup",
         "prepare": "husky"
     },
     "devDependencies": {

@@ -23,7 +23,7 @@ export default defineConfig({
     ],
     webServer: [
         {
-            command: 'pnpm db:reset && pnpm --filter @sealed-vote/server dev',
+            command: 'pnpm db:reset && pnpm --filter @sealed-vote/api dev',
             url: 'http://127.0.0.1:4000/api/health-check',
             reuseExistingServer: !process.env.CI,
             timeout: 120_000,

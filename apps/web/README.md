@@ -32,5 +32,3 @@ pnpm --filter @sealed-vote/web build
 ```
 
 For deployed builds, set `VITE_API_BASE_URL` to the backend origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
-
-Canonical docs live at [../../docs/voting.md](../../docs/voting.md) and [../../docs/deployment.md](../../docs/deployment.md).

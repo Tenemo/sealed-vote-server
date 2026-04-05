@@ -96,7 +96,7 @@ importers:
         specifier: ^8.58.0
         version: 8.58.0(eslint@9.39.4)(typescript@6.0.2)
 
-  apps/server:
+  apps/api:
     dependencies:
       '@fastify/cors':
         specifier: ^11.2.0

@@ -18,10 +18,10 @@ const OFF = 0;
 const allSourceFiles = ['**/*.{js,jsx,cjs,mjs,ts,tsx}'];
 const allTestFiles = ['**/*.spec.{js,jsx,ts,tsx}', '**/*.test.{js,jsx,ts,tsx}'];
 const frontendFiles = ['apps/web/src/**/*.{js,jsx,ts,tsx}'];
-const serverFiles = ['apps/server/**/*.{js,ts}'];
+const apiFiles = ['apps/api/**/*.{js,ts}'];
 
 const sharedProjects = [
-    './apps/server/tsconfig.json',
+    './apps/api/tsconfig.json',
     './apps/web/tsconfig.json',
     './packages/contracts/tsconfig.json',
     './packages/protocol/tsconfig.json',
@@ -197,7 +197,7 @@ module.exports = defineConfig(
         rules: frontendRules,
     },
     {
-        files: serverFiles,
+        files: apiFiles,
         plugins: {
             sql: sqlPlugin,
         },

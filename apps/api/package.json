@@ -1,17 +1,9 @@
 {
-    "name": "@sealed-vote/server",
+    "name": "@sealed-vote/api",
     "version": "2.0.0",
-    "description": "sealed-vote-server",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/Tenemo/sealed-vote-server.git"
-    },
+    "description": "sealed-vote-api",
     "author": "Piotr Piech <piotr@piech.dev>",
     "license": "AGPL-3.0-only",
-    "bugs": {
-        "url": "https://github.com/Tenemo/sealed-vote-server/issues"
-    },
-    "homepage": "https://github.com/Tenemo/sealed-vote-server#readme",
     "scripts": {
         "start": "node dist/server.js",
         "build": "tsc --project tsconfig.build.json",
@@ -23,8 +15,8 @@
         "db:reset": "tsx scripts/resetDb.ts",
         "db:seed": "tsx scripts/seedDb.ts",
         "db:setup": "pnpm db:reset && pnpm db:seed",
-        "lint": "pnpm --workspace-root exec eslint apps/server",
-        "lint:fix": "pnpm --workspace-root exec eslint apps/server --fix",
+        "lint": "pnpm --workspace-root exec eslint apps/api",
+        "lint:fix": "pnpm --workspace-root exec eslint apps/api --fix",
         "typecheck": "tsc",
         "test": "cross-env NODE_ENV=test vitest run --reporter verbose",
         "test:watch": "vitest watch --clearScreen"

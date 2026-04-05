@@ -8,7 +8,7 @@ This repository is licensed under AGPL-3.0-only. See the top-level `LICENSE` fil
 
 ## Workspace layout
 
-- `apps/server` fastify backend
+- `apps/api` fastify backend API
 - `apps/web` react frontend
 - `packages/contracts` shared request and response contracts
 - `packages/protocol` shared voting protocol and crypto helpers
@@ -37,6 +37,6 @@ pnpm e2e
 
 ## Documentation
 
-- [docs/endpoints.md](./docs/endpoints.md) for the current backend api
+- [docs/endpoints.md](./docs/endpoints.md) for the current backend API
 - [docs/voting.md](./docs/voting.md) for the protocol and phase model
-- [docs/deployment.md](./docs/deployment.md) for netlify and server artifact deployment
+- [docs/deployment.md](./docs/deployment.md) for Netlify, Railway, and API artifact deployment

@@ -20,10 +20,10 @@ The only redirect kept in `apps/web/public/_redirects` is the single-page-app fa
 ## Backend
 
 - Railway configuration lives in the repo root `railway.toml`
-- Railway service root directory should remain `/`, not `apps/server`
-- build command: `pnpm turbo run build --filter=@sealed-vote/server`
-- start command: `pnpm --filter @sealed-vote/server start`
-- pre-deploy migration: `pnpm --filter @sealed-vote/server db:migrate`
+- Railway service root directory should remain `/`, not `apps/api`
+- build command: `pnpm turbo run build --filter=@sealed-vote/api`
+- start command: `pnpm --filter @sealed-vote/api start`
+- pre-deploy migration: `pnpm --filter @sealed-vote/api db:migrate`
 - health check path: `/api/health-check`
 - required Railway variables:
   - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
@@ -35,7 +35,7 @@ Keep `RAILPACK_PRUNE_DEPS` unset or false. The migration command depends on dev 
 
 Recommended Railway watch paths for the backend service:
 
-- `/apps/server/**`
+- `/apps/api/**`
 - `/packages/contracts/**`
 - `/packages/protocol/**`
 - `/packages/testkit/**`
@@ -46,7 +46,7 @@ Recommended Railway watch paths for the backend service:
 - `/pnpm-lock.yaml`
 - `/turbo.json`
 
-`apps/server/Procfile` and `.github/workflows/server-artifact.yml` are still kept during the rollback window for the Heroku deployment path.
+`apps/api/Procfile` and `.github/workflows/api-artifact.yml` are still kept during the rollback window for the Heroku deployment path.
 
 ## Database and cutover
 
@@ -61,10 +61,10 @@ Keep the Heroku app, Heroku Postgres, and the final logical dump for 7 days afte
 ## CI and verification
 
 - `.github/workflows/ci.yml` installs the monorepo with pnpm, resets PostgreSQL 16.2, runs lint, typecheck, stylelint, tests, build, and browser e2e
-- `.github/workflows/server-artifact.yml` still builds the Heroku-style server artifact during the rollback window
+- `.github/workflows/api-artifact.yml` still builds the Heroku-style API artifact during the rollback window
 - pre-merge verification for Railway changes:
-  - `pnpm turbo run build --filter=@sealed-vote/server`
-  - `pnpm --filter @sealed-vote/server test`
+  - `pnpm turbo run build --filter=@sealed-vote/api`
+  - `pnpm --filter @sealed-vote/api test`
 
 `pnpm e2e` is currently failing because of a pre-existing browser session-storage issue in the frontend. Treat that as separate from the Railway migration.
 
