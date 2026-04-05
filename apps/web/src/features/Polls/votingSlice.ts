@@ -1,44 +1,21 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-
-import { pollsApi } from './pollsApi';
+import { canRegister } from '@sealed-vote/protocol';
 
 import { createAppSlice } from 'app/createAppSlice';
-import type { RootState } from 'app/store';
-
-export type VoteState = {
-    creatorToken: string | null;
-    selectedScores: Record<string, number> | null;
-    voterName: string | null;
-    voterIndex: number | null;
-    voterToken: string | null;
-    isVotingInProgress: boolean;
-    progressMessage: string | null;
-    results: number[] | null;
-    privateKey: string | null;
-    publicKey: string | null;
-    commonPublicKey: string | null;
-    hasSubmittedPublicKeyShare: boolean;
-    hasSubmittedVote: boolean;
-    hasSubmittedDecryptionShares: boolean;
-};
-export type VotingState = Record<string, VoteState>;
-
-export const initialVoteState: VoteState = {
-    creatorToken: null,
-    selectedScores: null,
-    isVotingInProgress: false,
-    voterName: null,
-    voterIndex: null,
-    voterToken: null,
-    progressMessage: null,
-    results: null,
-    privateKey: null,
-    publicKey: null,
-    commonPublicKey: null,
-    hasSubmittedPublicKeyShare: false,
-    hasSubmittedVote: false,
-    hasSubmittedDecryptionShares: false,
-};
+import { fetchFreshPoll } from 'features/Polls/pollQuery';
+import { pollsApi } from 'features/Polls/pollsApi';
+import {
+    initialVoteState,
+    sanitizeVotingStateForPersistence,
+    selectVoteStateByPollId,
+    type VoteState,
+    type VotingState,
+} from 'features/Polls/votingState';
+import {
+    runDecryptResults,
+    runEncryptVotesGenerateShares,
+    runProcessPublicPrivateKeys,
+} from 'features/Polls/votingWorkflow';
 
 const initialState: VotingState = {};
 
@@ -77,136 +54,445 @@ const clearCompletedSensitiveFields = (voteState: VoteState): VoteState => ({
     isVotingInProgress: false,
 });
 
-export const sanitizeVotingStateForPersistence = (
-    state: VotingState,
-): VotingState =>
-    Object.fromEntries(
-        Object.entries(state).map(([pollId, voteState]) => [
-            pollId,
-            voteState.results
-                ? {
-                      ...initialVoteState,
-                      ...clearCompletedSensitiveFields(voteState),
-                  }
-                : {
-                      ...initialVoteState,
-                      ...voteState,
-                      isVotingInProgress: false,
-                      progressMessage: null,
-                  },
-        ]),
-    );
+type VotingActionCreators = {
+    setKeys: (payload: {
+        pollId: string;
+        privateKey: string;
+        publicKey: string;
+        commonPublicKey: string | null;
+    }) => PayloadAction<unknown>;
+    setProgressMessage: (payload: {
+        progressMessage: string | null;
+        pollId: string;
+    }) => PayloadAction<unknown>;
+    setResults: (payload: {
+        results: number[];
+        pollId: string;
+    }) => PayloadAction<unknown>;
+    setSelectedScores: (payload: {
+        pollId: string;
+        selectedScores: Record<string, number>;
+    }) => PayloadAction<unknown>;
+    setSubmissionStatus: (payload: {
+        pollId: string;
+        phase: 'publicKey' | 'vote' | 'decryptionShares';
+        submitted: boolean;
+    }) => PayloadAction<unknown>;
+    setVoterSession: (payload: {
+        pollId: string;
+        voterName: string;
+        voterIndex: number;
+        voterToken: string;
+    }) => PayloadAction<unknown>;
+};
 
-export const selectVotingStateByPollId = (
-    state: RootState,
-    pollId: string,
-): VoteState => state.voting[pollId] ?? initialVoteState;
+let votingActionCreators: VotingActionCreators | null = null;
+
+const getVotingActions = (): VotingActionCreators => {
+    if (!votingActionCreators) {
+        throw new Error('Voting actions are not initialized.');
+    }
+
+    return votingActionCreators;
+};
 
 export const votingSlice = createAppSlice({
     name: 'voting',
     initialState,
-    reducers: {
-        setSelectedScores: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                selectedScores: Record<string, number>;
-            }>,
-        ) => {
-            const { pollId, selectedScores } = action.payload;
-            ensureVoteState(state, pollId).selectedScores = selectedScores;
-        },
-        setIsVotingInProgress: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                isVotingInProgress: boolean;
-            }>,
-        ) => {
-            const { pollId, isVotingInProgress } = action.payload;
-            ensureVoteState(state, pollId).isVotingInProgress =
-                isVotingInProgress;
-        },
-        setVoterSession: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                voterName: string;
-                voterIndex: number;
-                voterToken: string;
-            }>,
-        ) => {
-            const { pollId, voterName, voterIndex, voterToken } =
-                action.payload;
-            applyRegistration(ensureVoteState(state, pollId), {
-                voterName,
-                voterIndex,
-                voterToken,
-            });
-        },
-        setKeys: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                privateKey: string;
-                publicKey: string;
-                commonPublicKey: string | null;
-            }>,
-        ) => {
-            const { pollId, privateKey, publicKey, commonPublicKey } =
-                action.payload;
-            const voteState = ensureVoteState(state, pollId);
-            voteState.privateKey = privateKey;
-            voteState.publicKey = publicKey;
-            voteState.commonPublicKey = commonPublicKey;
-        },
-        setProgressMessage: (
-            state,
-            action: PayloadAction<{
-                progressMessage: string | null;
-                pollId: string;
-            }>,
-        ) => {
-            const { pollId, progressMessage } = action.payload;
-            ensureVoteState(state, pollId).progressMessage = progressMessage;
-        },
-        setResults: (
-            state,
-            action: PayloadAction<{
-                results: number[];
-                pollId: string;
-            }>,
-        ) => {
-            const { pollId, results } = action.payload;
-            const voteState = ensureVoteState(state, pollId);
-            voteState.results = results;
-            Object.assign(voteState, clearCompletedSensitiveFields(voteState));
-        },
-        setSubmissionStatus: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                phase: 'publicKey' | 'vote' | 'decryptionShares';
-                submitted: boolean;
-            }>,
-        ) => {
-            const { pollId, phase, submitted } = action.payload;
-            const voteState = ensureVoteState(state, pollId);
+    selectors: {
+        selectVotingStateByPollId: (state, pollId: string): VoteState =>
+            selectVoteStateByPollId(state, pollId),
+    },
+    reducers: (create) => {
+        const createVotingAsyncThunk = create.asyncThunk.withTypes<{
+            rejectValue: string;
+        }>();
 
-            switch (phase) {
-                case 'publicKey':
-                    voteState.hasSubmittedPublicKeyShare = submitted;
-                    return;
-                case 'vote':
-                    voteState.hasSubmittedVote = submitted;
-                    return;
-                case 'decryptionShares':
-                    voteState.hasSubmittedDecryptionShares = submitted;
-                    return;
-                default:
-                    return;
-            }
-        },
+        return {
+            setSelectedScores: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        pollId: string;
+                        selectedScores: Record<string, number>;
+                    }>,
+                ) => {
+                    const { pollId, selectedScores } = action.payload;
+                    ensureVoteState(state, pollId).selectedScores =
+                        selectedScores;
+                },
+            ),
+            setIsVotingInProgress: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        pollId: string;
+                        isVotingInProgress: boolean;
+                    }>,
+                ) => {
+                    const { pollId, isVotingInProgress } = action.payload;
+                    ensureVoteState(state, pollId).isVotingInProgress =
+                        isVotingInProgress;
+                },
+            ),
+            setVoterSession: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        pollId: string;
+                        voterName: string;
+                        voterIndex: number;
+                        voterToken: string;
+                    }>,
+                ) => {
+                    const { pollId, voterName, voterIndex, voterToken } =
+                        action.payload;
+                    applyRegistration(ensureVoteState(state, pollId), {
+                        voterName,
+                        voterIndex,
+                        voterToken,
+                    });
+                },
+            ),
+            setKeys: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        pollId: string;
+                        privateKey: string;
+                        publicKey: string;
+                        commonPublicKey: string | null;
+                    }>,
+                ) => {
+                    const { pollId, privateKey, publicKey, commonPublicKey } =
+                        action.payload;
+                    const voteState = ensureVoteState(state, pollId);
+                    voteState.privateKey = privateKey;
+                    voteState.publicKey = publicKey;
+                    voteState.commonPublicKey = commonPublicKey;
+                },
+            ),
+            setProgressMessage: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        progressMessage: string | null;
+                        pollId: string;
+                    }>,
+                ) => {
+                    const { pollId, progressMessage } = action.payload;
+                    ensureVoteState(state, pollId).progressMessage =
+                        progressMessage;
+                },
+            ),
+            setResults: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        results: number[];
+                        pollId: string;
+                    }>,
+                ) => {
+                    const { pollId, results } = action.payload;
+                    const voteState = ensureVoteState(state, pollId);
+                    voteState.results = results;
+                    Object.assign(
+                        voteState,
+                        clearCompletedSensitiveFields(voteState),
+                    );
+                },
+            ),
+            setSubmissionStatus: create.reducer(
+                (
+                    state,
+                    action: PayloadAction<{
+                        pollId: string;
+                        phase: 'publicKey' | 'vote' | 'decryptionShares';
+                        submitted: boolean;
+                    }>,
+                ) => {
+                    const { pollId, phase, submitted } = action.payload;
+                    const voteState = ensureVoteState(state, pollId);
+
+                    switch (phase) {
+                        case 'publicKey':
+                            voteState.hasSubmittedPublicKeyShare = submitted;
+                            return;
+                        case 'vote':
+                            voteState.hasSubmittedVote = submitted;
+                            return;
+                        case 'decryptionShares':
+                            voteState.hasSubmittedDecryptionShares = submitted;
+                            return;
+                        default:
+                            return;
+                    }
+                },
+            ),
+            processPublicPrivateKeys: createVotingAsyncThunk(
+                async (
+                    { pollId }: { pollId: string },
+                    { dispatch, getState, signal, rejectWithValue },
+                ) => {
+                    try {
+                        await runProcessPublicPrivateKeys({
+                            pollId,
+                            dispatch,
+                            getState,
+                            signal,
+                            actions: {
+                                setKeys: getVotingActions().setKeys,
+                                setProgressMessage:
+                                    getVotingActions().setProgressMessage,
+                                setResults: getVotingActions().setResults,
+                                setSubmissionStatus:
+                                    getVotingActions().setSubmissionStatus,
+                            },
+                        });
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? error.message
+                                : 'Failed during public/private key processing.';
+
+                        return rejectWithValue(message);
+                    }
+                },
+            ),
+            encryptVotesGenerateShares: createVotingAsyncThunk(
+                async (
+                    { pollId }: { pollId: string },
+                    { dispatch, getState, signal, rejectWithValue },
+                ) => {
+                    try {
+                        await runEncryptVotesGenerateShares({
+                            pollId,
+                            dispatch,
+                            getState,
+                            signal,
+                            actions: {
+                                setKeys: getVotingActions().setKeys,
+                                setProgressMessage:
+                                    getVotingActions().setProgressMessage,
+                                setResults: getVotingActions().setResults,
+                                setSubmissionStatus:
+                                    getVotingActions().setSubmissionStatus,
+                            },
+                        });
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? error.message
+                                : 'Failed during vote encryption/decryption-share flow.';
+
+                        return rejectWithValue(message);
+                    }
+                },
+            ),
+            decryptResults: createVotingAsyncThunk(
+                async (
+                    { pollId }: { pollId: string },
+                    { dispatch, getState, signal, rejectWithValue },
+                ) => {
+                    try {
+                        await runDecryptResults({
+                            pollId,
+                            dispatch,
+                            getState,
+                            signal,
+                            actions: {
+                                setKeys: getVotingActions().setKeys,
+                                setProgressMessage:
+                                    getVotingActions().setProgressMessage,
+                                setResults: getVotingActions().setResults,
+                                setSubmissionStatus:
+                                    getVotingActions().setSubmissionStatus,
+                            },
+                        });
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? error.message
+                                : 'Failed during result decryption wait.';
+
+                        return rejectWithValue(message);
+                    }
+                },
+            ),
+            vote: createVotingAsyncThunk(
+                async (
+                    {
+                        pollId,
+                        voterName,
+                        selectedScores,
+                    }: {
+                        pollId: string;
+                        voterName: string;
+                        selectedScores: Record<string, number>;
+                    },
+                    { dispatch, getState, signal, rejectWithValue },
+                ) => {
+                    const normalizedVoterName = voterName.trim();
+
+                    try {
+                        if (!selectedScores || !normalizedVoterName) {
+                            throw new Error(
+                                'Missing required data to participate in the vote.',
+                            );
+                        }
+
+                        dispatch(
+                            getVotingActions().setSelectedScores({
+                                pollId,
+                                selectedScores,
+                            }),
+                        );
+
+                        const {
+                            voterName: stateVoterName,
+                            voterIndex: stateVoterIndex,
+                            voterToken: stateVoterToken,
+                        } = selectVoteStateByPollId(
+                            (getState() as { voting: VotingState }).voting,
+                            pollId,
+                        );
+
+                        if (
+                            !stateVoterIndex ||
+                            !stateVoterToken ||
+                            !stateVoterName
+                        ) {
+                            dispatch(
+                                getVotingActions().setProgressMessage({
+                                    pollId,
+                                    progressMessage: 'Registering to vote...',
+                                }),
+                            );
+
+                            const poll = await fetchFreshPoll(pollId);
+
+                            if (!canRegister(poll)) {
+                                throw new Error(
+                                    'Poll is closed for new registrations.',
+                                );
+                            }
+
+                            const registerResult = (await dispatch(
+                                pollsApi.endpoints.registerVoter.initiate({
+                                    pollId,
+                                    voterData: {
+                                        voterName: normalizedVoterName,
+                                    },
+                                }),
+                            )) as unknown as {
+                                unwrap: () => Promise<{
+                                    pollId: string;
+                                    voterName: string;
+                                    voterIndex: number;
+                                    voterToken: string;
+                                }>;
+                            };
+
+                            const registerData = await registerResult.unwrap();
+
+                            dispatch(
+                                getVotingActions().setVoterSession({
+                                    pollId,
+                                    voterIndex: registerData.voterIndex,
+                                    voterName: registerData.voterName,
+                                    voterToken: registerData.voterToken,
+                                }),
+                            );
+                        }
+
+                        await runProcessPublicPrivateKeys({
+                            pollId,
+                            dispatch,
+                            getState,
+                            signal,
+                            actions: {
+                                setKeys: getVotingActions().setKeys,
+                                setProgressMessage:
+                                    getVotingActions().setProgressMessage,
+                                setResults: getVotingActions().setResults,
+                                setSubmissionStatus:
+                                    getVotingActions().setSubmissionStatus,
+                            },
+                        });
+
+                        await runEncryptVotesGenerateShares({
+                            pollId,
+                            dispatch,
+                            getState,
+                            signal,
+                            actions: {
+                                setKeys: getVotingActions().setKeys,
+                                setProgressMessage:
+                                    getVotingActions().setProgressMessage,
+                                setResults: getVotingActions().setResults,
+                                setSubmissionStatus:
+                                    getVotingActions().setSubmissionStatus,
+                            },
+                        });
+
+                        await runDecryptResults({
+                            pollId,
+                            dispatch,
+                            getState,
+                            signal,
+                            actions: {
+                                setKeys: getVotingActions().setKeys,
+                                setProgressMessage:
+                                    getVotingActions().setProgressMessage,
+                                setResults: getVotingActions().setResults,
+                                setSubmissionStatus:
+                                    getVotingActions().setSubmissionStatus,
+                            },
+                        });
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? error.message
+                                : 'Unknown voting error.';
+
+                        console.error('Error voting:', message);
+
+                        return rejectWithValue(message);
+                    }
+                },
+                {
+                    pending: (
+                        state,
+                        action: PayloadAction<
+                            undefined,
+                            string,
+                            { arg: { pollId: string } }
+                        >,
+                    ) => {
+                        ensureVoteState(
+                            state,
+                            action.meta.arg.pollId,
+                        ).isVotingInProgress = true;
+                    },
+                    settled: (
+                        state,
+                        action: PayloadAction<
+                            unknown,
+                            string,
+                            { arg: { pollId: string } }
+                        >,
+                    ) => {
+                        const voteState = ensureVoteState(
+                            state,
+                            action.meta.arg.pollId,
+                        );
+
+                        voteState.isVotingInProgress = false;
+                        voteState.progressMessage = null;
+                    },
+                },
+            ),
+        };
     },
     extraReducers: (builder) => {
         builder
@@ -234,11 +520,28 @@ export const votingSlice = createAppSlice({
 });
 
 export const {
-    setSelectedScores,
+    decryptResults,
+    encryptVotesGenerateShares,
+    processPublicPrivateKeys,
     setIsVotingInProgress,
-    setProgressMessage,
     setKeys,
+    setProgressMessage,
     setResults,
+    setSelectedScores,
     setSubmissionStatus,
     setVoterSession,
+    vote,
 } = votingSlice.actions;
+
+votingActionCreators = {
+    setKeys,
+    setProgressMessage,
+    setResults,
+    setSelectedScores,
+    setSubmissionStatus,
+    setVoterSession,
+};
+
+export const { selectVotingStateByPollId } = votingSlice.selectors;
+
+export { initialVoteState, sanitizeVotingStateForPersistence };

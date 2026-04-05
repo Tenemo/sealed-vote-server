@@ -1,155 +1,137 @@
+import type { EnhancedStore } from '@reduxjs/toolkit';
+import { configureStore } from '@reduxjs/toolkit';
+
 const mockedCanRegister = vi.fn();
-const mockedGetPollInitiate = vi.fn();
+const mockedFetchFreshPoll = vi.fn();
 const mockedRegisterVoterInitiate = vi.fn();
-const mockedProcessPublicPrivateKeys = vi.fn();
-const mockedEncryptVotesGenerateShares = vi.fn();
-const mockedDecryptResults = vi.fn();
+const mockedRunProcessPublicPrivateKeys = vi.fn();
+const mockedRunEncryptVotesGenerateShares = vi.fn();
+const mockedRunDecryptResults = vi.fn();
 
 vi.mock('@sealed-vote/protocol', () => ({
     canRegister: (...args: unknown[]) => mockedCanRegister(...args),
 }));
 
+vi.mock('features/Polls/pollQuery', () => ({
+    fetchFreshPoll: (...args: unknown[]) => mockedFetchFreshPoll(...args),
+    waitForPoll: vi.fn(),
+}));
+
 vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
+        reducerPath: 'polls',
+        reducer: (state = {}) => state,
+        middleware:
+            () => (next: (action: unknown) => unknown) => (action: unknown) =>
+                next(action),
         endpoints: {
-            getPollSkipCache: {
-                initiate: (...args: unknown[]) =>
-                    mockedGetPollInitiate(...args),
+            createPoll: {
+                matchFulfilled: () => false,
             },
             registerVoter: {
                 initiate: (...args: unknown[]) =>
                     mockedRegisterVoterInitiate(...args),
+                matchFulfilled: () => false,
             },
         },
     },
 }));
 
-vi.mock('./processPublicPrivateKeys', () => ({
-    processPublicPrivateKeys: (...args: unknown[]) =>
-        mockedProcessPublicPrivateKeys(...args),
+vi.mock('features/Polls/votingWorkflow', () => ({
+    runProcessPublicPrivateKeys: (...args: unknown[]) =>
+        mockedRunProcessPublicPrivateKeys(...args),
+    runEncryptVotesGenerateShares: (...args: unknown[]) =>
+        mockedRunEncryptVotesGenerateShares(...args),
+    runDecryptResults: (...args: unknown[]) => mockedRunDecryptResults(...args),
 }));
 
-vi.mock('./encryptVotesGenerateShares', () => ({
-    encryptVotesGenerateShares: (...args: unknown[]) =>
-        mockedEncryptVotesGenerateShares(...args),
-}));
-
-vi.mock('./decryptResults', () => ({
-    decryptResults: (...args: unknown[]) => mockedDecryptResults(...args),
-}));
+import { initialVoteState, votingSlice } from '../votingSlice';
 
 import { vote } from './vote';
 
-import {
-    setIsVotingInProgress,
-    setProgressMessage,
-    setSelectedScores,
-    setVoterSession,
-} from 'features/Polls/votingSlice';
+import type { VotingState } from 'features/Polls/votingState';
+
+const createTestStore = (): EnhancedStore<{ voting: VotingState }> =>
+    configureStore({
+        reducer: {
+            voting: votingSlice.reducer,
+        },
+        middleware: (getDefaultMiddleware) =>
+            getDefaultMiddleware({
+                serializableCheck: false,
+            }),
+    });
 
 describe('vote thunk', () => {
     beforeEach(() => {
         mockedCanRegister.mockReset();
-        mockedGetPollInitiate.mockReset();
+        mockedFetchFreshPoll.mockReset();
         mockedRegisterVoterInitiate.mockReset();
-        mockedProcessPublicPrivateKeys.mockReset();
-        mockedEncryptVotesGenerateShares.mockReset();
-        mockedDecryptResults.mockReset();
+        mockedRunProcessPublicPrivateKeys.mockReset();
+        mockedRunEncryptVotesGenerateShares.mockReset();
+        mockedRunDecryptResults.mockReset();
     });
 
-    it('dispatches voting progress and stores voter registration data', async () => {
+    it('stores voter registration data and runs the voting workflow', async () => {
         const selectedScores = { Apples: 7 };
+        const store = createTestStore();
+
         mockedCanRegister.mockReturnValue(true);
-        mockedGetPollInitiate.mockReturnValue({ type: 'getPoll' });
-        mockedRegisterVoterInitiate.mockReturnValue({ type: 'registerVoter' });
-        mockedProcessPublicPrivateKeys.mockReturnValue({
-            type: 'processPublicPrivateKeys',
+        mockedFetchFreshPoll.mockResolvedValue({
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples'],
+            voters: [],
+            isOpen: true,
+            publicKeyShares: [],
+            commonPublicKey: null,
+            encryptedVotes: [],
+            encryptedTallies: [],
+            decryptionShares: [],
+            results: [],
         });
-        mockedEncryptVotesGenerateShares.mockReturnValue({
-            type: 'encryptVotesGenerateShares',
-        });
-        mockedDecryptResults.mockReturnValue({ type: 'decryptResults' });
-
-        const dispatch = vi.fn((action) => {
-            switch (action.type) {
-                case 'getPoll':
-                    return {
-                        unwrap: async () => ({
-                            pollName: 'Best fruit',
-                            createdAt: '2026-01-01T00:00:00.000Z',
-                            choices: ['Apples'],
-                            voters: [],
-                            isOpen: true,
-                            publicKeyShares: [],
-                            commonPublicKey: null,
-                            encryptedVotes: [],
-                            encryptedTallies: [],
-                            decryptionShares: [],
-                            results: [],
-                        }),
-                    };
-                case 'registerVoter':
-                    return {
-                        unwrap: async () => ({
-                            message: 'Registered successfully',
-                            pollId: 'poll-1',
-                            voterName: 'Alice',
-                            voterIndex: 1,
-                            voterToken: 'voter-token',
-                        }),
-                    };
-                case 'processPublicPrivateKeys':
-                case 'encryptVotesGenerateShares':
-                case 'decryptResults':
-                    return {
-                        unwrap: async () => undefined,
-                    };
-                default:
-                    return action;
-            }
-        });
-
-        await vote({
-            pollId: 'poll-1',
-            voterName: 'Alice',
-            selectedScores,
-        })(dispatch as never, (() => ({ voting: {} })) as never, undefined);
-
-        expect(dispatch).toHaveBeenCalledWith(
-            setIsVotingInProgress({
-                pollId: 'poll-1',
-                isVotingInProgress: true,
-            }),
-        );
-        expect(dispatch).toHaveBeenCalledWith(
-            setSelectedScores({
-                pollId: 'poll-1',
-                selectedScores,
-            }),
-        );
-        expect(mockedRegisterVoterInitiate).toHaveBeenCalledWith({
-            pollId: 'poll-1',
-            voterData: { voterName: 'Alice' },
-        });
-        expect(dispatch).toHaveBeenCalledWith(
-            setVoterSession({
+        mockedRegisterVoterInitiate.mockReturnValue({
+            type: 'registerVoter',
+            unwrap: async () => ({
+                message: 'Registered successfully',
                 pollId: 'poll-1',
                 voterName: 'Alice',
                 voterIndex: 1,
                 voterToken: 'voter-token',
             }),
-        );
-        expect(dispatch).toHaveBeenCalledWith(
-            setIsVotingInProgress({
+        });
+        mockedRunProcessPublicPrivateKeys.mockResolvedValue(undefined);
+        mockedRunEncryptVotesGenerateShares.mockResolvedValue(undefined);
+        mockedRunDecryptResults.mockResolvedValue(undefined);
+
+        const voteResult = store.dispatch(
+            vote({
                 pollId: 'poll-1',
-                isVotingInProgress: false,
-            }),
-        );
-        expect(dispatch).toHaveBeenCalledWith(
-            setProgressMessage({
-                pollId: 'poll-1',
-                progressMessage: null,
-            }),
-        );
+                voterName: 'Alice',
+                selectedScores,
+            }) as never,
+        ) as {
+            unwrap: () => Promise<void>;
+        };
+
+        await voteResult.unwrap();
+
+        expect(mockedFetchFreshPoll).toHaveBeenCalledWith('poll-1');
+        expect(mockedRegisterVoterInitiate).toHaveBeenCalledWith({
+            pollId: 'poll-1',
+            voterData: { voterName: 'Alice' },
+        });
+        expect(mockedRunProcessPublicPrivateKeys).toHaveBeenCalled();
+        expect(mockedRunEncryptVotesGenerateShares).toHaveBeenCalled();
+        expect(mockedRunDecryptResults).toHaveBeenCalled();
+        expect(store.getState().voting['poll-1']).toEqual({
+            ...initialVoteState,
+            selectedScores,
+            voterName: 'Alice',
+            voterIndex: 1,
+            voterToken: 'voter-token',
+            isVotingInProgress: false,
+            progressMessage: null,
+        });
     });
 });

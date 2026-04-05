@@ -33,12 +33,6 @@ export const pollsApi = createApi({
             }),
             invalidatesTags: ['Poll'],
         }),
-        getPollSkipCache: build.mutation<PollResponse, { pollId: string }>({
-            query: ({ pollId }) => ({
-                url: POLL_ROUTES.poll(pollId),
-                method: 'GET',
-            }),
-        }),
         getPoll: build.query<PollResponse, string>({
             query: (pollId) => ({
                 url: POLL_ROUTES.poll(pollId),

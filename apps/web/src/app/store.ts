@@ -1,6 +1,5 @@
-import type { Action, ThunkAction } from '@reduxjs/toolkit';
-import { configureStore } from '@reduxjs/toolkit';
-import { combineReducers } from 'redux';
+import { combineSlices, configureStore } from '@reduxjs/toolkit';
+import { setupListeners } from '@reduxjs/toolkit/query';
 import { createLogger } from 'redux-logger';
 import {
     persistStore,
@@ -16,11 +15,14 @@ import {
 import hardSet from 'redux-persist/lib/stateReconciler/hardSet';
 import storageSession from 'redux-persist/lib/storage/session';
 
+import { registerPollQueryStore } from 'features/Polls/pollQuery';
 import { pollsApi } from 'features/Polls/pollsApi';
 import {
     sanitizeVotingStateForPersistence,
     votingSlice,
 } from 'features/Polls/votingSlice';
+
+export const rootReducer = combineSlices(pollsApi, votingSlice);
 
 export type RootState = ReturnType<typeof rootReducer>;
 
@@ -46,53 +48,33 @@ const logger = createLogger({
     collapsed: true,
 });
 
-export const rootReducer = combineReducers({
-    polls: pollsApi.reducer,
-    voting: votingSlice.reducer,
-});
 const persistedReducer = persistReducer(persistConfig, rootReducer);
-
-const middleware = [pollsApi.middleware];
 
 export const store = configureStore({
     reducer: persistedReducer,
     devTools: true, // Leaving it on for prod on purpose
-    middleware: (getDefaultMiddleware) =>
-        IS_LOGGING_ENABLED
-            ? getDefaultMiddleware({
-                  serializableCheck: {
-                      ignoredActions: [
-                          FLUSH,
-                          REHYDRATE,
-                          PAUSE,
-                          PERSIST,
-                          PURGE,
-                          REGISTER,
-                      ],
-                  },
-              })
-                  .concat(middleware)
-                  .concat(logger)
-            : getDefaultMiddleware({
-                  serializableCheck: {
-                      ignoredActions: [
-                          FLUSH,
-                          REHYDRATE,
-                          PAUSE,
-                          PERSIST,
-                          PURGE,
-                          REGISTER,
-                      ],
-                  },
-              }).concat(middleware),
+    middleware: (getDefaultMiddleware) => {
+        const middleware = getDefaultMiddleware({
+            serializableCheck: {
+                ignoredActions: [
+                    FLUSH,
+                    REHYDRATE,
+                    PAUSE,
+                    PERSIST,
+                    PURGE,
+                    REGISTER,
+                ],
+            },
+        }).concat(pollsApi.middleware);
+
+        return IS_LOGGING_ENABLED ? middleware.concat(logger) : middleware;
+    },
 });
+
+registerPollQueryStore(store);
+setupListeners(store.dispatch);
+
 export const persistor = persistStore(store);
 
 export type AppStore = typeof store;
 export type AppDispatch = AppStore['dispatch'];
-export type AppThunk<ThunkReturnType = void> = ThunkAction<
-    ThunkReturnType,
-    RootState,
-    unknown,
-    Action
->;

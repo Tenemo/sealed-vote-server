@@ -1,5 +1,4 @@
 import { Typography, Alert, CircularProgress } from '@mui/material';
-import { derivePollPhase } from '@sealed-vote/protocol';
 import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
@@ -27,8 +26,12 @@ const PollPage = (): React.JSX.Element => {
         data: poll,
         isLoading: isLoadingPoll,
         error: pollError,
-        refetch,
-    } = useGetPollQuery(pollId);
+    } = useGetPollQuery(pollId, {
+        pollingInterval: results ? 0 : 3000,
+        refetchOnFocus: true,
+        refetchOnReconnect: true,
+        skipPollingIfUnfocused: true,
+    });
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -41,24 +44,6 @@ const PollPage = (): React.JSX.Element => {
             }),
         );
     };
-
-    const shouldRefetchPoll =
-        !!poll && derivePollPhase(poll) === 'registration';
-
-    useEffect(() => {
-        if (shouldRefetchPoll) {
-            const pollInterval = setInterval(() => {
-                void refetch();
-                if (poll && !poll.isOpen) {
-                    clearInterval(pollInterval);
-                }
-            }, 3000);
-
-            return () => {
-                clearInterval(pollInterval);
-            };
-        }
-    }, [poll, refetch, shouldRefetchPoll]);
 
     useEffect(() => {
         if (

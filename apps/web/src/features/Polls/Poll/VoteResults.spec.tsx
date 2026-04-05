@@ -18,6 +18,16 @@ vi.mock('app/hooks', () => ({
 }));
 
 vi.mock('features/Polls/pollsApi', () => ({
+    pollsApi: {
+        endpoints: {
+            createPoll: {
+                matchFulfilled: () => false,
+            },
+            registerVoter: {
+                matchFulfilled: () => false,
+            },
+        },
+    },
     useGetPollQuery: vi.fn(),
 }));
 
