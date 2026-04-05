@@ -1,5 +1,7 @@
 # sealed.vote
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/431089b8-8373-4038-8b80-fb3a7aa02c6e/deploy-status)](https://app.netlify.com/projects/sealed-vote/deploys)
+
 [sealed.vote](https://sealed.vote) is a browser-based ranked-choice voting application built around homomorphic encryption. Voters score each choice from 1 to 10, and the system is designed so that individual votes remain hidden from everyone, including the server, while the final tally can still be computed.
 
 https://github.com/user-attachments/assets/f4334c3c-1781-462c-9f0e-3e7ccda372f1
