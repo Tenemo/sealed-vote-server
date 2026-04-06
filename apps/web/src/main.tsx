@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { apiBaseUrl, sentryTracePropagationTargets } from 'app/apiConfig';
 import App from 'app/App';
+import { resolveSentryEnabled } from 'app/sentryConfig';
 import { store, persistor } from 'app/store';
 import { ThemeProvider } from 'components/ThemeProvider';
 
@@ -58,28 +59,14 @@ export const Root = (): React.JSX.Element => {
   );
 };
 
-const resolveSentryEnabled = (): boolean => {
-  const configuredValue =
-    import.meta.env.VITE_SENTRY_ENABLED?.trim().toLowerCase();
-
-  if (configuredValue === 'true') {
-    return true;
-  }
-
-  if (configuredValue === 'false') {
-    return false;
-  }
-
-  return (
-    import.meta.env.MODE !== 'development' &&
-    import.meta.env.MODE !== 'test' &&
-    !apiBaseUrl.startsWith('http://127.0.0.1') &&
-    !apiBaseUrl.startsWith('http://localhost')
-  );
-};
-
 Sentry.init({
-  enabled: resolveSentryEnabled(),
+  enabled: resolveSentryEnabled({
+    apiBaseUrl,
+    configuredValue: import.meta.env.VITE_SENTRY_ENABLED,
+    currentHostname: window.location.hostname,
+    currentOrigin: window.location.origin,
+    mode: import.meta.env.MODE,
+  }),
   dsn: 'https://dce8580406e67b8cfe162b02e3d16e58@o502294.ingest.sentry.io/4506770255642624',
   integrations: [
     Sentry.browserTracingIntegration(),

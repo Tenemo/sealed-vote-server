@@ -26,7 +26,7 @@ const VoteItem = ({
             onClick={() => onVote(choiceName, scoreChoice)}
             variant={scoreChoice === selectedScore ? 'default' : 'outline'}
           >
-            {scoreChoice === 1 ? 'Abstain' : scoreChoice}
+            {scoreChoice}
           </Button>
         ))}
       </div>

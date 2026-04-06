@@ -32,7 +32,7 @@
         "@sinclair/typebox": "catalog:",
         "@sindresorhus/slugify": "^3.0.0",
         "cross-env": "^10.1.0",
-        "dotenv": "^17.4.0",
+        "dotenv": "^17.4.1",
         "drizzle-orm": "^0.45.2",
         "fastify": "^5.8.4",
         "http-errors": "^2.0.1",
