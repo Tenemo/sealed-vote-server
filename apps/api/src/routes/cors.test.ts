@@ -5,12 +5,20 @@ import { buildServer } from '../buildServer';
 
 describe('CORS configuration', () => {
     let fastify: FastifyInstance;
+    const originalWebAppOrigin = process.env.WEB_APP_ORIGIN;
 
     beforeAll(async () => {
+        delete process.env.WEB_APP_ORIGIN;
         fastify = await buildServer(false);
     });
 
     afterAll(async () => {
+        if (originalWebAppOrigin === undefined) {
+            delete process.env.WEB_APP_ORIGIN;
+        } else {
+            process.env.WEB_APP_ORIGIN = originalWebAppOrigin;
+        }
+
         await fastify.close();
     });
 
@@ -71,6 +79,25 @@ describe('CORS configuration', () => {
         expect(response.statusCode).toBe(200);
         expect(response.headers['access-control-allow-origin']).toBe(
             'https://deploy-preview-3--sealed-vote.netlify.app',
+        );
+    });
+
+    test('allows the configured preview web origin', async () => {
+        await fastify.close();
+        process.env.WEB_APP_ORIGIN = 'https://preview-web.up.railway.app';
+        fastify = await buildServer(false);
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/health-check',
+            headers: {
+                origin: 'https://preview-web.up.railway.app',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['access-control-allow-origin']).toBe(
+            'https://preview-web.up.railway.app',
         );
     });
 

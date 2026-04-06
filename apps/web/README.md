@@ -32,3 +32,11 @@ pnpm --filter @sealed-vote/web build
 ```
 
 The frontend only needs one user-configured environment variable: `VITE_API_BASE_URL` for deployed builds that talk to the backend on a different origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
+
+For deployed static serving outside Vite, the workspace also provides:
+
+```bash
+pnpm --filter @sealed-vote/web serve:dist
+```
+
+That command serves `dist` with SPA fallback and is used by the Railway preview web service.

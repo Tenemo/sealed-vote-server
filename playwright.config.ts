@@ -6,8 +6,9 @@ import {
     type ReporterDescription,
 } from '@playwright/test';
 
-const mobileFirefoxAndroidUserAgent =
-    'Mozilla/5.0 (Android 14; Mobile; rv:137.0) Gecko/137.0 Firefox/137.0';
+import {
+    mobileFirefoxAndroidContextOptions,
+} from './tests/e2e/support/profiles';
 
 const chromiumOnlySpecs = [
     '**/duplicate-title-polls.spec.ts',
@@ -133,12 +134,7 @@ export default defineConfig({
             testIgnore: chromiumOnlySpecs,
             use: {
                 browserName: 'firefox',
-                hasTouch: true,
-                userAgent: mobileFirefoxAndroidUserAgent,
-                viewport: {
-                    width: 412,
-                    height: 915,
-                },
+                ...mobileFirefoxAndroidContextOptions,
             },
         },
     ],

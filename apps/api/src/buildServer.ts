@@ -9,6 +9,7 @@ import Fastify, {
     FastifyTypeProviderDefault,
 } from 'fastify';
 
+import { getConfiguredWebAppOrigin } from './config.js';
 import { databasePlugin } from './db/plugin.js';
 import { close } from './routes/close.js';
 import { create } from './routes/create.js';
@@ -51,9 +52,13 @@ const isAllowedLocalOrigin = (origin: string): boolean => {
 const isAllowedDeployPreviewOrigin = (origin: string): boolean =>
     netlifyDeployPreviewOriginPattern.test(origin);
 
-const isAllowedCorsOrigin = (origin?: string): boolean =>
+const isAllowedCorsOrigin = (
+    origin: string | undefined,
+    configuredWebAppOrigin: string | null,
+): boolean =>
     !origin ||
     allowedProductionOrigins.has(origin) ||
+    origin === configuredWebAppOrigin ||
     isAllowedDeployPreviewOrigin(origin) ||
     isAllowedLocalOrigin(origin);
 
@@ -119,6 +124,7 @@ export const buildServer = async (
 > => {
     const shouldEnableLogging =
         isLoggingEnabled ?? process.env.NODE_ENV !== 'test';
+    const configuredWebAppOrigin = getConfiguredWebAppOrigin();
     const fastify = Fastify({
         logger: shouldEnableLogging ? logger : false,
     });
@@ -148,7 +154,7 @@ export const buildServer = async (
     });
     await fastify.register(cors, {
         origin: (origin, callback) => {
-            callback(null, isAllowedCorsOrigin(origin));
+            callback(null, isAllowedCorsOrigin(origin, configuredWebAppOrigin));
         },
         methods: ['GET', 'HEAD', 'POST', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'sentry-trace', 'baggage'],

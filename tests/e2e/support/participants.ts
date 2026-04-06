@@ -8,8 +8,7 @@ import type {
     TestInfo,
 } from '@playwright/test';
 
-const mobileFirefoxAndroidUserAgent =
-    'Mozilla/5.0 (Android 14; Mobile; rv:137.0) Gecko/137.0 Firefox/137.0';
+import { mobileFirefoxAndroidContextOptions } from './profiles';
 
 const browserContextOptionKeys = [
     'acceptDownloads',
@@ -41,15 +40,6 @@ const browserContextOptionKeys = [
     'userAgent',
     'viewport',
 ] as const satisfies ReadonlyArray<keyof BrowserContextOptions>;
-
-export const mobileFirefoxAndroidContextOptions: BrowserContextOptions = {
-    hasTouch: true,
-    userAgent: mobileFirefoxAndroidUserAgent,
-    viewport: {
-        width: 412,
-        height: 915,
-    },
-};
 
 type ManagedParticipant = {
     browser?: Browser;

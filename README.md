@@ -81,7 +81,6 @@ GitHub Actions uses a separate built-artifact path for PR e2e runs:
 - `pnpm e2e:ci:serve:api` starts the built API server
 - `pnpm e2e:ci:serve:web` starts the built web server
 - `pnpm e2e:ci:test` runs Playwright against the built API and built web server
-- the required PR check is the stable `e2e-required` job in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
 
 ## Workspace documentation
 

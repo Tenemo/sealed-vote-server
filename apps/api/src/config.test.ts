@@ -1,37 +1,46 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 
-import { shouldUseDatabaseSsl } from './config';
+import { getConfiguredWebAppOrigin } from './config';
 
-describe('shouldUseDatabaseSsl', () => {
-    test('disables SSL for the default local database URL', () => {
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://postgres:postgres@localhost:5432/sv-db',
-            ),
-        ).toBe(false);
+const originalWebAppOrigin = process.env.WEB_APP_ORIGIN;
+
+afterEach(() => {
+    if (originalWebAppOrigin === undefined) {
+        delete process.env.WEB_APP_ORIGIN;
+        return;
+    }
+
+    process.env.WEB_APP_ORIGIN = originalWebAppOrigin;
+});
+
+describe('getConfiguredWebAppOrigin', () => {
+    test('returns null when WEB_APP_ORIGIN is not set', () => {
+        delete process.env.WEB_APP_ORIGIN;
+
+        expect(getConfiguredWebAppOrigin()).toBeNull();
     });
 
-    test('disables SSL for loopback database URLs', () => {
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://postgres:postgres@127.0.0.1:5432/sv-db',
-            ),
-        ).toBe(false);
+    test('normalizes a configured origin to its origin value', () => {
+        process.env.WEB_APP_ORIGIN = 'https://preview-web.up.railway.app/path';
+
+        expect(getConfiguredWebAppOrigin()).toBe(
+            'https://preview-web.up.railway.app',
+        );
     });
 
-    test('disables SSL for docker-network local database URLs', () => {
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://postgres:postgres@postgres:5432/sv-db',
-            ),
-        ).toBe(false);
+    test('rejects invalid URLs', () => {
+        process.env.WEB_APP_ORIGIN = 'not-a-url';
+
+        expect(() => getConfiguredWebAppOrigin()).toThrow(
+            'WEB_APP_ORIGIN must be a valid absolute URL.',
+        );
     });
 
-    test('enables SSL for remote database URLs', () => {
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://user:pass@db.example.com:5432/sv-db',
-            ),
-        ).toBe(true);
+    test('rejects unsupported protocols', () => {
+        process.env.WEB_APP_ORIGIN = 'ftp://preview-web.up.railway.app';
+
+        expect(() => getConfiguredWebAppOrigin()).toThrow(
+            'WEB_APP_ORIGIN must use http or https.',
+        );
     });
 });

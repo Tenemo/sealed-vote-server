@@ -30,3 +30,28 @@ const isLocalDatabaseUrl = (databaseUrl: string): boolean => {
 
 export const shouldUseDatabaseSsl = (databaseUrl: string): boolean =>
     !isLocalDatabaseUrl(databaseUrl);
+
+export const getConfiguredWebAppOrigin = (): string | null => {
+    const configuredOrigin = process.env.WEB_APP_ORIGIN?.trim();
+
+    if (!configuredOrigin) {
+        return null;
+    }
+
+    let parsedOrigin: URL;
+
+    try {
+        parsedOrigin = new URL(configuredOrigin);
+    } catch {
+        throw new TypeError('WEB_APP_ORIGIN must be a valid absolute URL.');
+    }
+
+    if (
+        parsedOrigin.protocol !== 'http:' &&
+        parsedOrigin.protocol !== 'https:'
+    ) {
+        throw new TypeError('WEB_APP_ORIGIN must use http or https.');
+    }
+
+    return parsedOrigin.origin;
+};

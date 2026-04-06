@@ -324,7 +324,7 @@ jobs:
                   if-no-files-found: ignore
 
     e2e-required:
-        name: e2e-required
+        name: e2e
         if: >-
             always() &&
             (
