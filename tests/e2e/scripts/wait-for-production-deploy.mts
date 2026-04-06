@@ -129,10 +129,18 @@ const getJsonResponse = async (
         },
         cache: 'no-store',
     });
+    const statusCode = response.status;
+    let body: unknown = null;
+
+    try {
+        body = await response.json();
+    } catch {
+        body = null;
+    }
 
     return {
-        body: await response.json(),
-        statusCode: response.status,
+        body,
+        statusCode,
     };
 };
 

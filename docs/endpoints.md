@@ -83,8 +83,8 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```
 
 - notes:
-- `voterToken` is returned only once and is required for the secured phase endpoints below
-- voter names are unique per poll
+  - `voterToken` is returned only once and is required for the secured phase endpoints below
+  - voter names are unique per poll
 - failure responses:
 - `400` for invalid poll id, empty voter name, closed poll, or max participants reached
 - `404` when the poll does not exist
@@ -241,4 +241,4 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```
 
 - notes:
-- `commitSha` is `null` when the runtime does not expose a deployment commit SHA
+  - `commitSha` is `null` when the runtime does not expose a deployment commit SHA

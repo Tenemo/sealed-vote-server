@@ -47,23 +47,21 @@ export const fetchFreshPoll = async (
     dispatch: AppDispatch,
     pollId: string,
 ): Promise<PollResponse> => {
-    const fetchedPoll = await dispatch(
-        pollsApi.endpoints.getPoll.initiate(pollId, {
-            forceRefetch: true,
-            subscribe: false,
-        }),
-    ).unwrap();
+    try {
+        return await dispatch(
+            pollsApi.endpoints.getPoll.initiate(pollId, {
+                forceRefetch: true,
+                subscribe: false,
+            }),
+        ).unwrap();
+    } catch (error) {
+        const cachedPoll = selectPollResult(store.getState(), pollId);
+        if (cachedPoll) {
+            return cachedPoll;
+        }
 
-    if (fetchedPoll) {
-        return fetchedPoll;
+        throw error;
     }
-
-    const cachedPoll = selectPollResult(store.getState(), pollId);
-    if (cachedPoll) {
-        return cachedPoll;
-    }
-
-    throw new Error(`Poll ${pollId} could not be fetched.`);
 };
 
 export const waitForPoll = async ({
