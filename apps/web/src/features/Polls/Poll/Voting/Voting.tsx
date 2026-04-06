@@ -74,7 +74,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
         !isVoterNameDuplicate;
 
     return (
-        <>
+        <Box sx={{ width: '100%' }}>
             <Typography
                 sx={{ py: 1, px: 2, textAlign: 'center' }}
                 variant="body1"
@@ -83,7 +83,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                 geometric mean of all votes per item. All voters need to be
                 present in order to complete the vote.
             </Typography>
-            <List>
+            <List sx={{ width: '100%' }}>
                 {poll.choices.map((choiceName) => (
                     <VoteItem
                         choiceName={choiceName}
@@ -94,7 +94,12 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                 ))}
             </List>
             <Box
-                sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap',
+                }}
             >
                 <TextField
                     error={isVoterNameDuplicate}
@@ -121,7 +126,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                     Vote
                 </Button>
             </Box>
-        </>
+        </Box>
     );
 };
 

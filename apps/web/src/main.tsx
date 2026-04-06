@@ -7,7 +7,7 @@ import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 import { PersistGate } from 'redux-persist/integration/react';
 
-import { sentryTracePropagationTargets } from 'app/apiConfig';
+import { apiBaseUrl, sentryTracePropagationTargets } from 'app/apiConfig';
 import App from 'app/App';
 import { store, persistor } from 'app/store';
 import { darkTheme } from 'styles/theme';
@@ -56,10 +56,28 @@ export const Root = (): React.JSX.Element => {
     );
 };
 
-Sentry.init({
-    enabled:
+const resolveSentryEnabled = (): boolean => {
+    const configuredValue =
+        import.meta.env.VITE_SENTRY_ENABLED?.trim().toLowerCase();
+
+    if (configuredValue === 'true') {
+        return true;
+    }
+
+    if (configuredValue === 'false') {
+        return false;
+    }
+
+    return (
         import.meta.env.MODE !== 'development' &&
-        import.meta.env.MODE !== 'test',
+        import.meta.env.MODE !== 'test' &&
+        !apiBaseUrl.startsWith('http://127.0.0.1') &&
+        !apiBaseUrl.startsWith('http://localhost')
+    );
+};
+
+Sentry.init({
+    enabled: resolveSentryEnabled(),
     dsn: 'https://dce8580406e67b8cfe162b02e3d16e58@o502294.ingest.sentry.io/4506770255642624',
     integrations: [
         Sentry.browserTracingIntegration(),

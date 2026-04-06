@@ -8,9 +8,39 @@ export type UnexpectedErrorTracker = {
     readonly errors: string[];
 };
 
+const knownApiHostnames = new Set([
+    '127.0.0.1',
+    'localhost',
+    'sealed.vote',
+    'api.sealed.vote',
+]);
+
 export const createUnexpectedErrorTracker = (): UnexpectedErrorTracker => ({
     errors: [],
 });
+
+const isTrackedApiResponse = (page: Page, responseUrl: URL): boolean => {
+    if (!responseUrl.pathname.includes('/api/')) {
+        return false;
+    }
+
+    const allowedHostnames = new Set(knownApiHostnames);
+    const currentPageUrl = page.url();
+
+    if (currentPageUrl) {
+        const currentPageHostname = new URL(currentPageUrl).hostname;
+        allowedHostnames.add(currentPageHostname);
+
+        if (
+            currentPageHostname !== 'localhost' &&
+            currentPageHostname !== '127.0.0.1'
+        ) {
+            allowedHostnames.add(`api.${currentPageHostname}`);
+        }
+    }
+
+    return allowedHostnames.has(responseUrl.hostname);
+};
 
 export const attachErrorTracking = (
     page: Page,
@@ -31,13 +61,15 @@ export const attachErrorTracking = (
     });
 
     page.on('response', (response) => {
+        const responseUrl = new URL(response.url());
+
         if (
-            response.url().includes('/api/') &&
+            isTrackedApiResponse(page, responseUrl) &&
             response.status() >= 400 &&
             !allowedApiStatuses.has(response.status())
         ) {
             tracker.errors.push(
-                `[${label}] response: ${response.status()} ${response.url()}`,
+                `[${label}] response: ${response.status()} ${responseUrl.toString()}`,
             );
         }
     });

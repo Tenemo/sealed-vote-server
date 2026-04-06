@@ -15,11 +15,24 @@ const VoteItem = ({
     selectedScore,
 }: Props): React.JSX.Element => {
     return (
-        <ListItem sx={{ display: 'flex', flexDirection: 'column', mb: 3 }}>
+        <ListItem
+            sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                mb: 3,
+            }}
+        >
             <Typography sx={{ display: 'block' }} variant="h6">
                 {choiceName}
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                }}
+            >
                 {SCORE_CHOICES.map((scoreChoice) => (
                     <Button
                         key={scoreChoice}

@@ -1,4 +1,4 @@
-import { Typography, Alert, CircularProgress } from '@mui/material';
+import { Typography, Alert, Box, CircularProgress } from '@mui/material';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { isUuid } from '@sealed-vote/contracts';
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
@@ -117,16 +117,29 @@ const PollPage = (): React.JSX.Element => {
                 </Alert>
             )}
             {pollId && poll && (
-                <>
+                <Box
+                    sx={{
+                        width: '100%',
+                        maxWidth: 960,
+                        px: { xs: 2, sm: 3 },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                    }}
+                >
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />
                     <VoteResults poll={poll} pollId={pollId} />
-                    <Typography p={2} variant="body1">
+                    <Typography
+                        p={2}
+                        sx={{ textAlign: 'center' }}
+                        variant="body1"
+                    >
                         {poll.voters.length
                             ? `Voters in this poll: ${poll.voters.join(', ')}`
                             : 'No voters yet.'}
                     </Typography>
-                </>
+                </Box>
             )}
         </>
     );

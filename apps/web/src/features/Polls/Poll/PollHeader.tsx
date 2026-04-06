@@ -41,17 +41,17 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
             p={2}
             sx={{
                 display: 'flex',
-                justifyContent: 'space-between',
                 width: '100%',
                 flexDirection: 'column',
                 alignItems: 'center',
+                textAlign: 'center',
             }}
         >
             <Typography mb={1} variant="h5">
                 Vote: {poll.pollName}
             </Typography>
             {creatorToken && poll.isOpen && (
-                <Typography mb={1}>
+                <Typography mb={1} sx={{ maxWidth: 720 }}>
                     You are the creator of this vote. When there will be more
                     than 1 voter, including yourself, you can begin the vote to
                     calculate the results and prevent any new votes.
@@ -64,7 +64,8 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                     sx={{
                         display: 'flex',
                         width: '100%',
-                        alignItems: 'flex-start',
+                        justifyContent: 'center',
+                        alignItems: 'center',
                         flexDirection: 'column',
                     }}
                 >

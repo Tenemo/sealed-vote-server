@@ -1,8 +1,8 @@
 import { ContentCopy as CopyIcon } from '@mui/icons-material';
 import {
+    Box,
     FormControl,
     FormHelperText,
-    Grid,
     IconButton,
     InputAdornment,
     OutlinedInput,
@@ -34,20 +34,17 @@ const VoteSharing = (): React.JSX.Element => {
     };
 
     return (
-        <Grid
-            container
+        <Box
             sx={{
                 display: 'flex',
                 justifyContent: 'center',
+                width: '100%',
             }}
         >
-            <Grid
-                size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
-                sx={{ width: '100%', p: 2 }}
-            >
+            <Box sx={{ width: '100%', maxWidth: 720, p: 2 }}>
                 <FormControl
+                    fullWidth
                     sx={{
-                        alignSelf: 'flex-start',
                         width: '100%',
                     }}
                     variant="filled"
@@ -69,14 +66,23 @@ const VoteSharing = (): React.JSX.Element => {
                         }
                         readOnly
                         size="small"
+                        sx={{
+                            '& .MuiOutlinedInput-input': {
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                            },
+                        }}
                         value={window.location.href}
                     />
-                    <FormHelperText id="copy-page-link-helper-text">
+                    <FormHelperText
+                        id="copy-page-link-helper-text"
+                        sx={{ mt: 1, textAlign: 'center' }}
+                    >
                         Link to the vote to share with others
                     </FormHelperText>
                 </FormControl>
-            </Grid>
-        </Grid>
+            </Box>
+        </Box>
     );
 };
 

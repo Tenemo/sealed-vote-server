@@ -28,7 +28,7 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
 
     attachErrorTracking(page, 'page-1', tracker);
 
-    const createPollWithTitle = async () => {
+    const createPollWithTitle = async (): Promise<CreatedPoll> => {
         const createdPoll = await createPoll({
             page,
             pollName: pollTitle,
@@ -38,12 +38,12 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
         return createdPoll;
     };
 
-    const firstPollUrl = await createPollWithTitle();
-    const secondPollUrl = await createPollWithTitle();
+    const firstPoll = await createPollWithTitle();
+    const secondPoll = await createPollWithTitle();
 
-    expect(secondPollUrl.pollUrl).not.toBe(firstPollUrl.pollUrl);
+    expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
 
-    await page.goto(firstPollUrl.pollUrl);
+    await page.goto(firstPoll.pollUrl);
     await page
         .getByLabel('Voter name*')
         .fill(createVoterName('alice', namespace));
@@ -54,7 +54,7 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
     attachErrorTracking(participant.page, 'page-2', tracker);
 
     try {
-        await participant.page.goto(secondPollUrl.pollUrl);
+        await participant.page.goto(secondPoll.pollUrl);
         await participant.page
             .getByLabel('Voter name*')
             .fill(createVoterName('bob', namespace));
