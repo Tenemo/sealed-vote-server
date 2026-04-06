@@ -1,4 +1,8 @@
-import { assertSafeE2EEnv, runPnpmSync } from './shared.mts';
+import {
+    assertSafeE2EEnv,
+    getForwardedCliArgs,
+    runPnpmSync,
+} from './shared.mts';
 
 process.env.NODE_ENV = 'test';
 process.env.PLAYWRIGHT_USE_BUILT_SERVERS = 'true';
@@ -12,4 +16,4 @@ try {
     process.exit(1);
 }
 
-runPnpmSync(['exec', 'playwright', 'test', ...process.argv.slice(2)]);
+runPnpmSync(['exec', 'playwright', 'test', ...getForwardedCliArgs()]);

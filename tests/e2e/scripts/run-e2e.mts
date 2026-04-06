@@ -1,4 +1,8 @@
-import { assertSafeE2EEnv, runPnpmSync } from './shared.mts';
+import {
+    assertSafeE2EEnv,
+    getForwardedCliArgs,
+    runPnpmSync,
+} from './shared.mts';
 
 process.env.NODE_ENV = 'test';
 
@@ -11,7 +15,7 @@ try {
     process.exit(1);
 }
 
-const args = process.argv.slice(2);
+const args = getForwardedCliArgs();
 
 runPnpmSync(['build']);
 runPnpmSync(['exec', 'playwright', 'test', ...args]);

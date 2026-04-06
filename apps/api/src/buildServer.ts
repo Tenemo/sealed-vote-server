@@ -33,6 +33,8 @@ const allowedProductionOrigins = new Set([
     'https://sealed.vote',
     'https://www.sealed.vote',
 ]);
+const netlifyDeployPreviewOriginPattern =
+    /^https:\/\/deploy-preview-\d+--sealed-vote\.netlify\.app$/;
 
 const isAllowedLocalOrigin = (origin: string): boolean => {
     try {
@@ -46,9 +48,13 @@ const isAllowedLocalOrigin = (origin: string): boolean => {
     }
 };
 
+const isAllowedDeployPreviewOrigin = (origin: string): boolean =>
+    netlifyDeployPreviewOriginPattern.test(origin);
+
 const isAllowedCorsOrigin = (origin?: string): boolean =>
     !origin ||
     allowedProductionOrigins.has(origin) ||
+    isAllowedDeployPreviewOrigin(origin) ||
     isAllowedLocalOrigin(origin);
 
 type ValidationIssue = {

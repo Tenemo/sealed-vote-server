@@ -59,6 +59,21 @@ describe('CORS configuration', () => {
         );
     });
 
+    test('allows Netlify deploy preview origins', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/health-check',
+            headers: {
+                origin: 'https://deploy-preview-3--sealed-vote.netlify.app',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['access-control-allow-origin']).toBe(
+            'https://deploy-preview-3--sealed-vote.netlify.app',
+        );
+    });
+
     test('handles allowlisted preflight requests', async () => {
         const response = await fastify.inject({
             method: 'OPTIONS',
@@ -89,12 +104,42 @@ describe('CORS configuration', () => {
         ).toContain('baggage');
     });
 
+    test('handles deploy preview preflight requests', async () => {
+        const response = await fastify.inject({
+            method: 'OPTIONS',
+            url: '/api/polls/create',
+            headers: {
+                origin: 'https://deploy-preview-42--sealed-vote.netlify.app',
+                'access-control-request-method': 'POST',
+                'access-control-request-headers': 'content-type',
+            },
+        });
+
+        expect(response.statusCode).toBe(204);
+        expect(response.headers['access-control-allow-origin']).toBe(
+            'https://deploy-preview-42--sealed-vote.netlify.app',
+        );
+    });
+
     test('does not allow untrusted origins', async () => {
         const response = await fastify.inject({
             method: 'GET',
             url: '/api/health-check',
             headers: {
                 origin: 'https://evil.example',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    });
+
+    test('does not allow lookalike deploy preview origins', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/health-check',
+            headers: {
+                origin: 'https://deploy-preview-3--sealed-vote.netlify.app.evil.example',
             },
         });
 

@@ -114,6 +114,16 @@ export const runPnpmSync = (args: string[]): void => {
     }
 };
 
+export const getForwardedCliArgs = (): string[] => {
+    const args = process.argv.slice(2);
+
+    if (args[0] === '--') {
+        return args.slice(1);
+    }
+
+    return args;
+};
+
 export const spawnPnpm = (args: string[]): ChildProcess => {
     const [command, commandPrefix] = getPnpmCommand();
 
