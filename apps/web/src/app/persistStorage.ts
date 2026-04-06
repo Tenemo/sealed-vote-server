@@ -1,42 +1,42 @@
 import storageSessionModule from 'redux-persist/lib/storage/session';
 
 type PersistStorage = {
-    getItem(key: string): Promise<string | null> | string | null;
-    setItem(key: string, item: string): Promise<unknown> | unknown;
-    removeItem(key: string): Promise<unknown> | unknown;
+  getItem(key: string): Promise<string | null> | string | null;
+  setItem(key: string, item: string): Promise<unknown> | unknown;
+  removeItem(key: string): Promise<unknown> | unknown;
 };
 
 type PersistStorageModule = PersistStorage | { default: unknown };
 
 export const isPersistStorage = (value: unknown): value is PersistStorage =>
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as PersistStorage).getItem === 'function' &&
-    typeof (value as PersistStorage).setItem === 'function' &&
-    typeof (value as PersistStorage).removeItem === 'function';
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as PersistStorage).getItem === 'function' &&
+  typeof (value as PersistStorage).setItem === 'function' &&
+  typeof (value as PersistStorage).removeItem === 'function';
 
 export const normalizePersistStorage = (
-    value: PersistStorageModule,
+  value: PersistStorageModule,
 ): PersistStorage => {
-    let candidate: unknown = value;
+  let candidate: unknown = value;
 
-    while (
-        !isPersistStorage(candidate) &&
-        typeof candidate === 'object' &&
-        candidate !== null &&
-        'default' in candidate
-    ) {
-        candidate = (candidate as { default: unknown }).default;
-    }
+  while (
+    !isPersistStorage(candidate) &&
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    'default' in candidate
+  ) {
+    candidate = (candidate as { default: unknown }).default;
+  }
 
-    if (!isPersistStorage(candidate)) {
-        throw new TypeError(
-            'redux-persist session storage module did not expose a valid storage adapter.',
-        );
-    }
+  if (!isPersistStorage(candidate)) {
+    throw new TypeError(
+      'redux-persist session storage module did not expose a valid storage adapter.',
+    );
+  }
 
-    return candidate;
+  return candidate;
 };
 
 export const sessionPersistStorage =
-    normalizePersistStorage(storageSessionModule);
+  normalizePersistStorage(storageSessionModule);

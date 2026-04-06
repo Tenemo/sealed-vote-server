@@ -1,39 +1,26 @@
-import { Typography, Box, Button } from '@mui/material';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const NotFound = (): React.JSX.Element => {
-    const navigate = useNavigate();
-    const onClick = (): void => {
-        void navigate('/');
-    };
+import { Button } from '@/components/ui/button';
 
-    return (
-        <Box
-            sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '50%',
-            }}
-        >
-            <Box
-                sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}
-            >
-                <Typography>
-                    Path <strong>{window.location.pathname}</strong> not found.
-                </Typography>
-                <Button onClick={onClick} sx={{ mt: 2 }} variant="outlined">
-                    Go back to vote creation
-                </Button>
-            </Box>
-        </Box>
-    );
+const NotFound = (): React.JSX.Element => {
+  const navigate = useNavigate();
+  const onClick = (): void => {
+    void navigate('/');
+  };
+
+  return (
+    <div className="flex h-1/2 items-center justify-center">
+      <div className="flex flex-col items-center justify-center">
+        <p>
+          Path <strong>{window.location.pathname}</strong> not found.
+        </p>
+        <Button className="mt-2" onClick={onClick} variant="outline">
+          Go back to vote creation
+        </Button>
+      </div>
+    </div>
+  );
 };
 
 export default NotFound;

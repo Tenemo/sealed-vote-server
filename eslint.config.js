@@ -227,11 +227,4 @@ module.exports = defineConfig(
             '@typescript-eslint/consistent-type-definitions': OFF,
         },
     },
-    {
-        files: ['**/*.scss.d.ts'],
-        rules: {
-            'prettier/prettier': OFF,
-            '@typescript-eslint/no-empty-object-type': OFF,
-        },
-    },
 );

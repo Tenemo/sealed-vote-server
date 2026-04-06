@@ -1,131 +1,113 @@
-import {
-    Typography,
-    Button,
-    TextField,
-    Alert,
-    CircularProgress,
-    Grid,
-} from '@mui/material';
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, type ChangeEvent } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 
 import ChoiceAdding from './ChoiceAdding';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/utils';
 
 type Form = {
-    pollName: string;
-    choices: string[];
+  pollName: string;
+  choices: string[];
 };
 
-const initialForm = {
-    pollName: '',
-    choices: [],
+const initialForm: Form = {
+  pollName: '',
+  choices: [],
 };
 
 const PollCreationPage = (): React.JSX.Element => {
-    const navigate = useNavigate();
-    const [createPoll, { isLoading, error }] = useCreatePollMutation();
+  const navigate = useNavigate();
+  const [createPoll, { isLoading, error }] = useCreatePollMutation();
 
-    const [form, setForm] = useState<Form>(initialForm);
-    const { pollName, choices } = form;
+  const [form, setForm] = useState<Form>(initialForm);
+  const { pollName, choices } = form;
 
-    const onFormChange = ({
-        target: { id, value },
-    }: ChangeEvent<HTMLInputElement>): void =>
-        setForm({ ...form, [id]: value });
+  const onFormChange = ({
+    target: { id, value },
+  }: ChangeEvent<HTMLInputElement>): void => setForm({ ...form, [id]: value });
 
-    const onAddChoice = (choice: string): void =>
-        setForm((prev) => ({
-            ...prev,
-            choices: [...prev.choices, choice],
-        }));
+  const onAddChoice = (choice: string): void =>
+    setForm((prev) => ({
+      ...prev,
+      choices: [...prev.choices, choice],
+    }));
 
-    const onRemoveChoice = (choice: string): void =>
-        setForm((prev) => ({
-            ...prev,
-            choices: prev.choices.filter((c) => c !== choice),
-        }));
+  const onRemoveChoice = (choice: string): void =>
+    setForm((prev) => ({
+      ...prev,
+      choices: prev.choices.filter((currentChoice) => currentChoice !== choice),
+    }));
 
-    const onCreatePoll = (): void => {
-        void createPoll({
-            pollName: form.pollName.trim(),
-            choices: form.choices,
-        })
-            .unwrap()
-            .then(({ slug }) => {
-                void navigate(`/votes/${slug}`);
-            });
-    };
+  const onCreatePoll = (): void => {
+    void createPoll({
+      pollName: form.pollName.trim(),
+      choices: form.choices,
+    })
+      .unwrap()
+      .then(({ slug }) => {
+        void navigate(`/votes/${slug}`);
+      });
+  };
 
-    const isFormValid = pollName.trim() && choices.length > 1 && !isLoading;
+  const isFormValid = pollName.trim() && choices.length > 1 && !isLoading;
 
-    return (
-        <>
-            <Helmet>
-                <title>Vote creation</title>
-            </Helmet>
-            <Typography
-                sx={{
-                    mb: 2,
-                    mt: 4,
-                }}
-                variant="h5"
-            >
-                Create a new vote
-            </Typography>
-            <Grid
-                container
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    width: '100%',
-                }}
-            >
-                <Grid
-                    size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
-                    sx={{ width: '100%', p: 1 }}
-                >
-                    <TextField
-                        autoComplete="off"
-                        helperText={
-                            pollName ? '' : 'What would you like to vote on?'
-                        }
-                        id="pollName"
-                        inputProps={{ maxLength: 64 }}
-                        label="Vote name"
-                        name="pollName"
-                        onChange={onFormChange}
-                        required
-                        sx={{ mb: 1, minHeight: 80, width: '100%' }}
-                        value={pollName}
-                    />
-                </Grid>
-            </Grid>
-            <ChoiceAdding
-                choices={form.choices}
-                onAddChoice={onAddChoice}
-                onRemoveChoice={onRemoveChoice}
+  return (
+    <>
+      <Helmet>
+        <title>Vote creation</title>
+      </Helmet>
+      <h2 className="mb-4 mt-8 text-xl font-semibold tracking-tight">
+        Create a new vote
+      </h2>
+      <div className="flex w-full justify-center">
+        <div className="w-full p-2 sm:w-10/12 md:w-8/12 lg:w-6/12 xl:w-4/12">
+          <Field>
+            <FieldLabel htmlFor="pollName">Vote name</FieldLabel>
+            <Input
+              autoComplete="off"
+              id="pollName"
+              maxLength={64}
+              name="pollName"
+              onChange={onFormChange}
+              required
+              value={pollName}
             />
-            <Button
-                disabled={!isFormValid}
-                onClick={onCreatePoll}
-                size="large"
-                sx={{ m: 2 }}
-                variant="contained"
-            >
-                Create vote
-            </Button>
-            {error && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                    {renderError(error)}
-                </Alert>
+            {!pollName && (
+              <FieldDescription>
+                What would you like to vote on?
+              </FieldDescription>
             )}
-            {isLoading && <CircularProgress sx={{ mt: 2 }} />}
-        </>
-    );
+          </Field>
+        </div>
+      </div>
+      <ChoiceAdding
+        choices={form.choices}
+        onAddChoice={onAddChoice}
+        onRemoveChoice={onRemoveChoice}
+      />
+      <Button
+        className="m-2"
+        disabled={!isFormValid}
+        onClick={onCreatePoll}
+        size="lg"
+      >
+        Create vote
+      </Button>
+      {error && (
+        <Alert className="mt-2" variant="destructive">
+          <AlertDescription>{renderError(error)}</AlertDescription>
+        </Alert>
+      )}
+      {isLoading && <Spinner className="mt-2 size-6" />}
+    </>
+  );
 };
 
 export default PollCreationPage;

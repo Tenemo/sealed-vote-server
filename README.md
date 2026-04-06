@@ -30,9 +30,9 @@ See [docs/voting.md](./docs/voting.md) for the protocol and phase model, and [do
 
 ## Tech stack
 
-- Frontend: TypeScript, React, Redux Toolkit, Material UI, Vite, Vitest
+- Frontend: TypeScript, React, Redux Toolkit, Tailwind CSS, shadcn/ui, Vite, Vitest
 - Backend: TypeScript, Fastify, Drizzle ORM, PostgreSQL, Vitest
-- Tooling: pnpm workspaces, Turborepo, Playwright, ESLint, stylelint
+- Tooling: pnpm workspaces, Turborepo, Playwright, ESLint
 
 ## Local development
 
