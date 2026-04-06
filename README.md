@@ -75,13 +75,6 @@ The e2e entrypoint refuses to run unless all of these are true:
 
 The suite resets the database before starting the shared backend and web dev servers, so it must never be able to target a production or remote environment.
 
-Keep the app env surface small:
-
-- `DATABASE_URL` for the backend database connection
-- `VITE_API_BASE_URL` for deployed web builds that talk to the backend on a different origin
-
-Everything else uses repo defaults or platform-provided values.
-
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace
