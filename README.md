@@ -59,6 +59,24 @@ The default local setup serves:
 - the web app at `http://127.0.0.1:3000`
 - the API at `http://127.0.0.1:4000`
 
+## End-to-end testing
+
+Run the guarded Playwright suite from the repository root:
+
+```bash
+pnpm e2e
+```
+
+Locally, Playwright now uses multiple workers by default. Override that with `PLAYWRIGHT_WORKERS` when you want a different level of parallelism.
+
+The e2e entrypoint refuses to run unless all of these are true:
+
+- `NODE_ENV=test`
+- `DATABASE_URL` points at the local or CI Postgres `sv-db`
+- `VITE_API_BASE_URL`, if set, points at a local HTTP backend
+
+The suite resets the database before starting the shared backend and web dev servers, so it must never be able to target a production or remote environment.
+
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace

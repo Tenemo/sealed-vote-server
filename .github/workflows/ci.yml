@@ -122,8 +122,14 @@ jobs:
             - name: run build
               run: pnpm build
 
-    e2e:
+    e2e-required:
+        name: e2e-required
         runs-on: ubuntu-latest
+        if: >-
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref_name == 'master') ||
+            (github.event_name == 'pull_request' && github.base_ref == 'master')
+        timeout-minutes: 45
 
         services:
             postgres:
@@ -161,11 +167,18 @@ jobs:
             - name: install dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: reset database schema
-              run: pnpm db:reset
-
             - name: install Playwright browsers
               run: pnpm e2e:install
 
             - name: run browser e2e
               run: pnpm e2e
+
+            - name: upload Playwright artifacts
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-artifacts
+                  path: |
+                      playwright-report
+                      test-results
+                  if-no-files-found: ignore
