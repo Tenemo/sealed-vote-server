@@ -1,0 +1,23 @@
+[build]
+builder = "RAILPACK"
+watchPatterns = [
+    "/apps/api/**",
+    "/packages/contracts/**",
+    "/packages/protocol/**",
+    "/package.json",
+    "/pnpm-lock.yaml",
+    "/pnpm-workspace.yaml",
+    "/turbo.json",
+    "/.nvmrc",
+    "/.npmrc",
+    "/apps/api/railway.preview.toml",
+]
+buildCommand = "pnpm turbo run build --filter=@sealed-vote/contracts --filter=@sealed-vote/protocol --filter=@sealed-vote/api"
+
+[deploy]
+startCommand = "pnpm --filter @sealed-vote/api start"
+preDeployCommand = "pnpm --filter @sealed-vote/api db:migrate"
+healthcheckPath = "/api/health-check"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

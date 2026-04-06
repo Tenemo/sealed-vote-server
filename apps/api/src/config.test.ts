@@ -1,76 +1,46 @@
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { shouldUseDatabaseSsl } from './config';
+import { getConfiguredWebAppOrigin } from './config';
 
-const originalDatabaseSsl = process.env.DATABASE_SSL;
-const originalNodeEnv = process.env.NODE_ENV;
+const originalWebAppOrigin = process.env.WEB_APP_ORIGIN;
 
 afterEach(() => {
-    if (originalDatabaseSsl === undefined) {
-        delete process.env.DATABASE_SSL;
-    } else {
-        process.env.DATABASE_SSL = originalDatabaseSsl;
+    if (originalWebAppOrigin === undefined) {
+        delete process.env.WEB_APP_ORIGIN;
+        return;
     }
 
-    if (originalNodeEnv === undefined) {
-        delete process.env.NODE_ENV;
-    } else {
-        process.env.NODE_ENV = originalNodeEnv;
-    }
+    process.env.WEB_APP_ORIGIN = originalWebAppOrigin;
 });
 
-describe('shouldUseDatabaseSsl', () => {
-    test('respects an explicit DATABASE_SSL=true override', () => {
-        process.env.DATABASE_SSL = 'true';
-        process.env.NODE_ENV = 'development';
+describe('getConfiguredWebAppOrigin', () => {
+    test('returns null when WEB_APP_ORIGIN is not set', () => {
+        delete process.env.WEB_APP_ORIGIN;
 
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://postgres:postgres@localhost:5432/sv-db',
-            ),
-        ).toBe(true);
+        expect(getConfiguredWebAppOrigin()).toBeNull();
     });
 
-    test('respects an explicit DATABASE_SSL=false override', () => {
-        process.env.DATABASE_SSL = 'false';
-        process.env.NODE_ENV = 'production';
+    test('normalizes a configured origin to its origin value', () => {
+        process.env.WEB_APP_ORIGIN = 'https://preview-web.up.railway.app/path';
 
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://user:pass@db.example.com:5432/sv-db',
-            ),
-        ).toBe(false);
+        expect(getConfiguredWebAppOrigin()).toBe(
+            'https://preview-web.up.railway.app',
+        );
     });
 
-    test('defaults to disabled SSL for local development in auto mode', () => {
-        process.env.DATABASE_SSL = 'auto';
-        process.env.NODE_ENV = 'development';
+    test('rejects invalid URLs', () => {
+        process.env.WEB_APP_ORIGIN = 'not-a-url';
 
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://postgres:postgres@localhost:5432/sv-db',
-            ),
-        ).toBe(false);
+        expect(() => getConfiguredWebAppOrigin()).toThrow(
+            'WEB_APP_ORIGIN must be a valid absolute URL.',
+        );
     });
 
-    test('defaults to enabled SSL for configured production databases in auto mode', () => {
-        process.env.DATABASE_SSL = 'auto';
-        process.env.NODE_ENV = 'production';
+    test('rejects unsupported protocols', () => {
+        process.env.WEB_APP_ORIGIN = 'ftp://preview-web.up.railway.app';
 
-        expect(
-            shouldUseDatabaseSsl(
-                'postgres://user:pass@db.example.com:5432/sv-db',
-            ),
-        ).toBe(true);
-    });
-
-    test('rejects invalid DATABASE_SSL values', () => {
-        process.env.DATABASE_SSL = 'sometimes';
-
-        expect(() =>
-            shouldUseDatabaseSsl(
-                'postgres://user:pass@db.example.com:5432/sv-db',
-            ),
-        ).toThrow('DATABASE_SSL must be one of: auto, true, false.');
+        expect(() => getConfiguredWebAppOrigin()).toThrow(
+            'WEB_APP_ORIGIN must use http or https.',
+        );
     });
 });
