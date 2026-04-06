@@ -7,6 +7,9 @@
   NODE_VERSION = "24.14.1"
   PNPM_VERSION = "10.33.0"
 
+[context.deploy-preview.environment]
+  VITE_API_BASE_URL = "https://api.sealed.vote"
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -19,6 +22,11 @@
   for = "/index.html"
   [headers.values]
     Cache-Control = "public, max-age=300, stale-while-revalidate=3600"
+
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
 
 [[headers]]
   for = "/assets/*"

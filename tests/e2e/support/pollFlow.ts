@@ -1,6 +1,21 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{8,32}$/;
+const createPollApiPath = '/api/polls/create';
+
+type CreatePollResponse = {
+    creatorToken: string;
+    id: string;
+    slug: string;
+};
+
+export type CreatedPoll = {
+    apiBaseUrl: string;
+    creatorToken: string;
+    pollId: string;
+    pollSlug: string;
+    pollUrl: string;
+};
 
 export const createPoll = async ({
     page,
@@ -10,7 +25,7 @@ export const createPoll = async ({
     page: Page;
     pollName: string;
     choices?: string[];
-}): Promise<string> => {
+}): Promise<CreatedPoll> => {
     await page.goto('/');
     await page.getByLabel('Vote name').fill(pollName);
 
@@ -19,10 +34,26 @@ export const createPoll = async ({
         await page.getByRole('button', { name: 'Add new choice' }).click();
     }
 
-    await page.getByRole('button', { name: 'Create vote' }).click();
-    await expect(page).toHaveURL(pollSlugPattern);
+    const createPollResponsePromise = page.waitForResponse(
+        (response) =>
+            response.request().method() === 'POST' &&
+            response.url().endsWith(createPollApiPath),
+    );
 
-    return page.url();
+    await page.getByRole('button', { name: 'Create vote' }).click();
+    const createPollResponse = await createPollResponsePromise;
+    expect(createPollResponse.ok()).toBeTruthy();
+
+    await expect(page).toHaveURL(pollSlugPattern);
+    const createdPoll = (await createPollResponse.json()) as CreatePollResponse;
+
+    return {
+        apiBaseUrl: new URL(createPollResponse.url()).origin,
+        creatorToken: createdPoll.creatorToken,
+        pollId: createdPoll.id,
+        pollSlug: createdPoll.slug,
+        pollUrl: page.url(),
+    };
 };
 
 export const joinPoll = async ({
@@ -72,4 +103,31 @@ export const copyShareLink = async (page: Page): Promise<string> => {
     await page.getByRole('button', { name: 'Copy vote link' }).click();
 
     return await page.evaluate(async () => await navigator.clipboard.readText());
+};
+
+export const deletePoll = async (
+    request: APIRequestContext,
+    poll: CreatedPoll,
+): Promise<void> => {
+    const deleteResponse = await request.delete(
+        `${poll.apiBaseUrl}/api/polls/${poll.pollId}`,
+        {
+            data: {
+                creatorToken: poll.creatorToken,
+            },
+        },
+    );
+
+    expect(deleteResponse.ok()).toBeTruthy();
+};
+
+export const deletePolls = async (
+    request: APIRequestContext,
+    polls: readonly CreatedPoll[],
+): Promise<void> => {
+    const pollsToDelete = [...polls].reverse();
+
+    for (const poll of pollsToDelete) {
+        await deletePoll(request, poll);
+    }
 };

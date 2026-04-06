@@ -9,7 +9,7 @@ export default mergeConfig(
             environment: 'jsdom',
             globals: true,
             setupFiles: ['./config/testSetup.ts'],
-            include: ['src/**/*.{spec,test}.{ts,tsx}'],
+            include: ['src/**/*.spec.{ts,tsx}', 'config/**/*.spec.ts'],
             css: true,
             coverage: {
                 include: ['src/**/*.{ts,tsx}'],

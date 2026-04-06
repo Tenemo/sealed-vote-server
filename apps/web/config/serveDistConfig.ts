@@ -9,9 +9,7 @@ const defaultPort = 3000;
 const maxPort = 65_535;
 
 export const distDirectory = path.resolve(currentDirectory, '..', 'dist');
-const builtIndexPath = fileURLToPath(
-    new URL('../dist/index.html', import.meta.url),
-);
+const builtIndexPath = path.resolve(distDirectory, 'index.html');
 
 const parsePort = (value: string): number => {
     if (!/^\d+$/.test(value)) {
