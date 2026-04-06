@@ -31,6 +31,9 @@ const sharedProjects = [
 const prettierRule = [
     ERROR,
     {
+        tabWidth: 4,
+        printWidth: 80,
+        endOfLine: 'lf',
         useTabs: false,
         semi: true,
         singleQuote: true,

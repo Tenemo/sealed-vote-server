@@ -11,35 +11,41 @@ import PollCreation from 'features/Polls/PollCreation/PollCreation';
 const Poll = lazy(() => import('features/Polls/Poll/Poll'));
 
 const App = (): React.JSX.Element => {
-  return (
-    <>
-      <Helmet>
-        <title>sealed.vote</title>
-      </Helmet>
-      <ErrorBoundary
-        fallback={
-          <div>The application has crashed due to a rendering error.</div>
-        }
-        onError={(error) => console.error(error)}
-      >
-        <Header />
-        <main className="flex w-full flex-col items-center">
-          <Routes>
-            <Route element={<PollCreation />} path="/" />
-            <Route
-              element={
-                <Suspense fallback={<Spinner className="mt-5 size-6" />}>
-                  <Poll />
-                </Suspense>
-              }
-              path="votes/:pollSlug"
-            />
-            <Route element={<NotFound />} path="*" />
-          </Routes>
-        </main>
-      </ErrorBoundary>
-    </>
-  );
+    return (
+        <>
+            <Helmet>
+                <title>sealed.vote</title>
+            </Helmet>
+            <ErrorBoundary
+                fallback={
+                    <div>
+                        The application has crashed due to a rendering error.
+                    </div>
+                }
+                onError={(error) => console.error(error)}
+            >
+                <Header />
+                <main className="flex w-full flex-col items-center">
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                        <Route
+                            element={
+                                <Suspense
+                                    fallback={
+                                        <Spinner className="mt-5 size-6" />
+                                    }
+                                >
+                                    <Poll />
+                                </Suspense>
+                            }
+                            path="votes/:pollSlug"
+                        />
+                        <Route element={<NotFound />} path="*" />
+                    </Routes>
+                </main>
+            </ErrorBoundary>
+        </>
+    );
 };
 
 export default App;

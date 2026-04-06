@@ -3,8 +3,12 @@
         "baseUrl": "./src/",
         "paths": {
             "@/*": ["./*"],
-            "@sealed-vote/contracts": ["../../../packages/contracts/src/index.ts"],
-            "@sealed-vote/protocol": ["../../../packages/protocol/src/index.ts"],
+            "@sealed-vote/contracts": [
+                "../../../packages/contracts/src/index.ts"
+            ],
+            "@sealed-vote/protocol": [
+                "../../../packages/protocol/src/index.ts"
+            ],
             "@sealed-vote/testkit": ["../../../packages/testkit/src/index.ts"]
         },
         "jsx": "react-jsx",
