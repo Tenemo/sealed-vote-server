@@ -8,12 +8,29 @@ import {
     OutlinedInput,
     Tooltip,
 } from '@mui/material';
-import copy from 'copy-to-clipboard';
 import React from 'react';
+
+const copyTextToClipboard = async (text: string): Promise<void> => {
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
+
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'absolute';
+    textArea.style.left = '-9999px';
+
+    document.body.append(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    textArea.remove();
+};
 
 const VoteSharing = (): React.JSX.Element => {
     const handleCopyLink = (): void => {
-        copy(window.location.href);
+        void copyTextToClipboard(window.location.href);
     };
 
     return (
@@ -41,7 +58,7 @@ const VoteSharing = (): React.JSX.Element => {
                             <InputAdornment position="end">
                                 <Tooltip title="Copy to clipboard">
                                     <IconButton
-                                        aria-label="toggle password visibility"
+                                        aria-label="Copy vote link"
                                         edge="end"
                                         onClick={handleCopyLink}
                                     >
@@ -50,6 +67,7 @@ const VoteSharing = (): React.JSX.Element => {
                                 </Tooltip>
                             </InputAdornment>
                         }
+                        readOnly
                         size="small"
                         value={window.location.href}
                     />

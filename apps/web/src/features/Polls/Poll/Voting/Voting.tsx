@@ -5,26 +5,27 @@ import React, { useEffect, useState } from 'react';
 import VoteItem from './VoteItem';
 
 import { useAppSelector } from 'app/hooks';
-import { useGetPollQuery } from 'features/Polls/pollsApi';
+import { type PollResponse } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
 
+const buildDefaultScores = (choices: string[]): Record<string, number> =>
+    Object.fromEntries(choices.map((choiceName) => [choiceName, 1]));
+
 type VotingProps = {
-    choices: string[];
     onVote: (voterName: string, selectedScores: Record<string, number>) => void;
+    poll: PollResponse;
     pollId: string;
 };
 
-const Voting = ({
-    choices,
-    onVote,
-    pollId,
-}: VotingProps): React.JSX.Element => {
+const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
     const [selectedScores, setSelectedScoresForm] = useState<
         Record<string, number>
-    >(choices.reduce((acc, choiceName) => ({ ...acc, [choiceName]: 1 }), {}));
-    const { progressMessage, voterName: persistedVoterName } = useAppSelector(
-        (state) => selectVotingStateByPollId(state, pollId),
-    );
+    >(buildDefaultScores(poll.choices));
+    const {
+        progressMessage,
+        selectedScores: persistedSelectedScores,
+        voterName: persistedVoterName,
+    } = useAppSelector((state) => selectVotingStateByPollId(state, pollId));
     const [voterName, setVoterName] = useState(persistedVoterName ?? '');
 
     useEffect(() => {
@@ -33,17 +34,31 @@ const Voting = ({
         }
     }, [persistedVoterName]);
 
+    useEffect(() => {
+        setSelectedScoresForm((currentScores) => {
+            if (persistedSelectedScores) {
+                return persistedSelectedScores;
+            }
+
+            const nextScores = buildDefaultScores(poll.choices);
+            return Object.keys(currentScores).length
+                ? currentScores
+                : nextScores;
+        });
+    }, [persistedSelectedScores, poll.choices]);
+
     const onVoteSelect = (choiceName: string, score: number): void => {
-        setSelectedScoresForm({ ...selectedScores, [choiceName]: score });
+        setSelectedScoresForm((currentScores) => ({
+            ...currentScores,
+            [choiceName]: score,
+        }));
     };
 
     const onSubmit = (): void => {
         void onVote(voterName.trim(), selectedScores);
     };
 
-    const { data: poll } = useGetPollQuery(pollId);
-
-    if (!!progressMessage || !poll || !canRegister(poll)) {
+    if (progressMessage || !canRegister(poll)) {
         return <></>;
     }
 
@@ -69,7 +84,7 @@ const Voting = ({
                 present in order to complete the vote.
             </Typography>
             <List>
-                {choices.map((choiceName) => (
+                {poll.choices.map((choiceName) => (
                     <VoteItem
                         choiceName={choiceName}
                         key={choiceName}

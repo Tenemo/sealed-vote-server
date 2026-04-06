@@ -1,4 +1,3 @@
-import type { UnknownAction } from '@reduxjs/toolkit';
 import {
     canSubmitDecryptionShares,
     createDecryptionSharesForTallies,
@@ -9,47 +8,29 @@ import { generateKeys } from 'threshold-elgamal';
 
 import { fetchFreshPoll, waitForPoll } from './pollQuery';
 import { pollsApi, type PollResponse } from './pollsApi';
-import type { VotingState } from './votingState';
 import { selectVoteStateByPollId } from './votingState';
 
+import { type AppDispatch, type RootState } from 'app/store';
+
 type VotingWorkflowActionCreators = {
-    setKeys: (payload: {
-        pollId: string;
-        privateKey: string;
-        publicKey: string;
-        commonPublicKey: string | null;
-    }) => UnknownAction;
-    setProgressMessage: (payload: {
-        progressMessage: string | null;
-        pollId: string;
-    }) => UnknownAction;
-    setResults: (payload: {
-        results: number[];
-        pollId: string;
-    }) => UnknownAction;
-    setSubmissionStatus: (payload: {
-        pollId: string;
-        phase: 'publicKey' | 'vote' | 'decryptionShares';
-        submitted: boolean;
-    }) => UnknownAction;
+    setKeys: typeof import('./votingSlice').setKeys;
+    setProgressMessage: typeof import('./votingSlice').setProgressMessage;
+    setResults: typeof import('./votingSlice').setResults;
+    setSubmissionStatus: typeof import('./votingSlice').setSubmissionStatus;
 };
 
 type VotingWorkflowContext = {
     actions: VotingWorkflowActionCreators;
-    dispatch: (action: unknown) => unknown;
-    getState: () => unknown;
+    dispatch: AppDispatch;
+    getState: () => RootState;
     signal?: AbortSignal;
 };
 
-type RootStateLike = {
-    voting: VotingState;
-};
-
 const getVotingState = (
-    getState: () => unknown,
+    getState: () => RootState,
     pollId: string,
 ): ReturnType<typeof selectVoteStateByPollId> =>
-    selectVoteStateByPollId((getState() as RootStateLike).voting, pollId);
+    selectVoteStateByPollId(getState().voting, pollId);
 
 const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) {
@@ -68,14 +49,17 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 const waitForPollPhase = async ({
+    dispatch,
     pollId,
     predicate,
     signal,
 }: {
+    dispatch: AppDispatch;
     pollId: string;
     predicate: (poll: PollResponse) => boolean;
     signal?: AbortSignal;
-}): Promise<PollResponse> => waitForPoll({ pollId, predicate, signal });
+}): Promise<PollResponse> =>
+    await waitForPoll({ dispatch, pollId, predicate, signal });
 
 export const runProcessPublicPrivateKeys = async ({
     pollId,
@@ -106,10 +90,11 @@ export const runProcessPublicPrivateKeys = async ({
             }),
         );
 
-        let poll = await fetchFreshPoll(pollId);
+        let poll = await fetchFreshPoll(dispatch, pollId);
 
         if (derivePollPhase(poll) === 'registration') {
             poll = await waitForPollPhase({
+                dispatch,
                 pollId,
                 predicate: (currentPoll) =>
                     derivePollPhase(currentPoll) !== 'registration',
@@ -156,7 +141,7 @@ export const runProcessPublicPrivateKeys = async ({
                 }),
             );
 
-            const submitPublicKeyShareResult = dispatch(
+            await dispatch(
                 pollsApi.endpoints.submitPublicKeyShare.initiate({
                     pollId,
                     publicKeyShareData: {
@@ -164,11 +149,7 @@ export const runProcessPublicPrivateKeys = async ({
                         voterToken,
                     },
                 }),
-            ) as {
-                unwrap: () => Promise<unknown>;
-            };
-
-            await submitPublicKeyShareResult.unwrap();
+            ).unwrap();
 
             dispatch(
                 actions.setSubmissionStatus({
@@ -199,6 +180,7 @@ export const runProcessPublicPrivateKeys = async ({
         );
 
         const pollWithCommonKey = await waitForPollPhase({
+            dispatch,
             pollId,
             predicate: (currentPoll) => Boolean(currentPoll.commonPublicKey),
             signal,
@@ -242,7 +224,7 @@ export const runEncryptVotesGenerateShares = async ({
             throw new Error('Selected scores missing.');
         }
 
-        const poll = await fetchFreshPoll(pollId);
+        const poll = await fetchFreshPoll(dispatch, pollId);
 
         if (!hasSubmittedVote) {
             dispatch(
@@ -265,7 +247,7 @@ export const runEncryptVotesGenerateShares = async ({
                 }),
             );
 
-            const submitVoteResult = dispatch(
+            await dispatch(
                 pollsApi.endpoints.vote.initiate({
                     pollId,
                     voteData: {
@@ -273,11 +255,7 @@ export const runEncryptVotesGenerateShares = async ({
                         voterToken,
                     },
                 }),
-            ) as {
-                unwrap: () => Promise<unknown>;
-            };
-
-            await submitVoteResult.unwrap();
+            ).unwrap();
 
             dispatch(
                 actions.setSubmissionStatus({
@@ -298,6 +276,7 @@ export const runEncryptVotesGenerateShares = async ({
         const pollWithTallies = canSubmitDecryptionShares(poll)
             ? poll
             : await waitForPollPhase({
+                  dispatch,
                   pollId,
                   predicate: canSubmitDecryptionShares,
                   signal,
@@ -331,16 +310,12 @@ export const runEncryptVotesGenerateShares = async ({
                 }),
             );
 
-            const submitDecryptionSharesResult = dispatch(
+            await dispatch(
                 pollsApi.endpoints.submitDecryptionShares.initiate({
                     pollId,
                     decryptionSharesData: { decryptionShares, voterToken },
                 }),
-            ) as {
-                unwrap: () => Promise<unknown>;
-            };
-
-            await submitDecryptionSharesResult.unwrap();
+            ).unwrap();
 
             dispatch(
                 actions.setSubmissionStatus({
@@ -375,6 +350,7 @@ export const runDecryptResults = async ({
         );
 
         const poll = await waitForPollPhase({
+            dispatch,
             pollId,
             predicate: (currentPoll) =>
                 derivePollPhase(currentPoll) === 'complete',

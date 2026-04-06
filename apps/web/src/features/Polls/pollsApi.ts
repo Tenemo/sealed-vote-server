@@ -34,13 +34,12 @@ export const pollsApi = createApi({
             invalidatesTags: ['Poll'],
         }),
         getPoll: build.query<PollResponse, string>({
-            query: (pollId) => ({
-                url: POLL_ROUTES.poll(pollId),
+            query: (pollRef) => ({
+                url: POLL_ROUTES.poll(pollRef),
                 method: 'GET',
             }),
-            providesTags: (_result, _error, pollId) => [
-                { type: 'Poll', id: pollId },
-            ],
+            providesTags: (result) =>
+                result ? [{ type: 'Poll', id: result.id }] : [],
         }),
         registerVoter: build.mutation<
             RegisterVoterResponse,

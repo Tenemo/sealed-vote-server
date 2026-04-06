@@ -1,5 +1,5 @@
-import { Box } from '@mui/material';
-import React from 'react';
+import { Box, CircularProgress } from '@mui/material';
+import React, { Suspense, lazy } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Helmet } from 'react-helmet-async';
 import { Route, Routes } from 'react-router-dom';
@@ -7,14 +7,15 @@ import 'normalize.css';
 
 import Header from 'components/Header/Header';
 import NotFound from 'components/NotFound/NotFound';
-import Poll from 'features/Polls/Poll/Poll';
 import PollCreation from 'features/Polls/PollCreation/PollCreation';
+
+const Poll = lazy(() => import('features/Polls/Poll/Poll'));
 
 const App = (): React.JSX.Element => {
     return (
         <>
             <Helmet>
-                <title>Reactplate</title>
+                <title>sealed.vote</title>
             </Helmet>
             <ErrorBoundary
                 fallback={
@@ -35,7 +36,18 @@ const App = (): React.JSX.Element => {
                 >
                     <Routes>
                         <Route element={<PollCreation />} path="/" />
-                        <Route element={<Poll />} path="votes/:pollId" />
+                        <Route
+                            element={
+                                <Suspense
+                                    fallback={
+                                        <CircularProgress sx={{ mt: 5 }} />
+                                    }
+                                >
+                                    <Poll />
+                                </Suspense>
+                            }
+                            path="votes/:pollSlug"
+                        />
                         <Route element={<NotFound />} path="*" />
                     </Routes>
                 </Box>

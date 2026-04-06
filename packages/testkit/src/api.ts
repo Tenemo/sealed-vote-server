@@ -22,16 +22,19 @@ export const createPoll = async (
     maxParticipants: number = 10,
 ): Promise<{
     pollId: string;
+    pollSlug: string;
     creatorToken: string;
     pollName: string;
     choices: string[];
 }> => {
+    const requestedChoices = choices ?? ['Option 1', 'Option 2'];
+    const requestedPollName = pollName ?? `Test poll ${getUniquePollName()}`;
     const createResponse = await fastify.inject({
         method: 'POST',
         url: POLL_ROUTES.create,
         payload: {
-            choices: choices ?? ['Option 1', 'Option 2'],
-            pollName: pollName ?? `Test poll ${getUniquePollName()}`,
+            choices: requestedChoices,
+            pollName: requestedPollName,
             maxParticipants,
         },
     });
@@ -39,20 +42,21 @@ export const createPoll = async (
         createResponse.body,
     ) as CreatePollResponse;
     return {
-        pollName: createResponseBody.pollName,
-        choices: createResponseBody.choices,
+        pollName: requestedPollName.trim(),
+        choices: requestedChoices.map((choice) => choice.trim()),
         pollId: createResponseBody.id,
+        pollSlug: createResponseBody.slug,
         creatorToken: createResponseBody.creatorToken,
     };
 };
 
 export const fetchPoll = async (
     fastify: FastifyInstance,
-    pollId: string,
+    pollRef: string,
 ): Promise<PollResponse> => {
     const response = await fastify.inject({
         method: 'GET',
-        url: POLL_ROUTES.poll(pollId),
+        url: POLL_ROUTES.poll(pollRef),
     });
 
     return JSON.parse(response.body) as PollResponse;

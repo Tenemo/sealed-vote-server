@@ -6,6 +6,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Client } from 'pg';
 
 import { getDatabaseUrl } from '../config.js';
+import { backfillMissingPollSlugs } from '../utils/pollSlug.js';
 
 import {
     createDatabase,
@@ -54,6 +55,7 @@ export const migrateDatabase = async (): Promise<void> => {
         await migrate(createDatabase(pool), {
             migrationsFolder,
         });
+        await backfillMissingPollSlugs(pool);
     } finally {
         await pool.end();
     }

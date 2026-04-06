@@ -1,5 +1,7 @@
 import { Typography, Alert, CircularProgress } from '@mui/material';
-import React, { useEffect } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { isUuid } from '@sealed-vote/contracts';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
@@ -8,34 +10,56 @@ import VoteResults from './VoteResults';
 import Voting from './Voting/Voting';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import NotFound from 'components/NotFound/NotFound';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
-import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
+import {
+    hasResumableVotingSession,
+    initialVoteState,
+    selectVoteStateByPollId,
+} from 'features/Polls/votingState';
 import { vote } from 'features/Polls/votingThunks/vote';
 import { renderError } from 'utils/utils';
 
+const isNotFoundError = (error: unknown): boolean =>
+    !!error &&
+    typeof error === 'object' &&
+    'status' in error &&
+    error.status === 404;
+
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
-    const { pollId } = useParams();
-    if (!pollId) {
-        throw new Error('Poll ID missing.');
+    const { pollSlug } = useParams();
+    if (!pollSlug) {
+        throw new Error('Poll slug missing.');
     }
-
-    const { voterIndex, voterToken, selectedScores, results, voterName } =
-        useAppSelector((state) => selectVotingStateByPollId(state, pollId));
+    const isLegacyPollLink = isUuid(pollSlug);
+    const hasResumedVotingRef = useRef(false);
+    const shouldResumeOnResolvedPollRef = useRef(false);
+    const resolvedPollIdRef = useRef<string | null>(null);
     const {
         data: poll,
         isLoading: isLoadingPoll,
         error: pollError,
-    } = useGetPollQuery(pollId, {
-        pollingInterval: results ? 0 : 3000,
+    } = useGetPollQuery(isLegacyPollLink ? skipToken : pollSlug, {
+        pollingInterval: 3000,
         refetchOnFocus: true,
         refetchOnReconnect: true,
         skipPollingIfUnfocused: true,
     });
+    const pollId = poll?.id ?? null;
+    const votingState = useAppSelector((state) =>
+        pollId
+            ? selectVoteStateByPollId(state.voting, pollId)
+            : initialVoteState,
+    );
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
     ): void => {
+        if (!pollId) {
+            return;
+        }
+
         void dispatch(
             vote({
                 pollId,
@@ -45,58 +69,65 @@ const PollPage = (): React.JSX.Element => {
         );
     };
 
-    useEffect(() => {
-        if (
-            selectedScores &&
-            voterIndex &&
-            voterName &&
-            voterToken &&
-            !results
-        ) {
-            void dispatch(vote({ pollId, voterName, selectedScores }));
+    useLayoutEffect(() => {
+        if (!pollId || resolvedPollIdRef.current === pollId) {
+            return;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+
+        resolvedPollIdRef.current = pollId;
+        shouldResumeOnResolvedPollRef.current =
+            hasResumableVotingSession(votingState);
+        hasResumedVotingRef.current = false;
+    }, [pollId, votingState]);
+
+    useEffect(() => {
+        if (!pollId) {
+            return;
+        }
+
+        if (
+            !hasResumedVotingRef.current &&
+            shouldResumeOnResolvedPollRef.current &&
+            hasResumableVotingSession(votingState)
+        ) {
+            hasResumedVotingRef.current = true;
+            void dispatch(
+                vote({
+                    pollId,
+                    voterName: votingState.voterName!,
+                    selectedScores: votingState.selectedScores!,
+                }),
+            );
+        }
+    }, [dispatch, pollId, votingState]);
+
+    if (isLegacyPollLink || isNotFoundError(pollError)) {
+        return <NotFound />;
+    }
 
     return (
         <>
             <Helmet>
-                <title>
-                    {poll
-                        ? poll.pollName
-                        : `Vote ${pollId?.split('-')?.[0] ?? ''}`}
-                </title>
+                <title>{poll ? poll.pollName : 'Vote'}</title>
             </Helmet>
-            <PollHeader />
-            {(() => {
-                if (isLoadingPoll) {
-                    return <CircularProgress sx={{ mt: 5 }} />;
-                }
-
-                if (pollError) {
-                    return (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                            {renderError(pollError)}
-                        </Alert>
-                    );
-                }
-
-                return (
-                    <>
-                        <Voting
-                            choices={poll?.choices ?? []}
-                            onVote={onVote}
-                            pollId={pollId}
-                        />
-                        <VoteResults />
-                        <Typography p={2} variant="body1">
-                            {poll?.voters?.length
-                                ? `Voters in this poll: ${poll?.voters.join(', ')}`
-                                : 'No voters yet.'}
-                        </Typography>
-                    </>
-                );
-            })()}
+            {isLoadingPoll && <CircularProgress sx={{ mt: 5 }} />}
+            {pollError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                    {renderError(pollError)}
+                </Alert>
+            )}
+            {pollId && poll && (
+                <>
+                    <PollHeader poll={poll} pollId={pollId} />
+                    <Voting onVote={onVote} poll={poll} pollId={pollId} />
+                    <VoteResults poll={poll} pollId={pollId} />
+                    <Typography p={2} variant="body1">
+                        {poll.voters.length
+                            ? `Voters in this poll: ${poll.voters.join(', ')}`
+                            : 'No voters yet.'}
+                    </Typography>
+                </>
+            )}
         </>
     );
 };

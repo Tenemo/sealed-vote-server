@@ -24,26 +24,46 @@ type PollPhaseInput =
           | 'isOpen'
           | 'commonPublicKey'
           | 'voters'
-          | 'encryptedVotes'
+          | 'encryptedVoteCount'
           | 'encryptedTallies'
           | 'results'
-      >;
+      >
+    | {
+          isOpen: boolean;
+          commonPublicKey: string | null;
+          voters: PollResponse['voters'];
+          encryptedVotes: unknown[];
+          encryptedTallies: PollResponse['encryptedTallies'];
+          results: PollResponse['results'];
+      };
 
 export const toPollPhaseState = (
-    poll: Pick<
-        PollResponse,
-        | 'isOpen'
-        | 'commonPublicKey'
-        | 'voters'
-        | 'encryptedVotes'
-        | 'encryptedTallies'
-        | 'results'
-    >,
+    poll:
+        | Pick<
+              PollResponse,
+              | 'isOpen'
+              | 'commonPublicKey'
+              | 'voters'
+              | 'encryptedVoteCount'
+              | 'encryptedTallies'
+              | 'results'
+          >
+        | {
+              isOpen: boolean;
+              commonPublicKey: string | null;
+              voters: PollResponse['voters'];
+              encryptedVotes: unknown[];
+              encryptedTallies: PollResponse['encryptedTallies'];
+              results: PollResponse['results'];
+          },
 ): PollPhaseState => ({
     isOpen: poll.isOpen,
     commonPublicKey: poll.commonPublicKey,
     voterCount: poll.voters.length,
-    encryptedVoteCount: poll.encryptedVotes.length,
+    encryptedVoteCount:
+        'encryptedVoteCount' in poll
+            ? poll.encryptedVoteCount
+            : poll.encryptedVotes.length,
     encryptedTallyCount: poll.encryptedTallies.length,
     resultCount: poll.results.length,
 });

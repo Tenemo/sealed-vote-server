@@ -37,7 +37,7 @@ vi.mock('features/Polls/pollsApi', () => ({
     },
 }));
 
-vi.mock('features/Polls/votingWorkflow', () => ({
+vi.mock('../votingWorkflow', () => ({
     runProcessPublicPrivateKeys: (...args: unknown[]) =>
         mockedRunProcessPublicPrivateKeys(...args),
     runEncryptVotesGenerateShares: (...args: unknown[]) =>
@@ -85,16 +85,18 @@ describe('vote thunk', () => {
 
         mockedCanRegister.mockReturnValue(true);
         mockedFetchFreshPoll.mockResolvedValue({
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--11111111',
             pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples'],
             voters: [],
             isOpen: true,
-            publicKeyShares: [],
+            publicKeyShareCount: 0,
+            encryptedVoteCount: 0,
+            decryptionShareCount: 0,
             commonPublicKey: null,
-            encryptedVotes: [],
             encryptedTallies: [],
-            decryptionShares: [],
             results: [],
         });
         mockedRegisterVoterInitiate.mockReturnValue({
@@ -120,7 +122,10 @@ describe('vote thunk', () => {
 
         await voteResult.unwrap();
 
-        expect(mockedFetchFreshPoll).toHaveBeenCalledWith('poll-1');
+        expect(mockedFetchFreshPoll).toHaveBeenCalledWith(
+            expect.any(Function),
+            'poll-1',
+        );
         expect(mockedRegisterVoterInitiate).toHaveBeenCalledWith({
             pollId: 'poll-1',
             voterData: { voterName: 'Alice' },

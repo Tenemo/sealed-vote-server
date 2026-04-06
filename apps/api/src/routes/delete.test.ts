@@ -1,3 +1,4 @@
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -26,18 +27,24 @@ describe('DELETE /polls/:pollId', () => {
         expect(getResponse.statusCode).toBe(404);
     });
 
-    test('Should not delete a poll with incorrect creatorToken', async () => {
+    test('should not delete a poll with incorrect creator token', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         const wrongCreatorToken = 'wrong-token';
-        const invalidDeleteResult = await deletePoll(
-            fastify,
-            pollId,
-            wrongCreatorToken,
-        );
-        expect(invalidDeleteResult.success).toBeFalsy();
-        expect(invalidDeleteResult.message).toBe(
-            'Poll not found or unauthorized access.',
-        );
+
+        const invalidDeleteResponse = await fastify.inject({
+            method: 'DELETE',
+            url: `/api/polls/${pollId}`,
+            payload: {
+                creatorToken: wrongCreatorToken,
+            },
+        });
+
+        expect(invalidDeleteResponse.statusCode).toBe(403);
+        expect(
+            (JSON.parse(invalidDeleteResponse.body) as { message: string })
+                .message,
+        ).toBe(ERROR_MESSAGES.invalidCreatorToken);
+
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);
     });

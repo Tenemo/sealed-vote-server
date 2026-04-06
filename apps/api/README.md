@@ -14,6 +14,8 @@ pnpm --filter @sealed-vote/api dev
 
 Use `pnpm local:reset` when you want the full local docker and database reset in one command. `pnpm db:setup` remains available if the containers are already running. The seed data is for local manual checks and is not required for CI or automated tests.
 
+`DATABASE_SSL` supports `auto`, `true`, and `false`. `auto` is the default and keeps local development unencrypted while enabling SSL for configured remote databases outside `development` and `test`.
+
 To run the full stack together from the root:
 
 ```bash

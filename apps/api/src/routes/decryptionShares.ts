@@ -12,11 +12,9 @@ import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants.js';
 import {
     decryptionShares as decryptionSharesTable,
     polls,
-    voters,
 } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import {
@@ -26,16 +24,19 @@ import {
 } from '../utils/polls.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
+import {
+    MessageResponseSchema,
+    PollIdParamsSchema,
+    type PollIdParams,
+} from './schemas.js';
+
 const DecryptionSharesRequestSchema = Type.Object({
     decryptionShares: Type.Array(Type.String()),
     voterToken: Type.String(),
 });
 
-const MessageResponseSchema = Type.Object({
-    message: Type.String(),
-});
-
 const schema = {
+    params: PollIdParamsSchema,
     body: DecryptionSharesRequestSchema,
     response: {
         201: MessageResponseSchema,
@@ -58,17 +59,13 @@ export const decryptionShares = async (
         async (
             req: FastifyRequest<{
                 Body: DecryptionSharesRequest;
-                Params: { pollId: string };
+                Params: PollIdParams;
             }>,
             reply: FastifyReply,
         ): Promise<DecryptionSharesResponse> => {
             try {
                 const { pollId } = req.params;
                 const { decryptionShares: shares, voterToken } = req.body;
-
-                if (!uuidRegex.test(pollId)) {
-                    throw createError(400, ERROR_MESSAGES.invalidPollId);
-                }
 
                 const response = await withTransaction(fastify, async (tx) => {
                     const poll = await lockPollById(tx, pollId);
@@ -102,12 +99,6 @@ export const decryptionShares = async (
                         pollId,
                         voterToken,
                     );
-                    if (voter.hasSubmittedDecryptionShares) {
-                        throw createError(
-                            409,
-                            ERROR_MESSAGES.decryptionSharesAlreadySubmitted,
-                        );
-                    }
 
                     if (shares.length !== poll.encryptedTallies.length) {
                         throw createError(
@@ -121,11 +112,6 @@ export const decryptionShares = async (
                         voterId: voter.id,
                         shares,
                     });
-
-                    await tx
-                        .update(voters)
-                        .set({ hasSubmittedDecryptionShares: true })
-                        .where(eq(voters.id, voter.id));
 
                     const decryptionShareRows =
                         await getOrderedPollDecryptionShares(tx, pollId);
@@ -161,10 +147,6 @@ export const decryptionShares = async (
                         409,
                         ERROR_MESSAGES.decryptionSharesAlreadySubmitted,
                     );
-                }
-
-                if (!(error instanceof createError.HttpError)) {
-                    console.error(error);
                 }
 
                 throw error;

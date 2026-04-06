@@ -6,6 +6,7 @@ export type VoteState = {
     voterToken: string | null;
     isVotingInProgress: boolean;
     progressMessage: string | null;
+    workflowError: string | null;
     results: number[] | null;
     privateKey: string | null;
     publicKey: string | null;
@@ -25,6 +26,7 @@ export const initialVoteState: VoteState = {
     voterIndex: null,
     voterToken: null,
     progressMessage: null,
+    workflowError: null,
     results: null,
     privateKey: null,
     publicKey: null,
@@ -39,7 +41,18 @@ export const selectVoteStateByPollId = (
     pollId: string,
 ): VoteState => state[pollId] ?? initialVoteState;
 
-const clearCompletedSensitiveFields = (voteState: VoteState): VoteState => ({
+export const hasResumableVotingSession = (voteState: VoteState): boolean =>
+    Boolean(
+        voteState.selectedScores &&
+        voteState.voterIndex !== null &&
+        voteState.voterName &&
+        voteState.voterToken &&
+        !voteState.results,
+    );
+
+export const clearCompletedSensitiveFields = (
+    voteState: VoteState,
+): VoteState => ({
     ...voteState,
     creatorToken: null,
     selectedScores: null,
@@ -47,6 +60,7 @@ const clearCompletedSensitiveFields = (voteState: VoteState): VoteState => ({
     privateKey: null,
     publicKey: null,
     progressMessage: null,
+    workflowError: null,
     isVotingInProgress: false,
 });
 
@@ -66,6 +80,7 @@ export const sanitizeVotingStateForPersistence = (
                       ...voteState,
                       isVotingInProgress: false,
                       progressMessage: null,
+                      workflowError: null,
                   },
         ]),
     );
