@@ -5,7 +5,7 @@ const Header = (): React.JSX.Element => {
     return (
         <header className="flex w-full items-center justify-between border-b border-foreground p-2">
             <a
-                className="text-[2.125rem] leading-none text-foreground no-underline"
+                className="text-[34px] leading-[41.99px] font-normal tracking-[0.2499px] text-foreground no-underline"
                 href="/"
             >
                 sealed.vote

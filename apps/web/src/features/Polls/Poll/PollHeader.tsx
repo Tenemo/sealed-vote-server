@@ -34,7 +34,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
 
     return (
         <div className="flex w-full flex-col items-center p-2">
-            <h2 className="mb-2 text-xl font-semibold">
+            <h2 className="mb-2 text-2xl leading-8 font-normal">
                 Vote: {poll.pollName}
             </h2>
             {creatorToken && poll.isOpen && (

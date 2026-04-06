@@ -2,13 +2,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
-import {
-    Field,
-    FieldDescription,
-    FieldError,
-    FieldLabel,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { FieldDescription } from '@/components/ui/field';
+import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 
 type ChoiceAddingProps = {
     choices: string[];
@@ -48,47 +43,45 @@ const ChoiceAdding = ({
 
     return (
         <div className="flex w-full justify-center">
-            <div className="w-full rounded-md bg-accent p-2 sm:w-10/12 md:w-8/12 lg:w-6/12 xl:w-4/12">
+            <div className="w-full max-w-[720px] rounded-sm bg-accent p-2">
                 <div className="flex min-h-[100px] flex-wrap items-center justify-center">
-                    <Field className="m-1 min-w-[240px] flex-1">
-                        <FieldLabel htmlFor="choiceName">
-                            Choice to vote for
-                        </FieldLabel>
-                        <Input
-                            aria-invalid={isChoiceDuplicate}
-                            autoComplete="off"
-                            id="choiceName"
-                            maxLength={64}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            value={choiceName}
-                        />
-                        <FieldError>
-                            {isChoiceDuplicate
+                    <OutlinedInputField
+                        aria-invalid={isChoiceDuplicate}
+                        autoComplete="off"
+                        errorText={
+                            isChoiceDuplicate
                                 ? 'This choice already exists'
-                                : undefined}
-                        </FieldError>
-                    </Field>
+                                : undefined
+                        }
+                        id="choiceName"
+                        inputClassName="text-base"
+                        label="Choice to vote for"
+                        maxLength={64}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        value={choiceName}
+                        wrapperClassName="m-1 min-h-20 w-[210px] self-start"
+                    />
                     <Button
-                        className="m-1 mb-2 self-start"
+                        className="m-2 mb-4 h-[36.5px] px-[15px] py-[5px]"
                         disabled={!isChoiceNameValid}
                         onClick={handleAddChoice}
                         type="button"
                         variant="outline"
                     >
-                        <Plus className="mr-2 size-4" />
+                        <Plus className="-ml-1 mr-2 size-4" />
                         Add new choice
                     </Button>
                 </div>
                 {choices.length === 0 && (
-                    <FieldDescription className="m-1">
+                    <FieldDescription className="m-2 text-base text-foreground">
                         To create a vote, add choices that each participant will
                         be able to rank from 1 to 10.
                     </FieldDescription>
                 )}
                 {!!choices.length && (
                     <>
-                        <p className="m-1">Choices currently in the vote:</p>
+                        <p className="m-2">Choices currently in the vote:</p>
                         <ul className="px-4 py-2">
                             {choices.map((choice) => (
                                 <li
@@ -111,7 +104,7 @@ const ChoiceAdding = ({
                     </>
                 )}
                 {choices.length === 1 && (
-                    <p className="m-1">
+                    <p className="m-2">
                         There need to be at least two possible choices in a
                         vote.
                     </p>

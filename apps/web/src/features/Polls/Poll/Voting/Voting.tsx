@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import VoteItem from './VoteItem';
 
 import { Button } from '@/components/ui/button';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { useAppSelector } from 'app/hooks';
 import { type PollResponse } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
@@ -93,24 +92,21 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                 ))}
             </ul>
             <div className="flex flex-wrap items-center">
-                <Field className="m-2 w-full max-w-xs">
-                    <FieldLabel htmlFor="voterName">Voter name*</FieldLabel>
-                    <Input
-                        aria-invalid={isVoterNameDuplicate}
-                        id="voterName"
-                        maxLength={32}
-                        name="voterName"
-                        onChange={({ target: { value } }) =>
-                            setVoterName(value)
-                        }
-                        value={voterName}
-                    />
-                    <FieldError>
-                        {isVoterNameDuplicate
+                <OutlinedInputField
+                    aria-invalid={isVoterNameDuplicate}
+                    errorText={
+                        isVoterNameDuplicate
                             ? 'This voter name already exists'
-                            : undefined}
-                    </FieldError>
-                </Field>
+                            : undefined
+                    }
+                    id="voterName"
+                    label="Voter name*"
+                    maxLength={32}
+                    name="voterName"
+                    onChange={({ target: { value } }) => setVoterName(value)}
+                    value={voterName}
+                    wrapperClassName="m-2 w-full max-w-xs"
+                />
                 <Button
                     className="m-2"
                     disabled={!isSubmitEnabled}

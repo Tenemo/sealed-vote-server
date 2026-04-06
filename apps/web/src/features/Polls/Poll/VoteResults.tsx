@@ -36,7 +36,9 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
 
     return (
         <div className="flex flex-col items-center rounded-sm bg-accent p-1">
-            <h2 className="px-4 py-2 text-xl font-semibold">Results</h2>
+            <h2 className="px-4 py-2 text-2xl leading-8 font-normal">
+                Results
+            </h2>
             <ul className="w-full max-w-sm">
                 {sortedResults.map(([choiceName, score], index) => (
                     <li

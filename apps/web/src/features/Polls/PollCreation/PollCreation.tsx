@@ -6,8 +6,7 @@ import ChoiceAdding from './ChoiceAdding';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Spinner } from '@/components/ui/spinner';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/utils';
@@ -66,28 +65,27 @@ const PollCreationPage = (): React.JSX.Element => {
             <Helmet>
                 <title>Vote creation</title>
             </Helmet>
-            <h2 className="mb-4 mt-8 text-xl font-semibold tracking-tight">
+            <h2 className="mx-auto mb-4 mt-8 w-fit text-2xl leading-8 font-normal text-center">
                 Create a new vote
             </h2>
             <div className="flex w-full justify-center">
-                <div className="w-full p-2 sm:w-10/12 md:w-8/12 lg:w-6/12 xl:w-4/12">
-                    <Field>
-                        <FieldLabel htmlFor="pollName">Vote name</FieldLabel>
-                        <Input
-                            autoComplete="off"
-                            id="pollName"
-                            maxLength={64}
-                            name="pollName"
-                            onChange={onFormChange}
-                            required
-                            value={pollName}
-                        />
-                        {!pollName && (
-                            <FieldDescription>
-                                What would you like to vote on?
-                            </FieldDescription>
-                        )}
-                    </Field>
+                <div className="w-full max-w-[720px] p-2">
+                    <OutlinedInputField
+                        autoComplete="off"
+                        helperText={
+                            !pollName
+                                ? 'What would you like to vote on?'
+                                : undefined
+                        }
+                        id="pollName"
+                        label="Vote name"
+                        maxLength={64}
+                        name="pollName"
+                        onChange={onFormChange}
+                        required
+                        value={pollName}
+                        wrapperClassName="mb-2 min-h-20"
+                    />
                 </div>
             </div>
             <ChoiceAdding
@@ -96,7 +94,7 @@ const PollCreationPage = (): React.JSX.Element => {
                 onRemoveChoice={onRemoveChoice}
             />
             <Button
-                className="m-2"
+                className="m-2 mt-4"
                 disabled={!isFormValid}
                 onClick={onCreatePoll}
                 size="lg"

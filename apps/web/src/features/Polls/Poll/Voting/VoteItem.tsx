@@ -17,7 +17,7 @@ const VoteItem = ({
 }: Props): React.JSX.Element => {
     return (
         <li className="mb-6 flex flex-col">
-            <span className="block text-lg font-semibold">{choiceName}</span>
+            <span className="block text-xl font-medium">{choiceName}</span>
             <div className="flex flex-wrap">
                 {SCORE_CHOICES.map((scoreChoice) => (
                     <Button
