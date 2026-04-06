@@ -44,7 +44,7 @@ export const selectVoteStateByPollId = (
 export const hasResumableVotingSession = (voteState: VoteState): boolean =>
     Boolean(
         voteState.selectedScores &&
-        voteState.voterIndex &&
+        voteState.voterIndex !== null &&
         voteState.voterName &&
         voteState.voterToken &&
         !voteState.results,

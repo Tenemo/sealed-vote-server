@@ -73,7 +73,11 @@ export const vote = createAsyncThunk<
                 voterToken: stateVoterToken,
             } = selectVoteStateByPollId(getState().voting, pollId);
 
-            if (!stateVoterIndex || !stateVoterToken || !stateVoterName) {
+            if (
+                stateVoterIndex === null ||
+                !stateVoterToken ||
+                !stateVoterName
+            ) {
                 dispatch(
                     setProgressMessage({
                         pollId,
