@@ -9,7 +9,11 @@ import Voting from './Voting/Voting';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
-import { selectVotingStateByPollId, vote } from 'features/Polls/votingSlice';
+import {
+    hasResumableVotingSession,
+    selectVoteStateByPollId,
+} from 'features/Polls/votingState';
+import { vote } from 'features/Polls/votingThunks/vote';
 import { renderError } from 'utils/utils';
 
 const PollPage = (): React.JSX.Element => {
@@ -19,9 +23,13 @@ const PollPage = (): React.JSX.Element => {
         throw new Error('Poll ID missing.');
     }
     const hasResumedVotingRef = useRef(false);
-
-    const { voterIndex, voterToken, selectedScores, results, voterName } =
-        useAppSelector((state) => selectVotingStateByPollId(state, pollId));
+    const votingState = useAppSelector((state) =>
+        selectVoteStateByPollId(state.voting, pollId),
+    );
+    const shouldResumeOnMountRef = useRef(
+        hasResumableVotingSession(votingState),
+    );
+    const { results } = votingState;
     const {
         data: poll,
         isLoading: isLoadingPoll,
@@ -48,24 +56,19 @@ const PollPage = (): React.JSX.Element => {
     useEffect(() => {
         if (
             !hasResumedVotingRef.current &&
-            selectedScores &&
-            voterIndex &&
-            voterName &&
-            voterToken &&
-            !results
+            shouldResumeOnMountRef.current &&
+            hasResumableVotingSession(votingState)
         ) {
             hasResumedVotingRef.current = true;
-            void dispatch(vote({ pollId, voterName, selectedScores }));
+            void dispatch(
+                vote({
+                    pollId,
+                    voterName: votingState.voterName!,
+                    selectedScores: votingState.selectedScores!,
+                }),
+            );
         }
-    }, [
-        dispatch,
-        pollId,
-        results,
-        selectedScores,
-        voterIndex,
-        voterName,
-        voterToken,
-    ]);
+    }, [dispatch, pollId, votingState]);
 
     return (
         <>

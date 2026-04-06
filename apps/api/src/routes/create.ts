@@ -8,17 +8,10 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { choices as choicesTable, polls } from '../db/schema.js';
-import {
-    isConstraintViolation,
-    normalizeDatabaseTimestamp,
-    withTransaction,
-} from '../utils/db.js';
+import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
 
-const EncryptedMessageSchema = Type.Object({
-    c1: Type.String(),
-    c2: Type.String(),
-});
+import { MessageResponseSchema } from './schemas.js';
 
 const CreatePollRequestSchema = Type.Object({
     choices: Type.Array(Type.String()),
@@ -27,22 +20,8 @@ const CreatePollRequestSchema = Type.Object({
 });
 
 const CreatePollResponseSchema = Type.Object({
-    pollName: Type.String(),
-    creatorToken: Type.String(),
-    choices: Type.Array(Type.String()),
-    maxParticipants: Type.Number(),
     id: Type.String(),
-    createdAt: Type.String(),
-    publicKeyShares: Type.Array(Type.String()),
-    commonPublicKey: Type.Union([Type.String(), Type.Null()]),
-    encryptedVotes: Type.Array(Type.Array(EncryptedMessageSchema)),
-    encryptedTallies: Type.Array(EncryptedMessageSchema),
-    decryptionShares: Type.Array(Type.Array(Type.String())),
-    results: Type.Array(Type.Number()),
-});
-
-const MessageResponseSchema = Type.Object({
-    message: Type.String(),
+    creatorToken: Type.String(),
 });
 
 const schema = {
@@ -105,8 +84,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                             })
                             .returning({
                                 id: polls.id,
-                                createdAt: polls.createdAt,
-                                maxParticipants: polls.maxParticipants,
                             });
 
                         await tx.insert(choicesTable).values(
@@ -118,20 +95,8 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                         );
 
                         return {
-                            pollName,
                             creatorToken,
-                            choices: normalizedChoices,
-                            maxParticipants: poll.maxParticipants,
                             id: poll.id,
-                            createdAt: normalizeDatabaseTimestamp(
-                                poll.createdAt,
-                            ),
-                            publicKeyShares: [],
-                            commonPublicKey: null,
-                            encryptedVotes: [],
-                            encryptedTallies: [],
-                            decryptionShares: [],
-                            results: [],
                         } satisfies CreatePollResponse;
                     },
                 );
@@ -141,10 +106,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             } catch (error) {
                 if (isConstraintViolation(error, 'unique_poll_name')) {
                     throw createError(409, ERROR_MESSAGES.duplicatePollName);
-                }
-
-                if (!(error instanceof createError.HttpError)) {
-                    console.error(error);
                 }
 
                 throw error;

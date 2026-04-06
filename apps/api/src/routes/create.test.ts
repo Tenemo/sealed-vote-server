@@ -5,6 +5,7 @@ import { buildServer } from '../buildServer';
 import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
 
 import { CreatePollResponse } from './create';
+import { PollResponse } from './fetch';
 
 describe('POST /polls/create', () => {
     let fastify: FastifyInstance;
@@ -30,7 +31,7 @@ describe('POST /polls/create', () => {
         });
 
         expect(getResponse.statusCode).toBe(200);
-        const pollDetails = JSON.parse(getResponse.body) as CreatePollResponse;
+        const pollDetails = JSON.parse(getResponse.body) as PollResponse;
         expect(pollDetails.pollName).toContain(pollName);
         expect(pollDetails.choices).toEqual(['Dog', 'Cat']);
 
@@ -95,8 +96,16 @@ describe('POST /polls/create', () => {
 
         expect(response.statusCode).toBe(201);
         const responseBody = JSON.parse(response.body) as CreatePollResponse;
-        expect(responseBody.pollName).toBe(pollName);
-        expect(responseBody.choices).toEqual(['Dog', 'Cat']);
+
+        const getResponse = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${responseBody.id}`,
+        });
+
+        expect(getResponse.statusCode).toBe(200);
+        const pollDetails = JSON.parse(getResponse.body) as PollResponse;
+        expect(pollDetails.pollName).toBe(pollName);
+        expect(pollDetails.choices).toEqual(['Dog', 'Cat']);
 
         const deleteResult = await deletePoll(
             fastify,

@@ -1,22 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import {
-    generateKeys,
-    encrypt,
-    serializeEncryptedMessage,
-} from 'threshold-elgamal';
+import { encrypt, serializeEncryptedMessage } from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
 import {
-    createPoll,
     deletePoll,
-    registerVoter,
-    closePoll,
-    publicKeyShare,
+    fetchPoll,
     getUniquePollName,
+    TestPollBuilder,
 } from '../testUtils';
-
-import { PollResponse } from './fetch';
 
 describe('POST /polls/:pollId/vote', () => {
     let fastify: FastifyInstance;
@@ -32,47 +24,23 @@ describe('POST /polls/:pollId/vote', () => {
         const pollName = getUniquePollName('Vote test');
         const choices = ['Option 1', 'Option 2', 'Option 3'];
 
-        const { pollId, creatorToken } = await createPoll(
-            fastify,
-            pollName,
-            choices,
-        );
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(pollName)
+            .withChoices(choices)
+            .withVoters(['Voter 1', 'Voter 2', 'Voter 3']);
 
-        const voter1 = await registerVoter(fastify, pollId, 'Voter 1');
-        const voter2 = await registerVoter(fastify, pollId, 'Voter 2');
-        const voter3 = await registerVoter(fastify, pollId, 'Voter 3');
-        expect(voter1.success).toBe(true);
-        expect(voter2.success).toBe(true);
-        expect(voter3.success).toBe(true);
-        if (!voter1.success || !voter2.success || !voter3.success) {
-            throw new Error('Failed to register voters.');
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+        if (!context.poll?.commonPublicKey) {
+            throw new Error('Common public key is missing.');
         }
 
-        await closePoll(fastify, pollId, creatorToken);
-
-        const voter1Keys = generateKeys(1, 3);
-        const voter2Keys = generateKeys(2, 3);
-        const voter3Keys = generateKeys(3, 3);
-
-        await publicKeyShare(fastify, pollId, {
-            publicKeyShare: voter1Keys.publicKey.toString(),
-            voterToken: voter1.voterToken,
-        });
-        await publicKeyShare(fastify, pollId, {
-            publicKeyShare: voter2Keys.publicKey.toString(),
-            voterToken: voter2.voterToken,
-        });
-        await publicKeyShare(fastify, pollId, {
-            publicKeyShare: voter3Keys.publicKey.toString(),
-            voterToken: voter3.voterToken,
-        });
-
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-        let pollData = JSON.parse(response.body) as PollResponse;
-        const commonPublicKey = BigInt(pollData.commonPublicKey!);
+        const [voter1, voter2, voter3] = context.voters;
+        const commonPublicKey = BigInt(context.poll.commonPublicKey);
         const voter1Votes = choices.map((_, index) =>
             serializeEncryptedMessage(encrypt(index + 1, commonPublicKey)),
         );
@@ -85,33 +53,33 @@ describe('POST /polls/:pollId/vote', () => {
 
         const response1 = await fastify.inject({
             method: 'POST',
-            url: `/api/polls/${pollId}/vote`,
+            url: `/api/polls/${context.pollId}/vote`,
             payload: { votes: voter1Votes, voterToken: voter1.voterToken },
         });
         expect(response1.statusCode).toBe(200);
 
         const response2 = await fastify.inject({
             method: 'POST',
-            url: `/api/polls/${pollId}/vote`,
+            url: `/api/polls/${context.pollId}/vote`,
             payload: { votes: voter2Votes, voterToken: voter2.voterToken },
         });
         expect(response2.statusCode).toBe(200);
 
         const response3 = await fastify.inject({
             method: 'POST',
-            url: `/api/polls/${pollId}/vote`,
+            url: `/api/polls/${context.pollId}/vote`,
             payload: { votes: voter3Votes, voterToken: voter3.voterToken },
         });
         expect(response3.statusCode).toBe(200);
 
-        const pollResponse = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-        pollData = JSON.parse(pollResponse.body) as PollResponse;
-        expect(pollData.encryptedVotes.length).toBe(3);
+        const pollData = await fetchPoll(fastify, context.pollId);
+        expect(pollData.encryptedVoteCount).toBe(3);
         expect(pollData.encryptedTallies.length).toBe(3);
-        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
         expect(deleteResult.success).toBe(true);
     });
 
@@ -135,10 +103,10 @@ describe('POST /polls/:pollId/vote', () => {
 
     test('should return 400 for voting in an open poll', async () => {
         const openPollName = getUniquePollName('Open Poll');
-        const { pollId, creatorToken } = await createPoll(
-            fastify,
-            openPollName,
-        );
+        const builder = new TestPollBuilder(fastify).withPollName(openPollName);
+
+        await builder.create();
+        const { creatorToken, pollId } = builder.getContext();
 
         const response = await fastify.inject({
             method: 'POST',

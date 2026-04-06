@@ -4,19 +4,32 @@ test('completes the two-voter happy path in the browser', async ({
     browser,
     page,
 }) => {
-    page.on('console', (message) => {
-        if (message.type() === 'error') {
-            console.log('[page-1 console]', message.text());
-        }
-    });
-    page.on('pageerror', (error) => {
-        console.log('[page-1 error]', error.message);
-    });
-    page.on('response', (response) => {
-        if (response.url().includes('/api/') && response.status() >= 400) {
-            console.log('[page-1 response]', response.status(), response.url());
-        }
-    });
+    const unexpectedBrowserErrors: string[] = [];
+
+    const attachErrorTracking = (
+        trackedPage: typeof page,
+        label: string,
+    ): void => {
+        trackedPage.on('console', (message) => {
+            if (message.type() === 'error') {
+                unexpectedBrowserErrors.push(
+                    `[${label}] console: ${message.text()}`,
+                );
+            }
+        });
+        trackedPage.on('pageerror', (error) => {
+            unexpectedBrowserErrors.push(`[${label}] pageerror: ${error.message}`);
+        });
+        trackedPage.on('response', (response) => {
+            if (response.url().includes('/api/') && response.status() >= 400) {
+                unexpectedBrowserErrors.push(
+                    `[${label}] response: ${response.status()} ${response.url()}`,
+                );
+            }
+        });
+    };
+
+    attachErrorTracking(page, 'page-1');
 
     await page.goto('/');
 
@@ -32,19 +45,7 @@ test('completes the two-voter happy path in the browser', async ({
 
     const secondContext = await browser.newContext();
     const secondPage = await secondContext.newPage();
-    secondPage.on('console', (message) => {
-        if (message.type() === 'error') {
-            console.log('[page-2 console]', message.text());
-        }
-    });
-    secondPage.on('pageerror', (error) => {
-        console.log('[page-2 error]', error.message);
-    });
-    secondPage.on('response', (response) => {
-        if (response.url().includes('/api/') && response.status() >= 400) {
-            console.log('[page-2 response]', response.status(), response.url());
-        }
-    });
+    attachErrorTracking(secondPage, 'page-2');
     await secondPage.goto(pollUrl);
 
     await page.getByLabel('Voter name*').fill('Alice');
@@ -66,6 +67,7 @@ test('completes the two-voter happy path in the browser', async ({
         timeout: 120_000,
     });
     await expect(page.getByText('Voters in this poll: Alice, Bob')).toBeVisible();
+    expect(unexpectedBrowserErrors).toEqual([]);
 
     await secondContext.close();
 });

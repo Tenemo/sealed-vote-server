@@ -7,18 +7,8 @@ export type CreatePollRequest = {
 };
 
 export type CreatePollResponse = {
-    pollName: string;
-    creatorToken: string;
-    choices: string[];
-    maxParticipants: number;
     id: string;
-    createdAt: string;
-    publicKeyShares: string[];
-    commonPublicKey: string | null;
-    encryptedVotes: EncryptedMessage[][];
-    encryptedTallies: EncryptedMessage[];
-    decryptionShares: string[][];
-    results: number[];
+    creatorToken: string;
 };
 
 export type PollResponse = {
@@ -27,11 +17,11 @@ export type PollResponse = {
     choices: string[];
     voters: string[];
     isOpen: boolean;
-    publicKeyShares: string[];
+    publicKeyShareCount: number;
+    encryptedVoteCount: number;
+    decryptionShareCount: number;
     commonPublicKey: string | null;
-    encryptedVotes: EncryptedMessage[][];
     encryptedTallies: EncryptedMessage[];
-    decryptionShares: string[][];
     results: number[];
 };
 

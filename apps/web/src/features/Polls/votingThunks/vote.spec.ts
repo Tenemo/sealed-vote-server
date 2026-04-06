@@ -45,7 +45,9 @@ vi.mock('../votingWorkflow', () => ({
     runDecryptResults: (...args: unknown[]) => mockedRunDecryptResults(...args),
 }));
 
-import { initialVoteState, vote, votingSlice } from '../votingSlice';
+import { initialVoteState, votingSlice } from '../votingSlice';
+
+import { vote } from './vote';
 
 import type { VotingState } from 'features/Polls/votingState';
 
@@ -88,11 +90,11 @@ describe('vote thunk', () => {
             choices: ['Apples'],
             voters: [],
             isOpen: true,
-            publicKeyShares: [],
+            publicKeyShareCount: 0,
+            encryptedVoteCount: 0,
+            decryptionShareCount: 0,
             commonPublicKey: null,
-            encryptedVotes: [],
             encryptedTallies: [],
-            decryptionShares: [],
             results: [],
         });
         mockedRegisterVoterInitiate.mockReturnValue({

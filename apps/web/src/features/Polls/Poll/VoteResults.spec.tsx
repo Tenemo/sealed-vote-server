@@ -28,11 +28,11 @@ describe('VoteResults', () => {
             choices: ['Apples', 'Bananas'],
             voters: ['Alice', 'Bob', 'Charlie'],
             isOpen: false,
-            publicKeyShares: [],
+            publicKeyShareCount: 3,
             commonPublicKey: '123',
-            encryptedVotes: [],
+            encryptedVoteCount: 3,
             encryptedTallies: [],
-            decryptionShares: [],
+            decryptionShareCount: 3,
             results: [],
         };
 

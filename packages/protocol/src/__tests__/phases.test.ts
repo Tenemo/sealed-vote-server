@@ -18,11 +18,11 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     choices: ['Dog', 'Cat'],
     voters: ['Alice', 'Bob'],
     isOpen: true,
-    publicKeyShares: [],
+    publicKeyShareCount: 0,
     commonPublicKey: null,
-    encryptedVotes: [],
+    encryptedVoteCount: 0,
     encryptedTallies: [],
-    decryptionShares: [],
+    decryptionShareCount: 0,
     results: [],
     ...overrides,
 });
@@ -68,10 +68,7 @@ describe('derivePollPhase', () => {
                 createPoll({
                     isOpen: false,
                     commonPublicKey: '123',
-                    encryptedVotes: [
-                        [{ c1: '1', c2: '2' }],
-                        [{ c1: '3', c2: '4' }],
-                    ],
+                    encryptedVoteCount: 2,
                 }),
             ),
         ).toBe('tallying');

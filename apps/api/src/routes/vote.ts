@@ -9,7 +9,6 @@ import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { uuidRegex } from '../constants.js';
 import { encryptedVotes, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import {
@@ -21,10 +20,12 @@ import {
 } from '../utils/polls.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
-const EncryptedMessageSchema = Type.Object({
-    c1: Type.String(),
-    c2: Type.String(),
-});
+import {
+    EncryptedMessageSchema,
+    MessageResponseSchema,
+    PollIdParamsSchema,
+    type PollIdParams,
+} from './schemas.js';
 
 export const VoteRequestSchema = Type.Object({
     votes: Type.Array(EncryptedMessageSchema),
@@ -33,11 +34,8 @@ export const VoteRequestSchema = Type.Object({
 
 const VoteResponseSchema = Type.String();
 
-const MessageResponseSchema = Type.Object({
-    message: Type.String(),
-});
-
 const schema = {
+    params: PollIdParamsSchema,
     body: VoteRequestSchema,
     response: {
         200: VoteResponseSchema,
@@ -58,16 +56,12 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
         async (
             req: FastifyRequest<{
                 Body: VoteRequest;
-                Params: { pollId: string };
+                Params: PollIdParams;
             }>,
         ): Promise<VoteResponse> => {
             try {
                 const { votes, voterToken } = req.body;
                 const { pollId } = req.params;
-
-                if (!uuidRegex.test(pollId)) {
-                    throw createError(400, ERROR_MESSAGES.invalidPollId);
-                }
 
                 return await withTransaction(fastify, async (client) => {
                     const poll = await lockPollById(client, pollId);
@@ -143,10 +137,6 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
             } catch (error) {
                 if (isConstraintViolation(error, 'unique_vote_per_voter')) {
                     throw createError(409, ERROR_MESSAGES.voteAlreadySubmitted);
-                }
-
-                if (!(error instanceof createError.HttpError)) {
-                    console.error(error);
                 }
 
                 throw error;

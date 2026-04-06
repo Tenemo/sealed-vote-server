@@ -1,5 +1,3 @@
-import type { UnknownAction } from '@reduxjs/toolkit';
-
 const mockedFetchFreshPoll = vi.fn();
 const mockedWaitForPoll = vi.fn();
 const mockedVoteInitiate = vi.fn();
@@ -35,6 +33,12 @@ vi.mock('./pollsApi', () => ({
     },
 }));
 
+import {
+    setKeys,
+    setProgressMessage,
+    setResults,
+    setSubmissionStatus,
+} from './votingSlice';
 import { initialVoteState } from './votingState';
 import type { VotingState } from './votingState';
 import { runEncryptVotesGenerateShares } from './votingWorkflow';
@@ -52,9 +56,6 @@ const createVotingState = (
     },
 });
 
-const createMockAction = (type: string, payload: unknown): UnknownAction =>
-    ({ type, payload }) as UnknownAction;
-
 describe('runEncryptVotesGenerateShares', () => {
     beforeEach(() => {
         mockedFetchFreshPoll.mockReset();
@@ -68,24 +69,12 @@ describe('runEncryptVotesGenerateShares', () => {
 
     it('includes the voter token in vote and decryption share submissions', async () => {
         const state = createVotingState();
-        const dispatch = vi.fn((action: unknown) => action);
+        const dispatch = vi.fn((action: unknown) => action) as never;
         const actions = {
-            setKeys: vi.fn(
-                (payload: unknown): UnknownAction =>
-                    createMockAction('setKeys', payload),
-            ),
-            setProgressMessage: vi.fn(
-                (payload: unknown): UnknownAction =>
-                    createMockAction('setProgressMessage', payload),
-            ),
-            setResults: vi.fn(
-                (payload: unknown): UnknownAction =>
-                    createMockAction('setResults', payload),
-            ),
-            setSubmissionStatus: vi.fn(
-                (payload: unknown): UnknownAction =>
-                    createMockAction('setSubmissionStatus', payload),
-            ),
+            setKeys,
+            setProgressMessage,
+            setResults,
+            setSubmissionStatus,
         };
 
         mockedFetchFreshPoll.mockResolvedValue({
@@ -94,11 +83,11 @@ describe('runEncryptVotesGenerateShares', () => {
             choices: ['Apples'],
             voters: ['Alice'],
             isOpen: false,
-            publicKeyShares: ['pk-1'],
+            publicKeyShareCount: 1,
             commonPublicKey: '33',
-            encryptedVotes: [],
+            encryptedVoteCount: 0,
             encryptedTallies: [],
-            decryptionShares: [],
+            decryptionShareCount: 0,
             results: [],
         });
         mockedWaitForPoll.mockResolvedValue({
@@ -107,11 +96,11 @@ describe('runEncryptVotesGenerateShares', () => {
             choices: ['Apples'],
             voters: ['Alice'],
             isOpen: false,
-            publicKeyShares: ['pk-1'],
+            publicKeyShareCount: 1,
             commonPublicKey: '33',
-            encryptedVotes: [[{ c1: '1', c2: '2' }]],
+            encryptedVoteCount: 1,
             encryptedTallies: [{ c1: '9', c2: '8' }],
-            decryptionShares: [],
+            decryptionShareCount: 0,
             results: [],
         });
         mockedVoteInitiate.mockReturnValue({
@@ -127,7 +116,7 @@ describe('runEncryptVotesGenerateShares', () => {
         await runEncryptVotesGenerateShares({
             pollId: 'poll-1',
             dispatch,
-            getState: () => ({ voting: state }),
+            getState: (() => ({ voting: state })) as never,
             actions,
         });
 

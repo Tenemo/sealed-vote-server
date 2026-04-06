@@ -19,18 +19,8 @@ The backend routes live under `/api`. The request and response payloads below ma
 
 ```json
 {
-    "pollName": "Lunch vote",
-    "creatorToken": "creator-token",
-    "choices": ["Pizza", "Sushi", "Pasta"],
-    "maxParticipants": 20,
     "id": "poll-id",
-    "createdAt": "2026-04-04T12:00:00.000Z",
-    "publicKeyShares": [],
-    "commonPublicKey": null,
-    "encryptedVotes": [],
-    "encryptedTallies": [],
-    "decryptionShares": [],
-    "results": []
+    "creatorToken": "creator-token"
 }
 ```
 
@@ -50,21 +40,15 @@ The backend routes live under `/api`. The request and response payloads below ma
     "choices": ["Pizza", "Sushi", "Pasta"],
     "voters": ["Alice", "Bob"],
     "isOpen": false,
-    "publicKeyShares": ["pk-share-1", "pk-share-2"],
+    "publicKeyShareCount": 2,
     "commonPublicKey": "combined-public-key",
-    "encryptedVotes": [
-        [
-            { "c1": "1", "c2": "2" },
-            { "c1": "3", "c2": "4" },
-            { "c1": "5", "c2": "6" }
-        ]
-    ],
+    "encryptedVoteCount": 2,
     "encryptedTallies": [
         { "c1": "7", "c2": "8" },
         { "c1": "9", "c2": "10" },
         { "c1": "11", "c2": "12" }
     ],
-    "decryptionShares": [["13", "14", "15"]],
+    "decryptionShareCount": 2,
     "results": [12, 19, 7]
 }
 ```

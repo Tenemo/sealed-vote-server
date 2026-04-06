@@ -23,9 +23,8 @@ type PollHeaderProps = {
 };
 
 const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
-    const { creatorToken, progressMessage, results } = useAppSelector((state) =>
-        selectVotingStateByPollId(state, pollId),
-    );
+    const { creatorToken, progressMessage, results, workflowError } =
+        useAppSelector((state) => selectVotingStateByPollId(state, pollId));
 
     const [closePoll, { isLoading: isClosingPoll, error: closeError }] =
         useClosePollMutation();
@@ -101,6 +100,11 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                             {progressMessage}
                         </Alert>
                     </>
+                )}
+                {workflowError && (
+                    <Alert severity="error" sx={{ mt: 2 }}>
+                        {workflowError}
+                    </Alert>
                 )}
             </Box>
         </Box>
