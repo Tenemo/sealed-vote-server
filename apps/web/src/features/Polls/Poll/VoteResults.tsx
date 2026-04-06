@@ -35,12 +35,12 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
         .map(([choiceName, score]) => [choiceName, score.toFixed(2)]);
 
     return (
-        <div className="flex flex-col items-center rounded bg-accent p-2">
+        <div className="flex flex-col items-center rounded-sm bg-accent p-1">
             <h2 className="px-4 py-2 text-xl font-semibold">Results</h2>
-            <ul className="w-full">
+            <ul className="w-full max-w-sm">
                 {sortedResults.map(([choiceName, score], index) => (
                     <li
-                        className="flex items-center gap-3 py-2"
+                        className="flex items-center gap-3 px-2 py-2"
                         key={choiceName}
                     >
                         {index === 0 && <Trophy className="size-5" />}
@@ -50,7 +50,7 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
                         {index > 2 && <span className="inline-block size-5" />}
                         <div className="flex flex-col">
                             <span className="font-medium">{choiceName}</span>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-sm text-secondary">
                                 Score: {score}
                             </span>
                         </div>

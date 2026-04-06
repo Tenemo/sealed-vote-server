@@ -33,12 +33,12 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
     };
 
     return (
-        <div className="flex w-full flex-col items-center p-2 text-center">
+        <div className="flex w-full flex-col items-center p-2">
             <h2 className="mb-2 text-xl font-semibold">
                 Vote: {poll.pollName}
             </h2>
             {creatorToken && poll.isOpen && (
-                <p className="mb-2 max-w-[720px]">
+                <p className="mb-2 w-full">
                     You are the creator of this vote. When there will be more
                     than 1 voter, including yourself, you can begin the vote to
                     calculate the results and prevent any new votes.
@@ -46,7 +46,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
             )}
 
             {creatorToken && poll.isOpen && (
-                <div className="mb-2 flex w-full flex-col items-center justify-center">
+                <div className="mb-1 flex w-full flex-col items-start">
                     <Button
                         disabled={isClosingPoll || poll.voters.length < 2}
                         onClick={onClosePoll}
@@ -55,10 +55,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                         Begin vote
                     </Button>
                     {closeError && (
-                        <Alert
-                            className="mt-2 w-full max-w-[720px]"
-                            variant="destructive"
-                        >
+                        <Alert className="mt-2" variant="destructive">
                             <AlertDescription>
                                 {renderError(closeError)}
                             </AlertDescription>
@@ -71,10 +68,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                 {progressMessage && (
                     <>
                         {!results && <Spinner className="size-6" />}
-                        <Alert
-                            className="mt-2 w-full max-w-[720px]"
-                            variant="info"
-                        >
+                        <Alert className="mt-2" variant="info">
                             <AlertDescription>
                                 {progressMessage}
                             </AlertDescription>
@@ -82,10 +76,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                     </>
                 )}
                 {workflowError && (
-                    <Alert
-                        className="mt-2 w-full max-w-[720px]"
-                        variant="destructive"
-                    >
+                    <Alert className="mt-2" variant="destructive">
                         <AlertDescription>{workflowError}</AlertDescription>
                     </Alert>
                 )}

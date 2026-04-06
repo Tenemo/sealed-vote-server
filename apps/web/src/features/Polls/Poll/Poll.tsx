@@ -120,11 +120,11 @@ const PollPage = (): React.JSX.Element => {
                 </Alert>
             )}
             {pollId && poll && (
-                <div className="flex w-full max-w-[960px] flex-col items-center px-2 sm:px-3">
+                <div className="flex w-full flex-col items-center px-2">
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />
                     <VoteResults poll={poll} pollId={pollId} />
-                    <p className="p-2 text-center">
+                    <p className="p-2">
                         {poll.voters.length
                             ? `Voters in this poll: ${poll.voters.join(', ')}`
                             : 'No voters yet.'}

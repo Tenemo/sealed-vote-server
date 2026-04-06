@@ -40,7 +40,7 @@ const VoteSharing = (): React.JSX.Element => {
 
     return (
         <div className="flex w-full justify-center">
-            <div className="w-full p-4 sm:w-10/12 md:w-8/12 lg:w-6/12 xl:w-4/12">
+            <div className="w-full p-2 sm:w-10/12 md:w-8/12 lg:w-6/12 xl:w-4/12">
                 <Field>
                     <FieldLabel className="sr-only" htmlFor="voteLink">
                         Vote link
@@ -49,7 +49,7 @@ const VoteSharing = (): React.JSX.Element => {
                         <div className="relative">
                             <Input
                                 aria-describedby="copy-page-link-helper-text"
-                                className="overflow-hidden pr-10 text-ellipsis"
+                                className="pr-10"
                                 id="voteLink"
                                 readOnly
                                 value={window.location.href}
@@ -73,7 +73,7 @@ const VoteSharing = (): React.JSX.Element => {
                             </Tooltip>
                         </div>
                         <FieldDescription
-                            className="mt-1 text-center"
+                            className="mt-1"
                             id="copy-page-link-helper-text"
                         >
                             Link to the vote to share with others

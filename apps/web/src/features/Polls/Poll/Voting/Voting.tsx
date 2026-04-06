@@ -77,7 +77,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
 
     return (
         <div className="w-full">
-            <p className="px-2 py-1 text-center">
+            <p className="px-2 py-2 text-center">
                 Rate choices from 1 to 10. The results will be ranked by
                 geometric mean of all votes per item. All voters need to be
                 present in order to complete the vote.
@@ -92,7 +92,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                     />
                 ))}
             </ul>
-            <div className="flex flex-wrap items-center justify-center">
+            <div className="flex flex-wrap items-center">
                 <Field className="m-2 w-full max-w-xs">
                     <FieldLabel htmlFor="voterName">Voter name*</FieldLabel>
                     <Input
