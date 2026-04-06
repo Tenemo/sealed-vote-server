@@ -12,6 +12,58 @@ const resolveFromRoot = (...segments: string[]): string =>
 const resolveFromSrc = (...segments: string[]): string =>
     resolveFromRoot('src', ...segments);
 
+const getManualChunk = (id: string): string | undefined => {
+    const normalizedId = id.replaceAll('\\', '/');
+
+    if (
+        normalizedId.includes('/packages/protocol/') ||
+        normalizedId.includes('/node_modules/threshold-elgamal/')
+    ) {
+        return 'crypto';
+    }
+
+    if (
+        normalizedId.includes('/node_modules/@mui/') ||
+        normalizedId.includes('/node_modules/@emotion/') ||
+        normalizedId.includes('/node_modules/@floating-ui/') ||
+        normalizedId.includes('/node_modules/@popperjs/')
+    ) {
+        return 'ui';
+    }
+
+    if (
+        normalizedId.includes('/node_modules/react/') ||
+        normalizedId.includes('/node_modules/react-dom/') ||
+        normalizedId.includes('/node_modules/scheduler/') ||
+        normalizedId.includes('/node_modules/react-router-dom/') ||
+        normalizedId.includes('/node_modules/react-error-boundary/') ||
+        normalizedId.includes('/node_modules/react-helmet-async/')
+    ) {
+        return 'react';
+    }
+
+    if (
+        normalizedId.includes('/node_modules/@reduxjs/') ||
+        normalizedId.includes('/node_modules/react-redux/') ||
+        normalizedId.includes('/node_modules/redux/') ||
+        normalizedId.includes('/node_modules/redux-persist/') ||
+        normalizedId.includes('/node_modules/immer/') ||
+        normalizedId.includes('/node_modules/reselect/')
+    ) {
+        return 'state';
+    }
+
+    if (normalizedId.includes('/node_modules/@sentry/')) {
+        return 'sentry';
+    }
+
+    if (normalizedId.includes('/node_modules/')) {
+        return 'vendor';
+    }
+
+    return undefined;
+};
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -49,5 +101,10 @@ export default defineConfig({
     },
     build: {
         outDir: 'dist',
+        rollupOptions: {
+            output: {
+                manualChunks: getManualChunk,
+            },
+        },
     },
 });

@@ -75,6 +75,14 @@ The e2e entrypoint refuses to run unless all of these are true:
 
 The suite resets the database before starting the shared backend and web dev servers, so it must never be able to target a production or remote environment.
 
+GitHub Actions uses a separate built-artifact path for PR e2e runs:
+
+- `pnpm e2e:ci:build` builds the API and web artifacts once
+- `pnpm e2e:ci:serve:api` starts the built API server
+- `pnpm e2e:ci:serve:web` starts the built web server
+- `pnpm e2e:ci:test` runs Playwright against the built API and built web server
+- the required PR check is the stable `e2e-required` job in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
+
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace

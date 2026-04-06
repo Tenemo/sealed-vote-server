@@ -61,10 +61,12 @@ export const getShareLinkValue = async (page: Page): Promise<string> =>
     await page.locator('input[readonly]').inputValue();
 
 export const copyShareLink = async (page: Page): Promise<string> => {
+    const origin = new URL(page.url()).origin;
+
     await page.context().grantPermissions(
         ['clipboard-read', 'clipboard-write'],
         {
-            origin: 'http://127.0.0.1:3000',
+            origin,
         },
     );
     await page.getByRole('button', { name: 'Copy vote link' }).click();

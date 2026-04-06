@@ -1,6 +1,10 @@
 import { availableParallelism } from 'node:os';
 
-import { defineConfig, devices } from '@playwright/test';
+import {
+    defineConfig,
+    devices,
+    type ReporterDescription,
+} from '@playwright/test';
 
 const mobileFirefoxAndroidUserAgent =
     'Mozilla/5.0 (Android 14; Mobile; rv:137.0) Gecko/137.0 Firefox/137.0';
@@ -14,8 +18,73 @@ const chromiumOnlySpecs = [
     '**/share-link.spec.ts',
 ];
 
+const isCi = Boolean(process.env.CI);
+const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
+const shouldUseBuiltServers =
+    process.env.PLAYWRIGHT_USE_BUILT_SERVERS === 'true';
 const localWorkers = Math.max(2, Math.min(availableParallelism(), 6));
-const workers = process.env.CI ? 1 : localWorkers;
+const reporters: ReporterDescription[] | 'list' = shouldUseBlobReporter
+    ? [['dot'], ['blob', { outputDir: 'blob-report' }]]
+    : isCi
+      ? [['dot'], ['github'], ['html', { open: 'never' }]]
+      : 'list';
+
+const parseWorkerCount = (
+    rawValue: string | undefined,
+    fallback: number,
+): number => {
+    if (!rawValue) {
+        return fallback;
+    }
+
+    const parsedValue = Number(rawValue);
+
+    if (
+        !Number.isFinite(parsedValue) ||
+        !Number.isInteger(parsedValue) ||
+        parsedValue < 1
+    ) {
+        throw new Error(
+            `Invalid PLAYWRIGHT_CI_WORKERS value "${rawValue}". Expected a positive integer.`,
+        );
+    }
+
+    return parsedValue;
+};
+
+const workers = isCi
+    ? parseWorkerCount(process.env.PLAYWRIGHT_CI_WORKERS, 4)
+    : localWorkers;
+
+const webServers = shouldUseBuiltServers
+    ? [
+          {
+              command: 'pnpm e2e:ci:serve:api',
+              timeout: 120_000,
+              url: 'http://127.0.0.1:4000/api/health-check',
+              reuseExistingServer: false,
+          },
+          {
+              command: 'pnpm e2e:ci:serve:web',
+              timeout: 120_000,
+              url: 'http://127.0.0.1:3000',
+              reuseExistingServer: false,
+          },
+      ]
+    : [
+          {
+              command: 'pnpm exec node --experimental-strip-types tests/e2e/scripts/run-e2e-backend.mts',
+              timeout: 120_000,
+              url: 'http://127.0.0.1:4000/api/health-check',
+              reuseExistingServer: false,
+          },
+          {
+              command: 'pnpm --filter @sealed-vote/web dev',
+              timeout: 120_000,
+              url: 'http://127.0.0.1:3000',
+              reuseExistingServer: false,
+          },
+      ];
 
 export default defineConfig({
     testDir: './tests/e2e',
@@ -23,17 +92,15 @@ export default defineConfig({
     expect: {
         timeout: 20_000,
     },
-    forbidOnly: !!process.env.CI,
+    forbidOnly: isCi,
     fullyParallel: false,
     outputDir: 'test-results/playwright',
-    reporter: process.env.CI
-        ? [['github'], ['html', { open: 'never' }]]
-        : 'list',
-    retries: process.env.CI ? 1 : 0,
+    reporter: reporters,
+    retries: isCi ? 1 : 0,
     use: {
         baseURL: 'http://127.0.0.1:3000',
         screenshot: 'only-on-failure',
-        trace: process.env.CI ? 'retain-on-failure' : 'on-first-retry',
+        trace: isCi ? 'retain-on-failure' : 'on-first-retry',
         video: 'retain-on-failure',
     },
     workers,
@@ -75,18 +142,5 @@ export default defineConfig({
             },
         },
     ],
-    webServer: [
-        {
-            command: 'node scripts/run-e2e-backend.cjs',
-            url: 'http://127.0.0.1:4000/api/health-check',
-            reuseExistingServer: false,
-            timeout: 120_000,
-        },
-        {
-            command: 'pnpm --filter @sealed-vote/web dev',
-            url: 'http://127.0.0.1:3000',
-            reuseExistingServer: false,
-            timeout: 120_000,
-        },
-    ],
+    webServer: webServers,
 });

@@ -11,6 +11,37 @@ import type {
 const mobileFirefoxAndroidUserAgent =
     'Mozilla/5.0 (Android 14; Mobile; rv:137.0) Gecko/137.0 Firefox/137.0';
 
+const browserContextOptionKeys = [
+    'acceptDownloads',
+    'baseURL',
+    'bypassCSP',
+    'clientCertificates',
+    'colorScheme',
+    'deviceScaleFactor',
+    'extraHTTPHeaders',
+    'forcedColors',
+    'geolocation',
+    'hasTouch',
+    'httpCredentials',
+    'ignoreHTTPSErrors',
+    'isMobile',
+    'javaScriptEnabled',
+    'locale',
+    'offline',
+    'permissions',
+    'proxy',
+    'recordHar',
+    'recordVideo',
+    'reducedMotion',
+    'screen',
+    'serviceWorkers',
+    'storageState',
+    'strictSelectors',
+    'timezoneId',
+    'userAgent',
+    'viewport',
+] as const satisfies ReadonlyArray<keyof BrowserContextOptions>;
+
 export const mobileFirefoxAndroidContextOptions: BrowserContextOptions = {
     hasTouch: true,
     userAgent: mobileFirefoxAndroidUserAgent,
@@ -28,10 +59,27 @@ type ManagedParticipant = {
 
 export const getProjectContextOptions = (
     testInfo: TestInfo,
-): BrowserContextOptions | undefined =>
-    testInfo.project.name === 'mobile-firefox-android'
-        ? mobileFirefoxAndroidContextOptions
-        : undefined;
+): BrowserContextOptions | undefined => {
+    const contextOptions: BrowserContextOptions = {};
+    const projectUse = testInfo.project.use as Partial<BrowserContextOptions>;
+
+    for (const optionKey of browserContextOptionKeys) {
+        const optionValue = projectUse[optionKey];
+
+        if (optionValue !== undefined) {
+            contextOptions[optionKey] = optionValue;
+        }
+    }
+
+    if (testInfo.project.name === 'mobile-firefox-android') {
+        return {
+            ...contextOptions,
+            ...mobileFirefoxAndroidContextOptions,
+        };
+    }
+
+    return Object.keys(contextOptions).length > 0 ? contextOptions : undefined;
+};
 
 export const openProjectParticipant = async (
     browser: Browser,

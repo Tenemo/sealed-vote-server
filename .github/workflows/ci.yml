@@ -122,14 +122,76 @@ jobs:
             - name: run build
               run: pnpm build
 
-    e2e-required:
-        name: e2e-required
+    e2e-prepare:
+        name: e2e-prepare
         runs-on: ubuntu-latest
         if: >-
             github.event_name == 'merge_group' ||
-            (github.event_name == 'push' && github.ref_name == 'master') ||
-            (github.event_name == 'pull_request' && github.base_ref == 'master')
-        timeout-minutes: 45
+            (github.event_name == 'push' && contains(fromJson('["master","main"]'), github.ref_name)) ||
+            (github.event_name == 'pull_request' && contains(fromJson('["master","main"]'), github.base_ref))
+        timeout-minutes: 30
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: build e2e artifacts
+              env:
+                  VITE_API_BASE_URL: http://127.0.0.1:4000
+              run: pnpm e2e:ci:build
+
+            - name: upload e2e build artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: e2e-build-artifacts
+                  path: |
+                      apps/api/dist
+                      apps/web/dist
+                      packages/contracts/dist
+                      packages/protocol/dist
+                  if-no-files-found: error
+
+    e2e-matrix:
+        name: e2e (${{ matrix.engine.name }})
+        needs: e2e-prepare
+        runs-on: ubuntu-latest
+        if: >-
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && contains(fromJson('["master","main"]'), github.ref_name)) ||
+            (github.event_name == 'pull_request' && contains(fromJson('["master","main"]'), github.base_ref))
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            matrix:
+                engine:
+                    - name: chromium
+                      slug: chromium
+                      browser_cache_key: chromium-firefox
+                      install_browsers: chromium firefox
+                      projects: --project chromium-desktop
+                    - name: firefox
+                      slug: firefox
+                      browser_cache_key: firefox
+                      install_browsers: firefox
+                      projects: --project firefox-desktop --project mobile-firefox-android
+                    - name: webkit
+                      slug: webkit
+                      browser_cache_key: webkit
+                      install_browsers: webkit
+                      projects: --project webkit-desktop
 
         services:
             postgres:
@@ -149,6 +211,8 @@ jobs:
         env:
             DATABASE_URL: postgres://postgres:postgres@localhost:5432/sv-db
             NODE_ENV: test
+            PLAYWRIGHT_BLOB_REPORT: 'true'
+            PLAYWRIGHT_CI_WORKERS: '4'
 
         steps:
             - uses: actions/checkout@v6
@@ -167,18 +231,124 @@ jobs:
             - name: install dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: restore e2e build artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  name: e2e-build-artifacts
+                  path: .
+
+            - name: cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: ${{ runner.os }}-playwright-${{ matrix.engine.browser_cache_key }}-${{ hashFiles('pnpm-lock.yaml') }}
+
             - name: install Playwright browsers
-              run: pnpm e2e:install
+              run: pnpm exec playwright install --with-deps ${{ matrix.engine.install_browsers }}
 
             - name: run browser e2e
-              run: pnpm e2e
+              run: pnpm e2e:ci:test -- ${{ matrix.engine.projects }}
 
-            - name: upload Playwright artifacts
+            - name: upload Playwright blob report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-blob-report-${{ matrix.engine.slug }}
+                  path: blob-report
+                  if-no-files-found: ignore
+
+            - name: upload Playwright raw results
               if: failure()
               uses: actions/upload-artifact@v4
               with:
-                  name: playwright-artifacts
-                  path: |
-                      playwright-report
-                      test-results
+                  name: playwright-test-results-${{ matrix.engine.slug }}
+                  path: test-results
                   if-no-files-found: ignore
+
+    e2e-report:
+        name: e2e-report
+        if: >-
+            always() &&
+            (
+                github.event_name == 'merge_group' ||
+                (github.event_name == 'push' && contains(fromJson('["master","main"]'), github.ref_name)) ||
+                (github.event_name == 'pull_request' && contains(fromJson('["master","main"]'), github.base_ref))
+            )
+        needs: e2e-matrix
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+
+        steps:
+            - name: skip merged report on green matrix
+              if: needs.e2e-matrix.result == 'success'
+              run: echo "Skipping merged Playwright report because all matrix jobs passed."
+
+            - uses: actions/checkout@v6
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v5
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v6
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              run: pnpm install --frozen-lockfile
+
+            - name: download Playwright blob reports
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: playwright-blob-report-*
+                  merge-multiple: true
+                  path: all-blob-reports
+
+            - name: merge Playwright report
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+
+            - name: upload merged Playwright report
+              if: needs.e2e-matrix.result == 'failure' || needs.e2e-matrix.result == 'cancelled'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-report
+                  path: playwright-report
+                  if-no-files-found: ignore
+
+    e2e-required:
+        name: e2e-required
+        if: >-
+            always() &&
+            (
+                github.event_name == 'merge_group' ||
+                (github.event_name == 'push' && contains(fromJson('["master","main"]'), github.ref_name)) ||
+                (github.event_name == 'pull_request' && contains(fromJson('["master","main"]'), github.base_ref))
+            )
+        needs: [e2e-prepare, e2e-matrix, e2e-report]
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: assert e2e jobs passed
+              run: |
+                  if [ "${{ needs.e2e-prepare.result }}" != "success" ]; then
+                    echo "e2e-prepare result: ${{ needs.e2e-prepare.result }}"
+                    exit 1
+                  fi
+
+                  if [ "${{ needs.e2e-matrix.result }}" != "success" ]; then
+                    echo "e2e-matrix result: ${{ needs.e2e-matrix.result }}"
+                    exit 1
+                  fi
+
+                  if [ "${{ needs.e2e-report.result }}" != "success" ]; then
+                    echo "e2e-report result: ${{ needs.e2e-report.result }}"
+                    exit 1
+                  fi
