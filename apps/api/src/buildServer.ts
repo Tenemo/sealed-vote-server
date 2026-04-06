@@ -23,7 +23,7 @@ import { vote } from './routes/vote.js';
 config();
 
 const logger = {
-    level: process.env.LOG_LEVEL ?? 'info',
+    level: 'info',
     transport: {
         target: 'pino-pretty',
     },

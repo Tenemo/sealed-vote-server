@@ -31,4 +31,4 @@ pnpm --filter @sealed-vote/web test
 pnpm --filter @sealed-vote/web build
 ```
 
-For deployed builds, set `VITE_API_BASE_URL` to the backend origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
+The frontend only needs one user-configured environment variable: `VITE_API_BASE_URL` for deployed builds that talk to the backend on a different origin. Local development does not need it because Vite proxies `/api` to the backend dev server.

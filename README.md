@@ -67,8 +67,6 @@ Run the guarded Playwright suite from the repository root:
 pnpm e2e
 ```
 
-Locally, Playwright now uses multiple workers by default. Override that with `PLAYWRIGHT_WORKERS` when you want a different level of parallelism.
-
 The e2e entrypoint refuses to run unless all of these are true:
 
 - `NODE_ENV=test`
@@ -76,6 +74,13 @@ The e2e entrypoint refuses to run unless all of these are true:
 - `VITE_API_BASE_URL`, if set, points at a local HTTP backend
 
 The suite resets the database before starting the shared backend and web dev servers, so it must never be able to target a production or remote environment.
+
+Keep the app env surface small:
+
+- `DATABASE_URL` for the backend database connection
+- `VITE_API_BASE_URL` for deployed web builds that talk to the backend on a different origin
+
+Everything else uses repo defaults or platform-provided values.
 
 ## Workspace documentation
 

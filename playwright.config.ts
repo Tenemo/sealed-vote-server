@@ -14,17 +14,8 @@ const chromiumOnlySpecs = [
     '**/share-link.spec.ts',
 ];
 
-const configuredWorkers = Number.parseInt(
-    process.env.PLAYWRIGHT_WORKERS ?? '',
-    10,
-);
 const localWorkers = Math.max(2, Math.min(availableParallelism(), 6));
-const workers =
-    Number.isFinite(configuredWorkers) && configuredWorkers > 0
-        ? configuredWorkers
-        : process.env.CI
-          ? 1
-          : localWorkers;
+const workers = process.env.CI ? 1 : localWorkers;
 
 export default defineConfig({
     testDir: './tests/e2e',

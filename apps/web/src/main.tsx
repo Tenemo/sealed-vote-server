@@ -7,18 +7,12 @@ import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 import { PersistGate } from 'redux-persist/integration/react';
 
+import { sentryTracePropagationTargets } from 'app/apiConfig';
 import App from 'app/App';
 import { store, persistor } from 'app/store';
 import { darkTheme } from 'styles/theme';
 
 import 'styles/global.scss';
-
-const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-const tracePropagationTargets = ['localhost', /^https:\/\/sealed\.vote\/api/];
-
-if (configuredApiBaseUrl) {
-    tracePropagationTargets.push(configuredApiBaseUrl.replace(/\/+$/, ''));
-}
 
 export const Root = (): React.JSX.Element => {
     useEffect(() => {
@@ -75,7 +69,7 @@ Sentry.init({
         }),
     ],
     tracesSampleRate: 1.0,
-    tracePropagationTargets,
+    tracePropagationTargets: sentryTracePropagationTargets,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
 });
