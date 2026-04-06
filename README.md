@@ -82,6 +82,11 @@ GitHub Actions uses a separate built-artifact path for PR e2e runs:
 - `pnpm e2e:ci:serve:web` starts the built web server
 - `pnpm e2e:ci:test` runs Playwright against the built API and built web server
 
+Production e2e uses a separate remote-safe path:
+
+- `pnpm e2e:production:wait -- --commit <sha> --web https://sealed.vote --api https://api.sealed.vote` waits until the deployed frontend and API both serve the target commit SHA
+- `PLAYWRIGHT_BASE_URL=https://sealed.vote pnpm e2e:production:test` runs the same Playwright suite against the deployed site without starting local servers or touching the local database
+
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace

@@ -109,8 +109,10 @@ export const closeParticipant = async ({
     browser,
     context,
 }: ManagedParticipant): Promise<void> => {
-    await context.close();
     if (browser) {
         await browser.close();
+        return;
     }
+
+    await context.close();
 };

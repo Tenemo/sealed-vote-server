@@ -4,7 +4,11 @@ import {
     closeParticipant,
     openProjectParticipant,
 } from './support/participants';
-import { createPoll } from './support/pollFlow';
+import {
+    createPoll,
+    deletePolls,
+    type CreatedPoll,
+} from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -15,26 +19,31 @@ import { createTestNamespace, createVoterName } from './support/testData';
 test('keeps duplicate-title polls on distinct slug URLs', async ({
     browser,
     page,
+    request,
 }, testInfo) => {
     const tracker = createUnexpectedErrorTracker();
+    const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const pollTitle = `Duplicate title vote ${namespace}`.slice(0, 64);
 
     attachErrorTracking(page, 'page-1', tracker);
 
-    const createPollWithTitle = async (): Promise<string> => {
-        return await createPoll({
+    const createPollWithTitle = async () => {
+        const createdPoll = await createPoll({
             page,
             pollName: pollTitle,
         });
+        createdPolls.push(createdPoll);
+
+        return createdPoll;
     };
 
     const firstPollUrl = await createPollWithTitle();
     const secondPollUrl = await createPollWithTitle();
 
-    expect(secondPollUrl).not.toBe(firstPollUrl);
+    expect(secondPollUrl.pollUrl).not.toBe(firstPollUrl.pollUrl);
 
-    await page.goto(firstPollUrl);
+    await page.goto(firstPollUrl.pollUrl);
     await page
         .getByLabel('Voter name*')
         .fill(createVoterName('alice', namespace));
@@ -45,7 +54,7 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
     attachErrorTracking(participant.page, 'page-2', tracker);
 
     try {
-        await participant.page.goto(secondPollUrl);
+        await participant.page.goto(secondPollUrl.pollUrl);
         await participant.page
             .getByLabel('Voter name*')
             .fill(createVoterName('bob', namespace));
@@ -64,5 +73,6 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
+        await deletePolls(request, createdPolls);
     }
 });

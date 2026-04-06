@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import { createDeploymentVersionPlugin } from './config/deploymentVersion';
+
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 
 const resolveFromRoot = (...segments: string[]): string =>
@@ -65,7 +67,7 @@ const getManualChunk = (id: string): string | undefined => {
 };
 
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), createDeploymentVersionPlugin()],
     resolve: {
         alias: {
             app: resolveFromSrc('app'),

@@ -7,9 +7,11 @@ import {
 import {
     beginVote,
     createPoll,
+    deletePolls,
     expectResultsVisible,
     getShareLinkValue,
     joinPoll,
+    type CreatedPoll,
 } from './support/pollFlow';
 import {
     attachErrorTracking,
@@ -25,8 +27,10 @@ import {
 test('completes one real poll across desktop chromium, desktop firefox, and mobile firefox', async ({
     page,
     playwright,
+    request,
 }, testInfo) => {
     const tracker = createUnexpectedErrorTracker();
+    const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
     const firefoxDesktopName = createVoterName('bob', namespace);
@@ -34,12 +38,13 @@ test('completes one real poll across desktop chromium, desktop firefox, and mobi
 
     attachErrorTracking(page, 'creator', tracker);
 
-    const pollUrl = await createPoll({
+    const createdPoll = await createPoll({
         page,
         pollName: createPollName('Mixed platform vote', namespace),
     });
+    createdPolls.push(createdPoll);
 
-    expect(await getShareLinkValue(page)).toBe(pollUrl);
+    expect(await getShareLinkValue(page)).toBe(createdPoll.pollUrl);
 
     const firefoxDesktop = await launchFirefoxParticipant({ playwright });
     const firefoxMobile = await launchFirefoxParticipant({
@@ -57,12 +62,12 @@ test('completes one real poll across desktop chromium, desktop firefox, and mobi
         });
         await joinPoll({
             page: firefoxDesktop.page,
-            pollUrl,
+            pollUrl: createdPoll.pollUrl,
             voterName: firefoxDesktopName,
         });
         await joinPoll({
             page: firefoxMobile.page,
-            pollUrl,
+            pollUrl: createdPoll.pollUrl,
             voterName: firefoxMobileName,
         });
 
@@ -80,5 +85,6 @@ test('completes one real poll across desktop chromium, desktop firefox, and mobi
     } finally {
         await closeParticipant(firefoxDesktop);
         await closeParticipant(firefoxMobile);
+        await deletePolls(request, createdPolls);
     }
 });

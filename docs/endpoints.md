@@ -225,7 +225,8 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "service": "OK",
-    "database": "OK"
+    "database": "OK",
+    "commitSha": "abcdef1234567890"
 }
 ```
 
@@ -234,6 +235,10 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "service": "OK",
-    "database": "Failed"
+    "database": "Failed",
+    "commitSha": "abcdef1234567890"
 }
 ```
+
+- notes:
+- `commitSha` is `null` when the runtime does not expose a deployment commit SHA
