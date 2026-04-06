@@ -4,8 +4,8 @@ import type {
     BrowserContextOptions,
     BrowserType,
     Page,
-    Playwright,
     TestInfo,
+    PlaywrightWorkerArgs,
 } from '@playwright/test';
 
 import { mobileFirefoxAndroidContextOptions } from './profiles';
@@ -50,16 +50,19 @@ type ManagedParticipant = {
 export const getProjectContextOptions = (
     testInfo: TestInfo,
 ): BrowserContextOptions | undefined => {
-    const contextOptions: BrowserContextOptions = {};
     const projectUse = testInfo.project.use as Partial<BrowserContextOptions>;
-
-    for (const optionKey of browserContextOptionKeys) {
+    const contextEntries = browserContextOptionKeys.flatMap((optionKey) => {
         const optionValue = projectUse[optionKey];
 
-        if (optionValue !== undefined) {
-            contextOptions[optionKey] = optionValue;
+        if (optionValue === undefined) {
+            return [];
         }
-    }
+
+        return [[optionKey, optionValue] as const];
+    });
+    const contextOptions = Object.fromEntries(
+        contextEntries,
+    ) as BrowserContextOptions;
 
     if (testInfo.project.name === 'mobile-firefox-android') {
         return {
@@ -88,7 +91,7 @@ export const launchFirefoxParticipant = async ({
     playwright,
     mobile = false,
 }: {
-    playwright: Playwright;
+    playwright: PlaywrightWorkerArgs['playwright'];
     mobile?: boolean;
 }): Promise<ManagedParticipant> => {
     const browserType: BrowserType = playwright.firefox;

@@ -7,6 +7,9 @@
   NODE_VERSION = "24.14.1"
   PNPM_VERSION = "10.33.0"
 
+[context.deploy-preview.environment]
+  VITE_API_BASE_URL = "https://api.sealed.vote"
+
 [[headers]]
   for = "/*"
   [headers.values]

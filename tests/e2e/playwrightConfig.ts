@@ -2,6 +2,8 @@ import { availableParallelism } from 'node:os';
 
 import {
     devices,
+    type PlaywrightTestConfig,
+    type Project,
     type ReporterDescription,
 } from '@playwright/test';
 
@@ -74,12 +76,12 @@ const normalizeBaseUrl = (baseUrl: string): string => {
     return parsedBaseUrl.origin;
 };
 
-const projects = [
+const projects: Project[] = [
     {
         name: 'chromium-desktop',
         use: {
             ...devices['Desktop Chrome'],
-            browserName: 'chromium',
+            browserName: 'chromium' as const,
         },
     },
     {
@@ -87,7 +89,7 @@ const projects = [
         testIgnore: chromiumOnlySpecs,
         use: {
             ...devices['Desktop Firefox'],
-            browserName: 'firefox',
+            browserName: 'firefox' as const,
         },
     },
     {
@@ -95,7 +97,7 @@ const projects = [
         testIgnore: chromiumOnlySpecs,
         use: {
             ...devices['Desktop Safari'],
-            browserName: 'webkit',
+            browserName: 'webkit' as const,
         },
     },
     {
@@ -108,7 +110,10 @@ const projects = [
     },
 ];
 
-const getCommonConfig = (baseURL: string, outputDir: string) => ({
+const getCommonConfig = (
+    baseURL: string,
+    outputDir: string,
+): PlaywrightTestConfig => ({
     testDir: './tests/e2e',
     timeout: 180_000,
     expect: {
@@ -131,7 +136,7 @@ const getCommonConfig = (baseURL: string, outputDir: string) => ({
     projects,
 });
 
-export const createLocalE2EConfig = () => ({
+export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
     ...getCommonConfig('http://127.0.0.1:3000', 'test-results/playwright'),
     webServer: shouldUseBuiltServers
         ? [
@@ -164,7 +169,7 @@ export const createLocalE2EConfig = () => ({
           ],
 });
 
-export const createProductionE2EConfig = () => {
+export const createProductionE2EConfig = (): PlaywrightTestConfig => {
     if (!productionBaseUrl) {
         throw new Error(
             'PLAYWRIGHT_BASE_URL must be set before running production e2e tests.',

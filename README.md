@@ -87,6 +87,12 @@ Production e2e uses a separate remote-safe path:
 - `pnpm e2e:production:wait -- --commit <sha> --web https://sealed.vote --api https://api.sealed.vote` waits until the deployed frontend and API both serve the target commit SHA
 - `PLAYWRIGHT_BASE_URL=https://sealed.vote pnpm e2e:production:test` runs the same Playwright suite against the deployed site without starting local servers or touching the local database
 
+Netlify deploy previews are configured to point at the production API:
+
+- `netlify.toml` sets `VITE_API_BASE_URL=https://api.sealed.vote` for the `deploy-preview` context
+- the API CORS policy allows `https://deploy-preview-<number>--sealed-vote.netlify.app`
+- this gives PR preview frontend builds without trying to provision a matching preview backend
+
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace

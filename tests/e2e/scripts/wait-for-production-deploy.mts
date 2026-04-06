@@ -86,25 +86,25 @@ const parseArgs = (): WaitOptions => {
         return args[flagIndex + 1];
     };
 
-    const expectedCommitSha = getArgValue('--commit');
-    const webBaseUrl = getArgValue('--web');
-    const apiBaseUrl = getArgValue('--api');
+    const rawExpectedCommitSha = getArgValue('--commit');
+    const rawWebBaseUrl = getArgValue('--web');
+    const rawApiBaseUrl = getArgValue('--api');
 
-    if (!expectedCommitSha) {
+    if (!rawExpectedCommitSha) {
         fail('Missing required --commit argument.');
     }
 
-    if (!webBaseUrl) {
+    if (!rawWebBaseUrl) {
         fail('Missing required --web argument.');
     }
 
-    if (!apiBaseUrl) {
+    if (!rawApiBaseUrl) {
         fail('Missing required --api argument.');
     }
 
     return {
-        apiBaseUrl: normalizeAbsoluteUrl(apiBaseUrl, '--api'),
-        expectedCommitSha: normalizeCommitSha(expectedCommitSha),
+        apiBaseUrl: normalizeAbsoluteUrl(rawApiBaseUrl!, '--api'),
+        expectedCommitSha: normalizeCommitSha(rawExpectedCommitSha!),
         intervalMs: parsePositiveInteger(
             getArgValue('--interval-ms'),
             defaultIntervalMs,
@@ -115,7 +115,7 @@ const parseArgs = (): WaitOptions => {
             defaultTimeoutMs,
             '--timeout-ms',
         ),
-        webBaseUrl: normalizeAbsoluteUrl(webBaseUrl, '--web'),
+        webBaseUrl: normalizeAbsoluteUrl(rawWebBaseUrl!, '--web'),
     };
 };
 
