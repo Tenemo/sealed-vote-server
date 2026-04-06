@@ -32,6 +32,7 @@ export type TestPollVoter = {
 
 export type TestPollContext = {
     pollId: string;
+    pollSlug: string;
     creatorToken: string;
     pollName: string;
     choices: string[];
@@ -291,7 +292,3 @@ export class TestPollBuilder {
         return context.poll;
     }
 }
-
-export const createCompletedTestPoll = async (
-    fastify: FastifyInstance,
-): Promise<TestPollContext> => new TestPollBuilder(fastify).complete();

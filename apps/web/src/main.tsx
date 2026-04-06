@@ -23,15 +23,22 @@ if (configuredApiBaseUrl) {
 export const Root = (): React.JSX.Element => {
     useEffect(() => {
         // https://stackoverflow.com/questions/31402576/enable-focus-only-on-keyboard-use-or-tab-press
-        document.body.addEventListener('mousedown', () =>
-            document.body.classList.add('using-mouse'),
-        );
-        document.body.addEventListener('keydown', (event) => {
+        const handleMouseDown = (): void => {
+            document.body.classList.add('using-mouse');
+        };
+        const handleKeyDown = (event: KeyboardEvent): void => {
             if (event.key === 'Tab') {
                 document.body.classList.remove('using-mouse');
             }
-        });
-        console.log(`Build date: ${__BUILD_DATE__}`);
+        };
+
+        document.body.addEventListener('mousedown', handleMouseDown);
+        document.body.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.body.removeEventListener('mousedown', handleMouseDown);
+            document.body.removeEventListener('keydown', handleKeyDown);
+        };
     }, []);
 
     return (

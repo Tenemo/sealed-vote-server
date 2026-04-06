@@ -13,7 +13,7 @@ The canonical phases are:
 - `decryption`
 - `complete`
 
-They are derived from the shared `derivePollPhase` helper using the poll state returned by `GET /api/polls/:pollId`.
+They are derived from the shared `derivePollPhase` helper using the poll state returned by `GET /api/polls/:pollRef`.
 
 ## Flow
 

@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 
 import type { DatabaseTransaction } from '../db/client.js';
 import {
@@ -8,7 +8,6 @@ import {
     polls,
     voters,
 } from '../db/schema.js';
-
 export type LockedPoll = {
     id: string;
     isOpen: boolean;
@@ -21,6 +20,7 @@ export type LockedPoll = {
 export type LockedCreatorPoll = {
     id: string;
     isOpen: boolean;
+    creatorTokenHash: string;
 };
 
 export type OrderedDecryptionShareRow = {
@@ -41,7 +41,7 @@ type OrderedRowWithVoter<T> = T & {
     } | null;
 };
 
-const sortByVoterIndex = <T extends OrderedRowWithVoter<object>>(
+export const sortRowsByVoterIndex = <T extends OrderedRowWithVoter<object>>(
     rows: T[],
 ): T[] =>
     rows.sort(
@@ -69,18 +69,18 @@ export const lockPollById = async (
     return poll;
 };
 
-export const lockPollByIdAndCreatorToken = async (
+export const lockPollByIdForCreatorAction = async (
     tx: DatabaseTransaction,
     pollId: string,
-    creatorToken: string,
 ): Promise<LockedCreatorPoll | undefined> => {
     const [poll] = await tx
         .select({
             id: polls.id,
             isOpen: polls.isOpen,
+            creatorTokenHash: polls.creatorTokenHash,
         })
         .from(polls)
-        .where(and(eq(polls.id, pollId), eq(polls.creatorToken, creatorToken)))
+        .where(eq(polls.id, pollId))
         .for('update');
 
     return poll;
@@ -140,7 +140,7 @@ export const getOrderedPollDecryptionShares = async (
         },
     });
 
-    return sortByVoterIndex(rows).map(({ shares }) => ({ shares }));
+    return sortRowsByVoterIndex(rows).map(({ shares }) => ({ shares }));
 };
 
 export const getOrderedPollEncryptedVotes = async (
@@ -161,7 +161,7 @@ export const getOrderedPollEncryptedVotes = async (
         },
     });
 
-    return sortByVoterIndex(rows).map(({ votes }) => ({ votes }));
+    return sortRowsByVoterIndex(rows).map(({ votes }) => ({ votes }));
 };
 
 export const getOrderedPollPublicKeyShares = async (
@@ -182,7 +182,7 @@ export const getOrderedPollPublicKeyShares = async (
         },
     });
 
-    return sortByVoterIndex(rows).map(({ publicKeyShare }) => ({
+    return sortRowsByVoterIndex(rows).map(({ publicKeyShare }) => ({
         publicKeyShare,
     }));
 };

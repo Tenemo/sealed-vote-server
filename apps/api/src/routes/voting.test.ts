@@ -1,38 +1,18 @@
 import { FastifyInstance } from 'fastify';
-import {
-    createDecryptionShare,
-    encrypt,
-    generateKeys,
-    serializeEncryptedMessage,
-    deserializeEncryptedMessage,
-} from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
 import {
-    createPoll,
     deletePoll,
-    registerVoter,
-    closePoll,
-    publicKeyShare,
+    fetchPoll,
     getUniquePollName,
-    vote,
-    decryptionShares,
+    registerVoter,
+    TestPollBuilder,
+    type ScoreMatrix,
 } from '../testUtils';
-
-import { PollResponse } from './fetch';
 
 describe('E2E voting test', () => {
     let fastify: FastifyInstance;
-    let pollId: string;
-    let creatorToken: string;
-    let commonPublicKey: bigint;
-    let aliceToken: string;
-    let bobToken: string;
-    let charlieToken: string;
-    let aliceKeys: { publicKey: bigint; privateKey: bigint };
-    let bobKeys: { publicKey: bigint; privateKey: bigint };
-    let charlieKeys: { publicKey: bigint; privateKey: bigint };
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -42,238 +22,95 @@ describe('E2E voting test', () => {
         await fastify.close();
     });
 
-    const pollName = getUniquePollName('Which animal should we get?');
-    const choices = ['Dog', 'Cat', 'Cow', 'Goat'];
-    const threshold = 3;
-    const aliceChosenScores = [10, 2, 3, 9];
-    const bobChosenScores = [5, 6, 7, 8];
-    const charlieChosenScores = [9, 10, 1, 4];
+    test('completes the full voting workflow and produces the expected results', async () => {
+        const pollName = getUniquePollName('Which animal should we get?');
+        const choices = ['Dog', 'Cat', 'Cow', 'Goat'];
+        const voterNames = ['Alice', 'Bob', 'Charlie'];
+        const scoreMatrix: ScoreMatrix = {
+            Alice: {
+                Dog: 10,
+                Cat: 2,
+                Cow: 3,
+                Goat: 9,
+            },
+            Bob: {
+                Dog: 5,
+                Cat: 6,
+                Cow: 7,
+                Goat: 8,
+            },
+            Charlie: {
+                Dog: 9,
+                Cat: 10,
+                Cow: 1,
+                Goat: 4,
+            },
+        };
 
-    const expectedResults = aliceChosenScores.map(
-        (score, index) =>
-            score * bobChosenScores[index] * charlieChosenScores[index],
-    );
+        const expectedResults = choices.map((choice) =>
+            voterNames.reduce(
+                (product, voterName) =>
+                    product * scoreMatrix[voterName][choice],
+                1,
+            ),
+        );
 
-    test('Should create a new poll with 4 options successfully', async () => {
-        const pollData = await createPoll(fastify, pollName, choices);
-        pollId = pollData.pollId;
-        creatorToken = pollData.creatorToken;
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(pollName)
+            .withChoices(choices)
+            .withVoters(voterNames)
+            .withScoreMatrix(scoreMatrix);
 
-        expect(pollData.pollName).toBe(pollName);
-        expect(pollData.choices).toEqual(choices);
-    });
+        await builder.create();
+        let context = builder.getContext();
+        expect(context.pollName).toBe(pollName);
+        expect(context.choices).toEqual(choices);
 
-    test('Should allow 3 voters to register for the poll', async () => {
-        const alice = await registerVoter(fastify, pollId, 'Alice');
-        const bob = await registerVoter(fastify, pollId, 'Bob');
-        const charlie = await registerVoter(fastify, pollId, 'Charlie');
-        expect(alice.success).toBe(true);
-        expect(bob.success).toBe(true);
-        expect(charlie.success).toBe(true);
-        if (!alice.success || !bob.success || !charlie.success) {
-            throw new Error('Failed to register voters.');
-        }
-        aliceToken = alice.voterToken;
-        bobToken = bob.voterToken;
-        charlieToken = charlie.voterToken;
+        await builder.registerVoters();
+        context = builder.getContext();
+        expect(context.poll?.voters).toEqual(voterNames);
 
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
+        await builder.close();
+        context = builder.getContext();
+        expect(context.poll?.isOpen).toBe(false);
 
-        expect(response.statusCode).toBe(200);
-        const pollData = JSON.parse(response.body) as PollResponse;
-        expect(pollData.voters).toEqual(['Alice', 'Bob', 'Charlie']);
-    });
-
-    test('Should allow the creator to close the poll', async () => {
-        await closePoll(fastify, pollId, creatorToken);
-
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-
-        expect(response.statusCode).toBe(200);
-        const pollData = JSON.parse(response.body) as PollResponse;
-        expect(pollData.isOpen).toBe(false);
-    });
-
-    test('Should not allow a new voter to register after the poll is closed', async () => {
-        const newVoterName = 'NewVoter';
-        const registrationResult = await registerVoter(
+        const lateRegistration = await registerVoter(
             fastify,
-            pollId,
-            newVoterName,
+            context.pollId,
+            'NewVoter',
         );
+        expect(lateRegistration.success).toBe(false);
+        expect(lateRegistration.message).toContain('Poll is closed');
 
-        // Expect the registration to fail since the poll is closed
-        expect(registrationResult.success).toBeFalsy();
-        expect(registrationResult.message).toContain('Poll is closed');
+        await builder.submitPublicKeyShares();
+        context = builder.getContext();
+        expect(context.poll?.publicKeyShareCount).toBe(voterNames.length);
+        expect(context.poll?.commonPublicKey).not.toBeNull();
 
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
+        await builder.submitVotes();
+        context = builder.getContext();
+        expect(context.poll?.encryptedVoteCount).toBe(voterNames.length);
+        expect(context.poll?.encryptedTallies).toHaveLength(choices.length);
 
-        // Confirm that the new voter was indeed not added
-        expect(response.statusCode).toBe(200);
-        const pollData = JSON.parse(response.body) as PollResponse;
-        expect(pollData.voters).not.toContain(newVoterName);
-    });
+        await builder.submitDecryptionShares();
+        context = builder.getContext();
+        expect(context.poll?.decryptionShareCount).toBe(voterNames.length);
+        expect(context.poll?.results).toEqual(expectedResults);
 
-    test('Should allow voters to submit public key shares and form the common public key', async () => {
-        aliceKeys = generateKeys(1, threshold);
-        bobKeys = generateKeys(2, threshold);
-        charlieKeys = generateKeys(3, threshold);
+        const pollData = await fetchPoll(fastify, context.pollId);
+        expect(pollData.results).toEqual(expectedResults);
 
-        await publicKeyShare(fastify, pollId, {
-            publicKeyShare: aliceKeys.publicKey.toString(),
-            voterToken: aliceToken,
-        });
-        await publicKeyShare(fastify, pollId, {
-            publicKeyShare: bobKeys.publicKey.toString(),
-            voterToken: bobToken,
-        });
-        await publicKeyShare(fastify, pollId, {
-            publicKeyShare: charlieKeys.publicKey.toString(),
-            voterToken: charlieToken,
-        });
-
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-
-        expect(response.statusCode).toBe(200);
-        const pollData = JSON.parse(response.body) as PollResponse;
-        expect(pollData.publicKeyShares.length).toBe(3);
-        expect(pollData.commonPublicKey).not.toBeNull();
-
-        commonPublicKey = BigInt(pollData.commonPublicKey!);
-    });
-
-    test('Should allow voters to submit votes after public key shares are submitted', async () => {
-        const votesAlice = aliceChosenScores.map((score) =>
-            serializeEncryptedMessage(encrypt(score, commonPublicKey)),
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
         );
-        const votesBob = bobChosenScores.map((score) =>
-            serializeEncryptedMessage(encrypt(score, commonPublicKey)),
-        );
-        const votesCharlie = charlieChosenScores.map((score) =>
-            serializeEncryptedMessage(encrypt(score, commonPublicKey)),
-        );
-
-        await vote(fastify, pollId, {
-            votes: votesAlice,
-            voterToken: aliceToken,
-        });
-        await vote(fastify, pollId, {
-            votes: votesBob,
-            voterToken: bobToken,
-        });
-        await vote(fastify, pollId, {
-            votes: votesCharlie,
-            voterToken: charlieToken,
-        });
-
-        // Fetch the poll to verify votes are encrypted and stored
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-
-        expect(response.statusCode).toBe(200);
-        const pollData = JSON.parse(response.body) as PollResponse;
-        expect(pollData.encryptedVotes.length).toBe(threshold);
-        expect(pollData.encryptedTallies.length).toBe(aliceChosenScores.length);
-    });
-
-    test('Should generate and submit decryption shares once votes are tallied', async () => {
-        let response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-        let pollData = JSON.parse(response.body) as PollResponse;
-
-        if (pollData.encryptedTallies.length === 0) {
-            throw new Error(
-                'Encrypted tallies are not there. Nothing to create shares for.',
-            );
-        }
-        const decryptionSharesAlice = pollData.encryptedTallies.map((tally) =>
-            createDecryptionShare(
-                deserializeEncryptedMessage(tally),
-                aliceKeys.privateKey,
-            ).toString(),
-        );
-        const decryptionSharesBob = pollData.encryptedTallies.map((tally) =>
-            createDecryptionShare(
-                deserializeEncryptedMessage(tally),
-                bobKeys.privateKey,
-            ).toString(),
-        );
-        const decryptionSharesCharlie = pollData.encryptedTallies.map((tally) =>
-            createDecryptionShare(
-                deserializeEncryptedMessage(tally),
-                charlieKeys.privateKey,
-            ).toString(),
-        );
-        expect(decryptionSharesAlice.length).toBe(aliceChosenScores.length);
-        expect(decryptionSharesBob.length).toBe(bobChosenScores.length);
-        expect(decryptionSharesCharlie.length).toBe(charlieChosenScores.length);
-        await decryptionShares(fastify, pollId, {
-            decryptionShares: decryptionSharesAlice,
-            voterToken: aliceToken,
-        });
-        await decryptionShares(fastify, pollId, {
-            decryptionShares: decryptionSharesBob,
-            voterToken: bobToken,
-        });
-        await decryptionShares(fastify, pollId, {
-            decryptionShares: decryptionSharesCharlie,
-            voterToken: charlieToken,
-        });
-        response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-
-        expect(response.statusCode).toBe(200);
-        pollData = JSON.parse(response.body) as PollResponse;
-
-        expect(pollData.decryptionShares).toBeDefined();
-        expect(pollData.decryptionShares.length).toBeGreaterThan(0);
-
-        expect(Array.isArray(pollData.decryptionShares[0])).toBeTruthy();
-        expect(pollData.decryptionShares[0].length).toBe(
-            bobChosenScores.length,
-        );
-    });
-    test('The final results match with the expected, plaintext ones', async () => {
-        const response = await fastify.inject({
-            method: 'GET',
-            url: `/api/polls/${pollId}`,
-        });
-        expect(response.statusCode).toBe(200);
-
-        const pollData = JSON.parse(response.body) as PollResponse;
-
-        expect(pollData.results).toBeDefined();
-        expect(pollData.results.length).toBe(choices.length);
-        pollData.results.forEach((result, index) => {
-            expect(result).toBe(expectedResults[index]);
-        });
-    });
-
-    test('Should delete the poll after the voting process is complete', async () => {
-        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);
-        const response = await fastify.inject({
+
+        const deletedPoll = await fastify.inject({
             method: 'GET',
-            url: `/api/polls/${pollId}`,
+            url: `/api/polls/${context.pollId}`,
         });
-        expect(response.statusCode).toBe(404);
+        expect(deletedPoll.statusCode).toBe(404);
     });
 });

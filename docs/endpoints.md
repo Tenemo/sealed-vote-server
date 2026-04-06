@@ -19,58 +19,44 @@ The backend routes live under `/api`. The request and response payloads below ma
 
 ```json
 {
-    "pollName": "Lunch vote",
-    "creatorToken": "creator-token",
-    "choices": ["Pizza", "Sushi", "Pasta"],
-    "maxParticipants": 20,
     "id": "poll-id",
-    "createdAt": "2026-04-04T12:00:00.000Z",
-    "publicKeyShares": [],
-    "commonPublicKey": null,
-    "encryptedVotes": [],
-    "encryptedTallies": [],
-    "decryptionShares": [],
-    "results": []
+    "slug": "lunch-vote--1a2b3c4d",
+    "creatorToken": "creator-token"
 }
 ```
 
 - failure responses:
-- `400` for invalid input such as fewer than two choices or duplicate choice names
-- `409` when `pollName` is already taken
+- `400` for invalid input such as blank trimmed names, fewer than two choices, or duplicate choice names after trimming
 
 ## Fetch poll
 
-- `GET /api/polls/:pollId`
+- `GET /api/polls/:pollRef`
+- `pollRef` accepts either the poll UUID or the canonical public slug
 - success response: `200 OK`
 
 ```json
 {
+    "id": "poll-id",
+    "slug": "lunch-vote--1a2b3c4d",
     "pollName": "Lunch vote",
     "createdAt": "2026-04-04T12:00:00.000Z",
     "choices": ["Pizza", "Sushi", "Pasta"],
     "voters": ["Alice", "Bob"],
     "isOpen": false,
-    "publicKeyShares": ["pk-share-1", "pk-share-2"],
+    "publicKeyShareCount": 2,
     "commonPublicKey": "combined-public-key",
-    "encryptedVotes": [
-        [
-            { "c1": "1", "c2": "2" },
-            { "c1": "3", "c2": "4" },
-            { "c1": "5", "c2": "6" }
-        ]
-    ],
+    "encryptedVoteCount": 2,
     "encryptedTallies": [
         { "c1": "7", "c2": "8" },
         { "c1": "9", "c2": "10" },
         { "c1": "11", "c2": "12" }
     ],
-    "decryptionShares": [["13", "14", "15"]],
+    "decryptionShareCount": 2,
     "results": [12, 19, 7]
 }
 ```
 
 - failure responses:
-- `400` for an invalid poll id
 - `404` when the poll does not exist
 
 ## Register voter
@@ -228,7 +214,8 @@ The backend routes live under `/api`. The request and response payloads below ma
 
 - failure responses:
 - `400` for invalid poll id
-- `404` when the poll does not exist or the token does not match
+- `403` for an invalid creator token
+- `404` when the poll does not exist
 
 ## Health check
 

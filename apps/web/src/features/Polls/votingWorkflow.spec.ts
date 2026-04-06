@@ -1,6 +1,3 @@
-import type { EnhancedStore } from '@reduxjs/toolkit';
-import { configureStore } from '@reduxjs/toolkit';
-
 const mockedFetchFreshPoll = vi.fn();
 const mockedWaitForPoll = vi.fn();
 const mockedVoteInitiate = vi.fn();
@@ -17,25 +14,14 @@ vi.mock('@sealed-vote/protocol', () => ({
     serializeVotes: (...args: unknown[]) => mockedSerializeVotes(...args),
 }));
 
-vi.mock('features/Polls/pollQuery', () => ({
+vi.mock('./pollQuery', () => ({
     fetchFreshPoll: (...args: unknown[]) => mockedFetchFreshPoll(...args),
     waitForPoll: (...args: unknown[]) => mockedWaitForPoll(...args),
 }));
 
-vi.mock('features/Polls/pollsApi', () => ({
+vi.mock('./pollsApi', () => ({
     pollsApi: {
-        reducerPath: 'polls',
-        reducer: (state = {}) => state,
-        middleware:
-            () => (next: (action: unknown) => unknown) => (action: unknown) =>
-                next(action),
         endpoints: {
-            createPoll: {
-                matchFulfilled: () => false,
-            },
-            registerVoter: {
-                matchFulfilled: () => false,
-            },
             vote: {
                 initiate: (...args: unknown[]) => mockedVoteInitiate(...args),
             },
@@ -43,38 +29,34 @@ vi.mock('features/Polls/pollsApi', () => ({
                 initiate: (...args: unknown[]) =>
                     mockedSubmitDecryptionSharesInitiate(...args),
             },
-            submitPublicKeyShare: {
-                initiate: vi.fn(),
-            },
-            getPoll: {
-                select: () => () => ({}),
-            },
         },
     },
 }));
 
-import { encryptVotesGenerateShares } from './encryptVotesGenerateShares';
+import {
+    setKeys,
+    setProgressMessage,
+    setResults,
+    setSubmissionStatus,
+} from './votingSlice';
+import { initialVoteState } from './votingState';
+import type { VotingState } from './votingState';
+import { runEncryptVotesGenerateShares } from './votingWorkflow';
 
-import { initialVoteState, votingSlice } from 'features/Polls/votingSlice';
-import type { VotingState } from 'features/Polls/votingState';
+const createVotingState = (
+    overrides: Partial<VotingState[string]> = {},
+): VotingState => ({
+    'poll-1': {
+        ...initialVoteState,
+        selectedScores: { Apples: 7 },
+        commonPublicKey: '33',
+        privateKey: '11',
+        voterToken: 'voter-token',
+        ...overrides,
+    },
+});
 
-const createTestStore = (
-    votingState: VotingState,
-): EnhancedStore<{ voting: VotingState }> =>
-    configureStore({
-        reducer: {
-            voting: votingSlice.reducer,
-        },
-        preloadedState: {
-            voting: votingState,
-        },
-        middleware: (getDefaultMiddleware) =>
-            getDefaultMiddleware({
-                serializableCheck: false,
-            }),
-    });
-
-describe('encryptVotesGenerateShares thunk', () => {
+describe('runEncryptVotesGenerateShares', () => {
     beforeEach(() => {
         mockedFetchFreshPoll.mockReset();
         mockedWaitForPoll.mockReset();
@@ -86,62 +68,63 @@ describe('encryptVotesGenerateShares thunk', () => {
     });
 
     it('includes the voter token in vote and decryption share submissions', async () => {
-        const store = createTestStore({
-            'poll-1': {
-                ...initialVoteState,
-                selectedScores: { Apples: 7 },
-                commonPublicKey: '33',
-                privateKey: '11',
-                voterToken: 'voter-token',
-            },
-        });
+        const state = createVotingState();
+        const dispatch = vi.fn((action: unknown) => action) as never;
+        const actions = {
+            setKeys,
+            setProgressMessage,
+            setResults,
+            setSubmissionStatus,
+        };
 
         mockedFetchFreshPoll.mockResolvedValue({
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--11111111',
             pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples'],
             voters: ['Alice'],
             isOpen: false,
-            publicKeyShares: ['pk-1'],
+            publicKeyShareCount: 1,
             commonPublicKey: '33',
-            encryptedVotes: [],
+            encryptedVoteCount: 0,
             encryptedTallies: [],
-            decryptionShares: [],
+            decryptionShareCount: 0,
             results: [],
         });
         mockedWaitForPoll.mockResolvedValue({
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--11111111',
             pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples'],
             voters: ['Alice'],
             isOpen: false,
-            publicKeyShares: ['pk-1'],
+            publicKeyShareCount: 1,
             commonPublicKey: '33',
-            encryptedVotes: [[{ c1: '1', c2: '2' }]],
+            encryptedVoteCount: 1,
             encryptedTallies: [{ c1: '9', c2: '8' }],
-            decryptionShares: [],
+            decryptionShareCount: 0,
             results: [],
         });
         mockedVoteInitiate.mockReturnValue({
-            type: 'submitVote',
             unwrap: async () => undefined,
         });
         mockedSubmitDecryptionSharesInitiate.mockReturnValue({
-            type: 'submitDecryptionShares',
             unwrap: async () => undefined,
         });
         mockedSerializeVotes.mockReturnValue([{ c1: '1', c2: '2' }]);
         mockedCreateDecryptionSharesForTallies.mockReturnValue(['share-1']);
         mockedCanSubmitDecryptionShares.mockReturnValue(false);
 
-        const encryptResult = store.dispatch(
-            encryptVotesGenerateShares({ pollId: 'poll-1' }) as never,
-        ) as {
-            unwrap: () => Promise<void>;
-        };
+        await runEncryptVotesGenerateShares({
+            pollId: 'poll-1',
+            dispatch,
+            getState: (() => ({ voting: state })) as never,
+            actions,
+        });
 
-        await encryptResult.unwrap();
-
+        expect(mockedFetchFreshPoll).toHaveBeenCalledWith(dispatch, 'poll-1');
         expect(mockedSerializeVotes).toHaveBeenCalledWith(
             { Apples: 7 },
             ['Apples'],

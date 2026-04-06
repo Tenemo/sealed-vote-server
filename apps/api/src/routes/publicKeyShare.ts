@@ -10,8 +10,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 import { combinePublicKeys } from 'threshold-elgamal';
 
-import { uuidRegex } from '../constants.js';
-import { polls, publicKeyShares, voters } from '../db/schema.js';
+import { polls, publicKeyShares } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import {
     countPollVoters,
@@ -20,16 +19,19 @@ import {
 } from '../utils/polls.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
+import {
+    MessageResponseSchema,
+    PollIdParamsSchema,
+    type PollIdParams,
+} from './schemas.js';
+
 const PublicKeyShareRequestSchema = Type.Object({
     publicKeyShare: Type.String(),
     voterToken: Type.String(),
 });
 
-const MessageResponseSchema = Type.Object({
-    message: Type.String(),
-});
-
 const schema = {
+    params: PollIdParamsSchema,
     body: PublicKeyShareRequestSchema,
     response: {
         201: MessageResponseSchema,
@@ -52,17 +54,13 @@ export const publicKeyShare = async (
         async (
             req: FastifyRequest<{
                 Body: PublicKeyShareRequest;
-                Params: { pollId: string };
+                Params: PollIdParams;
             }>,
             reply: FastifyReply,
         ): Promise<PublicKeyShareResponse> => {
             try {
                 const { publicKeyShare: share, voterToken } = req.body;
                 const { pollId } = req.params;
-
-                if (!uuidRegex.test(pollId)) {
-                    throw createError(400, ERROR_MESSAGES.invalidPollId);
-                }
 
                 const response = await withTransaction(fastify, async (tx) => {
                     const poll = await lockPollById(tx, pollId);
@@ -96,23 +94,12 @@ export const publicKeyShare = async (
                         pollId,
                         voterToken,
                     );
-                    if (voter.hasSubmittedPublicKeyShare) {
-                        throw createError(
-                            409,
-                            ERROR_MESSAGES.publicKeyAlreadySubmitted,
-                        );
-                    }
 
                     await tx.insert(publicKeyShares).values({
                         pollId,
                         voterId: voter.id,
                         publicKeyShare: share,
                     });
-
-                    await tx
-                        .update(voters)
-                        .set({ hasSubmittedPublicKeyShare: true })
-                        .where(eq(voters.id, voter.id));
 
                     const publicKeyShareRows =
                         await getOrderedPollPublicKeyShares(tx, pollId);
@@ -151,10 +138,6 @@ export const publicKeyShare = async (
                         409,
                         ERROR_MESSAGES.publicKeyAlreadySubmitted,
                     );
-                }
-
-                if (!(error instanceof createError.HttpError)) {
-                    console.error(error);
                 }
 
                 throw error;

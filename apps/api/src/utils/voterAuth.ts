@@ -11,9 +11,6 @@ export type AuthenticatedVoter = {
     id: string;
     voterName: string;
     voterIndex: number;
-    hasSubmittedPublicKeyShare: boolean;
-    hasVoted: boolean;
-    hasSubmittedDecryptionShares: boolean;
 };
 
 export const generateSecureToken = (): string =>
@@ -33,9 +30,6 @@ export const authenticateVoter = async (
             id: voters.id,
             voterName: voters.voterName,
             voterIndex: voters.voterIndex,
-            hasSubmittedPublicKeyShare: voters.hasSubmittedPublicKeyShare,
-            hasVoted: voters.hasVoted,
-            hasSubmittedDecryptionShares: voters.hasSubmittedDecryptionShares,
         })
         .from(voters)
         .where(

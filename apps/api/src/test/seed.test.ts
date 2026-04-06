@@ -67,36 +67,42 @@ describe('seed database', () => {
             fastify,
             registrationPoll.pollId,
         );
+        expect(registrationState.id).toBe(registrationPoll.pollId);
+        expect(registrationState.slug).toContain('--');
         expect(registrationState.pollName).toBe('Seed registration sample');
         expect(registrationState.isOpen).toBe(true);
         expect(registrationState.voters).toEqual(['Alice', 'Bob']);
-        expect(registrationState.publicKeyShares).toEqual([]);
+        expect(registrationState.publicKeyShareCount).toBe(0);
         expect(registrationState.commonPublicKey).toBeNull();
-        expect(registrationState.encryptedVotes).toEqual([]);
+        expect(registrationState.encryptedVoteCount).toBe(0);
         expect(registrationState.encryptedTallies).toEqual([]);
-        expect(registrationState.decryptionShares).toEqual([]);
+        expect(registrationState.decryptionShareCount).toBe(0);
         expect(registrationState.results).toEqual([]);
 
         const votingState = await fetchPoll(fastify, votingPoll.pollId);
+        expect(votingState.id).toBe(votingPoll.pollId);
+        expect(votingState.slug).toContain('--');
         expect(votingState.pollName).toBe('Seed voting sample');
         expect(votingState.isOpen).toBe(false);
         expect(votingState.voters).toEqual(['Alice', 'Bob', 'Charlie']);
-        expect(votingState.publicKeyShares).toHaveLength(3);
+        expect(votingState.publicKeyShareCount).toBe(3);
         expect(votingState.commonPublicKey).not.toBeNull();
-        expect(votingState.encryptedVotes).toEqual([]);
+        expect(votingState.encryptedVoteCount).toBe(0);
         expect(votingState.encryptedTallies).toEqual([]);
-        expect(votingState.decryptionShares).toEqual([]);
+        expect(votingState.decryptionShareCount).toBe(0);
         expect(votingState.results).toEqual([]);
 
         const resultsState = await fetchPoll(fastify, resultsPoll.pollId);
+        expect(resultsState.id).toBe(resultsPoll.pollId);
+        expect(resultsState.slug).toContain('--');
         expect(resultsState.pollName).toBe('Seed results sample');
         expect(resultsState.isOpen).toBe(false);
         expect(resultsState.voters).toEqual(['Ada', 'Grace', 'Linus']);
-        expect(resultsState.publicKeyShares).toHaveLength(3);
+        expect(resultsState.publicKeyShareCount).toBe(3);
         expect(resultsState.commonPublicKey).not.toBeNull();
-        expect(resultsState.encryptedVotes).toHaveLength(3);
+        expect(resultsState.encryptedVoteCount).toBe(3);
         expect(resultsState.encryptedTallies).toHaveLength(3);
-        expect(resultsState.decryptionShares).toHaveLength(3);
+        expect(resultsState.decryptionShareCount).toBe(3);
         expect(resultsState.results).toHaveLength(3);
         expect(resultsState.results.every((value) => value > 0)).toBe(true);
     });

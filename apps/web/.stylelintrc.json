@@ -1,5 +1,5 @@
 {
-    "plugin": [
+    "plugins": [
         "stylelint-scss"
     ],
     "extends": [

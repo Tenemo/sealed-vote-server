@@ -1,32 +1,7 @@
 import type { PollResponse } from './pollsApi';
 import { pollsApi } from './pollsApi';
 
-import type { AppStore, RootState } from 'app/store';
-
-const POLL_INTERVAL_MS = 3000;
-
-type PollQueryStore = Pick<AppStore, 'dispatch' | 'getState' | 'subscribe'>;
-type PollQueryDispatchResult = {
-    unwrap: () => Promise<PollResponse>;
-};
-type PollQuerySubscriptionResult = PollQueryDispatchResult & {
-    unsubscribe: () => void;
-};
-
-let pollQueryStore: PollQueryStore | null = null;
-
-const selectPollQueryResult = (
-    pollId: string,
-): ReturnType<typeof pollsApi.endpoints.getPoll.select> =>
-    pollsApi.endpoints.getPoll.select(pollId);
-
-const getPollQueryStore = (): PollQueryStore => {
-    if (!pollQueryStore) {
-        throw new Error('Poll query store has not been registered.');
-    }
-
-    return pollQueryStore;
-};
+import { store, type AppDispatch, type RootState } from 'app/store';
 
 const createAbortError = (): Error => {
     const error = new Error('Poll query aborted.');
@@ -35,97 +10,98 @@ const createAbortError = (): Error => {
     return error;
 };
 
-export const registerPollQueryStore = (store: PollQueryStore): void => {
-    pollQueryStore = store;
+const isPollResponse = (value: unknown): value is PollResponse =>
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof (value as { id: unknown }).id === 'string';
+
+const selectPollResult = (
+    state: RootState,
+    pollId: string,
+): PollResponse | null => {
+    const directPoll = pollsApi.endpoints.getPoll.select(pollId)(state).data;
+    if (directPoll?.id === pollId) {
+        return directPoll;
+    }
+
+    const queryStates = Object.values(state[pollsApi.reducerPath].queries);
+    for (const queryState of queryStates) {
+        if (
+            !queryState ||
+            (queryState as { endpointName?: string }).endpointName !== 'getPoll'
+        ) {
+            continue;
+        }
+
+        const data = (queryState as { data?: unknown }).data;
+        if (isPollResponse(data) && data.id === pollId) {
+            return data;
+        }
+    }
+
+    return null;
 };
 
-export const fetchFreshPoll = async (pollId: string): Promise<PollResponse> =>
-    (
-        getPollQueryStore().dispatch(
-            pollsApi.endpoints.getPoll.initiate(pollId, {
-                forceRefetch: true,
-                subscribe: false,
-            }),
-        ) as PollQueryDispatchResult
+export const fetchFreshPoll = async (
+    dispatch: AppDispatch,
+    pollId: string,
+): Promise<PollResponse> =>
+    await dispatch(
+        pollsApi.endpoints.getPoll.initiate(pollId, {
+            forceRefetch: true,
+            subscribe: false,
+        }),
     ).unwrap();
 
 export const waitForPoll = async ({
+    dispatch,
     pollId,
     predicate,
     signal,
 }: {
+    dispatch: AppDispatch;
     pollId: string;
     predicate: (poll: PollResponse) => boolean;
     signal?: AbortSignal;
 }): Promise<PollResponse> => {
-    const store = getPollQueryStore();
-    const cachedPoll = selectPollQueryResult(pollId)(
-        store.getState() as RootState,
-    ).data;
+    const getCachedPoll = (): PollResponse | null =>
+        selectPollResult(store.getState(), pollId);
 
-    if (cachedPoll && predicate(cachedPoll)) {
-        return cachedPoll;
+    const currentPoll = getCachedPoll();
+    if (currentPoll && predicate(currentPoll)) {
+        return currentPoll;
     }
 
-    const pollSubscription = store.dispatch(
-        pollsApi.endpoints.getPoll.initiate(pollId, {
-            forceRefetch: true,
-            subscriptionOptions: {
-                pollingInterval: POLL_INTERVAL_MS,
-                skipPollingIfUnfocused: true,
-            },
-        }),
-    ) as PollQuerySubscriptionResult;
+    if (!currentPoll) {
+        const fetchedPoll = await fetchFreshPoll(dispatch, pollId);
+        if (predicate(fetchedPoll)) {
+            return fetchedPoll;
+        }
+    }
 
     return await new Promise<PollResponse>((resolve, reject) => {
-        let isFinished = false;
-        let unsubscribe: () => void = () => undefined;
-        let onAbort: () => void = () => undefined;
+        let unsubscribe = (): void => undefined;
 
-        const cleanup = (): void => {
-            if (isFinished) {
-                return;
-            }
-
-            isFinished = true;
+        const onAbort = (): void => {
             unsubscribe();
-            pollSubscription.unsubscribe();
-            signal?.removeEventListener('abort', onAbort);
-        };
-
-        const resolveIfReady = (): boolean => {
-            const poll = selectPollQueryResult(pollId)(
-                store.getState() as RootState,
-            ).data;
-
-            if (!poll || !predicate(poll)) {
-                return false;
-            }
-
-            cleanup();
-            resolve(poll);
-
-            return true;
-        };
-
-        onAbort = (): void => {
-            cleanup();
             reject(createAbortError());
         };
 
         unsubscribe = store.subscribe(() => {
-            void resolveIfReady();
+            const poll = getCachedPoll();
+            if (poll && predicate(poll)) {
+                signal?.removeEventListener('abort', onAbort);
+                unsubscribe();
+                resolve(poll);
+            }
         });
 
-        signal?.addEventListener('abort', onAbort, { once: true });
-
-        if (resolveIfReady()) {
+        if (signal?.aborted) {
+            onAbort();
             return;
         }
 
-        void pollSubscription.unwrap().catch((error: unknown) => {
-            cleanup();
-            reject(error);
-        });
+        signal?.addEventListener('abort', onAbort, { once: true });
     });
 };

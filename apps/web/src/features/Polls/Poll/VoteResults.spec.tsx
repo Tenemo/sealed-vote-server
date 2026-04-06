@@ -1,11 +1,9 @@
 import { ThemeProvider } from '@mui/material';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import VoteResults from './VoteResults';
 
 import { useAppSelector } from 'app/hooks';
-import { useGetPollQuery } from 'features/Polls/pollsApi';
 import { darkTheme } from 'styles/theme';
 
 vi.mock('@sealed-vote/protocol', () => ({
@@ -17,54 +15,32 @@ vi.mock('app/hooks', () => ({
     useAppSelector: vi.fn(),
 }));
 
-vi.mock('features/Polls/pollsApi', () => ({
-    pollsApi: {
-        endpoints: {
-            createPoll: {
-                matchFulfilled: () => false,
-            },
-            registerVoter: {
-                matchFulfilled: () => false,
-            },
-        },
-    },
-    useGetPollQuery: vi.fn(),
-}));
-
 const mockedUseAppSelector = vi.mocked(useAppSelector);
-const mockedUseGetPollQuery = vi.mocked(useGetPollQuery);
 
 describe('VoteResults', () => {
     it('renders geometric means using the voter count', () => {
         mockedUseAppSelector.mockReturnValue({
             results: [8, 27],
         } as never);
-        mockedUseGetPollQuery.mockReturnValue({
-            data: {
-                pollName: 'Best fruit',
-                createdAt: '2026-01-01T00:00:00.000Z',
-                choices: ['Apples', 'Bananas'],
-                voters: ['Alice', 'Bob', 'Charlie'],
-                isOpen: false,
-                publicKeyShares: [],
-                commonPublicKey: '123',
-                encryptedVotes: [],
-                encryptedTallies: [],
-                decryptionShares: [],
-                results: [],
-            },
-        } as never);
+        const poll = {
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--11111111',
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples', 'Bananas'],
+            voters: ['Alice', 'Bob', 'Charlie'],
+            isOpen: false,
+            publicKeyShareCount: 3,
+            commonPublicKey: '123',
+            encryptedVoteCount: 3,
+            encryptedTallies: [],
+            decryptionShareCount: 3,
+            results: [],
+        };
 
         render(
             <ThemeProvider theme={darkTheme}>
-                <MemoryRouter initialEntries={['/votes/poll-1']}>
-                    <Routes>
-                        <Route
-                            element={<VoteResults />}
-                            path="/votes/:pollId"
-                        />
-                    </Routes>
-                </MemoryRouter>
+                <VoteResults poll={poll} pollId="poll-1" />
             </ThemeProvider>,
         );
 
