@@ -10,11 +10,38 @@ const createAbortError = (): Error => {
     return error;
 };
 
+const isPollResponse = (value: unknown): value is PollResponse =>
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof (value as { id: unknown }).id === 'string';
+
 const selectPollResult = (
     state: RootState,
     pollId: string,
-): PollResponse | null =>
-    pollsApi.endpoints.getPoll.select(pollId)(state).data ?? null;
+): PollResponse | null => {
+    const directPoll = pollsApi.endpoints.getPoll.select(pollId)(state).data;
+    if (directPoll?.id === pollId) {
+        return directPoll;
+    }
+
+    const queryStates = Object.values(state[pollsApi.reducerPath].queries);
+    for (const queryState of queryStates) {
+        if (
+            !queryState ||
+            (queryState as { endpointName?: string }).endpointName !== 'getPoll'
+        ) {
+            continue;
+        }
+
+        const data = (queryState as { data?: unknown }).data;
+        if (isPollResponse(data) && data.id === pollId) {
+            return data;
+        }
+    }
+
+    return null;
+};
 
 export const fetchFreshPoll = async (
     dispatch: AppDispatch,

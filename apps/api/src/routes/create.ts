@@ -1,4 +1,5 @@
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { randomUUID } from 'node:crypto';
+
 import type {
     CreatePollRequest as CreatePollRequestContract,
     CreatePollResponse as CreatePollResponseContract,
@@ -9,6 +10,7 @@ import createError from 'http-errors';
 
 import { choices as choicesTable, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { getPollSlugCandidates } from '../utils/pollSlug.js';
 import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
 
 import { MessageResponseSchema } from './schemas.js';
@@ -21,6 +23,7 @@ const CreatePollRequestSchema = Type.Object({
 
 const CreatePollResponseSchema = Type.Object({
     id: Type.String(),
+    slug: Type.String(),
     creatorToken: Type.String(),
 });
 
@@ -29,7 +32,6 @@ const schema = {
     response: {
         201: CreatePollResponseSchema,
         400: MessageResponseSchema,
-        409: MessageResponseSchema,
     },
 };
 
@@ -44,72 +46,71 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Body: CreatePollRequest }>,
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
-            try {
-                const { choices, maxParticipants = 20 } = req.body;
-                const pollName = req.body.pollName.trim();
-                const normalizedChoices = choices.map((choice) =>
-                    choice.trim(),
-                );
+            const { choices, maxParticipants = 20 } = req.body;
+            const pollName = req.body.pollName.trim();
+            const normalizedChoices = choices.map((choice) => choice.trim());
 
-                if (!pollName) {
-                    throw createError(400, 'Poll name is required.');
-                }
+            if (!pollName) {
+                throw createError(400, 'Poll name is required.');
+            }
 
-                if (normalizedChoices.length < 2) {
-                    throw createError(400, 'Not enough choices.');
-                }
+            if (normalizedChoices.length < 2) {
+                throw createError(400, 'Not enough choices.');
+            }
 
-                if (normalizedChoices.some((choice) => !choice)) {
-                    throw createError(400, 'Choice names are required.');
-                }
+            if (normalizedChoices.some((choice) => !choice)) {
+                throw createError(400, 'Choice names are required.');
+            }
 
-                if (
-                    new Set(normalizedChoices).size !== normalizedChoices.length
-                ) {
-                    throw createError(400, 'Choice names must be unique.');
-                }
+            if (new Set(normalizedChoices).size !== normalizedChoices.length) {
+                throw createError(400, 'Choice names must be unique.');
+            }
 
-                const creatorToken = generateSecureToken();
-                const creatorTokenHash = hashSecureToken(creatorToken);
+            const creatorToken = generateSecureToken();
+            const creatorTokenHash = hashSecureToken(creatorToken);
+            const pollId = randomUUID();
 
-                const createdPoll = await withTransaction(
-                    fastify,
-                    async (tx) => {
-                        const [poll] = await tx
-                            .insert(polls)
-                            .values({
+            for (const slug of getPollSlugCandidates(pollName, pollId)) {
+                try {
+                    const createdPoll = await withTransaction(
+                        fastify,
+                        async (tx) => {
+                            await tx.insert(polls).values({
+                                id: pollId,
                                 creatorTokenHash,
                                 pollName,
+                                slug,
                                 maxParticipants,
-                            })
-                            .returning({
-                                id: polls.id,
                             });
 
-                        await tx.insert(choicesTable).values(
-                            normalizedChoices.map((choice, index) => ({
-                                choiceName: choice,
-                                pollId: poll.id,
-                                choiceIndex: index,
-                            })),
-                        );
+                            await tx.insert(choicesTable).values(
+                                normalizedChoices.map((choice, index) => ({
+                                    choiceName: choice,
+                                    pollId,
+                                    choiceIndex: index,
+                                })),
+                            );
 
-                        return {
-                            creatorToken,
-                            id: poll.id,
-                        } satisfies CreatePollResponse;
-                    },
-                );
+                            return {
+                                creatorToken,
+                                id: pollId,
+                                slug,
+                            } satisfies CreatePollResponse;
+                        },
+                    );
 
-                void reply.code(201);
-                return createdPoll;
-            } catch (error) {
-                if (isConstraintViolation(error, 'unique_poll_name')) {
-                    throw createError(409, ERROR_MESSAGES.duplicatePollName);
+                    void reply.code(201);
+                    return createdPoll;
+                } catch (error) {
+                    if (isConstraintViolation(error, 'unique_poll_slug')) {
+                        continue;
+                    }
+
+                    throw error;
                 }
-
-                throw error;
             }
+
+            throw createError(500, 'Unable to generate a unique poll slug.');
         },
     );
 };

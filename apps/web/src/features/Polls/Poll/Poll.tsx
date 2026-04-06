@@ -1,5 +1,7 @@
 import { Typography, Alert, CircularProgress } from '@mui/material';
-import React, { useEffect, useRef } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { isUuid } from '@sealed-vote/contracts';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
@@ -8,42 +10,56 @@ import VoteResults from './VoteResults';
 import Voting from './Voting/Voting';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import NotFound from 'components/NotFound/NotFound';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import {
     hasResumableVotingSession,
+    initialVoteState,
     selectVoteStateByPollId,
 } from 'features/Polls/votingState';
 import { vote } from 'features/Polls/votingThunks/vote';
 import { renderError } from 'utils/utils';
 
+const isNotFoundError = (error: unknown): boolean =>
+    !!error &&
+    typeof error === 'object' &&
+    'status' in error &&
+    error.status === 404;
+
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
-    const { pollId } = useParams();
-    if (!pollId) {
-        throw new Error('Poll ID missing.');
+    const { pollSlug } = useParams();
+    if (!pollSlug) {
+        throw new Error('Poll slug missing.');
     }
+    const isLegacyPollLink = isUuid(pollSlug);
     const hasResumedVotingRef = useRef(false);
-    const votingState = useAppSelector((state) =>
-        selectVoteStateByPollId(state.voting, pollId),
-    );
-    const shouldResumeOnMountRef = useRef(
-        hasResumableVotingSession(votingState),
-    );
-    const { results } = votingState;
+    const shouldResumeOnResolvedPollRef = useRef(false);
+    const resolvedPollIdRef = useRef<string | null>(null);
     const {
         data: poll,
         isLoading: isLoadingPoll,
         error: pollError,
-    } = useGetPollQuery(pollId, {
-        pollingInterval: results ? 0 : 3000,
+    } = useGetPollQuery(isLegacyPollLink ? skipToken : pollSlug, {
+        pollingInterval: 3000,
         refetchOnFocus: true,
         refetchOnReconnect: true,
         skipPollingIfUnfocused: true,
     });
+    const pollId = poll?.id ?? null;
+    const votingState = useAppSelector((state) =>
+        pollId
+            ? selectVoteStateByPollId(state.voting, pollId)
+            : initialVoteState,
+    );
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
     ): void => {
+        if (!pollId) {
+            return;
+        }
+
         void dispatch(
             vote({
                 pollId,
@@ -53,10 +69,25 @@ const PollPage = (): React.JSX.Element => {
         );
     };
 
+    useLayoutEffect(() => {
+        if (!pollId || resolvedPollIdRef.current === pollId) {
+            return;
+        }
+
+        resolvedPollIdRef.current = pollId;
+        shouldResumeOnResolvedPollRef.current =
+            hasResumableVotingSession(votingState);
+        hasResumedVotingRef.current = false;
+    }, [pollId, votingState]);
+
     useEffect(() => {
+        if (!pollId) {
+            return;
+        }
+
         if (
             !hasResumedVotingRef.current &&
-            shouldResumeOnMountRef.current &&
+            shouldResumeOnResolvedPollRef.current &&
             hasResumableVotingSession(votingState)
         ) {
             hasResumedVotingRef.current = true;
@@ -70,14 +101,14 @@ const PollPage = (): React.JSX.Element => {
         }
     }, [dispatch, pollId, votingState]);
 
+    if (isLegacyPollLink || isNotFoundError(pollError)) {
+        return <NotFound />;
+    }
+
     return (
         <>
             <Helmet>
-                <title>
-                    {poll
-                        ? poll.pollName
-                        : `Vote ${pollId?.split('-')?.[0] ?? ''}`}
-                </title>
+                <title>{poll ? poll.pollName : 'Vote'}</title>
             </Helmet>
             {isLoadingPoll && <CircularProgress sx={{ mt: 5 }} />}
             {pollError && (
@@ -85,7 +116,7 @@ const PollPage = (): React.JSX.Element => {
                     {renderError(pollError)}
                 </Alert>
             )}
-            {poll && (
+            {pollId && poll && (
                 <>
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />

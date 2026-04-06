@@ -1,4 +1,7 @@
-import { type PollResponse as PollResponseContract } from '@sealed-vote/contracts';
+import {
+    isUuid,
+    type PollResponse as PollResponseContract,
+} from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { count, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
@@ -13,11 +16,13 @@ import { normalizeDatabaseTimestamp } from '../utils/db.js';
 
 import {
     EncryptedMessageSchema,
-    PollIdParamsSchema,
-    type PollIdParams,
+    PollRefParamsSchema,
+    type PollRefParams,
 } from './schemas.js';
 
 const PollResponseSchema = Type.Object({
+    id: Type.String(),
+    slug: Type.String(),
     pollName: Type.String(),
     createdAt: Type.String(),
     choices: Type.Array(Type.String()),
@@ -32,7 +37,7 @@ const PollResponseSchema = Type.Object({
 });
 
 const schema = {
-    params: PollIdParamsSchema,
+    params: PollRefParamsSchema,
     response: {
         200: PollResponseSchema,
     },
@@ -42,16 +47,22 @@ export type PollResponse = PollResponseContract;
 
 export const fetch = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get(
-        '/polls/:pollId',
+        '/polls/:pollRef',
         { schema },
         async (
-            req: FastifyRequest<{ Params: PollIdParams }>,
+            req: FastifyRequest<{ Params: PollRefParams }>,
         ): Promise<PollResponse> => {
-            const { pollId } = req.params;
+            const { pollRef } = req.params;
+            const isPollId = isUuid(pollRef);
 
             const poll = await fastify.db.query.polls.findFirst({
-                where: (fields, { eq: isEqual }) => isEqual(fields.id, pollId),
+                where: (fields, { eq: isEqual }) =>
+                    isPollId
+                        ? isEqual(fields.id, pollRef)
+                        : isEqual(fields.slug, pollRef),
                 columns: {
+                    id: true,
+                    slug: true,
                     pollName: true,
                     createdAt: true,
                     isOpen: true,
@@ -76,10 +87,7 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
             });
 
             if (!poll) {
-                throw createError(
-                    404,
-                    `Poll with ID ${pollId} does not exist.`,
-                );
+                throw createError(404, `Poll ${pollRef} does not exist.`);
             }
 
             const [
@@ -90,18 +98,20 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                 fastify.db
                     .select({ count: count() })
                     .from(publicKeyShares)
-                    .where(eq(publicKeyShares.pollId, pollId)),
+                    .where(eq(publicKeyShares.pollId, poll.id)),
                 fastify.db
                     .select({ count: count() })
                     .from(encryptedVotes)
-                    .where(eq(encryptedVotes.pollId, pollId)),
+                    .where(eq(encryptedVotes.pollId, poll.id)),
                 fastify.db
                     .select({ count: count() })
                     .from(decryptionShares)
-                    .where(eq(decryptionShares.pollId, pollId)),
+                    .where(eq(decryptionShares.pollId, poll.id)),
             ]);
 
             return {
+                id: poll.id,
+                slug: poll.slug,
                 pollName: poll.pollName,
                 createdAt: normalizeDatabaseTimestamp(poll.createdAt),
                 choices: poll.choices.map(({ choiceName }) => choiceName),

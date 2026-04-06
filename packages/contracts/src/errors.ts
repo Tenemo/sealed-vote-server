@@ -4,7 +4,6 @@ export type MessageResponse = {
 
 export const ERROR_MESSAGES = {
     invalidPollId: 'Invalid poll ID',
-    duplicatePollName: 'Vote with that name already exists.',
     duplicateVoterName: 'Voter name is already taken for this vote.',
     pollClosed: 'Poll is closed for new registrations.',
     pollAlreadyClosed: 'Poll is already closed.',

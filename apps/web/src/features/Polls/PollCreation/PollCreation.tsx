@@ -55,8 +55,8 @@ const PollCreationPage = (): React.JSX.Element => {
             choices: form.choices,
         })
             .unwrap()
-            .then(({ id }) => {
-                void navigate(`/votes/${id}`);
+            .then(({ slug }) => {
+                void navigate(`/votes/${slug}`);
             });
     };
 

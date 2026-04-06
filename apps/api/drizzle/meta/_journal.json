@@ -15,6 +15,13 @@
       "when": 1775360205142,
       "tag": "0001_auth_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775481414679,
+      "tag": "0002_spotty_ares",
+      "breakpoints": true
     }
   ]
 }

@@ -21,6 +21,7 @@ export const polls = pgTable(
             .primaryKey()
             .default(sql`gen_random_uuid()`),
         pollName: text('poll_name').notNull(),
+        slug: text('slug').notNull(),
         creatorTokenHash: char('creator_token_hash', { length: 64 }).notNull(),
         maxParticipants: integer('max_participants').notNull().default(20),
         isOpen: boolean('is_open').notNull().default(true),
@@ -41,7 +42,7 @@ export const polls = pgTable(
             .defaultNow(),
     },
     (table) => [
-        unique('unique_poll_name').on(table.pollName),
+        unique('unique_poll_slug').on(table.slug),
         check(
             'polls_max_participants_check',
             sql`${table.maxParticipants} >= 2`,

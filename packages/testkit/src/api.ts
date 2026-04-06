@@ -22,6 +22,7 @@ export const createPoll = async (
     maxParticipants: number = 10,
 ): Promise<{
     pollId: string;
+    pollSlug: string;
     creatorToken: string;
     pollName: string;
     choices: string[];
@@ -44,17 +45,18 @@ export const createPoll = async (
         pollName: requestedPollName.trim(),
         choices: requestedChoices.map((choice) => choice.trim()),
         pollId: createResponseBody.id,
+        pollSlug: createResponseBody.slug,
         creatorToken: createResponseBody.creatorToken,
     };
 };
 
 export const fetchPoll = async (
     fastify: FastifyInstance,
-    pollId: string,
+    pollRef: string,
 ): Promise<PollResponse> => {
     const response = await fastify.inject({
         method: 'GET',
-        url: POLL_ROUTES.poll(pollId),
+        url: POLL_ROUTES.poll(pollRef),
     });
 
     return JSON.parse(response.body) as PollResponse;

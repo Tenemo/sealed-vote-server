@@ -23,6 +23,8 @@ describe('VoteResults', () => {
             results: [8, 27],
         } as never);
         const poll = {
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--11111111',
             pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples', 'Bananas'],

@@ -32,6 +32,7 @@ export type TestPollVoter = {
 
 export type TestPollContext = {
     pollId: string;
+    pollSlug: string;
     creatorToken: string;
     pollName: string;
     choices: string[];

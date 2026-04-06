@@ -20,21 +20,24 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "id": "poll-id",
+    "slug": "lunch-vote--1a2b3c4d",
     "creatorToken": "creator-token"
 }
 ```
 
 - failure responses:
 - `400` for invalid input such as blank trimmed names, fewer than two choices, or duplicate choice names after trimming
-- `409` when `pollName` is already taken
 
 ## Fetch poll
 
-- `GET /api/polls/:pollId`
+- `GET /api/polls/:pollRef`
+- `pollRef` accepts either the poll UUID or the canonical public slug
 - success response: `200 OK`
 
 ```json
 {
+    "id": "poll-id",
+    "slug": "lunch-vote--1a2b3c4d",
     "pollName": "Lunch vote",
     "createdAt": "2026-04-04T12:00:00.000Z",
     "choices": ["Pizza", "Sushi", "Pasta"],
@@ -54,7 +57,6 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```
 
 - failure responses:
-- `400` for an invalid poll id
 - `404` when the poll does not exist
 
 ## Register voter

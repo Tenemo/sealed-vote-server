@@ -2,7 +2,7 @@ export const API_PREFIX = '/api';
 
 export const POLL_ROUTES = {
     create: `${API_PREFIX}/polls/create`,
-    poll: (pollId: string): string => `${API_PREFIX}/polls/${pollId}`,
+    poll: (pollRef: string): string => `${API_PREFIX}/polls/${pollRef}`,
     register: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/register`,
     close: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/close`,

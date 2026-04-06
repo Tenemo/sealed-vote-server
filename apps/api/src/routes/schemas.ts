@@ -6,6 +6,12 @@ export const PollIdParamsSchema = Type.Object({
 
 export type PollIdParams = Static<typeof PollIdParamsSchema>;
 
+export const PollRefParamsSchema = Type.Object({
+    pollRef: Type.String({ minLength: 1 }),
+});
+
+export type PollRefParams = Static<typeof PollRefParamsSchema>;
+
 export const EncryptedMessageSchema = Type.Object({
     c1: Type.String(),
     c2: Type.String(),

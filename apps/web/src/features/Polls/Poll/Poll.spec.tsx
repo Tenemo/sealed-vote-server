@@ -1,4 +1,5 @@
 import { configureStore, type EnhancedStore } from '@reduxjs/toolkit';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
@@ -39,6 +40,8 @@ vi.mock('features/Polls/pollsApi', () => ({
 }));
 
 const basePoll = {
+    id: '11111111-1111-4111-8111-111111111111',
+    slug: 'best-fruit--11111111',
     pollName: 'Best fruit',
     createdAt: '2026-01-01T00:00:00.000Z',
     choices: ['Apples'],
@@ -54,6 +57,7 @@ const basePoll = {
 
 const renderPoll = (
     preloadedVotingState: VotingState = {},
+    initialEntry: string = '/votes/best-fruit--11111111',
 ): EnhancedStore<{ voting: VotingState }> => {
     const store = configureStore({
         preloadedState: {
@@ -67,9 +71,9 @@ const renderPoll = (
     render(
         <Provider store={store}>
             <HelmetProvider>
-                <MemoryRouter initialEntries={['/votes/poll-1']}>
+                <MemoryRouter initialEntries={[initialEntry]}>
                     <Routes>
-                        <Route element={<Poll />} path="/votes/:pollId" />
+                        <Route element={<Poll />} path="/votes/:pollSlug" />
                     </Routes>
                 </MemoryRouter>
             </HelmetProvider>
@@ -98,7 +102,7 @@ describe('Poll page', () => {
 
     it('resumes a persisted voting session that already existed on mount', async () => {
         renderPoll({
-            'poll-1': {
+            '11111111-1111-4111-8111-111111111111': {
                 ...initialVoteState,
                 selectedScores: {
                     Apples: 7,
@@ -111,7 +115,7 @@ describe('Poll page', () => {
 
         await waitFor(() => {
             expect(mockedVote).toHaveBeenCalledWith({
-                pollId: 'poll-1',
+                pollId: '11111111-1111-4111-8111-111111111111',
                 selectedScores: { Apples: 7 },
                 voterName: 'Alice',
             });
@@ -124,13 +128,13 @@ describe('Poll page', () => {
         await act(async () => {
             store.dispatch(
                 setSelectedScores({
-                    pollId: 'poll-1',
+                    pollId: '11111111-1111-4111-8111-111111111111',
                     selectedScores: { Apples: 7 },
                 }),
             );
             store.dispatch(
                 setVoterSession({
-                    pollId: 'poll-1',
+                    pollId: '11111111-1111-4111-8111-111111111111',
                     voterIndex: 1,
                     voterName: 'Alice',
                     voterToken: 'voter-token',
@@ -143,7 +147,7 @@ describe('Poll page', () => {
 
     it('renders workflow failures from state', () => {
         renderPoll({
-            'poll-1': {
+            '11111111-1111-4111-8111-111111111111': {
                 ...initialVoteState,
                 workflowError: 'Public key share submission failed.',
             },
@@ -152,5 +156,17 @@ describe('Poll page', () => {
         expect(
             screen.getByText('Public key share submission failed.'),
         ).toBeInTheDocument();
+    });
+
+    it('shows not found for legacy uuid vote links', () => {
+        renderPoll({}, '/votes/11111111-1111-4111-8111-111111111111');
+
+        expect(screen.getByText(/not found\./i)).toBeInTheDocument();
+        expect(mockedUseGetPollQuery).toHaveBeenCalledWith(
+            skipToken,
+            expect.objectContaining({
+                pollingInterval: 3000,
+            }),
+        );
     });
 });

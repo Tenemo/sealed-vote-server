@@ -46,7 +46,7 @@ const App = (): React.JSX.Element => {
                                     <Poll />
                                 </Suspense>
                             }
-                            path="votes/:pollId"
+                            path="votes/:pollSlug"
                         />
                         <Route element={<NotFound />} path="*" />
                     </Routes>

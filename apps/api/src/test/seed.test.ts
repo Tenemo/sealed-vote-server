@@ -67,6 +67,8 @@ describe('seed database', () => {
             fastify,
             registrationPoll.pollId,
         );
+        expect(registrationState.id).toBe(registrationPoll.pollId);
+        expect(registrationState.slug).toContain('--');
         expect(registrationState.pollName).toBe('Seed registration sample');
         expect(registrationState.isOpen).toBe(true);
         expect(registrationState.voters).toEqual(['Alice', 'Bob']);
@@ -78,6 +80,8 @@ describe('seed database', () => {
         expect(registrationState.results).toEqual([]);
 
         const votingState = await fetchPoll(fastify, votingPoll.pollId);
+        expect(votingState.id).toBe(votingPoll.pollId);
+        expect(votingState.slug).toContain('--');
         expect(votingState.pollName).toBe('Seed voting sample');
         expect(votingState.isOpen).toBe(false);
         expect(votingState.voters).toEqual(['Alice', 'Bob', 'Charlie']);
@@ -89,6 +93,8 @@ describe('seed database', () => {
         expect(votingState.results).toEqual([]);
 
         const resultsState = await fetchPoll(fastify, resultsPoll.pollId);
+        expect(resultsState.id).toBe(resultsPoll.pollId);
+        expect(resultsState.slug).toContain('--');
         expect(resultsState.pollName).toBe('Seed results sample');
         expect(resultsState.isOpen).toBe(false);
         expect(resultsState.voters).toEqual(['Ada', 'Grace', 'Linus']);

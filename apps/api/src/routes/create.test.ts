@@ -20,10 +20,11 @@ describe('POST /polls/create', () => {
 
     test('Should create a new poll successfully and then delete it', async () => {
         const pollName = getUniquePollName('Create poll');
-        const { pollId, creatorToken } = await createPoll(fastify, pollName, [
-            'Dog',
-            'Cat',
-        ]);
+        const { pollId, pollSlug, creatorToken } = await createPoll(
+            fastify,
+            pollName,
+            ['Dog', 'Cat'],
+        );
 
         const getResponse = await fastify.inject({
             method: 'GET',
@@ -32,7 +33,9 @@ describe('POST /polls/create', () => {
 
         expect(getResponse.statusCode).toBe(200);
         const pollDetails = JSON.parse(getResponse.body) as PollResponse;
+        expect(pollDetails.id).toBe(pollId);
         expect(pollDetails.pollName).toContain(pollName);
+        expect(pollDetails.slug).toBe(pollSlug);
         expect(pollDetails.choices).toEqual(['Dog', 'Cat']);
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
@@ -55,13 +58,12 @@ describe('POST /polls/create', () => {
         expect(responseBody.message).toBe('Not enough choices.');
     });
 
-    test('Should handle duplicate poll names correctly and clean up', async () => {
+    test('should allow duplicate poll names and generate distinct slugs', async () => {
         const pollName = getUniquePollName('Create poll');
-        const { pollId, creatorToken } = await createPoll(fastify, pollName, [
+        const firstPoll = await createPoll(fastify, pollName, [
             'Coffee',
             'Tea',
         ]);
-
         const duplicateResponse = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
@@ -71,16 +73,27 @@ describe('POST /polls/create', () => {
             },
         });
 
-        expect(duplicateResponse.statusCode).toBe(409);
-        const duplicateResponseBody = JSON.parse(duplicateResponse.body) as {
-            message: string;
-        };
-        expect(duplicateResponseBody.message).toBe(
-            'Vote with that name already exists.',
-        );
+        expect(duplicateResponse.statusCode).toBe(201);
+        const duplicateResponseBody = JSON.parse(
+            duplicateResponse.body,
+        ) as CreatePollResponse;
 
-        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
-        expect(deleteResult.success).toBe(true);
+        expect(duplicateResponseBody.id).not.toBe(firstPoll.pollId);
+        expect(duplicateResponseBody.slug).not.toBe(firstPoll.pollSlug);
+
+        const firstDeleteResult = await deletePoll(
+            fastify,
+            firstPoll.pollId,
+            firstPoll.creatorToken,
+        );
+        expect(firstDeleteResult.success).toBe(true);
+
+        const secondDeleteResult = await deletePoll(
+            fastify,
+            duplicateResponseBody.id,
+            duplicateResponseBody.creatorToken,
+        );
+        expect(secondDeleteResult.success).toBe(true);
     });
 
     test('should trim the poll name and choice names before storing them', async () => {
@@ -96,6 +109,7 @@ describe('POST /polls/create', () => {
 
         expect(response.statusCode).toBe(201);
         const responseBody = JSON.parse(response.body) as CreatePollResponse;
+        expect(responseBody.slug).toContain('--');
 
         const getResponse = await fastify.inject({
             method: 'GET',

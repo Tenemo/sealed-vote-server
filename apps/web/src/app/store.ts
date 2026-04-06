@@ -11,8 +11,8 @@ import {
     PURGE,
     REGISTER,
 } from 'redux-persist';
-import hardSet from 'redux-persist/lib/stateReconciler/hardSet';
 
+import { rootPersistStateReconciler } from './persistStateReconciler';
 import { sessionPersistStorage } from './persistStorage';
 import { shouldEnableReduxDevTools } from './reduxDevTools';
 
@@ -35,7 +35,7 @@ const votingSessionTransform = createTransform(
 const persistConfig = {
     key: 'root',
     storage: sessionPersistStorage,
-    stateReconciler: hardSet,
+    stateReconciler: rootPersistStateReconciler,
     blacklist: [pollsApi.reducerPath],
     transforms: [votingSessionTransform],
     version: 1,

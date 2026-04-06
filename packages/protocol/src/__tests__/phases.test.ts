@@ -13,6 +13,8 @@ import {
 } from '../phases';
 
 const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
+    id: '11111111-1111-4111-8111-111111111111',
+    slug: 'test-poll--11111111',
     pollName: 'Test poll',
     createdAt: new Date().toISOString(),
     choices: ['Dog', 'Cat'],

@@ -8,10 +8,13 @@ export type CreatePollRequest = {
 
 export type CreatePollResponse = {
     id: string;
+    slug: string;
     creatorToken: string;
 };
 
 export type PollResponse = {
+    id: string;
+    slug: string;
     pollName: string;
     createdAt: string;
     choices: string[];
