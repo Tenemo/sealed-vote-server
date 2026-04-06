@@ -4,7 +4,12 @@ import {
     closeParticipant,
     launchFirefoxParticipant,
 } from './support/participants';
-import { copyShareLink, createPoll } from './support/pollFlow';
+import {
+    copyShareLink,
+    createPoll,
+    deletePolls,
+    type CreatedPoll,
+} from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -19,18 +24,21 @@ import {
 test('keeps copied share links slug-based across platforms', async ({
     page,
     playwright,
+    request,
 }, testInfo) => {
     const tracker = createUnexpectedErrorTracker();
+    const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     attachErrorTracking(page, 'creator', tracker);
 
-    const pollUrl = await createPoll({
+    const createdPoll = await createPoll({
         page,
         pollName: createPollName('Share link vote', namespace),
     });
+    createdPolls.push(createdPoll);
 
     const copiedShareLink = await copyShareLink(page);
-    expect(copiedShareLink).toBe(pollUrl);
+    expect(copiedShareLink).toBe(createdPoll.pollUrl);
     expect(copiedShareLink).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{8,32}$/);
 
     const participant = await launchFirefoxParticipant({ playwright });
@@ -51,5 +59,6 @@ test('keeps copied share links slug-based across platforms', async ({
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
+        await deletePolls(request, createdPolls);
     }
 });

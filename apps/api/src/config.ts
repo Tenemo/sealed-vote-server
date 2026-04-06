@@ -1,6 +1,13 @@
 export const DEFAULT_DATABASE_URL =
     'postgres://postgres:postgres@localhost:5432/sv-db';
 
+const deploymentCommitShaEnvKeys = [
+    'RAILWAY_GIT_COMMIT_SHA',
+    'COMMIT_REF',
+    'GITHUB_SHA',
+] as const;
+const commitShaPattern = /^[0-9a-f]{7,40}$/i;
+
 const LOCAL_DATABASE_HOSTNAMES = new Set([
     'localhost',
     '127.0.0.1',
@@ -54,4 +61,18 @@ export const getConfiguredWebAppOrigin = (): string | null => {
     }
 
     return parsedOrigin.origin;
+};
+
+export const getDeploymentCommitSha = (
+    env: NodeJS.ProcessEnv = process.env,
+): string | null => {
+    for (const envKey of deploymentCommitShaEnvKeys) {
+        const rawCommitSha = env[envKey]?.trim();
+
+        if (rawCommitSha && commitShaPattern.test(rawCommitSha)) {
+            return rawCommitSha.toLowerCase();
+        }
+    }
+
+    return null;
 };

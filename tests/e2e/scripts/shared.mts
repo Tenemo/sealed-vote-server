@@ -171,12 +171,12 @@ export const wireChildProcess = (childProcess: ChildProcess): void => {
     process.on('SIGINT', forwardSignal);
     process.on('SIGTERM', forwardSignal);
 
-    childProcess.on('error', (error) => {
+    childProcess.on('error', (error: Error) => {
         console.error(error);
         process.exit(1);
     });
 
-    childProcess.on('exit', (code) => {
+    childProcess.on('exit', (code: number | null) => {
         process.exit(code ?? 0);
     });
 };
