@@ -1,6 +1,5 @@
 import { combineSlices, configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import { createLogger } from 'redux-logger';
 import {
     persistStore,
     persistReducer,
@@ -17,7 +16,6 @@ import hardSet from 'redux-persist/lib/stateReconciler/hardSet';
 import { sessionPersistStorage } from './persistStorage';
 import { shouldEnableReduxDevTools } from './reduxDevTools';
 
-import { registerPollQueryStore } from 'features/Polls/pollQuery';
 import { pollsApi } from 'features/Polls/pollsApi';
 import {
     sanitizeVotingStateForPersistence,
@@ -27,8 +25,6 @@ import {
 export const rootReducer = combineSlices(pollsApi, votingSlice);
 
 export type RootState = ReturnType<typeof rootReducer>;
-
-const IS_LOGGING_ENABLED = false;
 
 const votingSessionTransform = createTransform(
     sanitizeVotingStateForPersistence,
@@ -44,11 +40,6 @@ const persistConfig = {
     transforms: [votingSessionTransform],
     version: 1,
 };
-
-const logger = createLogger({
-    diff: true,
-    collapsed: true,
-});
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
@@ -68,12 +59,10 @@ export const store = configureStore({
                 ],
             },
         }).concat(pollsApi.middleware);
-
-        return IS_LOGGING_ENABLED ? middleware.concat(logger) : middleware;
+        return middleware;
     },
 });
 
-registerPollQueryStore(store);
 setupListeners(store.dispatch);
 
 export const persistor = persistStore(store);

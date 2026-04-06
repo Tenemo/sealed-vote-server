@@ -41,7 +41,7 @@ const VoteSharing = (): React.JSX.Element => {
                             <InputAdornment position="end">
                                 <Tooltip title="Copy to clipboard">
                                     <IconButton
-                                        aria-label="toggle password visibility"
+                                        aria-label="Copy vote link"
                                         edge="end"
                                         onClick={handleCopyLink}
                                     >
@@ -50,6 +50,7 @@ const VoteSharing = (): React.JSX.Element => {
                                 </Tooltip>
                             </InputAdornment>
                         }
+                        readOnly
                         size="small"
                         value={window.location.href}
                     />

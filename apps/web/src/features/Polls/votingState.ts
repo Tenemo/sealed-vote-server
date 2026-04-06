@@ -39,7 +39,9 @@ export const selectVoteStateByPollId = (
     pollId: string,
 ): VoteState => state[pollId] ?? initialVoteState;
 
-const clearCompletedSensitiveFields = (voteState: VoteState): VoteState => ({
+export const clearCompletedSensitiveFields = (
+    voteState: VoteState,
+): VoteState => ({
     ...voteState,
     creatorToken: null,
     selectedScores: null,

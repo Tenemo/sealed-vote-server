@@ -81,4 +81,76 @@ describe('POST /polls/create', () => {
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);
     });
+
+    test('should trim the poll name and choice names before storing them', async () => {
+        const pollName = getUniquePollName('Trimmed create poll');
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['  Dog  ', ' Cat '],
+                pollName: `  ${pollName}  `,
+            },
+        });
+
+        expect(response.statusCode).toBe(201);
+        const responseBody = JSON.parse(response.body) as CreatePollResponse;
+        expect(responseBody.pollName).toBe(pollName);
+        expect(responseBody.choices).toEqual(['Dog', 'Cat']);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            responseBody.id,
+            responseBody.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('should reject blank poll names after trimming', async () => {
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', 'Cat'],
+                pollName: '   ',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            'Poll name is required.',
+        );
+    });
+
+    test('should reject blank or duplicate choice names after trimming', async () => {
+        const blankChoiceResponse = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', '   '],
+                pollName: getUniquePollName('Blank choice poll'),
+            },
+        });
+
+        expect(blankChoiceResponse.statusCode).toBe(400);
+        expect(
+            (JSON.parse(blankChoiceResponse.body) as { message: string })
+                .message,
+        ).toBe('Choice names are required.');
+
+        const duplicateChoiceResponse = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', ' Dog '],
+                pollName: getUniquePollName('Duplicate trimmed choice poll'),
+            },
+        });
+
+        expect(duplicateChoiceResponse.statusCode).toBe(400);
+        expect(
+            (JSON.parse(duplicateChoiceResponse.body) as { message: string })
+                .message,
+        ).toBe('Choice names must be unique.');
+    });
 });

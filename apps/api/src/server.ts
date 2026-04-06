@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 
 import { buildServer } from './buildServer.js';
-import { getDatabaseUrl } from './config.js';
+import { getDatabaseUrl, isDefaultDatabaseUrl } from './config.js';
 
 config();
 
@@ -18,10 +18,11 @@ const start = async (): Promise<void> => {
         await fastify.listen({ port, host });
         fastify.log.info('Server started successfully.');
 
+        const databaseUrl = getDatabaseUrl();
         const dbClient = await fastify.pgPool.connect();
         dbClient.release();
         fastify.log.info(
-            `Database connection successful for ${getDatabaseUrl().includes('localhost') ? 'local' : 'configured'} database.`,
+            `Database connection successful for ${isDefaultDatabaseUrl(databaseUrl) ? 'default' : 'configured'} database.`,
         );
     } catch (err) {
         if (err instanceof Error) {

@@ -1,5 +1,5 @@
 import { Typography, Alert, CircularProgress } from '@mui/material';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
@@ -9,8 +9,7 @@ import Voting from './Voting/Voting';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
-import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
-import { vote } from 'features/Polls/votingThunks/vote';
+import { selectVotingStateByPollId, vote } from 'features/Polls/votingSlice';
 import { renderError } from 'utils/utils';
 
 const PollPage = (): React.JSX.Element => {
@@ -19,6 +18,7 @@ const PollPage = (): React.JSX.Element => {
     if (!pollId) {
         throw new Error('Poll ID missing.');
     }
+    const hasResumedVotingRef = useRef(false);
 
     const { voterIndex, voterToken, selectedScores, results, voterName } =
         useAppSelector((state) => selectVotingStateByPollId(state, pollId));
@@ -47,16 +47,25 @@ const PollPage = (): React.JSX.Element => {
 
     useEffect(() => {
         if (
+            !hasResumedVotingRef.current &&
             selectedScores &&
             voterIndex &&
             voterName &&
             voterToken &&
             !results
         ) {
+            hasResumedVotingRef.current = true;
             void dispatch(vote({ pollId, voterName, selectedScores }));
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [
+        dispatch,
+        pollId,
+        results,
+        selectedScores,
+        voterIndex,
+        voterName,
+        voterToken,
+    ]);
 
     return (
         <>
@@ -67,36 +76,24 @@ const PollPage = (): React.JSX.Element => {
                         : `Vote ${pollId?.split('-')?.[0] ?? ''}`}
                 </title>
             </Helmet>
-            <PollHeader />
-            {(() => {
-                if (isLoadingPoll) {
-                    return <CircularProgress sx={{ mt: 5 }} />;
-                }
-
-                if (pollError) {
-                    return (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                            {renderError(pollError)}
-                        </Alert>
-                    );
-                }
-
-                return (
-                    <>
-                        <Voting
-                            choices={poll?.choices ?? []}
-                            onVote={onVote}
-                            pollId={pollId}
-                        />
-                        <VoteResults />
-                        <Typography p={2} variant="body1">
-                            {poll?.voters?.length
-                                ? `Voters in this poll: ${poll?.voters.join(', ')}`
-                                : 'No voters yet.'}
-                        </Typography>
-                    </>
-                );
-            })()}
+            {isLoadingPoll && <CircularProgress sx={{ mt: 5 }} />}
+            {pollError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                    {renderError(pollError)}
+                </Alert>
+            )}
+            {poll && (
+                <>
+                    <PollHeader poll={poll} pollId={pollId} />
+                    <Voting onVote={onVote} poll={poll} pollId={pollId} />
+                    <VoteResults poll={poll} pollId={pollId} />
+                    <Typography p={2} variant="body1">
+                        {poll.voters.length
+                            ? `Voters in this poll: ${poll.voters.join(', ')}`
+                            : 'No voters yet.'}
+                    </Typography>
+                </>
+            )}
         </>
     );
 };

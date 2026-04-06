@@ -21,7 +21,7 @@ export const polls = pgTable(
             .primaryKey()
             .default(sql`gen_random_uuid()`),
         pollName: text('poll_name').notNull(),
-        creatorToken: char('creator_token', { length: 64 }).notNull(),
+        creatorTokenHash: char('creator_token_hash', { length: 64 }).notNull(),
         maxParticipants: integer('max_participants').notNull().default(20),
         isOpen: boolean('is_open').notNull().default(true),
         commonPublicKey: text('common_public_key'),
@@ -86,13 +86,6 @@ export const voters = pgTable(
         voterIndex: integer('voter_index').notNull(),
         pollId: uuid('poll_id').notNull(),
         voterTokenHash: char('voter_token_hash', { length: 64 }).notNull(),
-        hasSubmittedPublicKeyShare: boolean('has_submitted_public_key_share')
-            .notNull()
-            .default(false),
-        hasVoted: boolean('has_voted').notNull().default(false),
-        hasSubmittedDecryptionShares: boolean('has_submitted_decryption_shares')
-            .notNull()
-            .default(false),
     },
     (table) => [
         foreignKey({

@@ -1,11 +1,15 @@
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import type { Static } from '@sinclair/typebox';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
 import { polls } from '../db/schema.js';
+import { withTransaction } from '../utils/db.js';
+import { lockPollByIdForCreatorAction } from '../utils/polls.js';
+import { hashSecureToken } from '../utils/voterAuth.js';
 
 const DeletePollParams = Type.Object({
     pollId: Type.String(),
@@ -19,13 +23,19 @@ const DeletePollBody = Type.Object({
 
 export type DeletePollBody = Static<typeof DeletePollBody>;
 
+const MessageResponseSchema = Type.Object({
+    message: Type.String(),
+});
+
 const schema = {
     params: DeletePollParams,
     body: DeletePollBody,
-};
-
-export type DeletePollResponse = {
-    message: string;
+    response: {
+        200: MessageResponseSchema,
+        400: MessageResponseSchema,
+        403: MessageResponseSchema,
+        404: MessageResponseSchema,
+    },
 };
 
 export const deletePoll = async (fastify: FastifyInstance): Promise<void> => {
@@ -42,30 +52,31 @@ export const deletePoll = async (fastify: FastifyInstance): Promise<void> => {
                 const { pollId } = req.params;
                 const { creatorToken } = req.body;
                 if (!uuidRegex.test(pollId)) {
-                    throw createError(400, 'Invalid poll ID');
+                    throw createError(400, ERROR_MESSAGES.invalidPollId);
                 }
 
-                const [poll] = await fastify.db
-                    .select({
-                        id: polls.id,
-                    })
-                    .from(polls)
-                    .where(
-                        and(
-                            eq(polls.id, pollId),
-                            eq(polls.creatorToken, creatorToken),
-                        ),
-                    );
-                if (!poll) {
-                    throw createError(
-                        404,
-                        'Poll not found or unauthorized access.',
-                    );
-                }
+                return await withTransaction(fastify, async (tx) => {
+                    const poll = await lockPollByIdForCreatorAction(tx, pollId);
+                    if (!poll) {
+                        throw createError(
+                            404,
+                            `Poll with ID ${pollId} does not exist.`,
+                        );
+                    }
 
-                await fastify.db.delete(polls).where(eq(polls.id, pollId));
+                    if (
+                        poll.creatorTokenHash !== hashSecureToken(creatorToken)
+                    ) {
+                        throw createError(
+                            403,
+                            ERROR_MESSAGES.invalidCreatorToken,
+                        );
+                    }
 
-                return { message: 'Poll deleted successfully' };
+                    await tx.delete(polls).where(eq(polls.id, pollId));
+
+                    return { message: 'Poll deleted successfully' };
+                });
             } catch (error) {
                 if (!(error instanceof createError.HttpError)) {
                     console.error(error);

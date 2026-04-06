@@ -291,7 +291,3 @@ export class TestPollBuilder {
         return context.poll;
     }
 }
-
-export const createCompletedTestPoll = async (
-    fastify: FastifyInstance,
-): Promise<TestPollContext> => new TestPollBuilder(fastify).complete();

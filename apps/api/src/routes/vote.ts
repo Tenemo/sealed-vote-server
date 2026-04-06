@@ -1,6 +1,5 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
-    MessageResponse,
     VoteRequest as VoteRequestContract,
     VoteResponse as VoteResponseContract,
 } from '@sealed-vote/contracts';
@@ -11,7 +10,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
-import { encryptedVotes, polls, voters } from '../db/schema.js';
+import { encryptedVotes, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import {
     countPollChoices,
@@ -51,7 +50,6 @@ const schema = {
 
 export type VoteRequest = VoteRequestContract;
 export type VoteResponse = VoteResponseContract;
-export type VoteErrorResponse = MessageResponse;
 
 export const vote = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
@@ -106,12 +104,6 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         pollId,
                         voterToken,
                     );
-                    if (voter.hasVoted) {
-                        throw createError(
-                            409,
-                            ERROR_MESSAGES.voteAlreadySubmitted,
-                        );
-                    }
 
                     const choiceCount = await countPollChoices(client, pollId);
 
@@ -127,11 +119,6 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                         voterId: voter.id,
                         votes,
                     });
-
-                    await client
-                        .update(voters)
-                        .set({ hasVoted: true })
-                        .where(eq(voters.id, voter.id));
 
                     const encryptedVoteRows =
                         await getOrderedPollEncryptedVotes(client, pollId);
@@ -151,7 +138,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                             .where(eq(polls.id, pollId));
                     }
 
-                    return `Voted successfully in poll ${pollId}.`;
+                    return 'Vote submitted successfully';
                 });
             } catch (error) {
                 if (isConstraintViolation(error, 'unique_vote_per_voter')) {

@@ -1,3 +1,4 @@
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -98,10 +99,10 @@ describe('POST /polls/:pollId/close', () => {
             },
         });
 
-        expect(closeResponse.statusCode).toBe(404);
+        expect(closeResponse.statusCode).toBe(403);
         expect(
             (JSON.parse(closeResponse.body) as ClosePollResponse).message,
-        ).toBe('Poll not found or unauthorized access.');
+        ).toBe(ERROR_MESSAGES.invalidCreatorToken);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -121,6 +122,6 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(404);
         expect(
             (JSON.parse(closeResponse.body) as ClosePollResponse).message,
-        ).toBe('Poll not found or unauthorized access.');
+        ).toBe(`Poll with ID ${nonExistingPollId} does not exist.`);
     });
 });

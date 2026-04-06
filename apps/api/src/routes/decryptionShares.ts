@@ -16,7 +16,6 @@ import { uuidRegex } from '../constants.js';
 import {
     decryptionShares as decryptionSharesTable,
     polls,
-    voters,
 } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import {
@@ -102,12 +101,6 @@ export const decryptionShares = async (
                         pollId,
                         voterToken,
                     );
-                    if (voter.hasSubmittedDecryptionShares) {
-                        throw createError(
-                            409,
-                            ERROR_MESSAGES.decryptionSharesAlreadySubmitted,
-                        );
-                    }
 
                     if (shares.length !== poll.encryptedTallies.length) {
                         throw createError(
@@ -121,11 +114,6 @@ export const decryptionShares = async (
                         voterId: voter.id,
                         shares,
                     });
-
-                    await tx
-                        .update(voters)
-                        .set({ hasSubmittedDecryptionShares: true })
-                        .where(eq(voters.id, voter.id));
 
                     const decryptionShareRows =
                         await getOrderedPollDecryptionShares(tx, pollId);

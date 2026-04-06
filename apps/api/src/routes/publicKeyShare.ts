@@ -11,7 +11,7 @@ import createError from 'http-errors';
 import { combinePublicKeys } from 'threshold-elgamal';
 
 import { uuidRegex } from '../constants.js';
-import { polls, publicKeyShares, voters } from '../db/schema.js';
+import { polls, publicKeyShares } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import {
     countPollVoters,
@@ -96,23 +96,12 @@ export const publicKeyShare = async (
                         pollId,
                         voterToken,
                     );
-                    if (voter.hasSubmittedPublicKeyShare) {
-                        throw createError(
-                            409,
-                            ERROR_MESSAGES.publicKeyAlreadySubmitted,
-                        );
-                    }
 
                     await tx.insert(publicKeyShares).values({
                         pollId,
                         voterId: voter.id,
                         publicKeyShare: share,
                     });
-
-                    await tx
-                        .update(voters)
-                        .set({ hasSubmittedPublicKeyShare: true })
-                        .where(eq(voters.id, voter.id));
 
                     const publicKeyShareRows =
                         await getOrderedPollPublicKeyShares(tx, pollId);

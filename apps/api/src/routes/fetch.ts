@@ -1,10 +1,14 @@
-import type { PollResponse as PollResponseContract } from '@sealed-vote/contracts';
+import {
+    ERROR_MESSAGES,
+    type PollResponse as PollResponseContract,
+} from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { uuidRegex } from '../constants.js';
 import { normalizeDatabaseTimestamp } from '../utils/db.js';
+import { sortRowsByVoterIndex } from '../utils/polls.js';
 
 const PollParamsSchema = Type.Object({
     pollId: Type.String(),
@@ -42,20 +46,6 @@ export type PollParams = {
 
 export type PollResponse = PollResponseContract;
 
-type RowWithVoterIndex<T> = T & {
-    voter: {
-        voterIndex: number;
-    } | null;
-};
-
-const sortByVoterIndex = <T extends RowWithVoterIndex<object>>(
-    rows: T[],
-): T[] =>
-    rows.sort(
-        (left, right) =>
-            (left.voter?.voterIndex ?? 0) - (right.voter?.voterIndex ?? 0),
-    );
-
 export const fetch = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get(
         '/polls/:pollId',
@@ -67,7 +57,7 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                 const { pollId } = req.params;
 
                 if (!uuidRegex.test(pollId)) {
-                    throw createError(400, 'Invalid poll ID');
+                    throw createError(400, ERROR_MESSAGES.invalidPollId);
                 }
 
                 const poll = await fastify.db.query.polls.findFirst({
@@ -137,17 +127,17 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                 if (!poll) {
                     throw createError(
                         404,
-                        `Vote with ID ${pollId} does not exist.`,
+                        `Poll with ID ${pollId} does not exist.`,
                     );
                 }
 
-                const orderedPublicKeyShares = sortByVoterIndex(
+                const orderedPublicKeyShares = sortRowsByVoterIndex(
                     poll.publicKeyShares,
                 );
-                const orderedEncryptedVotes = sortByVoterIndex(
+                const orderedEncryptedVotes = sortRowsByVoterIndex(
                     poll.encryptedVotes,
                 );
-                const orderedDecryptionShares = sortByVoterIndex(
+                const orderedDecryptionShares = sortRowsByVoterIndex(
                     poll.decryptionShares,
                 );
 

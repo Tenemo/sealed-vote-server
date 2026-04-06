@@ -1,1 +1,0 @@
-export { decryptResults } from '../votingSlice';

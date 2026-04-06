@@ -68,14 +68,17 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 const waitForPollPhase = async ({
+    dispatch,
     pollId,
     predicate,
     signal,
 }: {
+    dispatch: (action: unknown) => unknown;
     pollId: string;
     predicate: (poll: PollResponse) => boolean;
     signal?: AbortSignal;
-}): Promise<PollResponse> => waitForPoll({ pollId, predicate, signal });
+}): Promise<PollResponse> =>
+    waitForPoll({ dispatch, pollId, predicate, signal });
 
 export const runProcessPublicPrivateKeys = async ({
     pollId,
@@ -106,10 +109,11 @@ export const runProcessPublicPrivateKeys = async ({
             }),
         );
 
-        let poll = await fetchFreshPoll(pollId);
+        let poll = await fetchFreshPoll(dispatch, pollId);
 
         if (derivePollPhase(poll) === 'registration') {
             poll = await waitForPollPhase({
+                dispatch,
                 pollId,
                 predicate: (currentPoll) =>
                     derivePollPhase(currentPoll) !== 'registration',
@@ -199,6 +203,7 @@ export const runProcessPublicPrivateKeys = async ({
         );
 
         const pollWithCommonKey = await waitForPollPhase({
+            dispatch,
             pollId,
             predicate: (currentPoll) => Boolean(currentPoll.commonPublicKey),
             signal,
@@ -242,7 +247,7 @@ export const runEncryptVotesGenerateShares = async ({
             throw new Error('Selected scores missing.');
         }
 
-        const poll = await fetchFreshPoll(pollId);
+        const poll = await fetchFreshPoll(dispatch, pollId);
 
         if (!hasSubmittedVote) {
             dispatch(
@@ -298,6 +303,7 @@ export const runEncryptVotesGenerateShares = async ({
         const pollWithTallies = canSubmitDecryptionShares(poll)
             ? poll
             : await waitForPollPhase({
+                  dispatch,
                   pollId,
                   predicate: canSubmitDecryptionShares,
                   signal,
@@ -375,6 +381,7 @@ export const runDecryptResults = async ({
         );
 
         const poll = await waitForPollPhase({
+            dispatch,
             pollId,
             predicate: (currentPoll) =>
                 derivePollPhase(currentPoll) === 'complete',

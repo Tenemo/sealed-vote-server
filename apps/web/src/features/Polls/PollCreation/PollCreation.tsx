@@ -51,7 +51,7 @@ const PollCreationPage = (): React.JSX.Element => {
 
     const onCreatePoll = (): void => {
         void createPoll({
-            pollName: form.pollName,
+            pollName: form.pollName.trim(),
             choices: form.choices,
         })
             .unwrap()

@@ -13,27 +13,26 @@ import {
 } from '@mui/material';
 import { computeGeometricMean } from '@sealed-vote/protocol';
 import React from 'react';
-import { useParams } from 'react-router-dom';
 
 import { useAppSelector } from 'app/hooks';
-import { useGetPollQuery } from 'features/Polls/pollsApi';
+import { type PollResponse } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
 
-const VoteResults = (): React.JSX.Element => {
-    const { pollId } = useParams();
+type VoteResultsProps = {
+    poll: PollResponse;
+    pollId: string;
+};
+
+const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
     const { results } = useAppSelector((state) =>
-        selectVotingStateByPollId(state, pollId ?? ''),
+        selectVotingStateByPollId(state, pollId),
     );
-    if (!pollId) {
-        throw new Error('Poll ID missing.');
-    }
-    const { data: poll } = useGetPollQuery(pollId);
     const theme = useTheme();
 
     const displayedResults =
-        results ?? (poll?.results.length ? poll.results : null);
+        results ?? (poll.results.length ? poll.results : null);
 
-    if (!displayedResults || !poll) {
+    if (!displayedResults) {
         return <></>;
     }
 

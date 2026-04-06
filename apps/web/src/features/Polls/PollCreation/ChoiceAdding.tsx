@@ -26,10 +26,14 @@ const ChoiceAdding = ({
 }: ChoiceAddingProps): React.JSX.Element => {
     const theme = useTheme();
     const [choiceName, setChoiceName] = useState('');
+    const normalizedChoiceName = choiceName.trim();
 
     const handleAddChoice = (): void => {
-        if (!choiceName.trim()) return;
-        onAddChoice(choiceName);
+        if (!normalizedChoiceName) {
+            return;
+        }
+
+        onAddChoice(normalizedChoiceName);
         setChoiceName('');
     };
 
@@ -38,11 +42,13 @@ const ChoiceAdding = ({
     };
 
     const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
-        if (event.key === 'Enter') handleAddChoice();
+        if (event.key === 'Enter') {
+            handleAddChoice();
+        }
     };
 
-    const isChoiceDuplicate = choices.includes(choiceName);
-    const isChoiceNameValid = !!choiceName.trim() && !isChoiceDuplicate;
+    const isChoiceDuplicate = choices.includes(normalizedChoiceName);
+    const isChoiceNameValid = !!normalizedChoiceName && !isChoiceDuplicate;
 
     return (
         <Grid

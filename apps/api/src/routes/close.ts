@@ -14,8 +14,9 @@ import { polls } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
 import {
     countPollVoters,
-    lockPollByIdAndCreatorToken,
+    lockPollByIdForCreatorAction,
 } from '../utils/polls.js';
+import { hashSecureToken } from '../utils/voterAuth.js';
 
 const ClosePollParamsSchema = Type.Object({
     pollId: Type.String(),
@@ -35,6 +36,7 @@ const schema = {
     response: {
         200: MessageResponseSchema,
         400: MessageResponseSchema,
+        403: MessageResponseSchema,
         404: MessageResponseSchema,
     },
 };
@@ -64,15 +66,23 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                 }
 
                 return await withTransaction(fastify, async (client) => {
-                    const poll = await lockPollByIdAndCreatorToken(
+                    const poll = await lockPollByIdForCreatorAction(
                         client,
                         pollId,
-                        creatorToken,
                     );
                     if (!poll) {
                         throw createError(
                             404,
-                            'Poll not found or unauthorized access.',
+                            `Poll with ID ${pollId} does not exist.`,
+                        );
+                    }
+
+                    if (
+                        poll.creatorTokenHash !== hashSecureToken(creatorToken)
+                    ) {
+                        throw createError(
+                            403,
+                            ERROR_MESSAGES.invalidCreatorToken,
                         );
                     }
 

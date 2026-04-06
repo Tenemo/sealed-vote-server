@@ -2,7 +2,6 @@ import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     CreatePollRequest as CreatePollRequestContract,
     CreatePollResponse as CreatePollResponseContract,
-    MessageResponse,
 } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -14,7 +13,7 @@ import {
     normalizeDatabaseTimestamp,
     withTransaction,
 } from '../utils/db.js';
-import { generateSecureToken } from '../utils/voterAuth.js';
+import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
 
 const EncryptedMessageSchema = Type.Object({
     c1: Type.String(),
@@ -67,13 +66,22 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
             try {
-                const { choices, pollName, maxParticipants = 20 } = req.body;
+                const { choices, maxParticipants = 20 } = req.body;
+                const pollName = req.body.pollName.trim();
                 const normalizedChoices = choices.map((choice) =>
                     choice.trim(),
                 );
 
+                if (!pollName) {
+                    throw createError(400, 'Poll name is required.');
+                }
+
                 if (normalizedChoices.length < 2) {
                     throw createError(400, 'Not enough choices.');
+                }
+
+                if (normalizedChoices.some((choice) => !choice)) {
+                    throw createError(400, 'Choice names are required.');
                 }
 
                 if (
@@ -83,6 +91,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                 }
 
                 const creatorToken = generateSecureToken();
+                const creatorTokenHash = hashSecureToken(creatorToken);
 
                 const createdPoll = await withTransaction(
                     fastify,
@@ -90,8 +99,8 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                         const [poll] = await tx
                             .insert(polls)
                             .values({
+                                creatorTokenHash,
                                 pollName,
-                                creatorToken,
                                 maxParticipants,
                             })
                             .returning({
@@ -143,5 +152,3 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
         },
     );
 };
-
-export type CreatePollErrorResponse = MessageResponse;

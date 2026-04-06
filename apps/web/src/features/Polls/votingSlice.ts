@@ -5,17 +5,13 @@ import { createAppSlice } from 'app/createAppSlice';
 import { fetchFreshPoll } from 'features/Polls/pollQuery';
 import { pollsApi } from 'features/Polls/pollsApi';
 import {
+    clearCompletedSensitiveFields,
     initialVoteState,
     sanitizeVotingStateForPersistence,
     selectVoteStateByPollId,
     type VoteState,
     type VotingState,
 } from 'features/Polls/votingState';
-import {
-    runDecryptResults,
-    runEncryptVotesGenerateShares,
-    runProcessPublicPrivateKeys,
-} from 'features/Polls/votingWorkflow';
 
 const initialState: VotingState = {};
 
@@ -42,17 +38,6 @@ const applyRegistration = (
     voteState.hasSubmittedVote = false;
     voteState.hasSubmittedDecryptionShares = false;
 };
-
-const clearCompletedSensitiveFields = (voteState: VoteState): VoteState => ({
-    ...voteState,
-    creatorToken: null,
-    selectedScores: null,
-    voterToken: null,
-    privateKey: null,
-    publicKey: null,
-    progressMessage: null,
-    isVotingInProgress: false,
-});
 
 type VotingActionCreators = {
     setKeys: (payload: {
@@ -96,6 +81,20 @@ const getVotingActions = (): VotingActionCreators => {
     return votingActionCreators;
 };
 
+const getWorkflowActions = (): Pick<
+    VotingActionCreators,
+    'setKeys' | 'setProgressMessage' | 'setResults' | 'setSubmissionStatus'
+> => {
+    const actions = getVotingActions();
+
+    return {
+        setKeys: actions.setKeys,
+        setProgressMessage: actions.setProgressMessage,
+        setResults: actions.setResults,
+        setSubmissionStatus: actions.setSubmissionStatus,
+    };
+};
+
 export const votingSlice = createAppSlice({
     name: 'voting',
     initialState,
@@ -120,19 +119,6 @@ export const votingSlice = createAppSlice({
                     const { pollId, selectedScores } = action.payload;
                     ensureVoteState(state, pollId).selectedScores =
                         selectedScores;
-                },
-            ),
-            setIsVotingInProgress: create.reducer(
-                (
-                    state,
-                    action: PayloadAction<{
-                        pollId: string;
-                        isVotingInProgress: boolean;
-                    }>,
-                ) => {
-                    const { pollId, isVotingInProgress } = action.payload;
-                    ensureVoteState(state, pollId).isVotingInProgress =
-                        isVotingInProgress;
                 },
             ),
             setVoterSession: create.reducer(
@@ -229,96 +215,6 @@ export const votingSlice = createAppSlice({
                     }
                 },
             ),
-            processPublicPrivateKeys: createVotingAsyncThunk(
-                async (
-                    { pollId }: { pollId: string },
-                    { dispatch, getState, signal, rejectWithValue },
-                ) => {
-                    try {
-                        await runProcessPublicPrivateKeys({
-                            pollId,
-                            dispatch,
-                            getState,
-                            signal,
-                            actions: {
-                                setKeys: getVotingActions().setKeys,
-                                setProgressMessage:
-                                    getVotingActions().setProgressMessage,
-                                setResults: getVotingActions().setResults,
-                                setSubmissionStatus:
-                                    getVotingActions().setSubmissionStatus,
-                            },
-                        });
-                    } catch (error) {
-                        const message =
-                            error instanceof Error
-                                ? error.message
-                                : 'Failed during public/private key processing.';
-
-                        return rejectWithValue(message);
-                    }
-                },
-            ),
-            encryptVotesGenerateShares: createVotingAsyncThunk(
-                async (
-                    { pollId }: { pollId: string },
-                    { dispatch, getState, signal, rejectWithValue },
-                ) => {
-                    try {
-                        await runEncryptVotesGenerateShares({
-                            pollId,
-                            dispatch,
-                            getState,
-                            signal,
-                            actions: {
-                                setKeys: getVotingActions().setKeys,
-                                setProgressMessage:
-                                    getVotingActions().setProgressMessage,
-                                setResults: getVotingActions().setResults,
-                                setSubmissionStatus:
-                                    getVotingActions().setSubmissionStatus,
-                            },
-                        });
-                    } catch (error) {
-                        const message =
-                            error instanceof Error
-                                ? error.message
-                                : 'Failed during vote encryption/decryption-share flow.';
-
-                        return rejectWithValue(message);
-                    }
-                },
-            ),
-            decryptResults: createVotingAsyncThunk(
-                async (
-                    { pollId }: { pollId: string },
-                    { dispatch, getState, signal, rejectWithValue },
-                ) => {
-                    try {
-                        await runDecryptResults({
-                            pollId,
-                            dispatch,
-                            getState,
-                            signal,
-                            actions: {
-                                setKeys: getVotingActions().setKeys,
-                                setProgressMessage:
-                                    getVotingActions().setProgressMessage,
-                                setResults: getVotingActions().setResults,
-                                setSubmissionStatus:
-                                    getVotingActions().setSubmissionStatus,
-                            },
-                        });
-                    } catch (error) {
-                        const message =
-                            error instanceof Error
-                                ? error.message
-                                : 'Failed during result decryption wait.';
-
-                        return rejectWithValue(message);
-                    }
-                },
-            ),
             vote: createVotingAsyncThunk(
                 async (
                     {
@@ -369,7 +265,7 @@ export const votingSlice = createAppSlice({
                                 }),
                             );
 
-                            const poll = await fetchFreshPoll(pollId);
+                            const poll = await fetchFreshPoll(dispatch, pollId);
 
                             if (!canRegister(poll)) {
                                 throw new Error(
@@ -405,19 +301,19 @@ export const votingSlice = createAppSlice({
                             );
                         }
 
+                        const workflowActions = getWorkflowActions();
+                        const {
+                            runDecryptResults,
+                            runEncryptVotesGenerateShares,
+                            runProcessPublicPrivateKeys,
+                        } = await import('./votingWorkflow');
+
                         await runProcessPublicPrivateKeys({
                             pollId,
                             dispatch,
                             getState,
                             signal,
-                            actions: {
-                                setKeys: getVotingActions().setKeys,
-                                setProgressMessage:
-                                    getVotingActions().setProgressMessage,
-                                setResults: getVotingActions().setResults,
-                                setSubmissionStatus:
-                                    getVotingActions().setSubmissionStatus,
-                            },
+                            actions: workflowActions,
                         });
 
                         await runEncryptVotesGenerateShares({
@@ -425,14 +321,7 @@ export const votingSlice = createAppSlice({
                             dispatch,
                             getState,
                             signal,
-                            actions: {
-                                setKeys: getVotingActions().setKeys,
-                                setProgressMessage:
-                                    getVotingActions().setProgressMessage,
-                                setResults: getVotingActions().setResults,
-                                setSubmissionStatus:
-                                    getVotingActions().setSubmissionStatus,
-                            },
+                            actions: workflowActions,
                         });
 
                         await runDecryptResults({
@@ -440,14 +329,7 @@ export const votingSlice = createAppSlice({
                             dispatch,
                             getState,
                             signal,
-                            actions: {
-                                setKeys: getVotingActions().setKeys,
-                                setProgressMessage:
-                                    getVotingActions().setProgressMessage,
-                                setResults: getVotingActions().setResults,
-                                setSubmissionStatus:
-                                    getVotingActions().setSubmissionStatus,
-                            },
+                            actions: workflowActions,
                         });
                     } catch (error) {
                         const message =
@@ -520,10 +402,6 @@ export const votingSlice = createAppSlice({
 });
 
 export const {
-    decryptResults,
-    encryptVotesGenerateShares,
-    processPublicPrivateKeys,
-    setIsVotingInProgress,
     setKeys,
     setProgressMessage,
     setResults,

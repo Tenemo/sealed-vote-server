@@ -35,7 +35,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```
 
 - failure responses:
-- `400` for invalid input such as fewer than two choices or duplicate choice names
+- `400` for invalid input such as blank trimmed names, fewer than two choices, or duplicate choice names after trimming
 - `409` when `pollName` is already taken
 
 ## Fetch poll
@@ -228,7 +228,8 @@ The backend routes live under `/api`. The request and response payloads below ma
 
 - failure responses:
 - `400` for invalid poll id
-- `404` when the poll does not exist or the token does not match
+- `403` for an invalid creator token
+- `404` when the poll does not exist
 
 ## Health check
 

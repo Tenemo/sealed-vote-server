@@ -8,6 +8,13 @@
       "when": 1775341320865,
       "tag": "0000_amazing_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775360205142,
+      "tag": "0001_auth_cleanup",
+      "breakpoints": true
     }
   ]
 }

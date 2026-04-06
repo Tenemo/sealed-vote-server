@@ -1,0 +1,479 @@
+{
+  "id": "3e000971-fc59-494e-9323-371d1bb7a1d9",
+  "prevId": "7d4efb14-dcef-4d74-99ae-32c33a864a96",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.choices": {
+      "name": "choices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "choice_name": {
+          "name": "choice_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poll_id": {
+          "name": "poll_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "index": {
+          "name": "index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_choices_poll_id": {
+          "name": "fk_choices_poll_id",
+          "tableFrom": "choices",
+          "columnsFrom": [
+            "poll_id"
+          ],
+          "tableTo": "polls",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_choice_name_per_poll": {
+          "name": "unique_choice_name_per_poll",
+          "columns": [
+            "poll_id",
+            "choice_name"
+          ],
+          "nullsNotDistinct": false
+        },
+        "unique_choice_index_per_poll": {
+          "name": "unique_choice_index_per_poll",
+          "columns": [
+            "poll_id",
+            "index"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.decryption_shares": {
+      "name": "decryption_shares",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "shares": {
+          "name": "shares",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poll_id": {
+          "name": "poll_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voter_id": {
+          "name": "voter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_decryption_shares_poll_id": {
+          "name": "fk_decryption_shares_poll_id",
+          "tableFrom": "decryption_shares",
+          "columnsFrom": [
+            "poll_id"
+          ],
+          "tableTo": "polls",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "fk_decryption_shares_voter_id": {
+          "name": "fk_decryption_shares_voter_id",
+          "tableFrom": "decryption_shares",
+          "columnsFrom": [
+            "voter_id"
+          ],
+          "tableTo": "voters",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_decryption_shares_per_voter": {
+          "name": "unique_decryption_shares_per_voter",
+          "columns": [
+            "poll_id",
+            "voter_id"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.encrypted_votes": {
+      "name": "encrypted_votes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "votes": {
+          "name": "votes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poll_id": {
+          "name": "poll_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voter_id": {
+          "name": "voter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_encrypted_votes_poll_id": {
+          "name": "fk_encrypted_votes_poll_id",
+          "tableFrom": "encrypted_votes",
+          "columnsFrom": [
+            "poll_id"
+          ],
+          "tableTo": "polls",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "fk_encrypted_votes_voter_id": {
+          "name": "fk_encrypted_votes_voter_id",
+          "tableFrom": "encrypted_votes",
+          "columnsFrom": [
+            "voter_id"
+          ],
+          "tableTo": "voters",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_vote_per_voter": {
+          "name": "unique_vote_per_voter",
+          "columns": [
+            "poll_id",
+            "voter_id"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.polls": {
+      "name": "polls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "poll_name": {
+          "name": "poll_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_token_hash": {
+          "name": "creator_token_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_participants": {
+          "name": "max_participants",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 20
+        },
+        "is_open": {
+          "name": "is_open",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "common_public_key": {
+          "name": "common_public_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "encrypted_tallies": {
+          "name": "encrypted_tallies",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "results": {
+          "name": "results",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::integer[]"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_poll_name": {
+          "name": "unique_poll_name",
+          "columns": [
+            "poll_name"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "polls_max_participants_check": {
+          "name": "polls_max_participants_check",
+          "value": "\"polls\".\"max_participants\" >= 2"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.public_key_shares": {
+      "name": "public_key_shares",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "poll_id": {
+          "name": "poll_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voter_id": {
+          "name": "voter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_key_share": {
+          "name": "public_key_share",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_public_key_shares_poll_id": {
+          "name": "fk_public_key_shares_poll_id",
+          "tableFrom": "public_key_shares",
+          "columnsFrom": [
+            "poll_id"
+          ],
+          "tableTo": "polls",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "fk_public_key_shares_voter_id": {
+          "name": "fk_public_key_shares_voter_id",
+          "tableFrom": "public_key_shares",
+          "columnsFrom": [
+            "voter_id"
+          ],
+          "tableTo": "voters",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_public_key_share_per_voter": {
+          "name": "unique_public_key_share_per_voter",
+          "columns": [
+            "poll_id",
+            "voter_id"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.voters": {
+      "name": "voters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "voter_name": {
+          "name": "voter_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voter_index": {
+          "name": "voter_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poll_id": {
+          "name": "poll_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voter_token_hash": {
+          "name": "voter_token_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_voters_poll_id": {
+          "name": "fk_voters_poll_id",
+          "tableFrom": "voters",
+          "columnsFrom": [
+            "poll_id"
+          ],
+          "tableTo": "polls",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unique_voter_name_per_poll": {
+          "name": "unique_voter_name_per_poll",
+          "columns": [
+            "poll_id",
+            "voter_name"
+          ],
+          "nullsNotDistinct": false
+        },
+        "unique_voter_index_per_poll": {
+          "name": "unique_voter_index_per_poll",
+          "columns": [
+            "poll_id",
+            "voter_index"
+          ],
+          "nullsNotDistinct": false
+        },
+        "unique_voter_token_hash_per_poll": {
+          "name": "unique_voter_token_hash_per_poll",
+          "columns": [
+            "poll_id",
+            "voter_token_hash"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

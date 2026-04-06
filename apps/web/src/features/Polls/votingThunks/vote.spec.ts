@@ -37,7 +37,7 @@ vi.mock('features/Polls/pollsApi', () => ({
     },
 }));
 
-vi.mock('features/Polls/votingWorkflow', () => ({
+vi.mock('../votingWorkflow', () => ({
     runProcessPublicPrivateKeys: (...args: unknown[]) =>
         mockedRunProcessPublicPrivateKeys(...args),
     runEncryptVotesGenerateShares: (...args: unknown[]) =>
@@ -45,9 +45,7 @@ vi.mock('features/Polls/votingWorkflow', () => ({
     runDecryptResults: (...args: unknown[]) => mockedRunDecryptResults(...args),
 }));
 
-import { initialVoteState, votingSlice } from '../votingSlice';
-
-import { vote } from './vote';
+import { initialVoteState, vote, votingSlice } from '../votingSlice';
 
 import type { VotingState } from 'features/Polls/votingState';
 
@@ -120,7 +118,10 @@ describe('vote thunk', () => {
 
         await voteResult.unwrap();
 
-        expect(mockedFetchFreshPoll).toHaveBeenCalledWith('poll-1');
+        expect(mockedFetchFreshPoll).toHaveBeenCalledWith(
+            expect.any(Function),
+            'poll-1',
+        );
         expect(mockedRegisterVoterInitiate).toHaveBeenCalledWith({
             pollId: 'poll-1',
             voterData: { voterName: 'Alice' },

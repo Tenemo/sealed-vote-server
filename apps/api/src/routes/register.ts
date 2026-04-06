@@ -1,6 +1,5 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
-    MessageResponse,
     RegisterVoterRequest as RegisterVoterRequestContract,
     RegisterVoterResponse as RegisterVoterResponseContract,
 } from '@sealed-vote/contracts';
@@ -42,7 +41,6 @@ const schema = {
 
 export type RegisterRequest = RegisterVoterRequestContract;
 export type RegisterResponse = RegisterVoterResponseContract;
-export type RegisterErrorResponse = MessageResponse;
 
 export const register = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
