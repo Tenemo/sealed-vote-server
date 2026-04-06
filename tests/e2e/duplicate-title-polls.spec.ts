@@ -1,49 +1,68 @@
 import { expect, test } from '@playwright/test';
 
+import {
+    closeParticipant,
+    openProjectParticipant,
+} from './support/participants';
+import { createPoll } from './support/pollFlow';
+import {
+    attachErrorTracking,
+    createUnexpectedErrorTracker,
+    expectNoUnexpectedErrors,
+} from './support/monitoring';
+import { createTestNamespace, createVoterName } from './support/testData';
+
 test('keeps duplicate-title polls on distinct slug URLs', async ({
     browser,
     page,
-}) => {
-    const pollTitle = `Duplicate title vote ${Date.now()}`;
+}, testInfo) => {
+    const tracker = createUnexpectedErrorTracker();
+    const namespace = createTestNamespace(testInfo);
+    const pollTitle = `Duplicate title vote ${namespace}`.slice(0, 64);
 
-    const createPoll = async (): Promise<string> => {
-        await page.goto('/');
-        await page.getByLabel('Vote name').fill(pollTitle);
-        await page.getByLabel('Choice to vote for').fill('Apples');
-        await page.getByRole('button', { name: 'Add new choice' }).click();
-        await page.getByLabel('Choice to vote for').fill('Bananas');
-        await page.getByRole('button', { name: 'Add new choice' }).click();
-        await page.getByRole('button', { name: 'Create vote' }).click();
-        await expect(page).toHaveURL(/\/votes\/[a-z0-9-]+--[0-9a-f]{8,32}$/);
+    attachErrorTracking(page, 'page-1', tracker);
 
-        return page.url();
+    const createPollWithTitle = async (): Promise<string> => {
+        return await createPoll({
+            page,
+            pollName: pollTitle,
+        });
     };
 
-    const firstPollUrl = await createPoll();
-    const secondPollUrl = await createPoll();
+    const firstPollUrl = await createPollWithTitle();
+    const secondPollUrl = await createPollWithTitle();
 
     expect(secondPollUrl).not.toBe(firstPollUrl);
 
     await page.goto(firstPollUrl);
-    await page.getByLabel('Voter name*').fill('Alice');
+    await page
+        .getByLabel('Voter name*')
+        .fill(createVoterName('alice', namespace));
     await page.getByRole('button', { exact: true, name: 'Vote' }).click();
-    await expect(page.getByText('Voters in this poll: Alice')).toBeVisible();
+    await expect(page.getByText(/Voters in this poll: .*alice/i)).toBeVisible();
 
-    const secondContext = await browser.newContext();
-    const secondPage = await secondContext.newPage();
+    const participant = await openProjectParticipant(browser, testInfo);
+    attachErrorTracking(participant.page, 'page-2', tracker);
 
-    await secondPage.goto(secondPollUrl);
-    await secondPage.getByLabel('Voter name*').fill('Bob');
-    await secondPage.getByRole('button', { exact: true, name: 'Vote' }).click();
+    try {
+        await participant.page.goto(secondPollUrl);
+        await participant.page
+            .getByLabel('Voter name*')
+            .fill(createVoterName('bob', namespace));
+        await participant.page
+            .getByRole('button', { exact: true, name: 'Vote' })
+            .click();
 
-    await expect(
-        secondPage.getByText('Voters in this poll: Bob'),
-    ).toBeVisible();
-    await expect(page.getByText('Voters in this poll: Alice')).toBeVisible();
-    await expect(page.getByText('Voters in this poll: Bob')).toHaveCount(0);
-    await expect(secondPage.getByText('Voters in this poll: Alice')).toHaveCount(
-        0,
-    );
-
-    await secondContext.close();
+        await expect(
+            participant.page.getByText(/Voters in this poll: .*bob/i),
+        ).toBeVisible();
+        await expect(page.getByText(/Voters in this poll: .*alice/i)).toBeVisible();
+        await expect(page.getByText(/Voters in this poll: .*bob/i)).toHaveCount(0);
+        await expect(
+            participant.page.getByText(/Voters in this poll: .*alice/i),
+        ).toHaveCount(0);
+        expectNoUnexpectedErrors(tracker);
+    } finally {
+        await closeParticipant(participant);
+    }
 });

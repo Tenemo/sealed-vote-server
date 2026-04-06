@@ -59,6 +59,29 @@ The default local setup serves:
 - the web app at `http://127.0.0.1:3000`
 - the API at `http://127.0.0.1:4000`
 
+## End-to-end testing
+
+Run the guarded Playwright suite from the repository root:
+
+```bash
+pnpm e2e
+```
+
+The e2e entrypoint refuses to run unless all of these are true:
+
+- `NODE_ENV=test`
+- `DATABASE_URL` points at the local or CI Postgres `sv-db`
+- `VITE_API_BASE_URL`, if set, points at a local HTTP backend
+
+The suite resets the database before starting the shared backend and web dev servers, so it must never be able to target a production or remote environment.
+
+GitHub Actions uses a separate built-artifact path for PR e2e runs:
+
+- `pnpm e2e:ci:build` builds the API and web artifacts once
+- `pnpm e2e:ci:serve:api` starts the built API server
+- `pnpm e2e:ci:serve:web` starts the built web server
+- `pnpm e2e:ci:test` runs Playwright against the built API and built web server
+
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace

@@ -27,9 +27,11 @@ const ChoiceAdding = ({
     const theme = useTheme();
     const [choiceName, setChoiceName] = useState('');
     const normalizedChoiceName = choiceName.trim();
+    const isChoiceDuplicate = choices.includes(normalizedChoiceName);
+    const isChoiceNameValid = !!normalizedChoiceName && !isChoiceDuplicate;
 
     const handleAddChoice = (): void => {
-        if (!normalizedChoiceName) {
+        if (!isChoiceNameValid) {
             return;
         }
 
@@ -43,12 +45,10 @@ const ChoiceAdding = ({
 
     const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
         if (event.key === 'Enter') {
+            event.preventDefault();
             handleAddChoice();
         }
     };
-
-    const isChoiceDuplicate = choices.includes(normalizedChoiceName);
-    const isChoiceNameValid = !!normalizedChoiceName && !isChoiceDuplicate;
 
     return (
         <Grid

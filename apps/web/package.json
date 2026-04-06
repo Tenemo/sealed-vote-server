@@ -13,6 +13,7 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
+        "serve:dist": "node --experimental-strip-types config/serveDist.mts",
         "clean": "rimraf ./dist",
         "eslint": "pnpm --workspace-root exec eslint apps/web",
         "eslint:fix": "pnpm --workspace-root exec eslint apps/web --fix",
@@ -49,6 +50,7 @@
         "react-router-dom": "^7.14.0",
         "redux": "^5.0.1",
         "redux-persist": "^6.0.0",
+        "sirv": "^3.0.2",
         "threshold-elgamal": "catalog:"
     },
     "devDependencies": {
@@ -68,11 +70,11 @@
         "postcss-html": "^1.8.1",
         "rimraf": "catalog:",
         "sass": "^1.99.0",
-        "sugarss": "^5.0.0",
         "stylelint": "^17.6.0",
         "stylelint-config-recommended": "^18.0.0",
         "stylelint-config-recommended-scss": "^17.0.0",
         "stylelint-scss": "^7.0.0",
+        "sugarss": "^5.0.0",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "catalog:"

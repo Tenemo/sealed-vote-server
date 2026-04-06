@@ -21,7 +21,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('completes the poll happy path on every required browser project', async ({
+test('resumes a persisted voting session after refresh', async ({
     browser,
     page,
 }, testInfo) => {
@@ -34,7 +34,7 @@ test('completes the poll happy path on every required browser project', async ({
 
     const pollUrl = await createPoll({
         page,
-        pollName: createPollName('E2E lifecycle', namespace),
+        pollName: createPollName('Refresh resume vote', namespace),
     });
 
     const participant = await openProjectParticipant(browser, testInfo);
@@ -51,13 +51,15 @@ test('completes the poll happy path on every required browser project', async ({
             voterName: participantName,
         });
 
+        await participant.page.reload();
+        await expect(
+            participant.page.getByText('Waiting for the vote to be started...'),
+        ).toBeVisible();
+
         await beginVote(page);
 
         await expectResultsVisible(page);
         await expectResultsVisible(participant.page);
-        await expect(
-            page.getByText(`Voters in this poll: ${creatorName}, ${participantName}`),
-        ).toBeVisible();
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);

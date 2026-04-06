@@ -9,6 +9,7 @@ import Fastify, {
     FastifyTypeProviderDefault,
 } from 'fastify';
 
+import { getConfiguredWebAppOrigin } from './config.js';
 import { databasePlugin } from './db/plugin.js';
 import { close } from './routes/close.js';
 import { create } from './routes/create.js';
@@ -23,7 +24,7 @@ import { vote } from './routes/vote.js';
 config();
 
 const logger = {
-    level: process.env.LOG_LEVEL ?? 'info',
+    level: 'info',
     transport: {
         target: 'pino-pretty',
     },
@@ -33,6 +34,8 @@ const allowedProductionOrigins = new Set([
     'https://sealed.vote',
     'https://www.sealed.vote',
 ]);
+const netlifyDeployPreviewOriginPattern =
+    /^https:\/\/deploy-preview-\d+--sealed-vote\.netlify\.app$/;
 
 const isAllowedLocalOrigin = (origin: string): boolean => {
     try {
@@ -46,9 +49,17 @@ const isAllowedLocalOrigin = (origin: string): boolean => {
     }
 };
 
-const isAllowedCorsOrigin = (origin?: string): boolean =>
+const isAllowedDeployPreviewOrigin = (origin: string): boolean =>
+    netlifyDeployPreviewOriginPattern.test(origin);
+
+const isAllowedCorsOrigin = (
+    origin: string | undefined,
+    configuredWebAppOrigin: string | null,
+): boolean =>
     !origin ||
     allowedProductionOrigins.has(origin) ||
+    origin === configuredWebAppOrigin ||
+    isAllowedDeployPreviewOrigin(origin) ||
     isAllowedLocalOrigin(origin);
 
 type ValidationIssue = {
@@ -113,6 +124,7 @@ export const buildServer = async (
 > => {
     const shouldEnableLogging =
         isLoggingEnabled ?? process.env.NODE_ENV !== 'test';
+    const configuredWebAppOrigin = getConfiguredWebAppOrigin();
     const fastify = Fastify({
         logger: shouldEnableLogging ? logger : false,
     });
@@ -142,7 +154,7 @@ export const buildServer = async (
     });
     await fastify.register(cors, {
         origin: (origin, callback) => {
-            callback(null, isAllowedCorsOrigin(origin));
+            callback(null, isAllowedCorsOrigin(origin, configuredWebAppOrigin));
         },
         methods: ['GET', 'HEAD', 'POST', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'sentry-trace', 'baggage'],
