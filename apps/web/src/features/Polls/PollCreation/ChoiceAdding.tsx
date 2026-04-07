@@ -42,74 +42,82 @@ const ChoiceAdding = ({
     };
 
     return (
-        <div className="flex w-full justify-center">
-            <div className="w-full max-w-[720px] rounded-sm bg-accent p-2">
-                <div className="flex min-h-[100px] flex-wrap items-center justify-center">
-                    <OutlinedInputField
-                        aria-invalid={isChoiceDuplicate}
-                        autoComplete="off"
-                        errorText={
-                            isChoiceDuplicate
-                                ? 'This choice already exists'
-                                : undefined
-                        }
-                        id="choiceName"
-                        inputClassName="text-base"
-                        label="Choice to vote for"
-                        maxLength={64}
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        value={choiceName}
-                        wrapperClassName="m-1 min-h-20 w-[210px] self-start"
-                    />
-                    <Button
-                        className="m-2 mb-4 h-[36.5px] px-[15px] py-[5px]"
-                        disabled={!isChoiceNameValid}
-                        onClick={handleAddChoice}
-                        type="button"
-                        variant="outline"
-                    >
-                        <Plus className="-ml-1 mr-2 size-4" />
-                        Add new choice
-                    </Button>
-                </div>
-                {choices.length === 0 && (
-                    <FieldDescription className="m-2 text-base text-foreground">
-                        To create a vote, add choices that each participant will
-                        be able to rank from 1 to 10.
-                    </FieldDescription>
-                )}
-                {!!choices.length && (
-                    <>
-                        <p className="m-2">Choices currently in the vote:</p>
-                        <ul className="px-4 py-2">
-                            {choices.map((choice) => (
-                                <li
-                                    className="my-2 flex items-center justify-between rounded border border-secondary px-4 py-2"
-                                    key={choice}
-                                >
-                                    <span>{choice}</span>
-                                    <Button
-                                        aria-label="delete"
-                                        onClick={() => onRemoveChoice(choice)}
-                                        size="icon-sm"
-                                        type="button"
-                                        variant="ghost"
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </Button>
-                                </li>
-                            ))}
-                        </ul>
-                    </>
-                )}
-                {choices.length === 1 && (
-                    <p className="m-2">
-                        There need to be at least two possible choices in a
-                        vote.
-                    </p>
-                )}
+        <div className="space-y-5">
+            <div className="space-y-2">
+                <h2 className="text-xl font-semibold tracking-tight">
+                    Choices
+                </h2>
+                <p className="text-sm leading-7 text-secondary sm:text-base">
+                    Each participant will rank every option from 1 to 10.
+                </p>
             </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <OutlinedInputField
+                    aria-invalid={isChoiceDuplicate}
+                    autoComplete="off"
+                    errorText={
+                        isChoiceDuplicate
+                            ? 'This choice already exists'
+                            : undefined
+                    }
+                    id="choiceName"
+                    inputClassName="text-base"
+                    label="Choice to vote for"
+                    maxLength={64}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    value={choiceName}
+                />
+                <Button
+                    className="w-full sm:mt-2 sm:w-auto"
+                    disabled={!isChoiceNameValid}
+                    onClick={handleAddChoice}
+                    type="button"
+                    variant="outline"
+                >
+                    <Plus className="mr-2 size-4" />
+                    Add new choice
+                </Button>
+            </div>
+            {choices.length === 0 && (
+                <FieldDescription className="rounded-xl border border-dashed border-border/70 bg-background/20 px-4 py-3 text-sm leading-7 text-secondary">
+                    To create a vote, add choices that each participant will be
+                    able to rank from 1 to 10.
+                </FieldDescription>
+            )}
+            {!!choices.length && (
+                <div className="space-y-3">
+                    <p className="text-sm font-medium text-secondary">
+                        Choices currently in the vote:
+                    </p>
+                    <ul className="space-y-2">
+                        {choices.map((choice) => (
+                            <li
+                                className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/30 px-4 py-3"
+                                key={choice}
+                            >
+                                <span className="min-w-0 flex-1 break-words text-base text-foreground">
+                                    {choice}
+                                </span>
+                                <Button
+                                    aria-label="delete"
+                                    onClick={() => onRemoveChoice(choice)}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    <Trash2 className="size-4" />
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {choices.length === 1 && (
+                <p className="text-sm leading-7 text-secondary">
+                    There need to be at least two possible choices in a vote.
+                </p>
+            )}
         </div>
     );
 };

@@ -4,6 +4,7 @@ import VoteSharing from './VoteSharing';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppSelector } from 'app/hooks';
 import {
@@ -33,29 +34,37 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
     };
 
     return (
-        <div className="flex w-full flex-col items-center p-2">
-            <h2 className="mb-2 text-2xl leading-8 font-normal">
-                Vote: {poll.pollName}
-            </h2>
-            {creatorToken && poll.isOpen && (
-                <p className="mb-2 w-full">
-                    You are the creator of this vote. When there will be more
-                    than 1 voter, including yourself, you can begin the vote to
-                    calculate the results and prevent any new votes.
+        <Panel className="space-y-6">
+            <div className="space-y-3">
+                <p className="text-sm font-medium text-secondary">Vote</p>
+                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                    {poll.pollName}
+                </h1>
+                <p className="max-w-3xl text-sm leading-7 text-secondary sm:text-base">
+                    Share the link below with participants. Once everyone has
+                    voted, the results are ranked by geometric mean.
                 </p>
-            )}
-
+            </div>
+            <VoteSharing />
             {creatorToken && poll.isOpen && (
-                <div className="mb-1 flex w-full flex-col items-start">
-                    <Button
-                        disabled={isClosingPoll || poll.voters.length < 2}
-                        onClick={onClosePoll}
-                        variant="warning"
-                    >
-                        Begin vote
-                    </Button>
+                <div className="flex flex-col gap-4 rounded-xl border border-border/70 bg-background/30 p-4">
+                    <p className="text-sm leading-7 text-secondary sm:text-base">
+                        You are the creator of this vote. When there are at
+                        least two voters, including yourself, you can begin the
+                        vote to lock registrations and calculate the results.
+                    </p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <Button
+                            className="w-full sm:w-auto"
+                            disabled={isClosingPoll || poll.voters.length < 2}
+                            onClick={onClosePoll}
+                            variant="warning"
+                        >
+                            Begin vote
+                        </Button>
+                    </div>
                     {closeError && (
-                        <Alert className="mt-2" variant="destructive">
+                        <Alert variant="destructive">
                             <AlertDescription>
                                 {renderError(closeError)}
                             </AlertDescription>
@@ -63,12 +72,11 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                     )}
                 </div>
             )}
-            <VoteSharing />
-            <div className="flex w-full flex-col items-center justify-center">
+            <div className="space-y-3">
                 {progressMessage && (
                     <>
                         {!results && <Spinner className="size-6" />}
-                        <Alert className="mt-2" variant="info">
+                        <Alert variant="info">
                             <AlertDescription>
                                 {progressMessage}
                             </AlertDescription>
@@ -76,12 +84,12 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                     </>
                 )}
                 {workflowError && (
-                    <Alert className="mt-2" variant="destructive">
+                    <Alert variant="destructive">
                         <AlertDescription>{workflowError}</AlertDescription>
                     </Alert>
                 )}
             </div>
-        </div>
+        </Panel>
     );
 };
 

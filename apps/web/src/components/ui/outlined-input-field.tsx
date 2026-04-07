@@ -15,6 +15,8 @@ const isInvalidInput = (
     ariaInvalid: React.AriaAttributes['aria-invalid'],
 ): boolean => ariaInvalid === true || ariaInvalid === 'true';
 
+const floatingLabelMaskColor = 'hsl(0 0% 7.1%)';
+
 const OutlinedInputField = ({
     className,
     errorText,
@@ -41,7 +43,7 @@ const OutlinedInputField = ({
         <div className={cn('w-full', wrapperClassName)}>
             <div
                 className={cn(
-                    'relative rounded-sm border transition-colors',
+                    'relative rounded-xl border bg-background transition-colors',
                     isInvalid ? 'border-destructive' : 'border-input',
                     isFocused && !isInvalid && 'border-foreground',
                     className,
@@ -49,19 +51,27 @@ const OutlinedInputField = ({
             >
                 <label
                     className={cn(
-                        'pointer-events-none absolute left-[14px] z-10 bg-background px-1 text-secondary transition-all duration-150',
+                        'pointer-events-none absolute left-3 z-10 inline-block text-secondary transition-all duration-150',
                         isFloating
-                            ? 'top-0 -translate-y-1/2 text-xs leading-none'
+                            ? 'top-0 -translate-y-1/2 rounded-md px-2 text-xs font-medium leading-none'
                             : 'top-1/2 -translate-y-1/2 text-base leading-[23px] tracking-[0.15008px]',
                         labelClassName,
                     )}
                     htmlFor={id}
+                    style={
+                        isFloating
+                            ? {
+                                  backgroundColor: floatingLabelMaskColor,
+                                  boxShadow: `0 0 0 6px ${floatingLabelMaskColor}`,
+                              }
+                            : undefined
+                    }
                 >
                     {label}
                 </label>
                 <input
                     className={cn(
-                        'h-14 w-full min-w-0 bg-transparent px-[14px] pb-[16.5px] pt-[16.5px] text-base leading-[23px] tracking-[0.15008px] text-foreground outline-none placeholder:text-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+                        'h-14 w-full min-w-0 bg-transparent px-4 pb-[15px] pt-5 text-base leading-6 tracking-[0.15008px] text-foreground outline-none placeholder:text-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
                         inputClassName,
                     )}
                     data-slot="outlined-input-field"
@@ -79,11 +89,11 @@ const OutlinedInputField = ({
                 />
             </div>
             {errorText ? (
-                <p className="mt-[3px] pl-[14px] text-xs text-destructive">
+                <p className="mt-2 px-2 text-sm leading-6 text-destructive">
                     {errorText}
                 </p>
             ) : helperText ? (
-                <p className="mt-[3px] pl-[14px] text-xs leading-[19.92px] tracking-[0.39996px] text-secondary">
+                <p className="mt-2 px-2 text-sm leading-6 text-secondary">
                     {helperText}
                 </p>
             ) : null}

@@ -16,34 +16,39 @@ const App = (): React.JSX.Element => {
             <Helmet>
                 <title>sealed.vote</title>
             </Helmet>
-            <ErrorBoundary
-                fallback={
-                    <div>
-                        The application has crashed due to a rendering error.
-                    </div>
-                }
-                onError={(error) => console.error(error)}
-            >
-                <Header />
-                <main className="flex w-full flex-col items-center">
-                    <Routes>
-                        <Route element={<PollCreation />} path="/" />
-                        <Route
-                            element={
-                                <Suspense
-                                    fallback={
-                                        <Spinner className="mt-5 size-6" />
+            <div className="flex min-h-full flex-col">
+                <ErrorBoundary
+                    fallback={
+                        <div>
+                            The application has crashed due to a rendering
+                            error.
+                        </div>
+                    }
+                    onError={(error) => console.error(error)}
+                >
+                    <Header />
+                    <main className="flex flex-1 justify-center px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-8">
+                        <div className="w-full max-w-4xl">
+                            <Routes>
+                                <Route element={<PollCreation />} path="/" />
+                                <Route
+                                    element={
+                                        <Suspense
+                                            fallback={
+                                                <Spinner className="mt-5 size-6" />
+                                            }
+                                        >
+                                            <Poll />
+                                        </Suspense>
                                     }
-                                >
-                                    <Poll />
-                                </Suspense>
-                            }
-                            path="votes/:pollSlug"
-                        />
-                        <Route element={<NotFound />} path="*" />
-                    </Routes>
-                </main>
-            </ErrorBoundary>
+                                    path="votes/:pollSlug"
+                                />
+                                <Route element={<NotFound />} path="*" />
+                            </Routes>
+                        </div>
+                    </main>
+                </ErrorBoundary>
+            </div>
         </>
     );
 };

@@ -5,6 +5,7 @@ import VoteItem from './VoteItem';
 
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
+import { Panel } from '@/components/ui/panel';
 import { useAppSelector } from 'app/hooks';
 import { type PollResponse } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
@@ -75,13 +76,18 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
         !isVoterNameDuplicate;
 
     return (
-        <div className="w-full">
-            <p className="px-2 py-2 text-center">
-                Rate choices from 1 to 10. The results will be ranked by
-                geometric mean of all votes per item. All voters need to be
-                present in order to complete the vote.
-            </p>
-            <ul className="w-full">
+        <Panel className="space-y-6">
+            <div className="space-y-2">
+                <h2 className="text-2xl font-semibold tracking-tight">
+                    Cast your vote
+                </h2>
+                <p className="text-sm leading-7 text-secondary sm:text-base">
+                    Rate choices from 1 to 10. The results will be ranked by
+                    geometric mean of all votes per item. All voters need to be
+                    present in order to complete the vote.
+                </p>
+            </div>
+            <ul className="space-y-4">
                 {poll.choices.map((choiceName) => (
                     <VoteItem
                         choiceName={choiceName}
@@ -91,7 +97,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                     />
                 ))}
             </ul>
-            <div className="flex flex-wrap items-center">
+            <div className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                 <OutlinedInputField
                     aria-invalid={isVoterNameDuplicate}
                     errorText={
@@ -105,10 +111,9 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                     name="voterName"
                     onChange={({ target: { value } }) => setVoterName(value)}
                     value={voterName}
-                    wrapperClassName="m-2 w-full max-w-xs"
                 />
                 <Button
-                    className="m-2"
+                    className="w-full sm:w-auto sm:min-w-32"
                     disabled={!isSubmitEnabled}
                     onClick={onSubmit}
                     size="lg"
@@ -116,7 +121,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                     Vote
                 </Button>
             </div>
-        </div>
+        </Panel>
     );
 };
 

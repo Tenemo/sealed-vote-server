@@ -7,6 +7,7 @@ import ChoiceAdding from './ChoiceAdding';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
+import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/utils';
@@ -65,11 +66,17 @@ const PollCreationPage = (): React.JSX.Element => {
             <Helmet>
                 <title>Vote creation</title>
             </Helmet>
-            <h2 className="mx-auto mb-4 mt-8 w-fit text-2xl leading-8 font-normal text-center">
-                Create a new vote
-            </h2>
-            <div className="flex w-full justify-center">
-                <div className="w-full max-w-[720px] p-2">
+            <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
+                <div className="space-y-3 text-center">
+                    <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                        Create a new vote
+                    </h1>
+                    <p className="mx-auto max-w-2xl text-base leading-7 text-secondary sm:text-lg">
+                        Give the vote a clear name, add a few choices, and share
+                        the generated link when you are ready.
+                    </p>
+                </div>
+                <Panel className="space-y-6">
                     <OutlinedInputField
                         autoComplete="off"
                         helperText={
@@ -84,29 +91,36 @@ const PollCreationPage = (): React.JSX.Element => {
                         onChange={onFormChange}
                         required
                         value={pollName}
-                        wrapperClassName="mb-2 min-h-20"
                     />
+                    <ChoiceAdding
+                        choices={form.choices}
+                        onAddChoice={onAddChoice}
+                        onRemoveChoice={onRemoveChoice}
+                    />
+                </Panel>
+                {(error || isLoading) && (
+                    <div className="space-y-3">
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertDescription>
+                                    {renderError(error)}
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        {isLoading && <Spinner className="size-6" />}
+                    </div>
+                )}
+                <div className="flex justify-end">
+                    <Button
+                        className="w-full sm:w-auto"
+                        disabled={!isFormValid}
+                        onClick={onCreatePoll}
+                        size="lg"
+                    >
+                        Create vote
+                    </Button>
                 </div>
-            </div>
-            <ChoiceAdding
-                choices={form.choices}
-                onAddChoice={onAddChoice}
-                onRemoveChoice={onRemoveChoice}
-            />
-            <Button
-                className="m-2 mt-4"
-                disabled={!isFormValid}
-                onClick={onCreatePoll}
-                size="lg"
-            >
-                Create vote
-            </Button>
-            {error && (
-                <Alert className="mt-2" variant="destructive">
-                    <AlertDescription>{renderError(error)}</AlertDescription>
-                </Alert>
-            )}
-            {isLoading && <Spinner className="mt-2 size-6" />}
+            </section>
         </>
     );
 };

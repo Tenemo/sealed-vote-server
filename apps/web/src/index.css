@@ -53,10 +53,15 @@ html {
 }
 
 body {
-    @apply bg-background text-foreground font-sans;
+    @apply text-foreground font-sans;
+    background-color: var(--color-background);
     height: 100%;
     display: flex;
     flex-direction: column;
+}
+
+#root {
+    min-height: 100%;
 }
 
 body.using-mouse :focus,

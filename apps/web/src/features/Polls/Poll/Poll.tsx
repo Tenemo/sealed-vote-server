@@ -9,6 +9,7 @@ import VoteResults from './VoteResults';
 import Voting from './Voting/Voting';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import NotFound from 'components/NotFound/NotFound';
@@ -111,24 +112,29 @@ const PollPage = (): React.JSX.Element => {
             <Helmet>
                 <title>{poll ? poll.pollName : 'Vote'}</title>
             </Helmet>
-            {isLoadingPoll && <Spinner className="mt-5 size-6" />}
+            {isLoadingPoll && <Spinner className="mx-auto mt-8 size-6" />}
             {pollError && (
-                <Alert className="mt-2" variant="destructive">
+                <Alert className="mx-auto mt-6 max-w-3xl" variant="destructive">
                     <AlertDescription>
                         {renderError(pollError)}
                     </AlertDescription>
                 </Alert>
             )}
             {pollId && poll && (
-                <div className="flex w-full flex-col items-center px-2">
+                <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />
                     <VoteResults poll={poll} pollId={pollId} />
-                    <p className="p-2">
-                        {poll.voters.length
-                            ? `Voters in this poll: ${poll.voters.join(', ')}`
-                            : 'No voters yet.'}
-                    </p>
+                    <Panel padding="compact" tone="subtle">
+                        <h2 className="text-lg font-semibold tracking-tight">
+                            Participants
+                        </h2>
+                        <p className="mt-2 text-sm leading-7 text-secondary">
+                            {poll.voters.length
+                                ? `Voters in this poll: ${poll.voters.join(', ')}`
+                                : 'No voters yet.'}
+                        </p>
+                    </Panel>
                 </div>
             )}
         </>
