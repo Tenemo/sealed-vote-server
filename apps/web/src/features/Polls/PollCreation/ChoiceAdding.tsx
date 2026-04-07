@@ -43,7 +43,7 @@ const ChoiceAdding = ({
 
     return (
         <div className="space-y-5">
-            <div className="space-y-2">
+            <div className="space-y-2 text-center">
                 <h2 className="text-xl font-semibold tracking-tight">
                     Choices
                 </h2>
