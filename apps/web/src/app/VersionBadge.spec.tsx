@@ -35,6 +35,7 @@ describe('VersionBadge', () => {
         const badge = await screen.findByText('Version: 8a9f');
 
         expect(badge).toHaveClass('self-end');
+        expect(badge).toHaveClass('mt-auto');
         expect(badge).not.toHaveClass('fixed');
         expect(badge).toHaveClass('sm:fixed');
     });

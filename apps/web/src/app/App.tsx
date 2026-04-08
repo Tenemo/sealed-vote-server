@@ -15,7 +15,7 @@ const Poll = lazy(() => import('features/Polls/Poll/Poll'));
 const App = (): React.JSX.Element => {
     return (
         <>
-            <div className="flex min-h-full flex-col">
+            <div className="flex min-h-[100svh] flex-col">
                 <ErrorBoundary
                     fallback={
                         <main className="flex flex-1 items-center justify-center px-4 py-10">
