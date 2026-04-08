@@ -161,6 +161,11 @@ export const waitForPoll = async ({
             throw createAbortError();
         }
 
+        const fallbackPoll = selectFallbackPoll(getState(), pollId);
+        if (fallbackPoll && predicate(fallbackPoll)) {
+            return fallbackPoll;
+        }
+
         const poll = await fetchFreshPoll({
             dispatch,
             getState,

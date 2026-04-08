@@ -41,4 +41,22 @@ describe('creatorSessionStorage', () => {
         expect(findCreatorSessionByPollId('poll-1')).toBeNull();
         expect(findCreatorSessionByPollSlug('best-fruit--1111')).toBeNull();
     });
+
+    it('ignores storage write failures instead of throwing', () => {
+        const setItemSpy = vi
+            .spyOn(Storage.prototype, 'setItem')
+            .mockImplementation(() => {
+                throw new Error('quota exceeded');
+            });
+
+        expect(() => {
+            saveCreatorSession({
+                creatorToken: 'creator-token',
+                pollId: 'poll-1',
+                pollSlug: 'best-fruit--1111',
+            });
+        }).not.toThrow();
+
+        setItemSpy.mockRestore();
+    });
 });

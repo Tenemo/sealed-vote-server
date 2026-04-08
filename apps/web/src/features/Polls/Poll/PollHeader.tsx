@@ -57,7 +57,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                     voted, the results are ordered by geometric mean.
                 </p>
             </div>
-            <VoteSharing />
+            <VoteSharing pollTitle={poll.pollName} />
             {creatorToken && poll.isOpen && (
                 <Panel
                     asChild

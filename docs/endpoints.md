@@ -10,6 +10,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "pollName": "Lunch vote",
+    "creatorToken": "creator-token",
     "choices": ["Pizza", "Sushi", "Pasta"]
 }
 ```

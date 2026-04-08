@@ -38,15 +38,19 @@ const writeCreatorSessions = (sessions: StoredCreatorSessions): void => {
         return;
     }
 
-    if (!Object.keys(sessions).length) {
-        window.localStorage.removeItem(creatorSessionsStorageKey);
+    try {
+        if (!Object.keys(sessions).length) {
+            window.localStorage.removeItem(creatorSessionsStorageKey);
+            return;
+        }
+
+        window.localStorage.setItem(
+            creatorSessionsStorageKey,
+            JSON.stringify(sessions),
+        );
+    } catch {
         return;
     }
-
-    window.localStorage.setItem(
-        creatorSessionsStorageKey,
-        JSON.stringify(sessions),
-    );
 };
 
 export const saveCreatorSession = (session: StoredCreatorSession): void => {
