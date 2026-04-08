@@ -1,11 +1,11 @@
-import http from "node:http";
+import http from 'node:http';
 
-import sirv from "sirv";
+import sirv from 'sirv';
 
 import {
     assertBuiltDistExists,
     resolveServeDistOptions,
-} from "./serveDistConfig.ts";
+} from './serveDistConfig.ts';
 
 const start = async (): Promise<void> => {
     const { distDirectory, host, port } = resolveServeDistOptions(
@@ -17,18 +17,18 @@ const start = async (): Promise<void> => {
     const serveStatic = sirv(distDirectory, {
         dev: false,
         etag: true,
-        single: "index.html",
+        single: 'index.html',
     });
 
     const server = http.createServer((request, response) => {
         serveStatic(request, response);
     });
 
-    server.on("error", (error) => {
+    server.on('error', (error) => {
         console.error(
             error instanceof Error
                 ? error.message
-                : "Failed to start built web server.",
+                : 'Failed to start built web server.',
         );
         process.exit(1);
     });

@@ -1,19 +1,18 @@
 {
-    "plugins": [
-        "stylelint-scss"
-    ],
-    "extends": [
-        "stylelint-config-recommended",
-        "stylelint-config-recommended-scss"
-    ],
+    "extends": ["stylelint-config-standard"],
     "rules": {
-        "selector-pseudo-class-no-unknown": [
+        "at-rule-no-unknown": [
             true,
             {
-                "ignorePseudoClasses": [
-                    "global"
-                ]
+                "ignoreAtRules": ["theme", "apply"]
             }
-        ]
+        ],
+        "alpha-value-notation": null,
+        "color-function-alias-notation": null,
+        "declaration-empty-line-before": null,
+        "font-family-name-quotes": null,
+        "hue-degree-notation": null,
+        "import-notation": null,
+        "value-keyword-case": null
     }
 }

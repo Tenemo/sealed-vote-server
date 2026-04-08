@@ -1,10 +1,8 @@
-import { ThemeProvider } from '@mui/material';
 import { render, screen } from '@testing-library/react';
 
 import VoteResults from './VoteResults';
 
 import { useAppSelector } from 'app/hooks';
-import { darkTheme } from 'styles/theme';
 
 vi.mock('@sealed-vote/protocol', () => ({
     computeGeometricMean: (results: number[], voterCount: number) =>
@@ -38,11 +36,7 @@ describe('VoteResults', () => {
             results: [],
         };
 
-        render(
-            <ThemeProvider theme={darkTheme}>
-                <VoteResults poll={poll} pollId="poll-1" />
-            </ThemeProvider>,
-        );
+        render(<VoteResults poll={poll} pollId="poll-1" />);
 
         expect(screen.getByText('Apples')).toBeInTheDocument();
         expect(screen.getByText('Bananas')).toBeInTheDocument();

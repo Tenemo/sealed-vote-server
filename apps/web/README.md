@@ -26,6 +26,7 @@ From the repository root:
 
 ```bash
 pnpm --filter @sealed-vote/web lint
+pnpm --filter @sealed-vote/web stylelint
 pnpm --filter @sealed-vote/web typecheck
 pnpm --filter @sealed-vote/web test
 pnpm --filter @sealed-vote/web build

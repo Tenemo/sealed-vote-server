@@ -1,4 +1,3 @@
-import { Typography, Alert, CircularProgress } from '@mui/material';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { isUuid } from '@sealed-vote/contracts';
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
@@ -9,6 +8,9 @@ import PollHeader from './PollHeader';
 import VoteResults from './VoteResults';
 import Voting from './Voting/Voting';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Panel } from '@/components/ui/panel';
+import { Spinner } from '@/components/ui/spinner';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import NotFound from 'components/NotFound/NotFound';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
@@ -110,23 +112,34 @@ const PollPage = (): React.JSX.Element => {
             <Helmet>
                 <title>{poll ? poll.pollName : 'Vote'}</title>
             </Helmet>
-            {isLoadingPoll && <CircularProgress sx={{ mt: 5 }} />}
+            {isLoadingPoll && (
+                <div className="flex min-h-[40vh] items-center justify-center">
+                    <Spinner className="size-10" />
+                </div>
+            )}
             {pollError && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                    {renderError(pollError)}
+                <Alert className="mx-auto mt-6 max-w-3xl" variant="destructive">
+                    <AlertDescription>
+                        {renderError(pollError)}
+                    </AlertDescription>
                 </Alert>
             )}
             {pollId && poll && (
-                <>
+                <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />
                     <VoteResults poll={poll} pollId={pollId} />
-                    <Typography p={2} variant="body1">
-                        {poll.voters.length
-                            ? `Voters in this poll: ${poll.voters.join(', ')}`
-                            : 'No voters yet.'}
-                    </Typography>
-                </>
+                    <Panel padding="compact" tone="subtle">
+                        <h2 className="text-lg font-semibold tracking-tight">
+                            Participants
+                        </h2>
+                        <p className="mt-2 text-sm leading-7 text-secondary">
+                            {poll.voters.length
+                                ? `Voters in this poll: ${poll.voters.join(', ')}`
+                                : 'No voters yet.'}
+                        </p>
+                    </Panel>
+                </div>
             )}
         </>
     );

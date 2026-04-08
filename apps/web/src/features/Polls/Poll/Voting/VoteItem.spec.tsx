@@ -1,0 +1,39 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import VoteItem from './VoteItem';
+
+describe('VoteItem', () => {
+    it('renders numeric scores from 1 to 10 as a radio group', () => {
+        render(
+            <VoteItem choiceName="Apples" onVote={vi.fn()} selectedScore={1} />,
+        );
+
+        expect(
+            screen.queryByRole('radio', { name: 'Abstain' }),
+        ).not.toBeInTheDocument();
+
+        for (let score = 1; score <= 10; score += 1) {
+            expect(
+                screen.getByRole('radio', {
+                    name: `Score ${score} for Apples`,
+                }),
+            ).toBeInTheDocument();
+        }
+    });
+
+    it('calls onVote with the selected numeric score', async () => {
+        const user = userEvent.setup();
+        const onVote = vi.fn();
+
+        render(
+            <VoteItem choiceName="Apples" onVote={onVote} selectedScore={1} />,
+        );
+
+        await user.click(
+            screen.getByRole('radio', { name: 'Score 2 for Apples' }),
+        );
+
+        expect(onVote).toHaveBeenCalledWith('Apples', 2);
+    });
+});

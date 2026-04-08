@@ -1,34 +1,31 @@
-import { GitHub as GitHubIcon } from '@mui/icons-material';
-import { useTheme, Box, Link } from '@mui/material';
+import { SiGithub } from '@icons-pack/react-simple-icons';
 import React from 'react';
+import { Link } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
 
 const Header = (): React.JSX.Element => {
-    const theme = useTheme();
-
     return (
-        <Box
-            alignItems="center"
-            component="header"
-            display="flex"
-            justifyContent="space-between"
-            sx={{
-                borderBottom: `1px solid ${theme.palette.text.primary}`,
-                p: 1,
-            }}
-        >
-            <Link href="/" underline="none" variant="h4">
-                sealed.vote
-            </Link>
-            <Link
-                href="https://github.com/Tenemo"
-                sx={{
-                    pt: '6px',
-                    cursor: 'pointer',
-                }}
-            >
-                <GitHubIcon />
-            </Link>
-        </Box>
+        <header className="border-b border-border/70 bg-background">
+            <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
+                <Link
+                    className="text-2xl font-semibold tracking-tight text-foreground no-underline sm:text-[2rem]"
+                    to="/"
+                >
+                    sealed.vote
+                </Link>
+                <Button asChild size="icon-lg" variant="secondary">
+                    <a
+                        aria-label="View the project source on GitHub"
+                        href="https://github.com/Tenemo"
+                        rel="noreferrer"
+                        target="_blank"
+                    >
+                        <SiGithub className="size-4" />
+                    </a>
+                </Button>
+            </div>
+        </header>
     );
 };
 
