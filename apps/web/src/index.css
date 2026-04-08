@@ -2,13 +2,13 @@
 @import 'tw-animate-css';
 
 @theme inline {
-    --color-background: hsl(0 0% 7.1%);
+    --color-background: hsl(0 0% 5.8%);
     --color-foreground: hsl(0 0% 100%);
-    --color-card: hsla(0 0% 100% / 0.05);
+    --color-card: hsla(0 0% 100% / 0.04);
     --color-primary: hsl(0 0% 100%);
     --color-primary-foreground: hsl(0 0% 0%);
     --color-muted-foreground: hsla(0 0% 100% / 0.7);
-    --color-accent: hsla(0 0% 100% / 0.08);
+    --color-accent: hsla(0 0% 100% / 0.065);
     --color-destructive: hsl(4 90% 60%);
     --color-border: hsla(0 0% 100% / 0.36);
     --font-sans:
