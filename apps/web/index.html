@@ -3,45 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="author" content="piotr@piech.dev" />
-        <meta name="apple-mobile-web-app-title" content="sealed.vote" />
-        <meta name="color-scheme" content="dark" />
-        <meta
-            name="description"
-            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
-        />
-        <meta name="format-detection" content="telephone=no" />
-        <meta
-            name="keywords"
-            content="confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery"
-        />
-        <meta name="robots" content="index, follow" />
-        <meta name="theme-color" content="#121212" />
-        <meta property="og:site_name" content="sealed.vote" />
-        <meta property="og:title" content="sealed.vote" />
-        <meta
-            property="og:description"
-            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
-        />
-        <meta property="og:image" content="https://sealed.vote/social/og-home.png" />
-        <meta property="og:image:alt" content="sealed.vote shown on a dark interface with a vote creation form." />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:locale" content="en_US" />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://sealed.vote/" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta
-            name="twitter:description"
-            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
-        />
-        <meta name="twitter:image" content="https://sealed.vote/social/og-home.png" />
-        <meta
-            name="twitter:image:alt"
-            content="sealed.vote shown on a dark interface with a vote creation form."
-        />
-        <meta name="twitter:title" content="sealed.vote" />
-        <link rel="canonical" href="https://sealed.vote/" />
+        <base href="/" />
         <link
             rel="icon"
             type="image/png"
@@ -56,6 +18,56 @@
             href="/favicon/apple-touch-icon.png"
         />
         <link rel="manifest" href="/favicon/site.webmanifest" />
+        <meta name="sealed-vote-seo-start" content="1" />
+        <meta name="author" content="piotr@piech.dev" />
+        <meta name="application-name" content="sealed.vote" />
+        <meta name="apple-mobile-web-app-title" content="sealed.vote" />
+        <meta name="color-scheme" content="dark" />
+        <meta
+            name="description"
+            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
+        />
+        <meta name="format-detection" content="telephone=no" />
+        <meta
+            name="keywords"
+            content="confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification"
+        />
+        <meta name="robots" content="index, follow" />
+        <meta name="theme-color" content="#121212" />
+        <meta property="og:site_name" content="sealed.vote" />
+        <meta property="og:title" content="sealed.vote" />
+        <meta
+            property="og:description"
+            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://sealed.vote/" />
+        <meta property="og:image" content="https://sealed.vote/social/og-home.png" />
+        <meta
+            property="og:image:secure_url"
+            content="https://sealed.vote/social/og-home.png"
+        />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta
+            property="og:image:alt"
+            content="sealed.vote homepage showing the vote creation interface."
+        />
+        <meta property="og:locale" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="sealed.vote" />
+        <meta
+            name="twitter:description"
+            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
+        />
+        <meta name="twitter:url" content="https://sealed.vote/" />
+        <meta name="twitter:image" content="https://sealed.vote/social/og-home.png" />
+        <meta
+            name="twitter:image:alt"
+            content="sealed.vote homepage showing the vote creation interface."
+        />
+        <link rel="canonical" href="https://sealed.vote/" />
         <title>sealed.vote</title>
         <script type="application/ld+json">
             {
@@ -64,10 +76,27 @@
                     {
                         "@type": "WebSite",
                         "@id": "https://sealed.vote/#website",
-                        "url": "https://sealed.vote/",
-                        "name": "sealed.vote",
                         "description": "Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result.",
-                        "inLanguage": "en"
+                        "inLanguage": "en",
+                        "name": "sealed.vote",
+                        "url": "https://sealed.vote/"
+                    },
+                    {
+                        "@type": "WebPage",
+                        "@id": "https://sealed.vote/#webpage",
+                        "description": "Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result.",
+                        "image": {
+                            "@id": "https://sealed.vote/#social-image"
+                        },
+                        "inLanguage": "en",
+                        "isPartOf": {
+                            "@id": "https://sealed.vote/#website"
+                        },
+                        "name": "sealed.vote",
+                        "primaryImageOfPage": {
+                            "@id": "https://sealed.vote/#social-image"
+                        },
+                        "url": "https://sealed.vote/"
                     },
                     {
                         "@type": "WebApplication",
@@ -82,10 +111,28 @@
                         "name": "sealed.vote",
                         "operatingSystem": "Any",
                         "url": "https://sealed.vote/"
+                    },
+                    {
+                        "@type": "ImageObject",
+                        "@id": "https://sealed.vote/#social-image",
+                        "caption": "sealed.vote homepage showing the vote creation interface.",
+                        "contentUrl": "https://sealed.vote/social/og-home.png",
+                        "height": {
+                            "@type": "QuantitativeValue",
+                            "unitText": "px",
+                            "value": 630
+                        },
+                        "url": "https://sealed.vote/social/og-home.png",
+                        "width": {
+                            "@type": "QuantitativeValue",
+                            "unitText": "px",
+                            "value": 1200
+                        }
                     }
                 ]
             }
         </script>
+        <meta name="sealed-vote-seo-end" content="1" />
         <script defer src="/browser-guard.js"></script>
     </head>
     <body style="background-color: #121212; color: #ffffff">

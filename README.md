@@ -1,6 +1,15 @@
 # sealed.vote
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/431089b8-8373-4038-8b80-fb3a7aa02c6e/deploy-status)](https://app.netlify.com/projects/sealed-vote/deploys)
+[![CI](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/ci.yml?branch=master&label=ci)](https://github.com/Tenemo/sealed-vote/actions/workflows/ci.yml)
+[![Production e2e](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/production-e2e.yml?branch=master&label=production%20e2e)](https://github.com/Tenemo/sealed-vote/actions/workflows/production-e2e.yml)
+[![Web deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed.vote%20%2F%20production?label=web%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed.vote+%2F+production)
+[![API deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed-vote-preview%20%2F%20production?label=api%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed-vote-preview+%2F+production)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/coverage.json)](https://github.com/Tenemo/sealed-vote/actions/workflows/readme-badges.yml)
+[![Node version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
+
+---
+
+[![License](https://img.shields.io/github/license/Tenemo/sealed-vote)](./LICENSE)
 
 [sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around homomorphic encryption. Voters score each choice from 1 to 10, and the system is designed so that individual votes remain hidden from everyone, including the server, while the final tally can still be computed.
 
@@ -47,6 +56,14 @@ The Playwright suite covers the recovery model directly:
 - [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) verifies safe replay after post-commit response loss for create, register, close, public key share, vote, and decryption share requests.
 - [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) also verifies that a previously visited poll can reopen from persisted local data when live poll fetches fail.
 - [`tests/e2e/voting-flow.spec.ts`](./tests/e2e/voting-flow.spec.ts) covers the normal happy path and asserts that completed polls show locally verified published results.
+
+## Social previews
+
+- The root page ships a full static SEO block with canonical, Open Graph, Twitter, and JSON-LD metadata.
+- Vote links publish route-specific HTML metadata before JavaScript runs. Share unfurls for `/votes/<slug>` use the exact vote title in the page title, Open Graph title, Twitter title, canonical URL, structured data, and a vote-specific PNG preview at `/social/votes/<slug>.png`.
+- Vote preview images are rendered lazily from the poll title and first choices while the vote is still open, then switch to a versioned results image after completion so newly shared links can show the final ranking without breaking CDN caching for already-shared live previews.
+- The per-vote image responses are cached aggressively through the Netlify CDN with durable caching so repeated shares of the same vote state do not keep regenerating the image.
+- The same metadata and image rendering logic is used for the static app shell, the client-side route updates, the Railway built-preview server, the Netlify `/votes/*` edge path, and the Netlify `/social/votes/:slug.png` function so previews stay consistent across environments.
 
 ## Tech stack
 

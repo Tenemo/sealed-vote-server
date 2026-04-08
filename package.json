@@ -10,6 +10,7 @@
     "scripts": {
         "dev": "turbo run dev",
         "build": "turbo run build",
+        "coverage:ci": "pnpm --filter @sealed-vote/protocol exec vitest run --coverage --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reportsDirectory=coverage && pnpm --filter @sealed-vote/api exec vitest run --coverage --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reportsDirectory=coverage && pnpm --filter @sealed-vote/web exec vitest run --coverage --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reportsDirectory=coverage && node --experimental-strip-types .github/scripts/writeBadgeData.mts",
         "test": "turbo run test --output-logs=errors-only --log-prefix=none",
         "lint": "turbo run lint --output-logs=errors-only --log-prefix=none",
         "typecheck": "turbo run typecheck --output-logs=errors-only --log-prefix=none && tsc --project tsconfig.root.json",

@@ -1,6 +1,5 @@
 import React, { Suspense, lazy } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { Helmet } from 'react-helmet-async';
 import { Route, Routes } from 'react-router-dom';
 
 import VersionBadge from './VersionBadge';
@@ -16,16 +15,7 @@ const Poll = lazy(() => import('features/Polls/Poll/Poll'));
 const App = (): React.JSX.Element => {
     return (
         <>
-            <Helmet>
-                <title>sealed.vote</title>
-                <meta
-                    content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
-                    name="description"
-                />
-                <link href="https://sealed.vote/" rel="canonical" />
-                <meta content="index, follow" name="robots" />
-            </Helmet>
-            <div className="flex min-h-full flex-col">
+            <div className="flex min-h-[100svh] flex-col">
                 <ErrorBoundary
                     fallback={
                         <main className="flex flex-1 items-center justify-center px-4 py-10">
