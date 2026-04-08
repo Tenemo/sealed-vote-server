@@ -32,7 +32,7 @@ See [docs/voting.md](./docs/voting.md) for the protocol and phase model, and [do
 
 - Frontend: TypeScript, React, Redux Toolkit, Tailwind CSS, shadcn/ui, Vite, Vitest
 - Backend: TypeScript, Fastify, Drizzle ORM, PostgreSQL, Vitest
-- Tooling: pnpm workspaces, Turborepo, Playwright, ESLint
+- Tooling: pnpm workspaces, Turborepo, Playwright, ESLint, stylelint (web app)
 
 ## Local development
 

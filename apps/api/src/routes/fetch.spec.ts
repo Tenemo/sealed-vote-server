@@ -94,6 +94,26 @@ describe('GET /polls/:pollRef', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('does not resolve longer legacy-style slugs for the same poll', async () => {
+        const pollName = getUniquePollName('GET poll legacy slug');
+        const { pollId, pollSlug, creatorToken } = await createPoll(
+            fastify,
+            pollName,
+            ['Option 1', 'Option 2'],
+        );
+        const legacySlug = `${pollSlug.slice(0, -4)}${pollId.replace(/-/g, '').slice(-8)}`;
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${legacySlug}`,
+        });
+
+        expect(response.statusCode).toBe(404);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('returns 404 for non-existing slug', async () => {
         const response = await fastify.inject({
             method: 'GET',

@@ -10,7 +10,7 @@ import createError from 'http-errors';
 
 import { choices as choicesTable, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
-import { getPollSlugCandidates } from '../utils/pollSlug.js';
+import { getCreatePollSlugAttempts } from '../utils/pollSlug.js';
 import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
 
 import { MessageResponseSchema } from './schemas.js';
@@ -37,6 +37,7 @@ const schema = {
 
 export type CreatePollRequest = CreatePollRequestContract;
 export type CreatePollResponse = CreatePollResponseContract;
+const canonicalPollSlugRetryCount = 8;
 
 export const create = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
@@ -68,9 +69,12 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
 
             const creatorToken = generateSecureToken();
             const creatorTokenHash = hashSecureToken(creatorToken);
-            const pollId = randomUUID();
 
-            for (const slug of getPollSlugCandidates(pollName, pollId)) {
+            for (const { id: pollId, slug } of getCreatePollSlugAttempts(
+                pollName,
+                randomUUID,
+                canonicalPollSlugRetryCount,
+            )) {
                 try {
                     const createdPoll = await withTransaction(
                         fastify,

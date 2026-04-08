@@ -20,7 +20,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "id": "poll-id",
-    "slug": "lunch-vote--1a2b3c4d",
+    "slug": "lunch-vote--3c4d",
     "creatorToken": "creator-token"
 }
 ```
@@ -37,7 +37,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "id": "poll-id",
-    "slug": "lunch-vote--1a2b3c4d",
+    "slug": "lunch-vote--3c4d",
     "pollName": "Lunch vote",
     "createdAt": "2026-04-04T12:00:00.000Z",
     "choices": ["Pizza", "Sushi", "Pasta"],

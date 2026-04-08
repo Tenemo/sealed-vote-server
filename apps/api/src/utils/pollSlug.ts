@@ -17,6 +17,7 @@ type PollSlugAssignment = {
 };
 
 const fallbackTitleSegment = 'vote';
+const defaultCanonicalPollSlugRetryCount = 8;
 
 const trimHyphens = (value: string): string => value.replace(/^-+|-+$/g, '');
 
@@ -45,6 +46,41 @@ export const getPollSlugCandidates = (
     POLL_SLUG_SUFFIX_LENGTHS.map((suffixLength) =>
         createPollSlug(pollName, pollId, suffixLength),
     );
+
+export const getCreatePollSlugAttempts = (
+    pollName: string,
+    createPollId: () => string,
+    canonicalPollSlugRetryCount: number = defaultCanonicalPollSlugRetryCount,
+): PollSlugAssignment[] => {
+    const canonicalAttemptCount =
+        Number.isInteger(canonicalPollSlugRetryCount) &&
+        canonicalPollSlugRetryCount > 0
+            ? canonicalPollSlugRetryCount
+            : defaultCanonicalPollSlugRetryCount;
+    const canonicalSuffixLength = POLL_SLUG_SUFFIX_LENGTHS[0];
+    const slugAttempts: PollSlugAssignment[] = [];
+
+    for (
+        let attemptIndex = 0;
+        attemptIndex < canonicalAttemptCount - 1;
+        attemptIndex += 1
+    ) {
+        const pollId = createPollId();
+        slugAttempts.push({
+            id: pollId,
+            slug: createPollSlug(pollName, pollId, canonicalSuffixLength),
+        });
+    }
+
+    const finalPollId = createPollId();
+    return [
+        ...slugAttempts,
+        ...getPollSlugCandidates(pollName, finalPollId).map((slug) => ({
+            id: finalPollId,
+            slug,
+        })),
+    ];
+};
 
 export const assignPollSlugs = (
     polls: PollSlugSource[],

@@ -39,7 +39,7 @@ test('keeps copied share links slug-based across platforms', async ({
 
     const copiedShareLink = await copyShareLink(page);
     expect(copiedShareLink).toBe(createdPoll.pollUrl);
-    expect(copiedShareLink).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{8,32}$/);
+    expect(copiedShareLink).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
 
     const participant = await launchFirefoxParticipant({ playwright });
     attachErrorTracking(participant.page, 'firefox-participant', tracker);

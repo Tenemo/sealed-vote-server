@@ -9,6 +9,7 @@ describe('sanitizeVotingStateForPersistence', () => {
             'poll-1': {
                 ...initialVoteState,
                 creatorToken: 'creator-token',
+                pendingVoterName: 'Alice',
                 selectedScores: {
                     Apples: 7,
                 },
@@ -17,6 +18,7 @@ describe('sanitizeVotingStateForPersistence', () => {
                 voterToken: 'voter-token',
                 isVotingInProgress: true,
                 progressMessage: 'Waiting for common public key...',
+                shouldResumeWorkflow: true,
                 privateKey: '11',
                 publicKey: '22',
                 commonPublicKey: '33',
@@ -29,6 +31,7 @@ describe('sanitizeVotingStateForPersistence', () => {
         expect(sanitizedState['poll-1']).toEqual({
             ...initialVoteState,
             creatorToken: 'creator-token',
+            pendingVoterName: 'Alice',
             selectedScores: {
                 Apples: 7,
             },
@@ -37,6 +40,7 @@ describe('sanitizeVotingStateForPersistence', () => {
             voterToken: 'voter-token',
             isVotingInProgress: false,
             progressMessage: null,
+            shouldResumeWorkflow: true,
             privateKey: '11',
             publicKey: '22',
             commonPublicKey: '33',
@@ -51,6 +55,7 @@ describe('sanitizeVotingStateForPersistence', () => {
             'poll-1': {
                 ...initialVoteState,
                 creatorToken: 'creator-token',
+                pendingVoterName: 'Alice',
                 selectedScores: {
                     Apples: 7,
                 },
@@ -60,6 +65,7 @@ describe('sanitizeVotingStateForPersistence', () => {
                 isVotingInProgress: true,
                 progressMessage: 'Waiting for common public key...',
                 results: [49],
+                shouldResumeWorkflow: true,
                 privateKey: '11',
                 publicKey: '22',
                 commonPublicKey: '33',

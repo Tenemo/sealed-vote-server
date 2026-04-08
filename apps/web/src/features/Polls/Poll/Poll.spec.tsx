@@ -42,7 +42,7 @@ vi.mock('features/Polls/pollsApi', () => ({
 
 const basePoll = {
     id: '11111111-1111-4111-8111-111111111111',
-    slug: 'best-fruit--11111111',
+    slug: 'best-fruit--1111',
     pollName: 'Best fruit',
     createdAt: '2026-01-01T00:00:00.000Z',
     choices: ['Apples'],
@@ -58,7 +58,7 @@ const basePoll = {
 
 const renderPoll = (
     preloadedVotingState: VotingState = {},
-    initialEntry: string = '/votes/best-fruit--11111111',
+    initialEntry: string = '/votes/best-fruit--1111',
 ): EnhancedStore<{ voting: VotingState }> => {
     const store = configureStore({
         preloadedState: {
@@ -171,5 +171,55 @@ describe('Poll page', () => {
                 pollingInterval: 3000,
             }),
         );
+    });
+
+    it('shows a non-blocking connection toast when polling fails after data has loaded', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: basePoll,
+            error: {
+                error: 'TypeError: Failed to fetch',
+                status: 'FETCH_ERROR',
+            },
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        expect(
+            screen.getByRole('heading', { name: 'Best fruit' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                /The connection to the server was lost\.\s+Showing the latest available vote state and retrying in the background\./i,
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('TypeError: Failed to fetch'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('shows a friendly reconnect state when the poll cannot be loaded because the connection was lost', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: undefined,
+            error: {
+                error: 'TypeError: Failed to fetch',
+                status: 'FETCH_ERROR',
+            },
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        expect(
+            screen.getByRole('heading', { name: 'Connection lost' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                /The app will keep retrying in the background and will recover automatically once the connection is back\./i,
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('TypeError: Failed to fetch'),
+        ).not.toBeInTheDocument();
     });
 });

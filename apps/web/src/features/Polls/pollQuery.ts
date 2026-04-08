@@ -48,12 +48,16 @@ export const fetchFreshPoll = async (
     pollId: string,
 ): Promise<PollResponse> => {
     try {
-        return await dispatch(
+        const freshPoll = await dispatch(
             pollsApi.endpoints.getPoll.initiate(pollId, {
                 forceRefetch: true,
                 subscribe: false,
             }),
         ).unwrap();
+
+        if (isPollResponse(freshPoll) && freshPoll.id === pollId) {
+            return freshPoll;
+        }
     } catch (error) {
         const cachedPoll = selectPollResult(store.getState(), pollId);
         if (cachedPoll) {
@@ -62,6 +66,13 @@ export const fetchFreshPoll = async (
 
         throw error;
     }
+
+    const cachedPoll = selectPollResult(store.getState(), pollId);
+    if (cachedPoll) {
+        return cachedPoll;
+    }
+
+    throw new Error(`Poll ${pollId} could not be fetched.`);
 };
 
 export const waitForPoll = async ({
