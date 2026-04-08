@@ -23,6 +23,7 @@ const alertVariants = cva(
 const Alert = ({
     className,
     variant,
+    role,
     ...props
 }: React.ComponentProps<'div'> &
     VariantProps<typeof alertVariants>): React.JSX.Element => {
@@ -31,7 +32,7 @@ const Alert = ({
             className={cn(alertVariants({ variant }), className)}
             data-slot="alert"
             data-variant={variant}
-            role="alert"
+            role={role ?? (variant === 'destructive' ? 'alert' : undefined)}
             {...props}
         />
     );

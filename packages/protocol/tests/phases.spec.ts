@@ -10,7 +10,7 @@ import {
     derivePollPhase,
     type PollPhaseState,
     toPollPhaseState,
-} from '../phases';
+} from '../src/phases';
 
 const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     id: '11111111-1111-4111-8111-111111111111',

@@ -4,6 +4,16 @@ import userEvent from '@testing-library/user-event';
 import VoteItem from './VoteItem';
 
 describe('VoteItem', () => {
+    it('uses the choice name as the visible group legend', () => {
+        render(
+            <VoteItem choiceName="Apples" onVote={vi.fn()} selectedScore={1} />,
+        );
+
+        expect(
+            screen.getByText('Apples', { selector: 'legend' }),
+        ).toBeVisible();
+    });
+
     it('renders numeric scores from 1 to 10 as a radio group', () => {
         render(
             <VoteItem choiceName="Apples" onVote={vi.fn()} selectedScore={1} />,

@@ -3,6 +3,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { Helmet } from 'react-helmet-async';
 import { Route, Routes } from 'react-router-dom';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
 import Header from 'components/Header/Header';
 import NotFound from 'components/NotFound/NotFound';
@@ -19,10 +20,17 @@ const App = (): React.JSX.Element => {
             <div className="flex min-h-full flex-col">
                 <ErrorBoundary
                     fallback={
-                        <div>
-                            The application has crashed due to a rendering
-                            error.
-                        </div>
+                        <main className="flex flex-1 items-center justify-center px-4 py-10">
+                            <Alert
+                                className="w-full max-w-xl"
+                                variant="destructive"
+                            >
+                                <AlertDescription>
+                                    The application crashed due to a rendering
+                                    error.
+                                </AlertDescription>
+                            </Alert>
+                        </main>
                     }
                     onError={(error) => console.error(error)}
                 >

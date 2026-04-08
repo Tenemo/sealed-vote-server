@@ -1,7 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 export const connectionToastMessage =
-    'Connection to the server was lost. Showing the latest available vote state and retrying in the background.';
+    'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';
 export const reconnectingWorkflowMessage =
     'Connection lost. Reconnecting and resuming in the background...';
 
@@ -91,6 +91,38 @@ export const expectResultsVisible = async (page: Page): Promise<void> => {
     await expect(
         page.getByRole('heading', { name: 'Results' }),
     ).toBeVisible({ timeout: 120_000 });
+};
+
+export const expectParticipantsVisible = async (
+    page: Page,
+    participantNames: readonly string[],
+): Promise<void> => {
+    const participantsRegion = page.getByRole('region', {
+        name: 'Participants',
+    });
+
+    await expect(participantsRegion).toBeVisible();
+
+    for (const participantName of participantNames) {
+        await expect(
+            participantsRegion.getByText(participantName, { exact: true }),
+        ).toBeVisible();
+    }
+};
+
+export const expectParticipantsHidden = async (
+    page: Page,
+    participantNames: readonly string[],
+): Promise<void> => {
+    const participantsRegion = page.getByRole('region', {
+        name: 'Participants',
+    });
+
+    for (const participantName of participantNames) {
+        await expect(
+            participantsRegion.getByText(participantName, { exact: true }),
+        ).toHaveCount(0);
+    }
 };
 
 export const expectConnectionToastVisible = async (

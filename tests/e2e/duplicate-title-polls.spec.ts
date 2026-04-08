@@ -7,6 +7,8 @@ import {
 import {
     createPoll,
     deletePolls,
+    expectParticipantsHidden,
+    expectParticipantsVisible,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -48,7 +50,7 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
         .getByLabel('Voter name')
         .fill(createVoterName('alice', namespace));
     await page.getByRole('button', { exact: true, name: 'Vote' }).click();
-    await expect(page.getByText(/Voters in this poll: .*alice/i)).toBeVisible();
+    await expectParticipantsVisible(page, [createVoterName('alice', namespace)]);
 
     const participant = await openProjectParticipant(browser, testInfo);
     attachErrorTracking(participant.page, 'page-2', tracker);
@@ -62,14 +64,14 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
             .getByRole('button', { exact: true, name: 'Vote' })
             .click();
 
-        await expect(
-            participant.page.getByText(/Voters in this poll: .*bob/i),
-        ).toBeVisible();
-        await expect(page.getByText(/Voters in this poll: .*alice/i)).toBeVisible();
-        await expect(page.getByText(/Voters in this poll: .*bob/i)).toHaveCount(0);
-        await expect(
-            participant.page.getByText(/Voters in this poll: .*alice/i),
-        ).toHaveCount(0);
+        await expectParticipantsVisible(participant.page, [
+            createVoterName('bob', namespace),
+        ]);
+        await expectParticipantsVisible(page, [createVoterName('alice', namespace)]);
+        await expectParticipantsHidden(page, [createVoterName('bob', namespace)]);
+        await expectParticipantsHidden(participant.page, [
+            createVoterName('alice', namespace),
+        ]);
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);

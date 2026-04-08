@@ -9,6 +9,7 @@ import {
     beginVote,
     createPoll,
     deletePolls,
+    expectParticipantsVisible,
     expectResultsVisible,
     joinPoll,
     type CreatedPoll,
@@ -66,9 +67,7 @@ test('completes the poll happy path on every required browser project', async ({
         await expectResultsVisible(participant.page);
         await expectNoAxeViolations(page, 'creator results page');
         await expectNoAxeViolations(participant.page, 'participant results page');
-        await expect(
-            page.getByText(`Voters in this poll: ${creatorName}, ${participantName}`),
-        ).toBeVisible();
+        await expectParticipantsVisible(page, [creatorName, participantName]);
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
