@@ -1,5 +1,4 @@
 import React, { useState, type ChangeEvent, type FormEvent } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 
 import ChoiceAdding from './ChoiceAdding';
@@ -10,6 +9,8 @@ import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import DocumentSeo from 'app/DocumentSeo';
+import { buildHomePageSeo } from 'app/seo';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
@@ -32,6 +33,15 @@ const PollCreationPage = (): React.JSX.Element => {
     const [form, setForm] = useState<Form>(initialForm);
     const [creatorToken, setCreatorToken] = useState<string | null>(null);
     const { pollName, choices } = form;
+    const runtimeOrigin =
+        typeof window === 'undefined' ? undefined : window.location.origin;
+    const homePageSeo = React.useMemo(
+        () =>
+            buildHomePageSeo({
+                origin: runtimeOrigin,
+            }),
+        [runtimeOrigin],
+    );
 
     const onFormChange = ({
         target: { id, value },
@@ -89,15 +99,7 @@ const PollCreationPage = (): React.JSX.Element => {
 
     return (
         <>
-            <Helmet>
-                <title>Create a new vote | sealed.vote</title>
-                <meta
-                    content="Create a confidential 1-10 score vote in the browser and share one link with every participant."
-                    name="description"
-                />
-                <meta content="index, follow" name="robots" />
-                <link href="https://sealed.vote/" rel="canonical" />
-            </Helmet>
+            <DocumentSeo metadata={homePageSeo} />
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
                     <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">

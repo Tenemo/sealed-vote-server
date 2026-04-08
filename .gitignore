@@ -10,6 +10,7 @@ dist/
 
 # Testing
 coverage/
+.github/badge-data/
 /test-results/
 /playwright-report/
 /blob-report/

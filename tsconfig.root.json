@@ -17,6 +17,7 @@
         "forceConsistentCasingInFileNames": true
     },
     "include": [
+        "netlify/**/*.ts",
         "playwright.config.ts",
         "playwright.production.config.ts",
         "tests/e2e/**/*.ts",

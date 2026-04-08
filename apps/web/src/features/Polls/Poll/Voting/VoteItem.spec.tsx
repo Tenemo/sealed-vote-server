@@ -62,4 +62,20 @@ describe('VoteItem', () => {
         expect(selectedLabel).toHaveClass('bg-white');
         expect(selectedLabel).toHaveClass('text-black');
     });
+
+    it('renders unselected scores with the shared solid surface instead of a transparent background', () => {
+        render(
+            <VoteItem choiceName="Apples" onVote={vi.fn()} selectedScore={7} />,
+        );
+
+        const unselectedRadio = screen.getByRole('radio', {
+            name: 'Score 6 for Apples',
+        });
+        const unselectedLabel = document.querySelector(
+            `label[for="${unselectedRadio.getAttribute('id')}"]`,
+        );
+
+        expect(unselectedLabel).toHaveClass('bg-background');
+        expect(unselectedLabel).not.toHaveClass('bg-transparent');
+    });
 });
