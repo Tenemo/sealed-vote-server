@@ -65,6 +65,8 @@ const getBrowserOnlineState = (): boolean =>
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
     const { pollSlug } = useParams();
+    const participantsHeadingId = React.useId();
+
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
     }
@@ -231,7 +233,7 @@ const PollPage = (): React.JSX.Element => {
                         <h1 className="text-2xl font-semibold tracking-tight">
                             Connection lost
                         </h1>
-                        <p className="text-sm leading-7 text-secondary sm:text-base">
+                        <p className="text-sm leading-7 text-muted-foreground sm:text-base">
                             We lost the connection to the server. The app will
                             keep retrying in the background and will recover
                             automatically once the connection is back.
@@ -251,15 +253,37 @@ const PollPage = (): React.JSX.Element => {
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />
                     <VoteResults poll={poll} pollId={pollId} />
-                    <Panel padding="compact" tone="subtle">
-                        <h2 className="text-lg font-semibold tracking-tight">
+                    <Panel
+                        aria-labelledby={participantsHeadingId}
+                        padding="compact"
+                        tone="surface"
+                    >
+                        <h2
+                            className="text-lg font-semibold tracking-tight"
+                            id={participantsHeadingId}
+                        >
                             Participants
                         </h2>
-                        <p className="mt-2 text-sm leading-7 text-secondary">
-                            {poll.voters.length
-                                ? `Voters in this poll: ${poll.voters.join(', ')}`
-                                : 'No voters yet.'}
-                        </p>
+                        {poll.voters.length ? (
+                            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {poll.voters.map((voterName) => (
+                                    <Panel
+                                        asChild
+                                        className="min-w-0 break-words text-sm leading-6 text-foreground"
+                                        key={voterName}
+                                        padding="row"
+                                        radius="compact"
+                                        tone="subtle"
+                                    >
+                                        <li>{voterName}</li>
+                                    </Panel>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                                No voters yet.
+                            </p>
+                        )}
                     </Panel>
                 </div>
             )}

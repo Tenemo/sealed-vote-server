@@ -8,6 +8,7 @@ import {
     beginVote,
     createPoll,
     deletePolls,
+    expectParticipantsVisible,
     expectResultsVisible,
     getShareLinkValue,
     joinPoll,
@@ -76,11 +77,11 @@ test('completes one real poll across desktop chromium, desktop firefox, and mobi
         await expectResultsVisible(page);
         await expectResultsVisible(firefoxDesktop.page);
         await expectResultsVisible(firefoxMobile.page);
-        await expect(
-            page.getByText(
-                `Voters in this poll: ${creatorName}, ${firefoxDesktopName}, ${firefoxMobileName}`,
-            ),
-        ).toBeVisible();
+        await expectParticipantsVisible(page, [
+            creatorName,
+            firefoxDesktopName,
+            firefoxMobileName,
+        ]);
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(firefoxDesktop);

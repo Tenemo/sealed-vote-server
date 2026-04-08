@@ -9,7 +9,7 @@ const Header = (): React.JSX.Element => {
         <header className="border-b border-border/70 bg-background">
             <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
                 <Link
-                    className="text-2xl font-semibold tracking-tight text-foreground no-underline sm:text-[2rem]"
+                    className="rounded-sm text-2xl font-semibold tracking-tight text-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:text-3xl"
                     to="/"
                 >
                     sealed.vote
@@ -18,10 +18,10 @@ const Header = (): React.JSX.Element => {
                     <a
                         aria-label="View the project source on GitHub"
                         href="https://github.com/Tenemo"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         target="_blank"
                     >
-                        <SiGithub className="size-4" />
+                        <SiGithub aria-hidden="true" className="size-4" />
                     </a>
                 </Button>
             </div>

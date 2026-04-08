@@ -20,6 +20,7 @@ type VotingProps = {
 };
 
 const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
+    const headingId = React.useId();
     const [selectedScores, setSelectedScoresForm] = useState<
         Record<string, number>
     >(buildDefaultScores(poll.choices));
@@ -85,13 +86,16 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
     }
 
     return (
-        <Panel>
+        <Panel aria-labelledby={headingId}>
             <form className="space-y-6" onSubmit={onSubmit}>
                 <div className="space-y-2">
-                    <h2 className="text-2xl font-semibold tracking-tight">
+                    <h2
+                        className="text-2xl font-semibold tracking-tight"
+                        id={headingId}
+                    >
                         Cast your vote
                     </h2>
-                    <p className="text-sm leading-7 text-secondary sm:text-base">
+                    <p className="text-sm leading-7 text-muted-foreground sm:text-base">
                         Rate choices from 1 to 10. The results will be ranked by
                         geometric mean of all votes per item. All voters need to
                         be present in order to complete the vote.

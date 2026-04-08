@@ -78,7 +78,7 @@ const PollCreationPage = (): React.JSX.Element => {
                     <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                         Create a new vote
                     </h1>
-                    <p className="mx-auto max-w-2xl text-base leading-7 text-secondary sm:text-lg">
+                    <p className="mx-auto max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
                         Give the vote a clear name, add a few choices, and share
                         the generated link when you are ready.
                     </p>
