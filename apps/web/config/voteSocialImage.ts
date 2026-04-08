@@ -48,6 +48,8 @@ const resolveVoteSocialImageFontPathFromModule = (): string | null => {
         return null;
     }
 };
+// Keep a bundled font for server-side social image rendering because Resvg
+// runs with system fonts disabled for deterministic output.
 const voteSocialImageFontPathCandidates = [
     path.resolve(process.cwd(), 'src', 'fonts', 'Roboto-Regular.ttf'),
     path.resolve(
