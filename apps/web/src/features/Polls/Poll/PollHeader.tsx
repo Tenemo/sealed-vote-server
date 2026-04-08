@@ -6,6 +6,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    actionButtonClassName,
+    mutedBodyClassName,
+    pageTitleClassName,
+} from '@/lib/uiClasses';
+import { cn } from '@/lib/utils';
 import { useAppSelector } from 'app/hooks';
 import { hasPublishedResults } from 'features/Polls/pollData';
 import {
@@ -51,13 +57,11 @@ const PollHeader = ({
                 <p className="text-sm font-medium text-muted-foreground">
                     Vote
                 </p>
-                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                    {poll.pollName}
-                </h1>
+                <h1 className={pageTitleClassName}>{poll.pollName}</h1>
                 <p className="text-sm font-medium text-muted-foreground">
                     Created {formatPollCreationDate(poll.createdAt)}
                 </p>
-                <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+                <p className={cn(mutedBodyClassName, 'max-w-3xl')}>
                     Share the link below with participants. Once everyone has
                     voted, the results are ordered by geometric mean.
                 </p>
@@ -72,7 +76,7 @@ const PollHeader = ({
                     tone="subtle"
                 >
                     <div>
-                        <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                        <p className={mutedBodyClassName}>
                             You are the creator of this vote. When there are at
                             least two voters, including yourself, you can begin
                             the vote to lock registrations and calculate the
@@ -80,7 +84,7 @@ const PollHeader = ({
                         </p>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <Button
-                                className="w-full sm:w-auto"
+                                className={actionButtonClassName}
                                 disabled={
                                     isClosingPoll || poll.voters.length < 2
                                 }

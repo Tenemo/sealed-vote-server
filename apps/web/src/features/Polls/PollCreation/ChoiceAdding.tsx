@@ -4,6 +4,8 @@ import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
+import { actionButtonClassName, mutedBodyClassName } from '@/lib/uiClasses';
+import { cn } from '@/lib/utils';
 
 type ChoiceAddingProps = {
     choices: string[];
@@ -47,7 +49,7 @@ const ChoiceAdding = ({
                 <h2 className="text-xl font-semibold tracking-tight">
                     Choices
                 </h2>
-                <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                <p className={mutedBodyClassName}>
                     Each participant will rank every option from 1 to 10.
                 </p>
             </div>
@@ -70,7 +72,7 @@ const ChoiceAdding = ({
                 />
                 <div className="sm:pt-7">
                     <Button
-                        className="w-full justify-center sm:w-auto"
+                        className={cn(actionButtonClassName, 'justify-center')}
                         disabled={!isChoiceNameValid}
                         onClick={handleAddChoice}
                         size="lg"
@@ -85,7 +87,7 @@ const ChoiceAdding = ({
             {choices.length === 0 && (
                 <Panel
                     borderStyle="dashed"
-                    className="text-sm leading-7 text-muted-foreground"
+                    className={mutedBodyClassName}
                     padding="row"
                     radius="compact"
                     tone="subtle"
@@ -132,7 +134,7 @@ const ChoiceAdding = ({
                 </div>
             )}
             {choices.length === 1 && (
-                <p className="text-sm leading-7 text-muted-foreground">
+                <p className={mutedBodyClassName}>
                     There need to be at least two possible choices in a vote.
                 </p>
             )}

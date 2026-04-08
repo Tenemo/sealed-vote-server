@@ -10,6 +10,7 @@ import Voting from './Voting/Voting';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
+import { mutedBodyClassName, sectionTitleClassName } from '@/lib/uiClasses';
 import DocumentSeo from 'app/DocumentSeo';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import { buildVotePageSeo } from 'app/seo';
@@ -178,7 +179,7 @@ const PollPage = (): React.JSX.Element => {
         <>
             <DocumentSeo metadata={pageSeo} />
             {isLoadingPoll && !hasPollData && (
-                <div className="flex min-h-[40vh] items-center justify-center">
+                <div className="flex flex-1 items-center justify-center">
                     <Spinner className="size-10" />
                 </div>
             )}
@@ -204,13 +205,13 @@ const PollPage = (): React.JSX.Element => {
                 </div>
             )}
             {shouldShowConnectionState && (
-                <Panel className="mx-auto flex w-full max-w-2xl flex-col items-center gap-4 text-center">
+                <Panel className="mx-auto flex flex-1 w-full max-w-2xl flex-col items-center justify-center gap-4 text-center">
                     <Spinner className="size-10" />
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-semibold tracking-tight">
+                        <h1 className={sectionTitleClassName}>
                             Connection lost
                         </h1>
-                        <p className="text-sm leading-7 text-muted-foreground sm:text-base">
+                        <p className={mutedBodyClassName}>
                             We lost the connection to the server. The app will
                             keep retrying in the background and will recover
                             automatically once the connection is back.
@@ -238,37 +239,35 @@ const PollPage = (): React.JSX.Element => {
                         pollId={pollId}
                     />
                     <VoteResults poll={effectivePoll} pollId={pollId} />
-                    <Panel
-                        aria-labelledby={participantsHeadingId}
-                        padding="compact"
-                        tone="surface"
-                    >
-                        <h2
-                            className="text-lg font-semibold tracking-tight"
-                            id={participantsHeadingId}
-                        >
-                            Participants
-                        </h2>
-                        {effectivePoll.voters.length ? (
-                            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {effectivePoll.voters.map((voterName) => (
-                                    <Panel
-                                        asChild
-                                        className="min-w-0 break-words text-sm leading-6 text-foreground"
-                                        key={voterName}
-                                        padding="row"
-                                        radius="compact"
-                                        tone="subtle"
-                                    >
-                                        <li>{voterName}</li>
-                                    </Panel>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                                No voters yet.
-                            </p>
-                        )}
+                    <Panel asChild padding="compact" tone="surface">
+                        <section aria-labelledby={participantsHeadingId}>
+                            <h2
+                                className="text-lg font-semibold tracking-tight"
+                                id={participantsHeadingId}
+                            >
+                                Participants
+                            </h2>
+                            {effectivePoll.voters.length ? (
+                                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                                    {effectivePoll.voters.map((voterName) => (
+                                        <Panel
+                                            asChild
+                                            className="min-w-0 break-words text-sm leading-6 text-foreground"
+                                            key={voterName}
+                                            padding="row"
+                                            radius="compact"
+                                            tone="subtle"
+                                        >
+                                            <li>{voterName}</li>
+                                        </Panel>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                                    No voters yet.
+                                </p>
+                            )}
+                        </section>
                     </Panel>
                 </div>
             )}

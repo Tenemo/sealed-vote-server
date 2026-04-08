@@ -34,14 +34,14 @@ const App = (): React.JSX.Element => {
                 >
                     <Header />
                     <main className="flex flex-1 justify-center px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-8">
-                        <div className="w-full max-w-4xl">
+                        <div className="flex w-full max-w-4xl flex-1 flex-col">
                             <Routes>
                                 <Route element={<PollCreation />} path="/" />
                                 <Route
                                     element={
                                         <Suspense
                                             fallback={
-                                                <div className="flex min-h-[50vh] items-center justify-center">
+                                                <div className="flex flex-1 items-center justify-center">
                                                     <Spinner className="size-10" />
                                                 </div>
                                             }
