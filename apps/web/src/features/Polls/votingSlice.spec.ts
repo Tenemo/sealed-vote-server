@@ -117,4 +117,46 @@ describe('sanitizeVotingStateForPersistence', () => {
             hasSubmittedDecryptionShares: false,
         });
     });
+
+    it('normalizes legacy persisted poll snapshots that predate resultScores', () => {
+        const sanitizedState = sanitizeVotingStateForPersistence({
+            'poll-1': {
+                ...initialVoteState,
+                pollSnapshot: {
+                    id: 'poll-1',
+                    slug: 'poll-1--1234',
+                    pollName: 'Poll 1',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    choices: ['Apples'],
+                    voters: ['Alice'],
+                    isOpen: true,
+                    publicKeyShareCount: 0,
+                    commonPublicKey: null,
+                    encryptedVoteCount: 0,
+                    encryptedTallies: [],
+                    decryptionShareCount: 0,
+                } as unknown as NonNullable<
+                    (typeof initialVoteState)['pollSnapshot']
+                >,
+            },
+        });
+
+        expect(sanitizedState['poll-1'].pollSnapshot).toEqual({
+            id: 'poll-1',
+            slug: 'poll-1--1234',
+            pollName: 'Poll 1',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples'],
+            voters: ['Alice'],
+            isOpen: true,
+            publicKeyShareCount: 0,
+            commonPublicKey: null,
+            encryptedVoteCount: 0,
+            encryptedTallies: [],
+            decryptionShareCount: 0,
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
+        });
+    });
 });

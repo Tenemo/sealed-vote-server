@@ -31,7 +31,7 @@ const persistVersion = 2;
 
 const votingSessionTransform = createTransform(
     sanitizeVotingStateForPersistence,
-    (outboundState) => outboundState,
+    sanitizeVotingStateForPersistence,
     { whitelist: ['voting'] },
 );
 

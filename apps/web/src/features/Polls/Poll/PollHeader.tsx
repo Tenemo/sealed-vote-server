@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppSelector } from 'app/hooks';
+import { hasPublishedResults } from 'features/Polls/pollData';
 import {
     useClosePollMutation,
     type PollResponse,
@@ -26,6 +27,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
     const { creatorToken, progressMessage, workflowError } = useAppSelector(
         (state) => selectVotingStateByPollId(state, pollId),
     );
+    const hasResults = hasPublishedResults(poll);
 
     const [closePoll, { isLoading: isClosingPoll, error: closeError }] =
         useClosePollMutation();
@@ -95,7 +97,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
             <div className="space-y-3">
                 {progressMessage && (
                     <Alert aria-live="polite" role="status" variant="info">
-                        {!poll.resultScores.length && (
+                        {!hasResults && (
                             <Spinner
                                 aria-hidden="true"
                                 className="size-4"

@@ -1,6 +1,7 @@
 import React, { useEffect, useEffectEvent, useRef } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import { hasPublishedResults } from 'features/Polls/pollData';
 import { recoverSession } from 'features/Polls/votingThunks/recoverSession';
 import { vote } from 'features/Polls/votingThunks/vote';
 
@@ -26,7 +27,7 @@ const RecoveryCoordinator = (): React.JSX.Element => {
             latestVotingStateRef.current,
         )) {
             if (
-                voteState.pollSnapshot?.resultScores.length ||
+                hasPublishedResults(voteState.pollSnapshot) ||
                 voteState.isVotingInProgress ||
                 recoveringPollIdsRef.current.has(pollId)
             ) {
@@ -77,7 +78,7 @@ const RecoveryCoordinator = (): React.JSX.Element => {
         const shouldRunRecovery = Object.values(votingState).some(
             (voteState) => {
                 if (
-                    voteState.pollSnapshot?.resultScores.length ||
+                    hasPublishedResults(voteState.pollSnapshot) ||
                     voteState.isVotingInProgress
                 ) {
                     return false;

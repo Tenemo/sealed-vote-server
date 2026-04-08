@@ -8,6 +8,7 @@ import type {
     RecoverSessionResponse,
 } from '@sealed-vote/contracts';
 
+import { hasPublishedResults, normalizePollResponse } from './pollData';
 import { pollsApi } from './pollsApi';
 import {
     clearCompletedSensitiveFields,
@@ -50,10 +51,16 @@ const applyRegistration = (
 };
 
 const applyPollSnapshot = (voteState: VoteState, poll: PollResponse): void => {
-    voteState.pollSlug = poll.slug;
-    voteState.pollSnapshot = poll;
+    const normalizedPoll = normalizePollResponse(poll);
 
-    if (!poll.resultScores.length) {
+    if (!normalizedPoll) {
+        return;
+    }
+
+    voteState.pollSlug = normalizedPoll.slug;
+    voteState.pollSnapshot = normalizedPoll;
+
+    if (!hasPublishedResults(normalizedPoll)) {
         return;
     }
 

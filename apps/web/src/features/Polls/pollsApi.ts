@@ -16,6 +16,7 @@ import {
 } from '@sealed-vote/contracts';
 
 import { apiBaseUrl } from 'app/apiConfig';
+import { normalizePollResponse } from 'features/Polls/pollData';
 
 export const pollsApi = createApi({
     reducerPath: 'polls',
@@ -37,6 +38,8 @@ export const pollsApi = createApi({
                 url: POLL_ROUTES.poll(pollRef),
                 method: 'GET',
             }),
+            transformResponse: (response: PollResponse) =>
+                normalizePollResponse(response)!,
             providesTags: (result) =>
                 result ? [{ type: 'Poll', id: result.id }] : [],
         }),

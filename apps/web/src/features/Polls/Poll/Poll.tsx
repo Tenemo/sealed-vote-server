@@ -19,6 +19,10 @@ import {
     removeCreatorSession,
     saveCreatorSession,
 } from 'features/Polls/creatorSessionStorage';
+import {
+    hasPublishedResults,
+    normalizePollResponse,
+} from 'features/Polls/pollData';
 import { pollPollingIntervalMs } from 'features/Polls/pollQuery';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import {
@@ -65,8 +69,11 @@ const PollPage = (): React.JSX.Element => {
     const votingState = useAppSelector((state) =>
         selectVoteStateByPollSlug(state.voting, pollSlug),
     );
-    const effectivePoll = poll ?? votingState.pollSnapshot;
+    const effectivePoll = normalizePollResponse(
+        poll ?? votingState.pollSnapshot,
+    );
     const pollId = effectivePoll?.id ?? null;
+    const hasResults = hasPublishedResults(effectivePoll);
     const currentVoteState = useAppSelector((state) =>
         pollId ? selectVotingStateByPollId(state, pollId) : votingState,
     );
@@ -88,16 +95,15 @@ const PollPage = (): React.JSX.Element => {
     };
 
     useEffect(() => {
-        const hasResults = !!effectivePoll?.resultScores.length;
         setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
-    }, [effectivePoll?.resultScores.length]);
+    }, [hasResults]);
 
     useEffect(() => {
         if (!effectivePoll) {
             return;
         }
 
-        if (effectivePoll.resultScores.length) {
+        if (hasResults) {
             removeCreatorSession(effectivePoll.id);
             return;
         }
@@ -131,8 +137,8 @@ const PollPage = (): React.JSX.Element => {
         dispatch,
         effectivePoll,
         effectivePoll?.id,
-        effectivePoll?.resultScores.length,
         effectivePoll?.slug,
+        hasResults,
     ]);
 
     if (isLegacyPollLink || isNotFoundError(pollError)) {

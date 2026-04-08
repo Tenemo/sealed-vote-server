@@ -1,5 +1,10 @@
 import type { PollResponse } from '@sealed-vote/contracts';
 
+import {
+    hasPublishedResults,
+    normalizePollResponse,
+} from 'features/Polls/pollData';
+
 export type VoteState = {
     creatorToken: string | null;
     pendingVoterName: string | null;
@@ -67,7 +72,7 @@ export const hasPendingVotingIntent = (voteState: VoteState): boolean =>
         voteState.selectedScores &&
         getResumableVoterName(voteState) &&
         (voteState.voterToken || voteState.pendingVoterToken) &&
-        !voteState.pollSnapshot?.resultScores.length,
+        !hasPublishedResults(voteState.pollSnapshot),
     );
 
 export const clearCompletedSensitiveFields = (
@@ -89,21 +94,29 @@ export const clearCompletedSensitiveFields = (
 
 export const sanitizeVotingStateForPersistence = (
     state: VotingState,
-): VotingState =>
-    Object.fromEntries(
-        Object.entries(state).map(([pollId, voteState]) => [
-            pollId,
-            voteState.pollSnapshot?.resultScores.length
-                ? {
-                      ...initialVoteState,
-                      ...clearCompletedSensitiveFields(voteState),
-                  }
-                : {
-                      ...initialVoteState,
-                      ...voteState,
-                      isVotingInProgress: false,
-                      progressMessage: null,
-                      workflowError: null,
-                  },
-        ]),
+): VotingState => {
+    return Object.fromEntries(
+        Object.entries(state).map(([pollId, voteState]) => {
+            const normalizedVoteState: VoteState = {
+                ...initialVoteState,
+                ...voteState,
+                pollSnapshot: normalizePollResponse(voteState.pollSnapshot),
+            };
+
+            return [
+                pollId,
+                hasPublishedResults(normalizedVoteState.pollSnapshot)
+                    ? {
+                          ...initialVoteState,
+                          ...clearCompletedSensitiveFields(normalizedVoteState),
+                      }
+                    : {
+                          ...normalizedVoteState,
+                          isVotingInProgress: false,
+                          progressMessage: null,
+                          workflowError: null,
+                      },
+            ];
+        }),
     );
+};

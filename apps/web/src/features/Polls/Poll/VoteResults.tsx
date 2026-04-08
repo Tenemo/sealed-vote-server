@@ -6,6 +6,10 @@ import React from 'react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Panel } from '@/components/ui/panel';
+import {
+    hasPublishedResults,
+    normalizePollResponse,
+} from 'features/Polls/pollData';
 import { type PollResponse } from 'features/Polls/pollsApi';
 
 type VoteResultsProps = {
@@ -15,8 +19,13 @@ type VoteResultsProps = {
 
 const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
     const headingId = React.useId();
+    const normalizedPoll = React.useMemo(
+        () => normalizePollResponse(poll) ?? poll,
+        [poll],
+    );
+
     const verificationState = React.useMemo(() => {
-        if (!poll.resultScores.length) {
+        if (!hasPublishedResults(normalizedPoll)) {
             return {
                 error: null,
                 verification: null,
@@ -27,11 +36,12 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
             return {
                 error: null,
                 verification: verifyPublishedResults({
-                    encryptedTallies: poll.encryptedTallies,
-                    publishedDecryptionShares: poll.publishedDecryptionShares,
-                    resultTallies: poll.resultTallies,
-                    resultScores: poll.resultScores,
-                    voterCount: poll.voters.length,
+                    encryptedTallies: normalizedPoll.encryptedTallies,
+                    publishedDecryptionShares:
+                        normalizedPoll.publishedDecryptionShares,
+                    resultTallies: normalizedPoll.resultTallies,
+                    resultScores: normalizedPoll.resultScores,
+                    voterCount: normalizedPoll.voters.length,
                 }),
             };
         } catch (error) {
@@ -40,13 +50,7 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
                 verification: null,
             };
         }
-    }, [
-        poll.encryptedTallies,
-        poll.publishedDecryptionShares,
-        poll.resultScores,
-        poll.resultTallies,
-        poll.voters.length,
-    ]);
+    }, [normalizedPoll]);
 
     React.useEffect(() => {
         if (verificationState.error) {
@@ -72,14 +76,14 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
         );
     }, [pollId, verificationState]);
 
-    if (!poll.resultScores.length) {
+    if (!hasPublishedResults(normalizedPoll)) {
         return <></>;
     }
 
-    const sortedResults = poll.choices
+    const sortedResults = normalizedPoll.choices
         .map(
             (choiceName, index) =>
-                [choiceName, poll.resultScores[index] ?? 0] as const,
+                [choiceName, normalizedPoll.resultScores[index] ?? 0] as const,
         )
         .sort((left, right) => right[1] - left[1])
         .map(([choiceName, score]) => [choiceName, score.toFixed(2)] as const);
