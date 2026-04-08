@@ -29,7 +29,7 @@ describe('PollCreation', () => {
         mockedCreatePoll.mockReturnValue({
             unwrap: async () => ({
                 id: '11111111-1111-4111-8111-111111111111',
-                slug: 'best-fruit--11111111',
+                slug: 'best-fruit--1111',
                 creatorToken: 'creator-token',
             }),
         });
@@ -64,9 +64,7 @@ describe('PollCreation', () => {
         await user.click(screen.getByRole('button', { name: 'Create vote' }));
 
         await waitFor(() => {
-            expect(
-                screen.getByText('best-fruit--11111111'),
-            ).toBeInTheDocument();
+            expect(screen.getByText('best-fruit--1111')).toBeInTheDocument();
         });
     });
 });

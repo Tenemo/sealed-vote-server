@@ -1,6 +1,11 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{8,32}$/;
+export const connectionToastMessage =
+    'Connection to the server was lost. Showing the latest available vote state and retrying in the background.';
+export const reconnectingWorkflowMessage =
+    'Connection lost. Reconnecting and resuming in the background...';
+
+const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
 
 type CreatePollResponse = {
@@ -86,6 +91,23 @@ export const expectResultsVisible = async (page: Page): Promise<void> => {
     await expect(
         page.getByRole('heading', { name: 'Results' }),
     ).toBeVisible({ timeout: 120_000 });
+};
+
+export const expectConnectionToastVisible = async (
+    page: Page,
+): Promise<void> => {
+    await expect(page.locator('[data-slot="connection-toast"]')).toBeVisible({
+        timeout: 20_000,
+    });
+    await expect(page.getByText(connectionToastMessage)).toBeVisible();
+};
+
+export const expectConnectionToastHidden = async (
+    page: Page,
+): Promise<void> => {
+    await expect(page.locator('[data-slot="connection-toast"]')).toBeHidden({
+        timeout: 20_000,
+    });
 };
 
 export const getShareLinkValue = async (page: Page): Promise<string> =>

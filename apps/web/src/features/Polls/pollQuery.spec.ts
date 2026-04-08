@@ -27,7 +27,7 @@ vi.mock('app/store', () => ({
 
 const createPoll = (id: string): PollResponse => ({
     id,
-    slug: `poll-${id}--12345678`,
+    slug: `poll-${id}--1234`,
     pollName: `Poll ${id}`,
     createdAt: '2026-01-01T00:00:00.000Z',
     choices: ['A', 'B'],
@@ -67,6 +67,21 @@ describe('fetchFreshPoll', () => {
             forceRefetch: true,
             subscribe: false,
         });
+    });
+
+    test('falls back to cached poll data when the refetch resolves without a poll payload', async () => {
+        const cachedPoll = createPoll('cached-after-empty-response');
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => undefined,
+        })) as never;
+
+        mockedSelect.mockReturnValue(() => ({
+            data: cachedPoll,
+        }));
+
+        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
+
+        expect(result).toEqual(cachedPoll);
     });
 
     test('falls back to the cached direct poll when the refetch fails', async () => {
@@ -125,6 +140,16 @@ describe('fetchFreshPoll', () => {
 
         await expect(fetchFreshPoll(dispatch, 'missing-poll')).rejects.toBe(
             expectedError,
+        );
+    });
+
+    test('throws when the refetch resolves without a poll payload and no cached poll is available', async () => {
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => undefined,
+        })) as never;
+
+        await expect(fetchFreshPoll(dispatch, 'missing-poll')).rejects.toThrow(
+            'Poll missing-poll could not be fetched.',
         );
     });
 });

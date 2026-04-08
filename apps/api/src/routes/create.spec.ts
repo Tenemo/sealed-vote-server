@@ -109,7 +109,7 @@ describe('POST /polls/create', () => {
 
         expect(response.statusCode).toBe(201);
         const responseBody = JSON.parse(response.body) as CreatePollResponse;
-        expect(responseBody.slug).toContain('--');
+        expect(responseBody.slug).toMatch(/--[0-9a-f]{4}$/);
 
         const getResponse = await fastify.inject({
             method: 'GET',

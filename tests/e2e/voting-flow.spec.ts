@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { expectNoAxeViolations } from './support/a11y';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -41,6 +42,7 @@ test('completes the poll happy path on every required browser project', async ({
         pollName: createPollName('E2E lifecycle', namespace),
     });
     createdPolls.push(createdPoll);
+    await expectNoAxeViolations(page, 'created vote page');
 
     const participant = await openProjectParticipant(browser, testInfo);
     attachErrorTracking(participant.page, 'participant', tracker);
@@ -55,11 +57,15 @@ test('completes the poll happy path on every required browser project', async ({
             pollUrl: createdPoll.pollUrl,
             voterName: participantName,
         });
+        await expectNoAxeViolations(page, 'creator waiting page');
+        await expectNoAxeViolations(participant.page, 'participant waiting page');
 
         await beginVote(page);
 
         await expectResultsVisible(page);
         await expectResultsVisible(participant.page);
+        await expectNoAxeViolations(page, 'creator results page');
+        await expectNoAxeViolations(participant.page, 'participant results page');
         await expect(
             page.getByText(`Voters in this poll: ${creatorName}, ${participantName}`),
         ).toBeVisible();

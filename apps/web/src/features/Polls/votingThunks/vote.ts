@@ -6,11 +6,13 @@ import { pollsApi } from '../pollsApi';
 import {
     clearWorkflowError,
     setKeys,
+    setPendingVoterName,
     setProgressMessage,
     setResults,
     setSelectedScores,
     setSubmissionStatus,
     setVoterSession,
+    type VoteThunkRejectValue,
 } from '../votingSlice';
 import { selectVoteStateByPollId } from '../votingState';
 import {
@@ -22,6 +24,10 @@ import {
 import { voteThunkTypePrefix } from './voteTypes';
 
 import { type AppDispatch, type RootState } from 'app/store';
+import {
+    isConnectionErrorMessage,
+    reconnectingWorkflowMessage,
+} from 'utils/utils';
 
 export type VoteThunkArg = {
     pollId: string;
@@ -42,7 +48,7 @@ export const vote = createAsyncThunk<
     {
         dispatch: AppDispatch;
         state: RootState;
-        rejectValue: string;
+        rejectValue: VoteThunkRejectValue;
     }
 >(
     voteThunkTypePrefix,
@@ -60,6 +66,12 @@ export const vote = createAsyncThunk<
             }
 
             dispatch(clearWorkflowError({ pollId }));
+            dispatch(
+                setPendingVoterName({
+                    pollId,
+                    voterName: normalizedVoterName,
+                }),
+            );
             dispatch(
                 setSelectedScores({
                     pollId,
@@ -139,7 +151,12 @@ export const vote = createAsyncThunk<
                     ? error.message
                     : 'Unknown voting error.';
 
-            return rejectWithValue(message);
+            return rejectWithValue({
+                message: isConnectionErrorMessage(message)
+                    ? reconnectingWorkflowMessage
+                    : message,
+                shouldResumeWorkflow: isConnectionErrorMessage(message),
+            });
         }
     },
 );

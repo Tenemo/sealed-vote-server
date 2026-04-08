@@ -14,6 +14,7 @@ const chromiumOnlySpecs = [
     '**/duplicate-voter-name.spec.ts',
     '**/legacy-route.spec.ts',
     '**/mixed-platform-poll.spec.ts',
+    '**/polling-offline.spec.ts',
     '**/refresh-resume.spec.ts',
     '**/share-link.spec.ts',
 ];
@@ -127,8 +128,8 @@ const getCommonConfig = (
     use: {
         baseURL,
         screenshot: 'only-on-failure' as const,
-        trace: isCi ? ('retain-on-failure' as const) : ('on-first-retry' as const),
-        video: 'retain-on-failure' as const,
+        trace: isCi ? ('retain-on-failure' as const) : ('off' as const),
+        video: isCi ? ('retain-on-failure' as const) : ('off' as const),
     },
     workers: isCi
         ? parseWorkerCount(process.env.PLAYWRIGHT_CI_WORKERS, 4)

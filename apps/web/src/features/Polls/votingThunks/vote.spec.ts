@@ -50,6 +50,7 @@ import { initialVoteState, votingSlice } from '../votingSlice';
 import { vote } from './vote';
 
 import type { VotingState } from 'features/Polls/votingState';
+import { reconnectingWorkflowMessage } from 'utils/utils';
 
 const createTestStore = (): EnhancedStore<{ voting: VotingState }> =>
     configureStore({
@@ -86,7 +87,7 @@ describe('vote thunk', () => {
         mockedCanRegister.mockReturnValue(true);
         mockedFetchFreshPoll.mockResolvedValue({
             id: '11111111-1111-4111-8111-111111111111',
-            slug: 'best-fruit--11111111',
+            slug: 'best-fruit--1111',
             pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples'],
@@ -135,12 +136,72 @@ describe('vote thunk', () => {
         expect(mockedRunDecryptResults).toHaveBeenCalled();
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
+            pendingVoterName: 'Alice',
             selectedScores,
             voterName: 'Alice',
             voterIndex: 1,
             voterToken: 'voter-token',
             isVotingInProgress: false,
             progressMessage: null,
+        });
+    });
+
+    it('marks the workflow for reconnect-driven resume after a connection failure', async () => {
+        const selectedScores = { Apples: 7 };
+        const store = createTestStore();
+        const registerPayload = {
+            message: 'Registered successfully',
+            pollId: 'poll-1',
+            voterName: 'Alice',
+            voterIndex: 1,
+            voterToken: 'voter-token',
+        };
+
+        mockedCanRegister.mockReturnValue(true);
+        mockedFetchFreshPoll.mockResolvedValue({
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples'],
+            voters: [],
+            isOpen: true,
+            publicKeyShareCount: 0,
+            encryptedVoteCount: 0,
+            decryptionShareCount: 0,
+            commonPublicKey: null,
+            encryptedTallies: [],
+            results: [],
+        });
+        mockedRegisterVoterInitiate.mockReturnValue({
+            type: 'registerVoter',
+            unwrap: async () => registerPayload,
+            then: (
+                resolve: (value: typeof registerPayload) => unknown,
+            ): Promise<unknown> => Promise.resolve(resolve(registerPayload)),
+        });
+        mockedRunProcessPublicPrivateKeys.mockRejectedValue(
+            new Error('TypeError: Failed to fetch'),
+        );
+
+        await store.dispatch(
+            vote({
+                pollId: 'poll-1',
+                voterName: 'Alice',
+                selectedScores,
+            }) as never,
+        );
+
+        expect(store.getState().voting['poll-1']).toEqual({
+            ...initialVoteState,
+            pendingVoterName: 'Alice',
+            selectedScores,
+            voterName: 'Alice',
+            voterIndex: 1,
+            voterToken: 'voter-token',
+            isVotingInProgress: false,
+            progressMessage: reconnectingWorkflowMessage,
+            shouldResumeWorkflow: true,
         });
     });
 });
