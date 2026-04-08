@@ -18,12 +18,18 @@ import { hashSecureToken } from '../utils/voterAuth.js';
 
 import { MessageResponseSchema, SecureTokenSchema } from './schemas.js';
 
-const CreatePollRequestSchema = Type.Object({
-    choices: Type.Array(Type.String()),
-    creatorToken: SecureTokenSchema,
-    pollName: Type.String(),
-    maxParticipants: Type.Optional(Type.Number({ minimum: 2 })),
-});
+const defaultMaxParticipants = 20;
+
+const CreatePollRequestSchema = Type.Object(
+    {
+        choices: Type.Array(Type.String()),
+        creatorToken: SecureTokenSchema,
+        pollName: Type.String(),
+    },
+    {
+        additionalProperties: false,
+    },
+);
 
 const CreatePollResponseSchema = Type.Object({
     id: Type.String(),
@@ -51,7 +57,6 @@ const getExistingPollByCreatorTokenHash = async (
     | {
           choices: string[];
           id: string;
-          maxParticipants: number;
           pollName: string;
           slug: string;
       }
@@ -62,7 +67,6 @@ const getExistingPollByCreatorTokenHash = async (
             eq(fields.creatorTokenHash, creatorTokenHash),
         columns: {
             id: true,
-            maxParticipants: true,
             pollName: true,
             slug: true,
         },
@@ -80,7 +84,6 @@ const getExistingPollByCreatorTokenHash = async (
         ? {
               choices: poll.choices.map(({ choiceName }) => choiceName),
               id: poll.id,
-              maxParticipants: poll.maxParticipants,
               pollName: poll.pollName,
               slug: poll.slug,
           }
@@ -89,22 +92,18 @@ const getExistingPollByCreatorTokenHash = async (
 
 const assertMatchingCreateRequest = ({
     existingPoll,
-    maxParticipants,
     normalizedChoices,
     pollName,
 }: {
     existingPoll: {
         choices: string[];
-        maxParticipants: number;
         pollName: string;
     };
-    maxParticipants: number;
     normalizedChoices: string[];
     pollName: string;
 }): void => {
     if (
         existingPoll.pollName !== pollName ||
-        existingPoll.maxParticipants !== maxParticipants ||
         !areStringArraysEqual(existingPoll.choices, normalizedChoices)
     ) {
         throw createError(409, ERROR_MESSAGES.creatorTokenConflict);
@@ -119,7 +118,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Body: CreatePollRequest }>,
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
-            const { choices, creatorToken, maxParticipants = 20 } = req.body;
+            const { choices, creatorToken } = req.body;
             const pollName = req.body.pollName.trim();
             const normalizedChoices = choices.map((choice) => choice.trim());
 
@@ -148,7 +147,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             if (existingPoll) {
                 assertMatchingCreateRequest({
                     existingPoll,
-                    maxParticipants,
                     normalizedChoices,
                     pollName,
                 });
@@ -179,7 +177,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                                 creatorTokenHash,
                                 pollName,
                                 slug,
-                                maxParticipants,
+                                maxParticipants: defaultMaxParticipants,
                             });
 
                             await tx.insert(choicesTable).values(
@@ -220,7 +218,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                         if (conflictingPoll) {
                             assertMatchingCreateRequest({
                                 existingPoll: conflictingPoll,
-                                maxParticipants,
                                 normalizedChoices,
                                 pollName,
                             });

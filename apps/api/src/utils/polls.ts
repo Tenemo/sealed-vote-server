@@ -15,7 +15,8 @@ export type LockedPoll = {
     maxParticipants: number;
     commonPublicKey: string | null;
     encryptedTallies: typeof polls.$inferSelect.encryptedTallies;
-    results: typeof polls.$inferSelect.results;
+    resultTallies: typeof polls.$inferSelect.resultTallies;
+    resultScores: typeof polls.$inferSelect.resultScores;
 };
 
 export type LockedCreatorPoll = {
@@ -73,7 +74,8 @@ export const lockPollById = async (
             maxParticipants: polls.maxParticipants,
             commonPublicKey: polls.commonPublicKey,
             encryptedTallies: polls.encryptedTallies,
-            results: polls.results,
+            resultTallies: polls.resultTallies,
+            resultScores: polls.resultScores,
         })
         .from(polls)
         .where(eq(polls.id, pollId))

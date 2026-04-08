@@ -33,7 +33,6 @@
     ],
     "type": "module",
     "dependencies": {
-        "@icons-pack/react-simple-icons": "^13.13.0",
         "@reduxjs/toolkit": "^2.11.2",
         "@sealed-vote/contracts": "workspace:*",
         "@sealed-vote/protocol": "workspace:*",

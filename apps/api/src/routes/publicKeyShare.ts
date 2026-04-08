@@ -19,7 +19,10 @@ import {
     lockPollById,
 } from '../utils/polls.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
-import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
+import {
+    authenticateVoter,
+    findVoterByTokenReadOnly,
+} from '../utils/voterAuth.js';
 
 import {
     MessageResponseSchema,
@@ -107,7 +110,7 @@ export const publicKeyShare = async (
                             voterCount,
                             encryptedVoteCount: 0,
                             encryptedTallyCount: poll.encryptedTallies.length,
-                            resultCount: poll.results.length,
+                            resultScoreCount: poll.resultScores.length,
                         })
                     ) {
                         throw createError(
@@ -159,16 +162,11 @@ export const publicKeyShare = async (
                         'unique_public_key_share_per_voter',
                     )
                 ) {
-                    const voter = await fastify.db.query.voters.findFirst({
-                        where: (fields, { and, eq: isEqual }) =>
-                            and(
-                                isEqual(fields.pollId, req.params.pollId),
-                                isEqual(
-                                    fields.voterTokenHash,
-                                    hashSecureToken(req.body.voterToken),
-                                ),
-                            ),
-                    });
+                    const voter = await findVoterByTokenReadOnly(
+                        fastify.db,
+                        req.params.pollId,
+                        req.body.voterToken,
+                    );
 
                     if (!voter) {
                         throw createError(

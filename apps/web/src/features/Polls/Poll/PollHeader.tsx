@@ -12,7 +12,7 @@ import {
     type PollResponse,
 } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
-import { renderError } from 'utils/utils';
+import { renderError } from 'utils/networkErrors';
 
 type PollHeaderProps = {
     poll: PollResponse;
@@ -23,8 +23,9 @@ const formatPollCreationDate = (createdAt: string): string =>
     createdAt.slice(0, 10);
 
 const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
-    const { creatorToken, progressMessage, results, workflowError } =
-        useAppSelector((state) => selectVotingStateByPollId(state, pollId));
+    const { creatorToken, progressMessage, workflowError } = useAppSelector(
+        (state) => selectVotingStateByPollId(state, pollId),
+    );
 
     const [closePoll, { isLoading: isClosingPoll, error: closeError }] =
         useClosePollMutation();
@@ -94,7 +95,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
             <div className="space-y-3">
                 {progressMessage && (
                     <Alert aria-live="polite" role="status" variant="info">
-                        {!results && (
+                        {!poll.resultScores.length && (
                             <Spinner
                                 aria-hidden="true"
                                 className="size-4"

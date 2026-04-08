@@ -2,24 +2,23 @@ import { render, screen } from '@testing-library/react';
 
 import VoteResults from './VoteResults';
 
-import { useAppSelector } from 'app/hooks';
+const mockedVerifyPublishedResults = vi.fn();
 
 vi.mock('@sealed-vote/protocol', () => ({
-    computeGeometricMean: (results: number[], voterCount: number) =>
-        results.map((result) => result ** (1 / voterCount)),
+    verifyPublishedResults: (...args: unknown[]) =>
+        mockedVerifyPublishedResults(...args),
 }));
-
-vi.mock('app/hooks', () => ({
-    useAppSelector: vi.fn(),
-}));
-
-const mockedUseAppSelector = vi.mocked(useAppSelector);
 
 describe('VoteResults', () => {
-    it('renders geometric means using the voter count', () => {
-        mockedUseAppSelector.mockReturnValue({
-            results: [8, 27],
-        } as never);
+    it('renders published scores and verification status', () => {
+        mockedVerifyPublishedResults.mockReturnValue({
+            computedScores: [2, 3],
+            computedTallies: ['8', '27'],
+            isVerified: true,
+            scoresMatch: true,
+            talliesMatch: true,
+        });
+
         const poll = {
             id: '11111111-1111-4111-8111-111111111111',
             slug: 'best-fruit--1111',
@@ -31,9 +30,18 @@ describe('VoteResults', () => {
             publicKeyShareCount: 3,
             commonPublicKey: '123',
             encryptedVoteCount: 3,
-            encryptedTallies: [],
+            encryptedTallies: [
+                { c1: '1', c2: '2' },
+                { c1: '3', c2: '4' },
+            ],
             decryptionShareCount: 3,
-            results: [],
+            publishedDecryptionShares: [
+                ['share-a-1', 'share-a-2'],
+                ['share-b-1', 'share-b-2'],
+                ['share-c-1', 'share-c-2'],
+            ],
+            resultTallies: ['8', '27'],
+            resultScores: [2, 3],
         };
 
         render(<VoteResults poll={poll} pollId="poll-1" />);
@@ -42,5 +50,8 @@ describe('VoteResults', () => {
         expect(screen.getByText('Bananas')).toBeInTheDocument();
         expect(screen.getByText('Score: 2.00')).toBeInTheDocument();
         expect(screen.getByText('Score: 3.00')).toBeInTheDocument();
+        expect(
+            screen.getByText(/Public verification passed\./i),
+        ).toBeInTheDocument();
     });
 });

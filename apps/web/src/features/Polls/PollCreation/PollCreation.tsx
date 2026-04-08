@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
-import { renderError } from 'utils/utils';
+import { renderError } from 'utils/networkErrors';
 
 type Form = {
     pollName: string;
@@ -77,7 +77,8 @@ const PollCreationPage = (): React.JSX.Element => {
             .unwrap()
             .then(({ slug }) => {
                 void navigate(`/votes/${slug}`);
-            });
+            })
+            .catch(() => undefined);
     };
 
     return (

@@ -24,11 +24,14 @@ import { vote } from './routes/vote.js';
 
 config();
 
-const logger = {
+const developmentLogger = {
     level: 'info',
     transport: {
         target: 'pino-pretty',
     },
+};
+const productionLogger = {
+    level: 'info',
 };
 
 const allowedProductionOrigins = new Set([
@@ -127,7 +130,16 @@ export const buildServer = async (
         isLoggingEnabled ?? process.env.NODE_ENV !== 'test';
     const configuredWebAppOrigin = getConfiguredWebAppOrigin();
     const fastify = Fastify({
-        logger: shouldEnableLogging ? logger : false,
+        ajv: {
+            customOptions: {
+                removeAdditional: false,
+            },
+        },
+        logger: shouldEnableLogging
+            ? process.env.NODE_ENV === 'development'
+                ? developmentLogger
+                : productionLogger
+            : false,
     });
     fastify.setErrorHandler((error, _request, reply) => {
         if (isPollIdValidationError(error)) {

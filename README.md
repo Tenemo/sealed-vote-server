@@ -25,8 +25,28 @@ The frontend and backend both rely on [`threshold-elgamal`](https://www.npmjs.co
 4. After all shares are present, voters encrypt their scores locally and submit only ciphertexts.
 5. The backend combines encrypted votes into encrypted tallies.
 6. Voters submit decryption shares so the final aggregate result can be revealed without exposing individual ballots.
+7. Once the poll is complete, the backend publishes the raw plaintext tally products, the rounded geometric-mean scores, and the ordered decryption shares used to reveal them.
+8. The frontend verifies the published results locally before showing the final ranking.
 
 See [docs/voting.md](./docs/voting.md) for the protocol and phase model, and [docs/endpoints.md](./docs/endpoints.md) for the current API surface.
+
+## Offline and reconnect recovery
+
+Offline and reconnect recovery is a core feature of the app, not a best-effort extra.
+
+- In-progress voting workflow state is persisted in the browser through `redux-persist`, including the current poll snapshot, selected scores, creator token, confirmed voter session, and pending registration intent when a registration response is lost.
+- The persisted state is sanitized on completion so finished polls no longer keep sensitive material such as private keys, voter tokens, or selected scores.
+- In production, the custom service worker caches the app shell plus any poll payloads the browser has already fetched. That allows previously visited polls to reopen from cached data while the network is unavailable.
+- `RecoveryCoordinator` runs in the background after startup, on window focus, and when the browser comes back online. It resumes creator sessions, confirmed voter sessions, and pending voter registrations without requiring the user to restart the flow manually.
+- Recovery is safe because the backend routes are deliberately idempotent where needed. Poll creation, voter registration, poll close, public key share submission, vote submission, and decryption share submission can all be retried after a lost response without duplicating state or changing the result unexpectedly.
+
+The Playwright suite covers the recovery model directly:
+
+- [`tests/e2e/refresh-resume.spec.ts`](./tests/e2e/refresh-resume.spec.ts) verifies that a persisted voter session survives a browser refresh and still reaches completion.
+- [`tests/e2e/polling-offline.spec.ts`](./tests/e2e/polling-offline.spec.ts) verifies that the UI stays usable across disconnects before and after the vote starts, and that background polling recovers cleanly.
+- [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) verifies safe replay after post-commit response loss for create, register, close, public key share, vote, and decryption share requests.
+- [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) also verifies that a previously visited poll can reopen from persisted local data when live poll fetches fail.
+- [`tests/e2e/voting-flow.spec.ts`](./tests/e2e/voting-flow.spec.ts) covers the normal happy path and asserts that completed polls show locally verified published results.
 
 ## Tech stack
 

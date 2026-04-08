@@ -47,8 +47,6 @@ export class TestPollBuilder {
 
     private voterNames: string[] = DEFAULT_TEST_VOTERS.slice(0, 2);
 
-    private maxParticipants = 10;
-
     private scoreMatrix: ScoreMatrix | null = null;
 
     private context: TestPollContext | null = null;
@@ -70,11 +68,6 @@ export class TestPollBuilder {
         return this;
     }
 
-    public withMaxParticipants(maxParticipants: number): TestPollBuilder {
-        this.maxParticipants = maxParticipants;
-        return this;
-    }
-
     public withScoreMatrix(scoreMatrix: ScoreMatrix): TestPollBuilder {
         this.scoreMatrix = scoreMatrix;
         return this;
@@ -85,7 +78,6 @@ export class TestPollBuilder {
             this.fastify,
             this.pollName,
             this.choices,
-            this.maxParticipants,
         );
 
         this.context = {

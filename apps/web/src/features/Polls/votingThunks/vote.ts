@@ -9,10 +9,10 @@ import {
     setKeys,
     setPendingVoterRegistration,
     setProgressMessage,
-    setResults,
     setSelectedScores,
     setSubmissionStatus,
     setVoterSession,
+    upsertPollSnapshot,
     type VoteThunkRejectValue,
 } from '../votingSlice';
 import { selectVoteStateByPollId } from '../votingState';
@@ -29,7 +29,7 @@ import {
     isConnectionError,
     isConnectionErrorMessage,
     reconnectingWorkflowMessage,
-} from 'utils/utils';
+} from 'utils/networkErrors';
 
 export type VoteThunkArg = {
     pollId: string;
@@ -40,8 +40,8 @@ export type VoteThunkArg = {
 const workflowActions = {
     setKeys,
     setProgressMessage,
-    setResults,
     setSubmissionStatus,
+    upsertPollSnapshot,
 };
 
 export const vote = createAsyncThunk<
@@ -71,15 +71,17 @@ export const vote = createAsyncThunk<
                 getState().voting,
                 pollId,
             );
-            const voterToken =
-                existingVoteState.voterToken ?? generateClientToken();
+            const pendingVoterToken =
+                existingVoteState.pendingVoterToken ??
+                existingVoteState.voterToken ??
+                generateClientToken();
 
             dispatch(clearWorkflowError({ pollId }));
             dispatch(
                 setPendingVoterRegistration({
                     pollId,
+                    pendingVoterToken,
                     voterName: normalizedVoterName,
-                    voterToken,
                 }),
             );
             dispatch(
@@ -89,10 +91,17 @@ export const vote = createAsyncThunk<
                 }),
             );
 
-            const { voterName: stateVoterName, voterIndex: stateVoterIndex } =
-                selectVoteStateByPollId(getState().voting, pollId);
+            const {
+                voterName: stateVoterName,
+                voterIndex: stateVoterIndex,
+                voterToken: confirmedVoterToken,
+            } = selectVoteStateByPollId(getState().voting, pollId);
 
-            if (stateVoterIndex === null || !voterToken || !stateVoterName) {
+            if (
+                stateVoterIndex === null ||
+                !confirmedVoterToken ||
+                !stateVoterName
+            ) {
                 dispatch(
                     setProgressMessage({
                         pollId,
@@ -100,7 +109,11 @@ export const vote = createAsyncThunk<
                     }),
                 );
 
-                const poll = await fetchFreshPoll(dispatch, pollId);
+                const poll = await fetchFreshPoll({
+                    dispatch,
+                    getState,
+                    pollId,
+                });
 
                 if (!canRegister(poll)) {
                     throw new Error('Poll is closed for new registrations.');
@@ -111,7 +124,7 @@ export const vote = createAsyncThunk<
                         pollId,
                         voterData: {
                             voterName: normalizedVoterName,
-                            voterToken,
+                            voterToken: pendingVoterToken,
                         },
                     }),
                 ).unwrap();

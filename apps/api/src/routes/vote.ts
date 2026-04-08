@@ -21,7 +21,10 @@ import {
     lockPollById,
 } from '../utils/polls.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
-import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
+import {
+    authenticateVoter,
+    findVoterByTokenReadOnly,
+} from '../utils/voterAuth.js';
 
 import {
     EncryptedMessageSchema,
@@ -121,7 +124,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                                 encryptedVoteCount,
                                 encryptedTallyCount:
                                     poll.encryptedTallies.length,
-                                resultCount: poll.results.length,
+                                resultScoreCount: poll.resultScores.length,
                             })
                         ) {
                             throw createError(
@@ -178,16 +181,11 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                 return response;
             } catch (error) {
                 if (isConstraintViolation(error, 'unique_vote_per_voter')) {
-                    const voter = await fastify.db.query.voters.findFirst({
-                        where: (fields, { and, eq: isEqual }) =>
-                            and(
-                                isEqual(fields.pollId, req.params.pollId),
-                                isEqual(
-                                    fields.voterTokenHash,
-                                    hashSecureToken(req.body.voterToken),
-                                ),
-                            ),
-                    });
+                    const voter = await findVoterByTokenReadOnly(
+                        fastify.db,
+                        req.params.pollId,
+                        req.body.voterToken,
+                    );
 
                     const existingVote =
                         voter &&

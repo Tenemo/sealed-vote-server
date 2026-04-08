@@ -3,6 +3,7 @@ import type { PollResponse } from '@sealed-vote/contracts';
 export type VoteState = {
     creatorToken: string | null;
     pendingVoterName: string | null;
+    pendingVoterToken: string | null;
     pollSlug: string | null;
     pollSnapshot: PollResponse | null;
     selectedScores: Record<string, number> | null;
@@ -13,10 +14,8 @@ export type VoteState = {
     progressMessage: string | null;
     workflowError: string | null;
     shouldResumeWorkflow: boolean;
-    results: number[] | null;
     privateKey: string | null;
     publicKey: string | null;
-    commonPublicKey: string | null;
     hasSubmittedPublicKeyShare: boolean;
     hasSubmittedVote: boolean;
     hasSubmittedDecryptionShares: boolean;
@@ -27,6 +26,7 @@ export type VotingState = Record<string, VoteState>;
 export const initialVoteState: VoteState = {
     creatorToken: null,
     pendingVoterName: null,
+    pendingVoterToken: null,
     pollSlug: null,
     pollSnapshot: null,
     selectedScores: null,
@@ -37,10 +37,8 @@ export const initialVoteState: VoteState = {
     progressMessage: null,
     workflowError: null,
     shouldResumeWorkflow: false,
-    results: null,
     privateKey: null,
     publicKey: null,
-    commonPublicKey: null,
     hasSubmittedPublicKeyShare: false,
     hasSubmittedVote: false,
     hasSubmittedDecryptionShares: false,
@@ -64,21 +62,12 @@ export const selectVoteStateByPollSlug = (
 export const getResumableVoterName = (voteState: VoteState): string | null =>
     voteState.voterName ?? voteState.pendingVoterName;
 
-export const hasResumableVotingSession = (voteState: VoteState): boolean =>
-    Boolean(
-        voteState.selectedScores &&
-        voteState.voterIndex !== null &&
-        voteState.voterName &&
-        voteState.voterToken &&
-        !voteState.results,
-    );
-
 export const hasPendingVotingIntent = (voteState: VoteState): boolean =>
     Boolean(
         voteState.selectedScores &&
         getResumableVoterName(voteState) &&
-        voteState.voterToken &&
-        !voteState.results,
+        (voteState.voterToken || voteState.pendingVoterToken) &&
+        !voteState.pollSnapshot?.resultScores.length,
     );
 
 export const clearCompletedSensitiveFields = (
@@ -87,6 +76,7 @@ export const clearCompletedSensitiveFields = (
     ...voteState,
     creatorToken: null,
     pendingVoterName: null,
+    pendingVoterToken: null,
     selectedScores: null,
     voterToken: null,
     privateKey: null,
@@ -103,7 +93,7 @@ export const sanitizeVotingStateForPersistence = (
     Object.fromEntries(
         Object.entries(state).map(([pollId, voteState]) => [
             pollId,
-            voteState.results
+            voteState.pollSnapshot?.resultScores.length
                 ? {
                       ...initialVoteState,
                       ...clearCompletedSensitiveFields(voteState),

@@ -1,12 +1,13 @@
 import type { EncryptedMessage } from '@sealed-vote/contracts';
+import { modInv } from 'bigint-mod-arith';
 import {
     combineDecryptionShares,
     createDecryptionShare,
     deserializeEncryptedMessage,
     encrypt,
+    getGroup,
     multiplyEncryptedValues,
     serializeEncryptedMessage,
-    thresholdDecrypt,
 } from 'threshold-elgamal';
 
 export const serializeVotes = (
@@ -58,17 +59,31 @@ export const computeEncryptedTallies = (
 export const decryptTallies = (
     encryptedTallies: EncryptedMessage[],
     decryptionShares: string[][],
-): number[] => {
+): bigint[] => {
     if (encryptedTallies.length === 0) {
         return [];
     }
 
-    return encryptedTallies.map((tally, index) =>
-        thresholdDecrypt(
-            deserializeEncryptedMessage(tally),
-            combineDecryptionShares(
-                decryptionShares.map((share) => BigInt(share[index])),
-            ),
-        ),
-    );
+    const { prime } = getGroup();
+
+    return encryptedTallies.map((tally, index) => {
+        const encryptedTally = deserializeEncryptedMessage(tally);
+        const combinedShares = combineDecryptionShares(
+            decryptionShares.map((share) => BigInt(share[index])),
+        );
+        const decryptedPlaintext =
+            (encryptedTally.c2 * modInv(combinedShares, prime)) % prime;
+
+        return decryptedPlaintext >= 0n
+            ? decryptedPlaintext
+            : decryptedPlaintext + prime;
+    });
 };
+
+export const decryptTalliesToStrings = (
+    encryptedTallies: EncryptedMessage[],
+    decryptionShares: string[][],
+): string[] =>
+    decryptTallies(encryptedTallies, decryptionShares).map((value) =>
+        value.toString(),
+    );

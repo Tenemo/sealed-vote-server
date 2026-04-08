@@ -25,6 +25,8 @@
     },
     "dependencies": {
         "@sealed-vote/contracts": "workspace:*",
+        "bigint-mod-arith": "^3.3.1",
+        "decimal.js": "^10.6.0",
         "threshold-elgamal": "catalog:"
     },
     "devDependencies": {

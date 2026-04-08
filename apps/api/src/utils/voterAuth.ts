@@ -4,7 +4,7 @@ import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { and, eq } from 'drizzle-orm';
 import createError from 'http-errors';
 
-import type { DatabaseTransaction } from '../db/client.js';
+import type { Database, DatabaseTransaction } from '../db/client.js';
 import { voters } from '../db/schema.js';
 
 export type AuthenticatedVoter = {
@@ -52,7 +52,7 @@ export const authenticateVoter = async (
 };
 
 export const authenticateVoterReadOnly = async (
-    tx: DatabaseTransaction,
+    tx: Database | DatabaseTransaction,
     pollId: string,
     voterToken: string,
 ): Promise<AuthenticatedVoter> => {
@@ -74,6 +74,29 @@ export const authenticateVoterReadOnly = async (
     if (!voter) {
         throw createError(403, ERROR_MESSAGES.invalidVoterToken);
     }
+
+    return voter;
+};
+
+export const findVoterByTokenReadOnly = async (
+    tx: Database | DatabaseTransaction,
+    pollId: string,
+    voterToken: string,
+): Promise<AuthenticatedVoter | undefined> => {
+    const voterTokenHash = hashSecureToken(voterToken);
+    const [voter] = await tx
+        .select({
+            id: voters.id,
+            voterName: voters.voterName,
+            voterIndex: voters.voterIndex,
+        })
+        .from(voters)
+        .where(
+            and(
+                eq(voters.pollId, pollId),
+                eq(voters.voterTokenHash, voterTokenHash),
+            ),
+        );
 
     return voter;
 };

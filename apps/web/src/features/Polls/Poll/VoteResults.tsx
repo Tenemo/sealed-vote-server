@@ -1,39 +1,111 @@
-import { computeGeometricMean } from '@sealed-vote/protocol';
+import {
+    type PublishedResultVerification,
+    verifyPublishedResults,
+} from '@sealed-vote/protocol';
 import React from 'react';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Panel } from '@/components/ui/panel';
-import { useAppSelector } from 'app/hooks';
 import { type PollResponse } from 'features/Polls/pollsApi';
-import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
 
 type VoteResultsProps = {
     poll: PollResponse;
     pollId: string;
 };
 
+const reportVerificationMismatch = async ({
+    pollId,
+    verification,
+}: {
+    pollId: string;
+    verification: PublishedResultVerification;
+}): Promise<void> => {
+    const message = `Public result verification failed for poll ${pollId}.`;
+    console.error(message, verification);
+
+    try {
+        const Sentry = await import('@sentry/react');
+        Sentry.captureMessage(message, {
+            extra: verification,
+            level: 'error',
+            tags: {
+                area: 'vote-results',
+                pollId,
+            },
+        });
+    } catch {
+        // Ignore reporting failures so the results UI keeps working.
+    }
+};
+
 const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
     const headingId = React.useId();
-    const { results } = useAppSelector((state) =>
-        selectVotingStateByPollId(state, pollId),
-    );
+    const verificationState = React.useMemo(() => {
+        if (!poll.resultScores.length) {
+            return {
+                error: null,
+                verification: null,
+            };
+        }
 
-    const displayedResults =
-        results ?? (poll.results.length ? poll.results : null);
+        try {
+            return {
+                error: null,
+                verification: verifyPublishedResults({
+                    encryptedTallies: poll.encryptedTallies,
+                    publishedDecryptionShares: poll.publishedDecryptionShares,
+                    resultTallies: poll.resultTallies,
+                    resultScores: poll.resultScores,
+                    voterCount: poll.voters.length,
+                }),
+            };
+        } catch (error) {
+            return {
+                error,
+                verification: null,
+            };
+        }
+    }, [
+        poll.encryptedTallies,
+        poll.publishedDecryptionShares,
+        poll.resultScores,
+        poll.resultTallies,
+        poll.voters.length,
+    ]);
 
-    if (!displayedResults) {
+    React.useEffect(() => {
+        if (verificationState.error) {
+            console.error(
+                `Public result verification crashed for poll ${pollId}.`,
+                verificationState.error,
+            );
+            return;
+        }
+
+        if (
+            !verificationState.verification ||
+            verificationState.verification.isVerified
+        ) {
+            return;
+        }
+
+        void reportVerificationMismatch({
+            pollId,
+            verification: verificationState.verification,
+        });
+    }, [pollId, verificationState]);
+
+    if (!poll.resultScores.length) {
         return <></>;
     }
 
-    const geometricMeans = computeGeometricMean(
-        displayedResults,
-        poll.voters.length,
-    );
     const sortedResults = poll.choices
         .map(
-            (choiceName, index) => [choiceName, geometricMeans[index]] as const,
+            (choiceName, index) =>
+                [choiceName, poll.resultScores[index] ?? 0] as const,
         )
-        .sort((a, b) => b[1] - a[1])
-        .map(([choiceName, score]) => [choiceName, score.toFixed(2)]);
+        .sort((left, right) => right[1] - left[1])
+        .map(([choiceName, score]) => [choiceName, score.toFixed(2)] as const);
 
     return (
         <Panel aria-labelledby={headingId} className="space-y-5">
@@ -48,6 +120,23 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
                     Ordered by geometric mean across all submitted votes.
                 </p>
             </div>
+            {verificationState.verification?.isVerified ? (
+                <Alert variant="info">
+                    <AlertDescription>
+                        Public verification passed. The published tallies and
+                        scores match the encrypted tallies and published
+                        decryption shares.
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                <Alert>
+                    <AlertDescription>
+                        Public verification failed. Showing the published scores
+                        anyway, but the completed poll data does not validate
+                        locally.
+                    </AlertDescription>
+                </Alert>
+            )}
             <ol className="space-y-3">
                 {sortedResults.map(([choiceName, score], index) => (
                     <Panel

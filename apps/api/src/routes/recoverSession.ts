@@ -106,7 +106,7 @@ export const recoverSession = async (
                         encryptedTallies: true,
                         id: true,
                         isOpen: true,
-                        results: true,
+                        resultScores: true,
                         slug: true,
                     },
                 });
@@ -128,7 +128,7 @@ export const recoverSession = async (
                     encryptedTallyCount: poll.encryptedTallies.length,
                     encryptedVoteCount,
                     isOpen: poll.isOpen,
-                    resultCount: poll.results.length,
+                    resultScoreCount: poll.resultScores.length,
                     voterCount,
                 });
 
@@ -153,7 +153,7 @@ export const recoverSession = async (
                         hasSubmittedPublicKeyShare: false,
                         hasSubmittedVote: false,
                         hasSubmittedDecryptionShares: false,
-                        resultsAvailable: poll.results.length > 0,
+                        resultsAvailable: poll.resultScores.length > 0,
                     };
                 }
 
@@ -187,7 +187,7 @@ export const recoverSession = async (
                     hasSubmittedDecryptionShares: Boolean(
                         existingDecryptionShares,
                     ),
-                    resultsAvailable: poll.results.length > 0,
+                    resultsAvailable: poll.resultScores.length > 0,
                 };
             });
         },

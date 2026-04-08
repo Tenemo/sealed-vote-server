@@ -1,6 +1,6 @@
 import { configureStore, type EnhancedStore } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -8,12 +8,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Poll from './Poll';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
-import {
-    initialVoteState,
-    setSelectedScores,
-    setVoterSession,
-    votingSlice,
-} from 'features/Polls/votingSlice';
+import { initialVoteState, votingSlice } from 'features/Polls/votingSlice';
 import type { VotingState } from 'features/Polls/votingState';
 
 const mockedVote = vi.fn((payload: unknown) => ({
@@ -22,17 +17,9 @@ const mockedVote = vi.fn((payload: unknown) => ({
 }));
 const mockedUseGetPollQuery = vi.fn();
 const mockedUseClosePollMutation = vi.fn();
-const mockedRecoverSession = vi.fn((payload: unknown) => ({
-    payload,
-    type: 'voting/recoverSession',
-}));
 
 vi.mock('features/Polls/votingThunks/vote', () => ({
     vote: (payload: unknown) => mockedVote(payload),
-}));
-
-vi.mock('features/Polls/votingThunks/recoverSession', () => ({
-    recoverSession: (payload: unknown) => mockedRecoverSession(payload),
 }));
 
 vi.mock('features/Polls/pollsApi', () => ({
@@ -64,7 +51,9 @@ const basePoll = {
     decryptionShareCount: 0,
     commonPublicKey: null,
     encryptedTallies: [],
-    results: [],
+    publishedDecryptionShares: [],
+    resultTallies: [],
+    resultScores: [],
 };
 
 const renderPoll = (
@@ -102,7 +91,6 @@ describe('Poll page', () => {
         mockedVote.mockClear();
         mockedUseGetPollQuery.mockReset();
         mockedUseClosePollMutation.mockReset();
-        mockedRecoverSession.mockReset();
 
         mockedUseGetPollQuery.mockReturnValue({
             data: basePoll,
@@ -113,74 +101,6 @@ describe('Poll page', () => {
             vi.fn(),
             { error: undefined, isLoading: false },
         ]);
-    });
-
-    it('does not auto-resume a persisted voting session on mount', () => {
-        renderPoll({
-            '11111111-1111-4111-8111-111111111111': {
-                ...initialVoteState,
-                pollSlug: 'best-fruit--1111',
-                selectedScores: {
-                    Apples: 7,
-                },
-                voterName: 'Alice',
-                voterIndex: 1,
-                voterToken: 'voter-token',
-            },
-        });
-
-        expect(mockedVote).not.toHaveBeenCalled();
-    });
-
-    it('starts session recovery for resumable workflows instead of replaying the vote directly', async () => {
-        renderPoll({
-            '11111111-1111-4111-8111-111111111111': {
-                ...initialVoteState,
-                pollSlug: 'best-fruit--1111',
-                selectedScores: {
-                    Apples: 7,
-                },
-                shouldResumeWorkflow: true,
-                voterName: 'Alice',
-                voterIndex: 1,
-                voterToken: 'a'.repeat(64),
-            },
-        });
-
-        await waitFor(() => {
-            expect(mockedRecoverSession).toHaveBeenCalledWith({
-                pollId: '11111111-1111-4111-8111-111111111111',
-            });
-        });
-        expect(mockedVote).not.toHaveBeenCalled();
-    });
-
-    it('does not auto-resume when the voting session appears only after mount', async () => {
-        const store = renderPoll({
-            '11111111-1111-4111-8111-111111111111': {
-                ...initialVoteState,
-                pollSlug: 'best-fruit--1111',
-            },
-        });
-
-        await act(async () => {
-            store.dispatch(
-                setSelectedScores({
-                    pollId: '11111111-1111-4111-8111-111111111111',
-                    selectedScores: { Apples: 7 },
-                }),
-            );
-            store.dispatch(
-                setVoterSession({
-                    pollId: '11111111-1111-4111-8111-111111111111',
-                    voterIndex: 1,
-                    voterName: 'Alice',
-                    voterToken: 'voter-token',
-                }),
-            );
-        });
-
-        expect(mockedVote).not.toHaveBeenCalled();
     });
 
     it('renders workflow failures from state', () => {
@@ -258,7 +178,15 @@ describe('Poll page', () => {
         mockedUseGetPollQuery.mockReturnValue({
             data: {
                 ...basePoll,
-                results: [12],
+                encryptedTallies: [
+                    {
+                        c1: '1',
+                        c2: '8',
+                    },
+                ],
+                publishedDecryptionShares: [['1']],
+                resultTallies: ['8'],
+                resultScores: [8],
             },
             error: undefined,
             isLoading: false,

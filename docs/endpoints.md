@@ -10,8 +10,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```json
 {
     "pollName": "Lunch vote",
-    "choices": ["Pizza", "Sushi", "Pasta"],
-    "maxParticipants": 20
+    "choices": ["Pizza", "Sushi", "Pasta"]
 }
 ```
 
@@ -26,7 +25,9 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```
 
 - failure responses:
-- `400` for invalid input such as blank trimmed names, fewer than two choices, or duplicate choice names after trimming
+- `400` for invalid input such as blank trimmed names, fewer than two choices, duplicate choice names after trimming, or unexpected legacy fields like `maxParticipants`
+- notes:
+  - the participant cap is now server-owned; new polls default to `20` participants
 
 ## Fetch poll
 
@@ -52,12 +53,20 @@ The backend routes live under `/api`. The request and response payloads below ma
         { "c1": "11", "c2": "12" }
     ],
     "decryptionShareCount": 2,
-    "results": [12, 19, 7]
+    "publishedDecryptionShares": [
+        ["101", "102", "103"],
+        ["201", "202", "203"]
+    ],
+    "resultTallies": ["12", "19", "7"],
+    "resultScores": [3.464102, 4.358899, 2.645751]
 }
 ```
 
 - failure responses:
 - `404` when the poll does not exist
+- notes:
+  - `publishedDecryptionShares`, `resultTallies`, and `resultScores` are empty arrays until the poll reaches `complete`
+  - once complete, `publishedDecryptionShares` is ordered by voter index, each inner array is ordered by choice index, and `resultScores` are rounded to 6 fractional digits
 
 ## Register voter
 
@@ -66,7 +75,8 @@ The backend routes live under `/api`. The request and response payloads below ma
 
 ```json
 {
-    "voterName": "Alice"
+    "voterName": "Alice",
+    "voterToken": "voter-token"
 }
 ```
 

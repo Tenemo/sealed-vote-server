@@ -106,7 +106,9 @@ describe('recoverSession thunk', () => {
             decryptionShareCount: 1,
             commonPublicKey: '33',
             encryptedTallies: [],
-            results: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
         });
 
         const result = store.dispatch(
@@ -126,8 +128,11 @@ describe('recoverSession thunk', () => {
             },
         });
         expect(mockedFetchFreshPoll).toHaveBeenCalledWith(
-            expect.any(Function),
-            'poll-1',
+            expect.objectContaining({
+                dispatch: expect.any(Function),
+                getState: expect.any(Function),
+                pollId: 'poll-1',
+            }),
         );
         expect(mockedVote).toHaveBeenCalledWith({
             pollId: 'poll-1',
@@ -150,14 +155,15 @@ describe('recoverSession thunk', () => {
                 decryptionShareCount: 1,
                 commonPublicKey: '33',
                 encryptedTallies: [],
-                results: [],
+                publishedDecryptionShares: [],
+                resultTallies: [],
+                resultScores: [],
             },
             selectedScores: { Apples: 7 },
             voterName: 'Alice',
             pendingVoterName: 'Alice',
             voterIndex: 1,
             voterToken: 'voter-token',
-            commonPublicKey: '33',
             hasSubmittedPublicKeyShare: true,
             hasSubmittedVote: true,
             hasSubmittedDecryptionShares: false,
@@ -184,5 +190,89 @@ describe('recoverSession thunk', () => {
 
         expect(mockedRecoverSessionInitiate).not.toHaveBeenCalled();
         expect(mockedFetchFreshPoll).not.toHaveBeenCalled();
+    });
+
+    it('promotes a pending voter token after server recovery proves the voter session exists', async () => {
+        const store = createTestStore({
+            'poll-1': {
+                ...initialVoteState,
+                pendingVoterName: 'Alice',
+                pendingVoterToken: 'pending-voter-token',
+                selectedScores: { Apples: 7 },
+            },
+        });
+
+        mockedRecoverSessionInitiate.mockReturnValue({
+            type: 'recoverSession',
+            unwrap: async () => ({
+                role: 'voter',
+                pollId: 'poll-1',
+                pollSlug: 'best-fruit--1111',
+                phase: 'voting',
+                isOpen: false,
+                voterName: 'Alice',
+                voterIndex: 1,
+                hasSubmittedPublicKeyShare: false,
+                hasSubmittedVote: false,
+                hasSubmittedDecryptionShares: false,
+                resultsAvailable: false,
+            }),
+        });
+        mockedFetchFreshPoll.mockResolvedValue({
+            id: 'poll-1',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples'],
+            voters: ['Alice'],
+            isOpen: false,
+            publicKeyShareCount: 0,
+            encryptedVoteCount: 0,
+            decryptionShareCount: 0,
+            commonPublicKey: null,
+            encryptedTallies: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
+        });
+
+        await (
+            store.dispatch(
+                recoverSession({
+                    pollId: 'poll-1',
+                }) as never,
+            ) as { unwrap: () => Promise<void> }
+        ).unwrap();
+
+        expect(store.getState().voting['poll-1']).toEqual({
+            ...initialVoteState,
+            pollSlug: 'best-fruit--1111',
+            pollSnapshot: {
+                id: 'poll-1',
+                slug: 'best-fruit--1111',
+                pollName: 'Best fruit',
+                createdAt: '2026-01-01T00:00:00.000Z',
+                choices: ['Apples'],
+                voters: ['Alice'],
+                isOpen: false,
+                publicKeyShareCount: 0,
+                encryptedVoteCount: 0,
+                decryptionShareCount: 0,
+                commonPublicKey: null,
+                encryptedTallies: [],
+                publishedDecryptionShares: [],
+                resultTallies: [],
+                resultScores: [],
+            },
+            selectedScores: { Apples: 7 },
+            voterName: 'Alice',
+            pendingVoterName: 'Alice',
+            voterIndex: 1,
+            voterToken: 'pending-voter-token',
+            hasSubmittedPublicKeyShare: false,
+            hasSubmittedVote: false,
+            hasSubmittedDecryptionShares: false,
+            shouldResumeWorkflow: true,
+        });
     });
 });

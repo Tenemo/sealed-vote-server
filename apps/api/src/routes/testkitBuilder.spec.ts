@@ -1,3 +1,4 @@
+import { computeGeometricMean } from '@sealed-vote/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -33,7 +34,11 @@ describe('shared testkit builder', () => {
             .complete();
 
         expect(completedPoll.poll).not.toBeNull();
-        expect(completedPoll.poll?.results).toEqual([14, 15]);
+        expect(completedPoll.poll?.resultTallies).toEqual(['14', '15']);
+        expect(completedPoll.poll?.resultScores).toEqual(
+            computeGeometricMean(['14', '15'], 2),
+        );
+        expect(completedPoll.poll?.publishedDecryptionShares).toHaveLength(2);
         expect(completedPoll.poll?.voters).toEqual(['Alice', 'Bob']);
     });
 });

@@ -54,26 +54,42 @@ const reporters: ReporterDescription[] | 'list' = shouldUseBlobReporter
 
 const productionBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
 
-const normalizeBaseUrl = (baseUrl: string): string => {
-    let parsedBaseUrl: URL;
-
+const parseBaseUrl = (baseUrl: string, label: string): URL => {
     try {
-        parsedBaseUrl = new URL(baseUrl);
+        return new URL(baseUrl);
     } catch {
-        throw new TypeError('PLAYWRIGHT_BASE_URL must be a valid absolute URL.');
+        throw new TypeError(`${label} must be a valid absolute URL.`);
     }
+};
+
+const normalizeBaseUrl = (baseUrl: string, label: string): string => {
+    const parsedBaseUrl = parseBaseUrl(baseUrl, label);
 
     if (
         parsedBaseUrl.protocol !== 'http:' &&
         parsedBaseUrl.protocol !== 'https:'
     ) {
-        throw new TypeError(
-            'PLAYWRIGHT_BASE_URL must use the http or https protocol.',
-        );
+        throw new TypeError(`${label} must use the http or https protocol.`);
     }
 
     return parsedBaseUrl.origin;
 };
+
+const localApiBaseUrl = normalizeBaseUrl(
+    process.env.VITE_API_BASE_URL?.trim() || 'http://127.0.0.1:4000',
+    'VITE_API_BASE_URL',
+);
+const localWebBaseUrl = normalizeBaseUrl(
+    process.env.PLAYWRIGHT_WEB_BASE_URL?.trim() || 'http://127.0.0.1:3000',
+    'PLAYWRIGHT_WEB_BASE_URL',
+);
+const localWebServerUrl = parseBaseUrl(
+    localWebBaseUrl,
+    'PLAYWRIGHT_WEB_BASE_URL',
+);
+const localWebPort =
+    localWebServerUrl.port ||
+    (localWebServerUrl.protocol === 'https:' ? '443' : '80');
 
 const projects: Project[] = [
     {
@@ -136,19 +152,19 @@ const getCommonConfig = (
 });
 
 export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
-    ...getCommonConfig('http://127.0.0.1:3000', 'test-results/playwright'),
+    ...getCommonConfig(localWebBaseUrl, 'test-results/playwright'),
     webServer: shouldUseBuiltServers
         ? [
               {
                   command: 'pnpm e2e:ci:serve:api',
                   timeout: 120_000,
-                  url: 'http://127.0.0.1:4000/api/health-check',
+                  url: `${localApiBaseUrl}/api/health-check`,
                   reuseExistingServer: false,
               },
               {
                   command: 'pnpm e2e:ci:serve:web',
                   timeout: 120_000,
-                  url: 'http://127.0.0.1:3000',
+                  url: localWebBaseUrl,
                   reuseExistingServer: false,
               },
           ]
@@ -156,13 +172,13 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
               {
                   command: 'pnpm exec node --experimental-strip-types tests/e2e/scripts/run-e2e-backend.mts',
                   timeout: 120_000,
-                  url: 'http://127.0.0.1:4000/api/health-check',
+                  url: `${localApiBaseUrl}/api/health-check`,
                   reuseExistingServer: false,
               },
               {
-                  command: 'pnpm --filter @sealed-vote/web dev',
+                  command: `pnpm --filter @sealed-vote/web dev -- --host ${localWebServerUrl.hostname} --port ${localWebPort}`,
                   timeout: 120_000,
-                  url: 'http://127.0.0.1:3000',
+                  url: localWebBaseUrl,
                   reuseExistingServer: false,
               },
           ],
@@ -176,7 +192,7 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
     }
 
     return getCommonConfig(
-        normalizeBaseUrl(productionBaseUrl),
+        normalizeBaseUrl(productionBaseUrl, 'PLAYWRIGHT_BASE_URL'),
         'test-results/playwright-production',
     );
 };

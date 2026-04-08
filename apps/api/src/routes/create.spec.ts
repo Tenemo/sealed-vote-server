@@ -203,6 +203,21 @@ describe('POST /polls/create', () => {
         ).toBe('Choice names must be unique.');
     });
 
+    test('rejects legacy maxParticipants input', async () => {
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', 'Cat'],
+                creatorToken: generateToken(),
+                maxParticipants: 50,
+                pollName: getUniquePollName('Legacy max participants'),
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
+
     test('replays the same create request idempotently for the same creator token', async () => {
         const creatorToken = generateToken();
         const pollName = getUniquePollName('Idempotent create poll');

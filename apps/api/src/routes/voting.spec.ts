@@ -1,3 +1,4 @@
+import { computeGeometricMean } from '@sealed-vote/protocol';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -47,12 +48,19 @@ describe('E2E voting test', () => {
             },
         };
 
-        const expectedResults = choices.map((choice) =>
+        const expectedTallies = choices.map((choice) =>
             voterNames.reduce(
                 (product, voterName) =>
                     product * scoreMatrix[voterName][choice],
                 1,
             ),
+        );
+        const expectedResultTallies = expectedTallies.map((value) =>
+            value.toString(),
+        );
+        const expectedResultScores = computeGeometricMean(
+            expectedResultTallies,
+            voterNames.length,
         );
 
         const builder = new TestPollBuilder(fastify)
@@ -95,10 +103,18 @@ describe('E2E voting test', () => {
         await builder.submitDecryptionShares();
         context = builder.getContext();
         expect(context.poll?.decryptionShareCount).toBe(voterNames.length);
-        expect(context.poll?.results).toEqual(expectedResults);
+        expect(context.poll?.publishedDecryptionShares).toHaveLength(
+            voterNames.length,
+        );
+        expect(context.poll?.resultTallies).toEqual(expectedResultTallies);
+        expect(context.poll?.resultScores).toEqual(expectedResultScores);
 
         const pollData = await fetchPoll(fastify, context.pollId);
-        expect(pollData.results).toEqual(expectedResults);
+        expect(pollData.publishedDecryptionShares).toHaveLength(
+            voterNames.length,
+        );
+        expect(pollData.resultTallies).toEqual(expectedResultTallies);
+        expect(pollData.resultScores).toEqual(expectedResultScores);
 
         const deleteResult = await deletePoll(
             fastify,

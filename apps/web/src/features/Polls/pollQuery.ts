@@ -1,7 +1,33 @@
 import type { PollResponse } from './pollsApi';
 import { pollsApi } from './pollsApi';
+import { selectVoteStateByPollId } from './votingState';
 
-import { store, type AppDispatch, type RootState } from 'app/store';
+import { type AppDispatch, type RootState } from 'app/store';
+
+const defaultPollPollingIntervalMs = 5000;
+const minimumPollPollingIntervalMs = 250;
+
+const resolvePollPollingIntervalMs = (rawValue: string | undefined): number => {
+    if (!rawValue) {
+        return defaultPollPollingIntervalMs;
+    }
+
+    const parsedValue = Number(rawValue);
+
+    if (
+        !Number.isFinite(parsedValue) ||
+        !Number.isInteger(parsedValue) ||
+        parsedValue < minimumPollPollingIntervalMs
+    ) {
+        return defaultPollPollingIntervalMs;
+    }
+
+    return parsedValue;
+};
+
+export const pollPollingIntervalMs = resolvePollPollingIntervalMs(
+    import.meta.env.VITE_POLLING_INTERVAL_MS,
+);
 
 const createAbortError = (): Error => {
     const error = new Error('Poll query aborted.');
@@ -16,56 +42,79 @@ const isPollResponse = (value: unknown): value is PollResponse =>
     'id' in value &&
     typeof (value as { id: unknown }).id === 'string';
 
-type PollQueryState = {
-    data?: unknown;
-    endpointName?: string;
-    fulfilledTimeStamp?: number;
-};
-
-const getPollQueryTimestamp = (queryState: PollQueryState): number =>
-    queryState.fulfilledTimeStamp ?? 0;
-
-const selectPollResult = (
+const selectCachedPoll = (
     state: RootState,
     pollId: string,
 ): PollResponse | null => {
-    const queryStates = Object.values(
-        state[pollsApi.reducerPath].queries,
-    ) as Array<PollQueryState | undefined>;
-
-    let freshestMatchingQuery: PollQueryState | undefined;
-
-    for (const queryState of queryStates) {
-        if (
-            !queryState ||
-            queryState.endpointName !== 'getPoll' ||
-            !isPollResponse(queryState.data) ||
-            queryState.data.id !== pollId
-        ) {
-            continue;
-        }
-
-        if (
-            !freshestMatchingQuery ||
-            getPollQueryTimestamp(queryState) >
-                getPollQueryTimestamp(freshestMatchingQuery)
-        ) {
-            freshestMatchingQuery = queryState;
-        }
-    }
-
-    if (freshestMatchingQuery && isPollResponse(freshestMatchingQuery.data)) {
-        return freshestMatchingQuery.data;
-    }
-
-    const directPoll = pollsApi.endpoints.getPoll.select(pollId)(state).data;
-    return directPoll?.id === pollId ? directPoll : null;
+    const cachedPoll = pollsApi.endpoints.getPoll.select(pollId)(state).data;
+    return cachedPoll?.id === pollId ? cachedPoll : null;
 };
 
-export const fetchFreshPoll = async (
-    dispatch: AppDispatch,
+const selectPersistedPollSnapshot = (
+    state: RootState,
     pollId: string,
-): Promise<PollResponse> => {
+): PollResponse | null => {
+    const persistedPoll = selectVoteStateByPollId(
+        state.voting ?? {},
+        pollId,
+    ).pollSnapshot;
+    return persistedPoll?.id === pollId ? persistedPoll : null;
+};
+
+const selectFallbackPoll = (
+    state: RootState,
+    pollId: string,
+): PollResponse | null =>
+    selectCachedPoll(state, pollId) ??
+    selectPersistedPollSnapshot(state, pollId);
+
+const waitForDelay = async (
+    delayMs: number,
+    signal?: AbortSignal,
+): Promise<void> => {
+    if (delayMs <= 0) {
+        if (signal?.aborted) {
+            throw createAbortError();
+        }
+
+        return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        const timeoutHandle: {
+            current: ReturnType<typeof globalThis.setTimeout> | null;
+        } = {
+            current: null,
+        };
+        const onAbort = (): void => {
+            if (timeoutHandle.current !== null) {
+                globalThis.clearTimeout(timeoutHandle.current);
+            }
+            reject(createAbortError());
+        };
+        timeoutHandle.current = globalThis.setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, delayMs);
+
+        if (signal?.aborted) {
+            onAbort();
+            return;
+        }
+
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
+};
+
+export const fetchFreshPoll = async ({
+    dispatch,
+    getState,
+    pollId,
+}: {
+    dispatch: AppDispatch;
+    getState: () => RootState;
+    pollId: string;
+}): Promise<PollResponse> => {
     try {
         const freshPoll = await dispatch(
             pollsApi.endpoints.getPoll.initiate(pollId, {
@@ -78,17 +127,17 @@ export const fetchFreshPoll = async (
             return freshPoll;
         }
     } catch (error) {
-        const cachedPoll = selectPollResult(store.getState(), pollId);
-        if (cachedPoll) {
-            return cachedPoll;
+        const fallbackPoll = selectFallbackPoll(getState(), pollId);
+        if (fallbackPoll) {
+            return fallbackPoll;
         }
 
         throw error;
     }
 
-    const cachedPoll = selectPollResult(store.getState(), pollId);
-    if (cachedPoll) {
-        return cachedPoll;
+    const fallbackPoll = selectFallbackPoll(getState(), pollId);
+    if (fallbackPoll) {
+        return fallbackPoll;
     }
 
     throw new Error(`Poll ${pollId} could not be fetched.`);
@@ -96,52 +145,31 @@ export const fetchFreshPoll = async (
 
 export const waitForPoll = async ({
     dispatch,
+    getState,
     pollId,
     predicate,
     signal,
 }: {
     dispatch: AppDispatch;
+    getState: () => RootState;
     pollId: string;
     predicate: (poll: PollResponse) => boolean;
     signal?: AbortSignal;
 }): Promise<PollResponse> => {
-    const getCachedPoll = (): PollResponse | null =>
-        selectPollResult(store.getState(), pollId);
-
-    const currentPoll = getCachedPoll();
-    if (currentPoll && predicate(currentPoll)) {
-        return currentPoll;
-    }
-
-    if (!currentPoll) {
-        const fetchedPoll = await fetchFreshPoll(dispatch, pollId);
-        if (predicate(fetchedPoll)) {
-            return fetchedPoll;
-        }
-    }
-
-    return await new Promise<PollResponse>((resolve, reject) => {
-        let unsubscribe = (): void => undefined;
-
-        const onAbort = (): void => {
-            unsubscribe();
-            reject(createAbortError());
-        };
-
-        unsubscribe = store.subscribe(() => {
-            const poll = getCachedPoll();
-            if (poll && predicate(poll)) {
-                signal?.removeEventListener('abort', onAbort);
-                unsubscribe();
-                resolve(poll);
-            }
-        });
-
+    while (true) {
         if (signal?.aborted) {
-            onAbort();
-            return;
+            throw createAbortError();
         }
 
-        signal?.addEventListener('abort', onAbort, { once: true });
-    });
+        const poll = await fetchFreshPoll({
+            dispatch,
+            getState,
+            pollId,
+        });
+        if (predicate(poll)) {
+            return poll;
+        }
+
+        await waitForDelay(pollPollingIntervalMs, signal);
+    }
 };

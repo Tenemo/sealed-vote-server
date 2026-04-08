@@ -83,7 +83,7 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                         voterCount,
                         encryptedVoteCount: 0,
                         encryptedTallyCount: 0,
-                        resultCount: 0,
+                        resultScoreCount: 0,
                     })
                 ) {
                     throw createError(

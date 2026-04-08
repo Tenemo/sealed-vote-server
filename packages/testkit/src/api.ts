@@ -23,7 +23,6 @@ export const createPoll = async (
     fastify: FastifyInstance,
     pollName?: string,
     choices?: string[],
-    maxParticipants: number = 10,
 ): Promise<{
     pollId: string;
     pollSlug: string;
@@ -41,7 +40,6 @@ export const createPoll = async (
             choices: requestedChoices,
             creatorToken,
             pollName: requestedPollName,
-            maxParticipants,
         },
     });
     const createResponseBody = JSON.parse(

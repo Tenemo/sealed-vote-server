@@ -34,6 +34,13 @@ if (!fs.existsSync(builtIndexPath)) {
     process.exit(1);
 }
 
+const localWebBaseUrl = process.env.PLAYWRIGHT_WEB_BASE_URL?.trim();
+const parsedWebBaseUrl = localWebBaseUrl ? new URL(localWebBaseUrl) : null;
+const webHost = parsedWebBaseUrl?.hostname || '127.0.0.1';
+const webPort =
+    parsedWebBaseUrl?.port ||
+    (parsedWebBaseUrl?.protocol === 'https:' ? '443' : '3000');
+
 wireChildProcess(
     spawnPnpm([
         '--filter',
@@ -42,8 +49,8 @@ wireChildProcess(
         'serve:dist',
         '--',
         '--host',
-        '127.0.0.1',
+        webHost,
         '--port',
-        '3000',
+        webPort,
     ]),
 );

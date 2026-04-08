@@ -13,6 +13,7 @@ import {
     publicKeyShares,
 } from '../db/schema.js';
 import { normalizeDatabaseTimestamp } from '../utils/db.js';
+import { sortRowsByVoterIndex } from '../utils/polls.js';
 
 import {
     EncryptedMessageSchema,
@@ -33,7 +34,9 @@ const PollResponseSchema = Type.Object({
     decryptionShareCount: Type.Number(),
     commonPublicKey: Type.Union([Type.String(), Type.Null()]),
     encryptedTallies: Type.Array(EncryptedMessageSchema),
-    results: Type.Array(Type.Number()),
+    publishedDecryptionShares: Type.Array(Type.Array(Type.String())),
+    resultTallies: Type.Array(Type.String()),
+    resultScores: Type.Array(Type.Number()),
 });
 
 const schema = {
@@ -68,7 +71,8 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     isOpen: true,
                     commonPublicKey: true,
                     encryptedTallies: true,
-                    results: true,
+                    resultTallies: true,
+                    resultScores: true,
                 },
                 with: {
                     choices: {
@@ -109,6 +113,26 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                     .where(eq(decryptionShares.pollId, poll.id)),
             ]);
 
+            const publishedDecryptionShares =
+                poll.resultScores.length > 0
+                    ? sortRowsByVoterIndex(
+                          await fastify.db.query.decryptionShares.findMany({
+                              where: (fields, { eq: isEqual }) =>
+                                  isEqual(fields.pollId, poll.id),
+                              columns: {
+                                  shares: true,
+                              },
+                              with: {
+                                  voter: {
+                                      columns: {
+                                          voterIndex: true,
+                                      },
+                                  },
+                              },
+                          }),
+                      ).map(({ shares }) => shares)
+                    : [];
+
             return {
                 id: poll.id,
                 slug: poll.slug,
@@ -122,7 +146,9 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
                 decryptionShareCount: decryptionShareCountRow[0]?.count ?? 0,
                 commonPublicKey: poll.commonPublicKey,
                 encryptedTallies: poll.encryptedTallies,
-                results: poll.results,
+                publishedDecryptionShares,
+                resultTallies: poll.resultTallies,
+                resultScores: poll.resultScores,
             };
         },
     );

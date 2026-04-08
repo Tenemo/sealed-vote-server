@@ -52,7 +52,9 @@ describe('GET /polls/:pollRef', () => {
         expect(pollDetails.encryptedVoteCount).toBe(0);
         expect(pollDetails.encryptedTallies).toEqual([]);
         expect(pollDetails.decryptionShareCount).toBe(0);
-        expect(pollDetails.results).toEqual([]);
+        expect(pollDetails.publishedDecryptionShares).toEqual([]);
+        expect(pollDetails.resultTallies).toEqual([]);
+        expect(pollDetails.resultScores).toEqual([]);
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

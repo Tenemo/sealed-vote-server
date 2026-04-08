@@ -77,7 +77,9 @@ describe('seed database', () => {
         expect(registrationState.encryptedVoteCount).toBe(0);
         expect(registrationState.encryptedTallies).toEqual([]);
         expect(registrationState.decryptionShareCount).toBe(0);
-        expect(registrationState.results).toEqual([]);
+        expect(registrationState.publishedDecryptionShares).toEqual([]);
+        expect(registrationState.resultTallies).toEqual([]);
+        expect(registrationState.resultScores).toEqual([]);
 
         const votingState = await fetchPoll(fastify, votingPoll.pollId);
         expect(votingState.id).toBe(votingPoll.pollId);
@@ -90,7 +92,9 @@ describe('seed database', () => {
         expect(votingState.encryptedVoteCount).toBe(0);
         expect(votingState.encryptedTallies).toEqual([]);
         expect(votingState.decryptionShareCount).toBe(0);
-        expect(votingState.results).toEqual([]);
+        expect(votingState.publishedDecryptionShares).toEqual([]);
+        expect(votingState.resultTallies).toEqual([]);
+        expect(votingState.resultScores).toEqual([]);
 
         const resultsState = await fetchPoll(fastify, resultsPoll.pollId);
         expect(resultsState.id).toBe(resultsPoll.pollId);
@@ -103,7 +107,14 @@ describe('seed database', () => {
         expect(resultsState.encryptedVoteCount).toBe(3);
         expect(resultsState.encryptedTallies).toHaveLength(3);
         expect(resultsState.decryptionShareCount).toBe(3);
-        expect(resultsState.results).toHaveLength(3);
-        expect(resultsState.results.every((value) => value > 0)).toBe(true);
+        expect(resultsState.publishedDecryptionShares).toHaveLength(3);
+        expect(resultsState.resultTallies).toHaveLength(3);
+        expect(resultsState.resultScores).toHaveLength(3);
+        expect(
+            resultsState.resultTallies.every((value) => BigInt(value) > 0n),
+        ).toBe(true);
+        expect(resultsState.resultScores.every((value) => value > 0)).toBe(
+            true,
+        );
     });
 });

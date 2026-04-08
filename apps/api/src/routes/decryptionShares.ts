@@ -4,8 +4,9 @@ import type {
     MessageResponse,
 } from '@sealed-vote/contracts';
 import {
+    computePublishedResultScores,
     canSubmitDecryptionShares,
-    decryptTallies,
+    decryptTalliesToStrings,
 } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { eq } from 'drizzle-orm';
@@ -25,7 +26,10 @@ import {
     lockPollById,
 } from '../utils/polls.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
-import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
+import {
+    authenticateVoter,
+    findVoterByTokenReadOnly,
+} from '../utils/voterAuth.js';
 
 import {
     MessageResponseSchema,
@@ -116,7 +120,7 @@ export const decryptionShares = async (
                             voterCount: votersCount,
                             encryptedVoteCount: 0,
                             encryptedTallyCount: poll.encryptedTallies.length,
-                            resultCount: poll.results.length,
+                            resultScoreCount: poll.resultScores.length,
                         })
                     ) {
                         throw createError(
@@ -142,15 +146,19 @@ export const decryptionShares = async (
                         await getOrderedPollDecryptionShares(tx, pollId);
 
                     if (decryptionShareRows.length === votersCount) {
-                        const results = decryptTallies(
+                        const resultTallies = decryptTalliesToStrings(
                             poll.encryptedTallies,
                             decryptionShareRows.map(
                                 ({ shares: voterShares }) => voterShares,
                             ),
                         );
+                        const resultScores = computePublishedResultScores(
+                            resultTallies,
+                            votersCount,
+                        );
                         await tx
                             .update(polls)
-                            .set({ results })
+                            .set({ resultTallies, resultScores })
                             .where(eq(polls.id, pollId));
                     }
 
@@ -172,16 +180,11 @@ export const decryptionShares = async (
                         'unique_decryption_shares_per_voter',
                     )
                 ) {
-                    const voter = await fastify.db.query.voters.findFirst({
-                        where: (fields, { and, eq: isEqual }) =>
-                            and(
-                                isEqual(fields.pollId, req.params.pollId),
-                                isEqual(
-                                    fields.voterTokenHash,
-                                    hashSecureToken(req.body.voterToken),
-                                ),
-                            ),
-                    });
+                    const voter = await findVoterByTokenReadOnly(
+                        fastify.db,
+                        req.params.pollId,
+                        req.body.voterToken,
+                    );
 
                     const existingShares =
                         voter &&

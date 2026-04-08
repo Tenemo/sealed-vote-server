@@ -13,19 +13,15 @@ import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import NotFound from 'components/NotFound/NotFound';
+import { pollPollingIntervalMs } from 'features/Polls/pollQuery';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
-import {
-    getResumableVoterName,
-    hasPendingVotingIntent,
-    selectVoteStateByPollSlug,
-} from 'features/Polls/votingState';
-import { recoverSession } from 'features/Polls/votingThunks/recoverSession';
+import { selectVoteStateByPollSlug } from 'features/Polls/votingState';
 import { vote } from 'features/Polls/votingThunks/vote';
 import {
     connectionLostMessage,
     isConnectionError,
     renderError,
-} from 'utils/utils';
+} from 'utils/networkErrors';
 
 const isNotFoundError = (error: unknown): boolean =>
     !!error &&
@@ -33,39 +29,10 @@ const isNotFoundError = (error: unknown): boolean =>
     'status' in error &&
     error.status === 404;
 
-const defaultPollPollingIntervalMs = 5000;
-const minimumPollPollingIntervalMs = 250;
-
-const resolvePollPollingIntervalMs = (rawValue: string | undefined): number => {
-    if (!rawValue) {
-        return defaultPollPollingIntervalMs;
-    }
-
-    const parsedValue = Number(rawValue);
-
-    if (
-        !Number.isFinite(parsedValue) ||
-        !Number.isInteger(parsedValue) ||
-        parsedValue < minimumPollPollingIntervalMs
-    ) {
-        return defaultPollPollingIntervalMs;
-    }
-
-    return parsedValue;
-};
-
-const pollPollingIntervalMs = resolvePollPollingIntervalMs(
-    import.meta.env.VITE_POLLING_INTERVAL_MS,
-);
-
-const getBrowserOnlineState = (): boolean =>
-    typeof navigator === 'undefined' ? true : navigator.onLine;
-
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
     const { pollSlug } = useParams();
     const participantsHeadingId = React.useId();
-    const isRecoveringSessionRef = React.useRef(false);
 
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
@@ -73,9 +40,6 @@ const PollPage = (): React.JSX.Element => {
     const isLegacyPollLink = isUuid(pollSlug);
     const [activePollingIntervalMs, setActivePollingIntervalMs] = useState(
         pollPollingIntervalMs,
-    );
-    const [isBrowserOnline, setIsBrowserOnline] = useState(
-        getBrowserOnlineState,
     );
     // Voting can advance in another tab or window, so background polling
     // must continue until the workflow reaches results.
@@ -93,11 +57,6 @@ const PollPage = (): React.JSX.Element => {
     );
     const effectivePoll = poll ?? votingState.pollSnapshot;
     const pollId = effectivePoll?.id ?? null;
-    const hasPendingVotingState = hasPendingVotingIntent(votingState);
-    const resumableVoterName = getResumableVoterName(votingState);
-    const selectedScores = votingState.selectedScores;
-    const shouldResumeWorkflow = votingState.shouldResumeWorkflow;
-    const isVotingInProgress = votingState.isVotingInProgress;
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -116,61 +75,9 @@ const PollPage = (): React.JSX.Element => {
     };
 
     useEffect(() => {
-        const handleOnline = (): void => {
-            setIsBrowserOnline(true);
-        };
-        const handleOffline = (): void => {
-            setIsBrowserOnline(false);
-        };
-
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
-
-    useEffect(() => {
-        const hasResults =
-            !!effectivePoll?.results.length || !!votingState.results?.length;
-
+        const hasResults = !!effectivePoll?.resultScores.length;
         setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
-    }, [effectivePoll?.results.length, votingState.results]);
-
-    useEffect(() => {
-        if (
-            !pollId ||
-            !isBrowserOnline ||
-            isVotingInProgress ||
-            isRecoveringSessionRef.current ||
-            !shouldResumeWorkflow ||
-            !hasPendingVotingState
-        ) {
-            return;
-        }
-
-        if (!resumableVoterName || !selectedScores) {
-            return;
-        }
-
-        isRecoveringSessionRef.current = true;
-        void Promise.resolve(dispatch(recoverSession({ pollId }))).finally(
-            () => {
-                isRecoveringSessionRef.current = false;
-            },
-        );
-    }, [
-        dispatch,
-        hasPendingVotingState,
-        isBrowserOnline,
-        isVotingInProgress,
-        pollId,
-        resumableVoterName,
-        selectedScores,
-        shouldResumeWorkflow,
-    ]);
+    }, [effectivePoll?.resultScores.length]);
 
     if (isLegacyPollLink || isNotFoundError(pollError)) {
         return <NotFound />;

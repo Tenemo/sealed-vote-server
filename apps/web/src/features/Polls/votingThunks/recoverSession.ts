@@ -30,9 +30,11 @@ export const recoverSession = createAsyncThunk<
     const voteState = selectVoteStateByPollId(getState().voting, pollId);
     const recoveryData = voteState.voterToken
         ? { voterToken: voteState.voterToken }
-        : voteState.creatorToken
-          ? { creatorToken: voteState.creatorToken }
-          : null;
+        : voteState.pendingVoterToken
+          ? { voterToken: voteState.pendingVoterToken }
+          : voteState.creatorToken
+            ? { creatorToken: voteState.creatorToken }
+            : null;
 
     if (!recoveryData) {
         return;
@@ -53,7 +55,11 @@ export const recoverSession = createAsyncThunk<
     );
 
     try {
-        const poll = await fetchFreshPoll(dispatch, pollId);
+        const poll = await fetchFreshPoll({
+            dispatch,
+            getState,
+            pollId,
+        });
         dispatch(
             upsertPollSnapshot({
                 pollId: poll.id,

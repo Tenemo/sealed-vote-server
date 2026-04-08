@@ -37,7 +37,8 @@ const applyRegistration = (
         voterToken: string;
     },
 ): void => {
-    voteState.pendingVoterName = payload.voterName;
+    voteState.pendingVoterName = null;
+    voteState.pendingVoterToken = null;
     voteState.voterName = payload.voterName;
     voteState.voterIndex = payload.voterIndex;
     voteState.voterToken = payload.voterToken;
@@ -51,13 +52,11 @@ const applyRegistration = (
 const applyPollSnapshot = (voteState: VoteState, poll: PollResponse): void => {
     voteState.pollSlug = poll.slug;
     voteState.pollSnapshot = poll;
-    voteState.commonPublicKey = poll.commonPublicKey;
 
-    if (!poll.results.length) {
+    if (!poll.resultScores.length) {
         return;
     }
 
-    voteState.results = poll.results;
     Object.assign(voteState, clearCompletedSensitiveFields(voteState));
 };
 
@@ -126,6 +125,10 @@ export const votingSlice = createSlice({
                 voteState.voterName = recovery.voterName ?? voteState.voterName;
                 voteState.voterIndex =
                     recovery.voterIndex ?? voteState.voterIndex;
+                if (!voteState.voterToken && voteState.pendingVoterToken) {
+                    voteState.voterToken = voteState.pendingVoterToken;
+                    voteState.pendingVoterToken = null;
+                }
                 voteState.hasSubmittedPublicKeyShare =
                     recovery.hasSubmittedPublicKeyShare;
                 voteState.hasSubmittedVote = recovery.hasSubmittedVote;
@@ -155,29 +158,28 @@ export const votingSlice = createSlice({
                 pollId: string;
                 privateKey: string;
                 publicKey: string;
-                commonPublicKey: string | null;
             }>,
         ) => {
-            const { pollId, privateKey, publicKey, commonPublicKey } =
-                action.payload;
+            const { pollId, privateKey, publicKey } = action.payload;
             const voteState = ensureVoteState(state, pollId);
             voteState.privateKey = privateKey;
             voteState.publicKey = publicKey;
-            voteState.commonPublicKey = commonPublicKey;
         },
         setPendingVoterRegistration: (
             state,
             action: PayloadAction<{
                 pollId: string;
                 voterName: string;
-                voterToken: string;
+                pendingVoterToken: string;
             }>,
         ) => {
-            const { pollId, voterName, voterToken } = action.payload;
+            const { pollId, voterName, pendingVoterToken } = action.payload;
             const voteState = ensureVoteState(state, pollId);
 
             voteState.pendingVoterName = voterName;
-            voteState.voterToken = voterToken;
+            voteState.pendingVoterToken = voteState.voterToken
+                ? null
+                : pendingVoterToken;
             voteState.workflowError = null;
         },
         setProgressMessage: (
@@ -189,26 +191,6 @@ export const votingSlice = createSlice({
         ) => {
             const { pollId, progressMessage } = action.payload;
             ensureVoteState(state, pollId).progressMessage = progressMessage;
-        },
-        setResults: (
-            state,
-            action: PayloadAction<{
-                results: number[];
-                pollId: string;
-            }>,
-        ) => {
-            const { pollId, results } = action.payload;
-            const voteState = ensureVoteState(state, pollId);
-            voteState.results = results;
-
-            if (voteState.pollSnapshot) {
-                voteState.pollSnapshot = {
-                    ...voteState.pollSnapshot,
-                    results,
-                };
-            }
-
-            Object.assign(voteState, clearCompletedSensitiveFields(voteState));
         },
         setSelectedScores: (
             state,
@@ -371,7 +353,6 @@ export const {
     setKeys,
     setPendingVoterRegistration,
     setProgressMessage,
-    setResults,
     setSelectedScores,
     setShouldResumeWorkflow,
     setSubmissionStatus,
