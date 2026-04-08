@@ -149,6 +149,7 @@ describe('vote thunk', () => {
         expect(mockedRunDecryptResults).toHaveBeenCalled();
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
+            lastUpdatedAt: expect.any(Number),
             pendingVoterName: 'Alice',
             selectedScores,
             voterName: 'Alice',
@@ -207,6 +208,7 @@ describe('vote thunk', () => {
 
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
+            lastUpdatedAt: expect.any(Number),
             pendingVoterName: 'Alice',
             selectedScores,
             voterName: 'Alice',

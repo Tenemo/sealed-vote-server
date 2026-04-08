@@ -136,6 +136,7 @@ describe('recoverSession thunk', () => {
         });
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
+            lastUpdatedAt: expect.any(Number),
             pollSlug: 'best-fruit--1111',
             pollSnapshot: {
                 id: 'poll-1',

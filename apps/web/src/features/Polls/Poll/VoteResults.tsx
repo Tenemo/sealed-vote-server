@@ -45,7 +45,7 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
                     Results
                 </h2>
                 <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                    Ranked by geometric mean across all submitted votes.
+                    Ordered by geometric mean across all submitted votes.
                 </p>
             </div>
             <ol className="space-y-3">

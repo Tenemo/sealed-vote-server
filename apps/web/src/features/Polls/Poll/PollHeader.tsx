@@ -80,7 +80,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                 </p>
                 <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                     Share the link below with participants. Once everyone has
-                    voted, the results are ranked by geometric mean.
+                    voted, the results are ordered by geometric mean.
                 </p>
             </div>
             <VoteSharing />

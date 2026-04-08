@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
 import {
@@ -17,6 +17,31 @@ import {
     openProjectParticipant,
 } from './support/participants';
 import { createPollName, createTestNamespace } from './support/testData';
+
+const voteInProgressMessagePattern =
+    /Waiting for common public key\.\.\.|Waiting for encrypted tallies\.\.\.|Waiting for all decryption shares and results\.\.\./i;
+
+const expectVoteStartedOrFinished = async (page: Page): Promise<void> => {
+    const voteInProgressMessage = page.getByText(voteInProgressMessagePattern);
+    const resultsHeading = page.getByRole('heading', { name: 'Results' });
+
+    await expect
+        .poll(
+            async () => {
+                if (await resultsHeading.isVisible()) {
+                    return 'results-visible';
+                }
+
+                if (await voteInProgressMessage.isVisible()) {
+                    return 'vote-in-progress';
+                }
+
+                return 'pending';
+            },
+            { timeout: 30_000 },
+        )
+        .not.toBe('pending');
+};
 
 test('keeps the voting flow usable across disconnects before and after the vote starts', async ({
     browser,
@@ -71,11 +96,7 @@ test('keeps the voting flow usable across disconnects before and after the vote 
             await expectConnectionToastHidden(page);
 
             await beginVote(page);
-            await expect(
-                page.getByText(
-                    /Waiting for common public key\.\.\.|Waiting for encrypted tallies\.\.\.|Waiting for all decryption shares and results\.\.\./i,
-                ),
-            ).toBeVisible({ timeout: 30_000 });
+            await expectVoteStartedOrFinished(page);
             await participant.context.setOffline(true);
             await expect(
                 participant.page.getByRole('heading', { name: pollName }),

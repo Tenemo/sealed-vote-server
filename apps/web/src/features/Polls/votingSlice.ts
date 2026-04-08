@@ -12,10 +12,13 @@ import { pollsApi } from './pollsApi';
 import {
     clearCompletedSensitiveFields,
     initialVoteState,
+    restoreVotingStateFromPersistence,
     sanitizeVotingStateForPersistence,
+    touchVoteState,
     selectVoteStateByPollId,
     type VoteState,
     type VotingState,
+    votingStatePersistenceTtlMs,
 } from './votingState';
 import { voteThunkTypePrefix } from './votingThunks/voteTypes';
 
@@ -23,7 +26,10 @@ const initialState: VotingState = {};
 
 const ensureVoteState = (state: VotingState, pollId: string): VoteState => {
     if (!state[pollId]) {
-        state[pollId] = { ...initialVoteState };
+        state[pollId] = {
+            ...initialVoteState,
+            lastUpdatedAt: Date.now(),
+        };
     }
 
     return state[pollId];
@@ -46,6 +52,7 @@ const applyRegistration = (
     voteState.hasSubmittedPublicKeyShare = false;
     voteState.hasSubmittedVote = false;
     voteState.hasSubmittedDecryptionShares = false;
+    touchVoteState(voteState);
 };
 
 const applyPollSnapshot = (voteState: VoteState, poll: PollResponse): void => {
@@ -54,11 +61,13 @@ const applyPollSnapshot = (voteState: VoteState, poll: PollResponse): void => {
     voteState.commonPublicKey = poll.commonPublicKey;
 
     if (!poll.results.length) {
+        touchVoteState(voteState);
         return;
     }
 
     voteState.results = poll.results;
     Object.assign(voteState, clearCompletedSensitiveFields(voteState));
+    touchVoteState(voteState);
 };
 
 export type VoteThunkRejectValue = {
@@ -136,10 +145,12 @@ export const votingSlice = createSlice({
                     voteState.voterToken &&
                     !recovery.resultsAvailable,
                 );
+                touchVoteState(voteState);
                 return;
             }
 
             voteState.shouldResumeWorkflow = false;
+            touchVoteState(voteState);
         },
         clearWorkflowError: (
             state,
@@ -147,7 +158,9 @@ export const votingSlice = createSlice({
                 pollId: string;
             }>,
         ) => {
-            ensureVoteState(state, action.payload.pollId).workflowError = null;
+            const voteState = ensureVoteState(state, action.payload.pollId);
+            voteState.workflowError = null;
+            touchVoteState(voteState);
         },
         forgetLocalVoteState: (
             state,
@@ -172,6 +185,7 @@ export const votingSlice = createSlice({
             voteState.privateKey = privateKey;
             voteState.publicKey = publicKey;
             voteState.commonPublicKey = commonPublicKey;
+            touchVoteState(voteState);
         },
         setPendingVoterRegistration: (
             state,
@@ -187,6 +201,7 @@ export const votingSlice = createSlice({
             voteState.pendingVoterName = voterName;
             voteState.voterToken = voterToken;
             voteState.workflowError = null;
+            touchVoteState(voteState);
         },
         setProgressMessage: (
             state,
@@ -196,7 +211,9 @@ export const votingSlice = createSlice({
             }>,
         ) => {
             const { pollId, progressMessage } = action.payload;
-            ensureVoteState(state, pollId).progressMessage = progressMessage;
+            const voteState = ensureVoteState(state, pollId);
+            voteState.progressMessage = progressMessage;
+            touchVoteState(voteState);
         },
         setResults: (
             state,
@@ -217,6 +234,7 @@ export const votingSlice = createSlice({
             }
 
             Object.assign(voteState, clearCompletedSensitiveFields(voteState));
+            touchVoteState(voteState);
         },
         setSelectedScores: (
             state,
@@ -226,7 +244,9 @@ export const votingSlice = createSlice({
             }>,
         ) => {
             const { pollId, selectedScores } = action.payload;
-            ensureVoteState(state, pollId).selectedScores = selectedScores;
+            const voteState = ensureVoteState(state, pollId);
+            voteState.selectedScores = selectedScores;
+            touchVoteState(voteState);
         },
         setShouldResumeWorkflow: (
             state,
@@ -236,8 +256,9 @@ export const votingSlice = createSlice({
             }>,
         ) => {
             const { pollId, shouldResumeWorkflow } = action.payload;
-            ensureVoteState(state, pollId).shouldResumeWorkflow =
-                shouldResumeWorkflow;
+            const voteState = ensureVoteState(state, pollId);
+            voteState.shouldResumeWorkflow = shouldResumeWorkflow;
+            touchVoteState(voteState);
         },
         setSubmissionStatus: (
             state,
@@ -253,12 +274,15 @@ export const votingSlice = createSlice({
             switch (phase) {
                 case 'publicKey':
                     voteState.hasSubmittedPublicKeyShare = submitted;
+                    touchVoteState(voteState);
                     return;
                 case 'vote':
                     voteState.hasSubmittedVote = submitted;
+                    touchVoteState(voteState);
                     return;
                 case 'decryptionShares':
                     voteState.hasSubmittedDecryptionShares = submitted;
+                    touchVoteState(voteState);
                     return;
                 default:
                     return;
@@ -300,6 +324,7 @@ export const votingSlice = createSlice({
                     const voteState = ensureVoteState(state, payload.id);
                     voteState.creatorToken = payload.creatorToken;
                     voteState.pollSlug = payload.slug;
+                    touchVoteState(voteState);
                 },
             )
             .addMatcher(
@@ -324,6 +349,7 @@ export const votingSlice = createSlice({
                     voteState.isVotingInProgress = true;
                     voteState.workflowError = null;
                     voteState.shouldResumeWorkflow = false;
+                    touchVoteState(voteState);
                 },
             )
             .addMatcher(
@@ -340,6 +366,7 @@ export const votingSlice = createSlice({
                     voteState.isVotingInProgress = false;
                     voteState.progressMessage = null;
                     voteState.shouldResumeWorkflow = false;
+                    touchVoteState(voteState);
                 },
             )
             .addMatcher(
@@ -361,6 +388,7 @@ export const votingSlice = createSlice({
                         voteState.progressMessage = action.payload.message;
                         voteState.workflowError = null;
                         voteState.shouldResumeWorkflow = true;
+                        touchVoteState(voteState);
                         return;
                     }
 
@@ -368,6 +396,7 @@ export const votingSlice = createSlice({
                     voteState.workflowError =
                         action.payload?.message ?? 'Unknown voting error.';
                     voteState.shouldResumeWorkflow = false;
+                    touchVoteState(voteState);
                 },
             );
     },
@@ -390,4 +419,9 @@ export const {
 
 export const { selectVotingStateByPollId } = votingSlice.selectors;
 
-export { initialVoteState, sanitizeVotingStateForPersistence };
+export {
+    initialVoteState,
+    sanitizeVotingStateForPersistence,
+    restoreVotingStateFromPersistence,
+    votingStatePersistenceTtlMs,
+};

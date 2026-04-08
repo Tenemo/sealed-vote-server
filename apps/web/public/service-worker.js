@@ -28,6 +28,21 @@ const isCacheableStaticRequest = (request) =>
         request.destination,
     );
 
+const createOfflinePollUnavailableResponse = () =>
+    new Response(
+        JSON.stringify({
+            message:
+                'This vote is not available offline yet. Open it once while online to make it available for offline recovery.',
+        }),
+        {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            status: 503,
+            statusText: 'Service Unavailable',
+        },
+    );
+
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches
@@ -108,7 +123,10 @@ self.addEventListener('fetch', (event) => {
                 })
                 .catch(async () => {
                     const cache = await caches.open(pollCacheName);
-                    return await cache.match(request);
+                    return (
+                        (await cache.match(request)) ??
+                        createOfflinePollUnavailableResponse()
+                    );
                 }),
         );
         return;
