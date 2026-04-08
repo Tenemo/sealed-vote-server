@@ -89,7 +89,9 @@ const initializeSentry = async (): Promise<void> => {
 
 const scheduleSentryInitialization = (): void => {
     const initialize = (): void => {
-        void initializeSentry();
+        void initializeSentry().catch((error: unknown) => {
+            console.error('Failed to initialize Sentry.', error);
+        });
     };
     const requestIdleCallback = window.requestIdleCallback;
 

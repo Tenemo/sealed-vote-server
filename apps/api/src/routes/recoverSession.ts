@@ -12,12 +12,14 @@ import { withTransaction } from '../utils/db.js';
 import {
     countPollEncryptedVotes,
     countPollVoters,
-    getExistingDecryptionShares,
-    getExistingEncryptedVote,
-    getExistingPublicKeyShare,
-    lockPollByIdForCreatorAction,
+    getExistingDecryptionSharesReadOnly,
+    getExistingEncryptedVoteReadOnly,
+    getExistingPublicKeyShareReadOnly,
 } from '../utils/polls.js';
-import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
+import {
+    authenticateVoterReadOnly,
+    hashSecureToken,
+} from '../utils/voterAuth.js';
 
 import {
     MessageResponseSchema,
@@ -100,6 +102,7 @@ export const recoverSession = async (
                         isEqual(fields.id, pollId),
                     columns: {
                         commonPublicKey: true,
+                        creatorTokenHash: true,
                         encryptedTallies: true,
                         id: true,
                         isOpen: true,
@@ -130,21 +133,8 @@ export const recoverSession = async (
                 });
 
                 if (creatorToken) {
-                    const creatorPoll = await lockPollByIdForCreatorAction(
-                        tx,
-                        pollId,
-                    );
-
-                    if (!creatorPoll) {
-                        throw createError(
-                            404,
-                            `Poll with ID ${pollId} does not exist.`,
-                        );
-                    }
-
                     if (
-                        creatorPoll.creatorTokenHash !==
-                        hashSecureToken(creatorToken)
+                        poll.creatorTokenHash !== hashSecureToken(creatorToken)
                     ) {
                         throw createError(
                             403,
@@ -167,13 +157,21 @@ export const recoverSession = async (
                     };
                 }
 
-                const voter = await authenticateVoter(tx, pollId, voterToken!);
+                const voter = await authenticateVoterReadOnly(
+                    tx,
+                    pollId,
+                    voterToken!,
+                );
 
                 const [publicKeyShare, existingVote, existingDecryptionShares] =
                     await Promise.all([
-                        getExistingPublicKeyShare(tx, pollId, voter.id),
-                        getExistingEncryptedVote(tx, pollId, voter.id),
-                        getExistingDecryptionShares(tx, pollId, voter.id),
+                        getExistingPublicKeyShareReadOnly(tx, pollId, voter.id),
+                        getExistingEncryptedVoteReadOnly(tx, pollId, voter.id),
+                        getExistingDecryptionSharesReadOnly(
+                            tx,
+                            pollId,
+                            voter.id,
+                        ),
                     ]);
 
                 return {

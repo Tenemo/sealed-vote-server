@@ -8,6 +8,13 @@ export const registerOfflineServiceWorker = async (): Promise<void> => {
     }
 
     window.addEventListener('load', () => {
-        void navigator.serviceWorker.register('/service-worker.js');
+        void navigator.serviceWorker
+            .register('/service-worker.js')
+            .catch((error: unknown) => {
+                console.error(
+                    'Failed to register offline service worker.',
+                    error,
+                );
+            });
     });
 };

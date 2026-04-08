@@ -221,6 +221,26 @@ export const getExistingPublicKeyShare = async (
     return row;
 };
 
+export const getExistingPublicKeyShareReadOnly = async (
+    tx: DatabaseTransaction,
+    pollId: string,
+    voterId: string,
+): Promise<ExistingPublicKeyShareRow | undefined> => {
+    const [row] = await tx
+        .select({
+            publicKeyShare: publicKeyShares.publicKeyShare,
+        })
+        .from(publicKeyShares)
+        .where(
+            and(
+                eq(publicKeyShares.pollId, pollId),
+                eq(publicKeyShares.voterId, voterId),
+            ),
+        );
+
+    return row;
+};
+
 export const getExistingEncryptedVote = async (
     tx: DatabaseTransaction,
     pollId: string,
@@ -242,6 +262,26 @@ export const getExistingEncryptedVote = async (
     return row;
 };
 
+export const getExistingEncryptedVoteReadOnly = async (
+    tx: DatabaseTransaction,
+    pollId: string,
+    voterId: string,
+): Promise<ExistingEncryptedVoteRow | undefined> => {
+    const [row] = await tx
+        .select({
+            votes: encryptedVotes.votes,
+        })
+        .from(encryptedVotes)
+        .where(
+            and(
+                eq(encryptedVotes.pollId, pollId),
+                eq(encryptedVotes.voterId, voterId),
+            ),
+        );
+
+    return row;
+};
+
 export const getExistingDecryptionShares = async (
     tx: DatabaseTransaction,
     pollId: string,
@@ -259,6 +299,26 @@ export const getExistingDecryptionShares = async (
             ),
         )
         .for('update');
+
+    return row;
+};
+
+export const getExistingDecryptionSharesReadOnly = async (
+    tx: DatabaseTransaction,
+    pollId: string,
+    voterId: string,
+): Promise<ExistingDecryptionSharesRow | undefined> => {
+    const [row] = await tx
+        .select({
+            shares: decryptionShares.shares,
+        })
+        .from(decryptionShares)
+        .where(
+            and(
+                eq(decryptionShares.pollId, pollId),
+                eq(decryptionShares.voterId, voterId),
+            ),
+        );
 
     return row;
 };

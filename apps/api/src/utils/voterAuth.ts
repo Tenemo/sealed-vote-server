@@ -51,5 +51,32 @@ export const authenticateVoter = async (
     return voter;
 };
 
+export const authenticateVoterReadOnly = async (
+    tx: DatabaseTransaction,
+    pollId: string,
+    voterToken: string,
+): Promise<AuthenticatedVoter> => {
+    const voterTokenHash = hashSecureToken(voterToken);
+    const [voter] = await tx
+        .select({
+            id: voters.id,
+            voterName: voters.voterName,
+            voterIndex: voters.voterIndex,
+        })
+        .from(voters)
+        .where(
+            and(
+                eq(voters.pollId, pollId),
+                eq(voters.voterTokenHash, voterTokenHash),
+            ),
+        );
+
+    if (!voter) {
+        throw createError(403, ERROR_MESSAGES.invalidVoterToken);
+    }
+
+    return voter;
+};
+
 export const isSecureToken = (value: string): boolean =>
     typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
