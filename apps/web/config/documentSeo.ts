@@ -19,18 +19,20 @@ export const resolveSeoApiBaseUrl = (rawBaseUrl?: string | null): string => {
         return defaultSeoApiBaseUrl;
     }
 
-    const parsedBaseUrl = new URL(trimmedBaseUrl);
+    try {
+        const parsedBaseUrl = new URL(trimmedBaseUrl);
 
-    if (
-        parsedBaseUrl.protocol !== 'http:' &&
-        parsedBaseUrl.protocol !== 'https:'
-    ) {
-        throw new TypeError(
-            'SEO API base URL must use the http or https protocol.',
-        );
+        if (
+            parsedBaseUrl.protocol !== 'http:' &&
+            parsedBaseUrl.protocol !== 'https:'
+        ) {
+            return defaultSeoApiBaseUrl;
+        }
+
+        return parsedBaseUrl.origin;
+    } catch {
+        return defaultSeoApiBaseUrl;
     }
-
-    return parsedBaseUrl.origin;
 };
 
 export const extractVoteSlugFromPathname = (
@@ -42,16 +44,66 @@ export const extractVoteSlugFromPathname = (
         return null;
     }
 
-    return decodeURIComponent(segments[1]);
+    try {
+        return decodeURIComponent(segments[1]);
+    } catch {
+        return null;
+    }
 };
 
-const isPollPayload = (value: unknown): value is { pollName: string } =>
+type SeoPollPayload = {
+    pollName: string;
+    resultScores: number[];
+    resultTallies: string[];
+};
+
+const isPollPayload = (
+    value: unknown,
+): value is {
+    pollName: string;
+    resultScores?: unknown;
+    resultTallies?: unknown;
+} =>
     typeof value === 'object' &&
     value !== null &&
     'pollName' in value &&
     typeof value.pollName === 'string';
 
-export const fetchPollTitle = async ({
+const normalizeNumberArray = (value: unknown): number[] =>
+    Array.isArray(value)
+        ? value.filter(
+              (item): item is number =>
+                  typeof item === 'number' && Number.isFinite(item),
+          )
+        : [];
+
+const normalizeStringArray = (value: unknown): string[] =>
+    Array.isArray(value)
+        ? value.filter(
+              (item): item is string =>
+                  typeof item === 'string' && item.trim().length > 0,
+          )
+        : [];
+
+const normalizeSeoPollPayload = (value: unknown): SeoPollPayload | null => {
+    if (!isPollPayload(value)) {
+        return null;
+    }
+
+    const pollTitle = value.pollName.trim();
+
+    if (!pollTitle) {
+        return null;
+    }
+
+    return {
+        pollName: pollTitle,
+        resultScores: normalizeNumberArray(value.resultScores),
+        resultTallies: normalizeStringArray(value.resultTallies),
+    };
+};
+
+const fetchPollSeoPayload = async ({
     apiBaseUrl,
     fetchImpl = fetch,
     pollSlug,
@@ -61,7 +113,7 @@ export const fetchPollTitle = async ({
     fetchImpl?: FetchLike;
     pollSlug: string;
     signal?: AbortSignal;
-}): Promise<string | null> => {
+}): Promise<SeoPollPayload | null> => {
     try {
         const response = await fetchImpl(
             new URL(`/api/polls/${encodeURIComponent(pollSlug)}`, apiBaseUrl),
@@ -77,18 +129,31 @@ export const fetchPollTitle = async ({
             return null;
         }
 
-        const payload: unknown = await response.json();
-
-        if (!isPollPayload(payload)) {
-            return null;
-        }
-
-        const pollTitle = payload.pollName.trim();
-
-        return pollTitle ? pollTitle : null;
+        return normalizeSeoPollPayload(await response.json());
     } catch {
         return null;
     }
+};
+
+export const fetchPollTitle = async ({
+    apiBaseUrl,
+    fetchImpl = fetch,
+    pollSlug,
+    signal,
+}: {
+    apiBaseUrl: string;
+    fetchImpl?: FetchLike;
+    pollSlug: string;
+    signal?: AbortSignal;
+}): Promise<string | null> => {
+    const payload = await fetchPollSeoPayload({
+        apiBaseUrl,
+        fetchImpl,
+        pollSlug,
+        signal,
+    });
+
+    return payload?.pollName ?? null;
 };
 
 export const resolveDocumentSeoMetadata = async ({
@@ -111,7 +176,7 @@ export const resolveDocumentSeoMetadata = async ({
         });
     }
 
-    const pollTitle = await fetchPollTitle({
+    const pollPayload = await fetchPollSeoPayload({
         apiBaseUrl,
         fetchImpl,
         pollSlug,
@@ -122,7 +187,9 @@ export const resolveDocumentSeoMetadata = async ({
         origin: requestUrl.origin,
         pollPath: requestUrl.pathname,
         pollSlug,
-        pollTitle,
+        pollTitle: pollPayload?.pollName,
+        resultScores: pollPayload?.resultScores,
+        resultTallies: pollPayload?.resultTallies,
     });
 };
 

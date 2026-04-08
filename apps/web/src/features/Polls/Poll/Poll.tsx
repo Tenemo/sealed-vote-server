@@ -92,10 +92,15 @@ const PollPage = (): React.JSX.Element => {
         currentVoteState.creatorToken ??
         fallbackCreatorSession?.creatorToken ??
         null;
+    const runtimeOrigin =
+        typeof window === 'undefined' ? undefined : window.location.origin;
     const pageSeo = buildVotePageSeo({
+        origin: runtimeOrigin,
         pollPath: `/votes/${effectivePoll?.slug ?? pollSlug}`,
         pollSlug: effectivePoll?.slug ?? pollSlug,
         pollTitle: effectivePoll?.pollName,
+        resultScores: effectivePoll?.resultScores,
+        resultTallies: effectivePoll?.resultTallies,
     });
     const onVote = (
         newVoterName: string,

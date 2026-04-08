@@ -17,12 +17,15 @@ type FetchLike = typeof fetch;
 type VoteSocialImageRow = {
     kind: 'choice' | 'summary';
     label: string;
+    scoreLabel?: string;
 };
 
 type VoteSocialImagePayload = {
     choices: string[];
+    isComplete: boolean;
     isFallback: boolean;
     pollTitle: string | null;
+    resultScores: number[];
 };
 
 type VoteSocialImageResponse = {
@@ -104,6 +107,11 @@ const truncateText = (value: string, maxLength: number): string => {
     return `${normalizedValue.slice(0, maxLength - 3).trimEnd()}...`;
 };
 
+const hasVoteSocialImageResults = (resultScores: number[]): boolean =>
+    resultScores.some((score) => Number.isFinite(score));
+
+const formatVoteSocialImageScore = (score: number): string => score.toFixed(2);
+
 export const wrapVoteSocialImageTitle = (title: string): string[] => {
     const normalizedTitle = truncateText(title, voteSocialImageTitleMaxLength);
 
@@ -156,10 +164,57 @@ export const wrapVoteSocialImageTitle = (title: string): string[] => {
 
 export const createVoteSocialImageRows = (
     choices: string[],
+    resultScores: number[] = [],
 ): VoteSocialImageRow[] => {
     const normalizedChoices = choices
         .map((choice) => normalizeWhitespace(choice))
         .filter(Boolean);
+
+    if (hasVoteSocialImageResults(resultScores)) {
+        const visibleResults = normalizedChoices
+            .map((choice, index) => ({
+                choice,
+                index,
+                score: resultScores[index] ?? Number.NEGATIVE_INFINITY,
+            }))
+            .filter((entry) => Number.isFinite(entry.score))
+            .sort((left, right) => {
+                if (right.score !== left.score) {
+                    return right.score - left.score;
+                }
+
+                return left.index - right.index;
+            })
+            .slice(0, voteSocialImageChoicesLimit)
+            .map((entry) => ({
+                kind: 'choice' as const,
+                label: truncateText(
+                    entry.choice,
+                    voteSocialImageChoiceMaxLength,
+                ),
+                scoreLabel: formatVoteSocialImageScore(entry.score),
+            }));
+
+        const resultRows: VoteSocialImageRow[] = visibleResults.map(
+            ({ kind, label, scoreLabel }) => ({
+                kind,
+                label,
+                scoreLabel,
+            }),
+        );
+
+        if (normalizedChoices.length > voteSocialImageChoicesLimit) {
+            resultRows.push({
+                kind: 'summary',
+                label: `+${normalizedChoices.length - voteSocialImageChoicesLimit} more choices`,
+            });
+        }
+
+        if (resultRows.length > 0) {
+            return resultRows;
+        }
+    }
+
     const visibleChoices: VoteSocialImageRow[] = normalizedChoices
         .slice(0, voteSocialImageChoicesLimit)
         .map((choice) => ({
@@ -200,30 +255,44 @@ const createChoiceRowsSvg = (rows: VoteSocialImageRow[]): string =>
             const rowFill = row.kind === 'choice' ? '#1c1c1c' : '#181818';
             const badgeFill = row.kind === 'choice' ? '#f2f2f2' : '#2d2d2d';
             const badgeTextFill = row.kind === 'choice' ? '#111111' : '#f2f2f2';
+            const scoreText = row.scoreLabel
+                ? `<text x="1086" y="${y + 36}" text-anchor="end" font-size="24" font-weight="700" fill="#ffffff">${escapeXml(row.scoreLabel)}</text>`
+                : '';
 
             return `
                 <rect x="72" y="${y}" width="1056" height="56" rx="8" fill="${rowFill}" stroke="#343434" />
                 <rect x="92" y="${y + 12}" width="32" height="32" rx="6" fill="${badgeFill}" />
                 <text x="108" y="${y + 34}" text-anchor="middle" font-size="18" font-weight="700" fill="${badgeTextFill}">${badgeText}</text>
                 <text x="144" y="${y + 36}" font-size="26" fill="#f5f5f5">${escapeXml(row.label)}</text>
+                ${scoreText}
             `;
         })
         .join('');
 
 export const createVoteSocialImageSvg = ({
     choices,
+    isComplete,
     pollTitle,
+    resultScores,
 }: VoteSocialImagePayload): string => {
     const titleLines = wrapVoteSocialImageTitle(pollTitle || siteName);
-    const choiceRows = createVoteSocialImageRows(choices);
+    const choiceRows = createVoteSocialImageRows(choices, resultScores);
+    const sectionLabel = isComplete ? 'Final results' : 'Choices';
+    const statusBadge = isComplete
+        ? `
+            <rect x="956" y="40" width="172" height="40" rx="8" fill="#1f1f1f" stroke="#353535" />
+            <text x="1042" y="66" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Completed</text>
+        `
+        : '';
 
     return `
         <svg xmlns="http://www.w3.org/2000/svg" width="${socialImageWidth}" height="${socialImageHeight}" viewBox="0 0 ${socialImageWidth} ${socialImageHeight}">
             <rect width="${socialImageWidth}" height="${socialImageHeight}" fill="#121212" />
             <rect x="0" y="96" width="${socialImageWidth}" height="1" fill="#303030" />
             <text x="72" y="72" font-size="54" font-weight="700" fill="#ffffff">${siteName}</text>
+            ${statusBadge}
             <text x="72" y="176" font-size="72" font-weight="700" fill="#ffffff">${createTitleTspans(titleLines)}</text>
-            <text x="72" y="274" font-size="24" fill="#8f8f8f">Choices</text>
+            <text x="72" y="274" font-size="24" fill="#8f8f8f">${sectionLabel}</text>
             ${createChoiceRowsSvg(choiceRows)}
         </svg>
     `;
@@ -235,6 +304,14 @@ const normalizePollChoices = (value: unknown): string[] =>
               .filter((choice): choice is string => typeof choice === 'string')
               .map((choice) => normalizeWhitespace(choice))
               .filter(Boolean)
+        : [];
+
+const normalizePollScores = (value: unknown): number[] =>
+    Array.isArray(value)
+        ? value.filter(
+              (score): score is number =>
+                  typeof score === 'number' && Number.isFinite(score),
+          )
         : [];
 
 const normalizePollTitle = (value: unknown): string | null => {
@@ -257,6 +334,9 @@ const normalizeVoteSocialImagePayload = (
     const pollTitle = normalizePollTitle(
         (value as { pollName?: unknown }).pollName,
     );
+    const resultScores = normalizePollScores(
+        (value as { resultScores?: unknown }).resultScores,
+    );
 
     if (!pollTitle) {
         return null;
@@ -264,8 +344,10 @@ const normalizeVoteSocialImagePayload = (
 
     return {
         choices: normalizePollChoices((value as { choices?: unknown }).choices),
+        isComplete: hasVoteSocialImageResults(resultScores),
         isFallback: false,
         pollTitle,
+        resultScores,
     };
 };
 
@@ -284,7 +366,11 @@ export const extractVoteSocialImageSlugFromPathname = (
         return null;
     }
 
-    return decodeURIComponent(encodedSlug);
+    try {
+        return decodeURIComponent(encodedSlug);
+    } catch {
+        return null;
+    }
 };
 
 export const fetchVoteSocialImagePayload = async ({
@@ -338,6 +424,14 @@ export const renderVoteSocialImagePng = (
     return resvg.render().asPng();
 };
 
+const createFallbackVoteSocialImagePayload = (): VoteSocialImagePayload => ({
+    choices: [],
+    isComplete: false,
+    isFallback: true,
+    pollTitle: null,
+    resultScores: [],
+});
+
 const buildVoteSocialImageHeaders = ({
     byteLength,
     isFallback,
@@ -366,25 +460,30 @@ export const createVoteSocialImageResponse = async ({
     pollSlug: string;
     signal?: AbortSignal;
 }): Promise<VoteSocialImageResponse> => {
-    const payload = (await fetchVoteSocialImagePayload({
-        apiBaseUrl,
-        fetchImpl,
-        pollSlug,
-        signal,
-    })) || {
-        choices: [],
-        isFallback: true,
-        pollTitle: null,
-    };
-    const body = renderVoteSocialImagePng(payload);
+    const payload =
+        (await fetchVoteSocialImagePayload({
+            apiBaseUrl,
+            fetchImpl,
+            pollSlug,
+            signal,
+        })) || createFallbackVoteSocialImagePayload();
+    let renderedPayload = payload;
+    let body: Uint8Array;
+
+    try {
+        body = renderVoteSocialImagePng(payload);
+    } catch {
+        renderedPayload = createFallbackVoteSocialImagePayload();
+        body = renderVoteSocialImagePng(renderedPayload);
+    }
 
     return {
         body,
         headers: buildVoteSocialImageHeaders({
             byteLength: body.byteLength,
-            isFallback: payload.isFallback,
+            isFallback: renderedPayload.isFallback,
         }),
-        isFallback: payload.isFallback,
+        isFallback: renderedPayload.isFallback,
     };
 };
 

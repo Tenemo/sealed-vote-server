@@ -12,6 +12,17 @@ type NetlifyFunctionContext = {
 
 const seoApiBaseUrl = resolveSeoApiBaseUrl(process.env.VITE_API_BASE_URL);
 
+const createVoteSocialImageErrorResponse = (
+    requestMethod: string,
+): Response =>
+    new Response(requestMethod === 'HEAD' ? null : 'Failed to render image.', {
+        headers: {
+            'cache-control': 'no-store, max-age=0',
+            'content-type': 'text/plain; charset=utf-8',
+        },
+        status: 500,
+    });
+
 export const config = {
     path: '/social/votes/:slug.png',
 };
@@ -39,19 +50,29 @@ export default async (
         });
     }
 
-    const voteSocialImageResponse = await createVoteSocialImageResponse({
-        apiBaseUrl: seoApiBaseUrl,
-        pollSlug,
-        signal: AbortSignal.timeout(5000),
-    });
+    try {
+        const voteSocialImageResponse = await createVoteSocialImageResponse({
+            apiBaseUrl: seoApiBaseUrl,
+            pollSlug,
+            signal: AbortSignal.timeout(5000),
+        });
 
-    return new Response(
-        request.method === 'HEAD'
-            ? null
-            : Buffer.from(voteSocialImageResponse.body),
-        {
-            headers: voteSocialImageResponse.headers,
-            status: 200,
-        },
-    );
+        return new Response(
+            request.method === 'HEAD'
+                ? null
+                : Buffer.from(voteSocialImageResponse.body),
+            {
+                headers: voteSocialImageResponse.headers,
+                status: 200,
+            },
+        );
+    } catch (error) {
+        console.error(
+            error instanceof Error
+                ? error.message
+                : 'Failed to render vote social image.',
+        );
+
+        return createVoteSocialImageErrorResponse(request.method);
+    }
 };

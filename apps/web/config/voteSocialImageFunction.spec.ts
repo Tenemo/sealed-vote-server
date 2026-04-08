@@ -120,4 +120,27 @@ describe('vote social image Netlify function', () => {
         expect(response.status).toBe(405);
         expect(response.headers.get('allow')).toBe('GET, HEAD');
     });
+
+    test('returns a safe 500 response when image rendering fails unexpectedly', async () => {
+        mockCreateVoteSocialImageResponse.mockRejectedValue(
+            new Error('resvg exploded'),
+        );
+
+        const voteSocialImageModule =
+            await import('../../../netlify/functions/vote-social-image');
+        const response = await voteSocialImageModule.default(
+            new Request('https://sealed.vote/social/votes/test--4a39.png'),
+            {
+                params: {
+                    slug: 'test--4a39',
+                },
+            },
+        );
+
+        expect(response.status).toBe(500);
+        expect(response.headers.get('cache-control')).toBe(
+            'no-store, max-age=0',
+        );
+        await expect(response.text()).resolves.toBe('Failed to render image.');
+    });
 });

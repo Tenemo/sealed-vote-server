@@ -26,8 +26,6 @@ const initialForm: Form = {
     choices: [],
 };
 
-const homePageSeo = buildHomePageSeo();
-
 const PollCreationPage = (): React.JSX.Element => {
     const navigate = useNavigate();
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
@@ -35,6 +33,15 @@ const PollCreationPage = (): React.JSX.Element => {
     const [form, setForm] = useState<Form>(initialForm);
     const [creatorToken, setCreatorToken] = useState<string | null>(null);
     const { pollName, choices } = form;
+    const runtimeOrigin =
+        typeof window === 'undefined' ? undefined : window.location.origin;
+    const homePageSeo = React.useMemo(
+        () =>
+            buildHomePageSeo({
+                origin: runtimeOrigin,
+            }),
+        [runtimeOrigin],
+    );
 
     const onFormChange = ({
         target: { id, value },

@@ -44,11 +44,85 @@ export type SeoMetadata = {
     url: string;
 };
 
-export const createVoteSocialImagePath = (pollSlug: string): string =>
-    `${voteSocialImagePathPrefix}${encodeURIComponent(pollSlug)}.png`;
+const normalizeVoteSocialImageVersion = (
+    imageVersion: string | null | undefined,
+): string | null => {
+    const normalizedImageVersion = imageVersion?.trim() || null;
+
+    return normalizedImageVersion ? normalizedImageVersion : null;
+};
+
+const hashVoteSocialImageVersion = (value: string): string => {
+    let hash = 0x811c9dc5;
+
+    for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+
+    return (hash >>> 0).toString(36);
+};
+
+const normalizeVoteSocialImageScores = (value: unknown): number[] =>
+    Array.isArray(value)
+        ? value.filter(
+              (score): score is number =>
+                  typeof score === 'number' && Number.isFinite(score),
+          )
+        : [];
+
+const normalizeVoteSocialImageTallies = (value: unknown): string[] =>
+    Array.isArray(value)
+        ? value.filter(
+              (tally): tally is string =>
+                  typeof tally === 'string' && tally.trim().length > 0,
+          )
+        : [];
+
+export const createVoteSocialImageVersion = ({
+    resultScores,
+    resultTallies,
+}: {
+    resultScores?: unknown;
+    resultTallies?: unknown;
+}): string | null => {
+    const normalizedTallies = normalizeVoteSocialImageTallies(resultTallies);
+
+    if (normalizedTallies.length > 0) {
+        return `results-${hashVoteSocialImageVersion(
+            `t:${normalizedTallies.join('|')}`,
+        )}`;
+    }
+
+    const normalizedScores = normalizeVoteSocialImageScores(resultScores);
+
+    if (normalizedScores.length === 0) {
+        return null;
+    }
+
+    return `results-${hashVoteSocialImageVersion(
+        `s:${normalizedScores.map((score) => score.toFixed(6)).join('|')}`,
+    )}`;
+};
+
+export const createVoteSocialImagePath = (
+    pollSlug: string,
+    imageVersion?: string | null,
+): string => {
+    const pathname = `${voteSocialImagePathPrefix}${encodeURIComponent(pollSlug)}.png`;
+    const normalizedImageVersion =
+        normalizeVoteSocialImageVersion(imageVersion);
+
+    if (!normalizedImageVersion) {
+        return pathname;
+    }
+
+    return `${pathname}?v=${encodeURIComponent(normalizedImageVersion)}`;
+};
 
 export const createVoteSocialImageAlt = (
     pollTitle: string | null | undefined,
+    isComplete?: boolean,
 ): string => {
     const normalizedPollTitle = pollTitle?.trim() || null;
 
@@ -56,7 +130,9 @@ export const createVoteSocialImageAlt = (
         return socialImageAlt;
     }
 
-    return `Preview image for "${normalizedPollTitle}" on sealed.vote.`;
+    return isComplete
+        ? `Results image for "${normalizedPollTitle}" on sealed.vote.`
+        : `Preview image for "${normalizedPollTitle}" on sealed.vote.`;
 };
 
 const normalizeOrigin = (origin: string | undefined): string => {
@@ -194,9 +270,13 @@ const buildStructuredData = (
 const createVotePageImageUrl = (
     origin: string,
     pollSlug: string | null,
+    imageVersion: string | null,
 ): string =>
     pollSlug
-        ? createAbsoluteUrl(origin, createVoteSocialImagePath(pollSlug))
+        ? createAbsoluteUrl(
+              origin,
+              createVoteSocialImagePath(pollSlug, imageVersion),
+          )
         : createAbsoluteUrl(origin, socialImagePath);
 
 export const buildHomePageSeo = ({
@@ -251,22 +331,34 @@ export const buildVotePageSeo = ({
     origin,
     pollPath,
     pollSlug,
+    resultScores,
+    resultTallies,
     pollTitle,
 }: {
     origin?: string;
     pollPath: string;
     pollSlug?: string | null;
+    resultScores?: unknown;
+    resultTallies?: unknown;
     pollTitle?: string | null;
 }): SeoMetadata => {
     const normalizedOrigin = normalizeOrigin(origin);
     const normalizedPollSlug = pollSlug?.trim() || null;
     const normalizedPollTitle = pollTitle?.trim() || null;
+    const imageVersion = createVoteSocialImageVersion({
+        resultScores,
+        resultTallies,
+    });
     const url = createAbsoluteUrl(normalizedOrigin, pollPath);
     const description = createVotePageDescription(normalizedPollTitle);
-    const imageAlt = createVoteSocialImageAlt(normalizedPollTitle);
+    const imageAlt = createVoteSocialImageAlt(
+        normalizedPollTitle,
+        imageVersion !== null,
+    );
     const imageUrl = createVotePageImageUrl(
         normalizedOrigin,
         normalizedPollSlug,
+        imageVersion,
     );
     const title = normalizedPollTitle
         ? `${normalizedPollTitle} | ${siteName}`

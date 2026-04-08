@@ -33,9 +33,15 @@ describe('resolveSeoApiBaseUrl', () => {
         );
     });
 
-    test('rejects unsupported protocols', () => {
-        expect(() => resolveSeoApiBaseUrl('ftp://api.example.com')).toThrow(
-            'SEO API base URL must use the http or https protocol.',
+    test('falls back to the production API origin for malformed urls', () => {
+        expect(resolveSeoApiBaseUrl('api.example.com')).toBe(
+            'https://api.sealed.vote',
+        );
+    });
+
+    test('falls back to the production API origin for unsupported protocols', () => {
+        expect(resolveSeoApiBaseUrl('ftp://api.example.com')).toBe(
+            'https://api.sealed.vote',
         );
     });
 });
@@ -56,6 +62,10 @@ describe('extractVoteSlugFromPathname', () => {
     test('returns null for non-vote routes', () => {
         expect(extractVoteSlugFromPathname('/')).toBeNull();
         expect(extractVoteSlugFromPathname('/health-check')).toBeNull();
+    });
+
+    test('returns null for malformed encoded vote slugs', () => {
+        expect(extractVoteSlugFromPathname('/votes/%E0%A4%A.png')).toBeNull();
     });
 });
 
@@ -140,6 +150,27 @@ describe('resolveDocumentSeoMetadata', () => {
         expect(metadata.robots).toBe('noindex, nofollow, noarchive');
     });
 
+    test('uses a versioned results image url for completed votes', async () => {
+        const metadata = await resolveDocumentSeoMetadata({
+            apiBaseUrl: 'https://api.sealed.vote',
+            fetchImpl: vi.fn(async () =>
+                Response.json({
+                    pollName: 'Budget & roadmap',
+                    resultScores: [8.5, 6.25],
+                    resultTallies: ['17', '11'],
+                }),
+            ),
+            requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+        });
+
+        expect(metadata.imageUrl).toContain(
+            'https://sealed.vote/social/votes/budget-roadmap.png?v=results-',
+        );
+        expect(metadata.imageAlt).toBe(
+            'Results image for "Budget & roadmap" on sealed.vote.',
+        );
+    });
+
     test('returns homepage SEO for non-vote routes', async () => {
         const metadata = await resolveDocumentSeoMetadata({
             requestUrl: new URL('https://sealed.vote/'),
@@ -162,6 +193,8 @@ describe('renderDocumentHtml', () => {
             fetchImpl: vi.fn(async () =>
                 Response.json({
                     pollName: 'Team <sync> "Q2"',
+                    resultScores: [9.25],
+                    resultTallies: ['37'],
                 }),
             ),
             requestUrl: new URL('https://sealed.vote/votes/team-sync'),
@@ -172,7 +205,7 @@ describe('renderDocumentHtml', () => {
         );
         expect(html).toContain('content="https://sealed.vote/votes/team-sync"');
         expect(html).toContain(
-            'content="https://sealed.vote/social/votes/team-sync.png"',
+            'content="https://sealed.vote/social/votes/team-sync.png?v=results-',
         );
         expect(html).toContain('Team \\u003csync\\u003e \\"Q2\\"');
         expect(html).not.toContain('<title>placeholder</title>');

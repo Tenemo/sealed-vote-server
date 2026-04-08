@@ -50,6 +50,20 @@ describe('createVoteSocialImageRows', () => {
         ]);
     });
 
+    test('renders the highest-ranked completed results with score labels', () => {
+        expect(
+            createVoteSocialImageRows(
+                ['Alpha', 'Beta', 'Gamma', 'Delta'],
+                [6.5, 9.25, 7.75, 8.1],
+            ),
+        ).toEqual([
+            { kind: 'choice', label: 'Beta', scoreLabel: '9.25' },
+            { kind: 'choice', label: 'Delta', scoreLabel: '8.10' },
+            { kind: 'choice', label: 'Gamma', scoreLabel: '7.75' },
+            { kind: 'summary', label: '+1 more choices' },
+        ]);
+    });
+
     test('falls back to generic rows when the vote has no usable choices', () => {
         expect(createVoteSocialImageRows(['', '   '])).toEqual([
             {
@@ -72,8 +86,10 @@ describe('createVoteSocialImageSvg', () => {
     test('renders a generic branded fallback image when poll data is missing', () => {
         const svg = createVoteSocialImageSvg({
             choices: [],
+            isComplete: false,
             isFallback: true,
             pollTitle: null,
+            resultScores: [],
         });
 
         expect(svg).toContain('sealed.vote');
@@ -87,6 +103,21 @@ describe('createVoteSocialImageSvg', () => {
         expect(svg).not.toContain(
             'width="1056" height="286" rx="10" fill="#161616" stroke="#343434"',
         );
+    });
+
+    test('renders a completed-results layout when published scores are available', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Alpha', 'Beta', 'Gamma'],
+            isComplete: true,
+            isFallback: false,
+            pollTitle: 'Quarterly roadmap',
+            resultScores: [6.25, 9.5, 8.1],
+        });
+
+        expect(svg).toContain('Completed');
+        expect(svg).toContain('Final results');
+        expect(svg).toContain('9.50');
+        expect(svg).toContain('Beta');
     });
 });
 
@@ -102,6 +133,14 @@ describe('extractVoteSocialImageSlugFromPathname', () => {
     test('returns null for unrelated routes', () => {
         expect(
             extractVoteSocialImageSlugFromPathname('/social/og-home.png'),
+        ).toBeNull();
+    });
+
+    test('returns null for malformed encoded vote slugs', () => {
+        expect(
+            extractVoteSocialImageSlugFromPathname(
+                '/social/votes/%E0%A4%A.png',
+            ),
         ).toBeNull();
     });
 });

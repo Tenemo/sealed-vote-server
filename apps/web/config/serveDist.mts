@@ -26,6 +26,41 @@ const readForwardedHeader = (
     return normalizedValue?.split(',')[0]?.trim() || null;
 };
 
+const normalizeForwardedProtocol = (value: string | null): 'http' | 'https' => {
+    if (value === 'https') {
+        return 'https';
+    }
+
+    return 'http';
+};
+
+const createSafeRequestUrl = ({
+    fallbackHost,
+    protocol,
+    rawHostHeader,
+    rawRequestUrl,
+}: {
+    fallbackHost: string;
+    protocol: 'http' | 'https';
+    rawHostHeader: string | undefined;
+    rawRequestUrl: string | undefined;
+}): URL => {
+    const fallbackBaseUrl = `${protocol}://${fallbackHost}`;
+
+    try {
+        return new URL(
+            rawRequestUrl || '/',
+            `${protocol}://${rawHostHeader || fallbackHost}`,
+        );
+    } catch {
+        try {
+            return new URL(rawRequestUrl || '/', fallbackBaseUrl);
+        } catch {
+            return new URL('/', fallbackBaseUrl);
+        }
+    }
+};
+
 const start = async (): Promise<void> => {
     const { distDirectory, host, port } = resolveServeDistOptions(
         process.argv.slice(2),
@@ -45,12 +80,15 @@ const start = async (): Promise<void> => {
     });
 
     const server = http.createServer(async (request, response) => {
-        const protocol =
-            readForwardedHeader(request.headers['x-forwarded-proto']) || 'http';
-        const requestUrl = new URL(
-            request.url || '/',
-            `${protocol}://${request.headers.host || `${host}:${port}`}`,
+        const protocol = normalizeForwardedProtocol(
+            readForwardedHeader(request.headers['x-forwarded-proto']),
         );
+        const requestUrl = createSafeRequestUrl({
+            fallbackHost: `${host}:${port}`,
+            protocol,
+            rawHostHeader: request.headers.host,
+            rawRequestUrl: request.url,
+        });
         const voteSocialImageSlug = extractVoteSocialImageSlugFromPathname(
             requestUrl.pathname,
         );
