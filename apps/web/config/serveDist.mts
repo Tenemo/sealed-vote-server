@@ -34,29 +34,117 @@ const normalizeForwardedProtocol = (value: string | null): 'http' | 'https' => {
     return 'http';
 };
 
+const trustedSeoPublicOrigin = (() => {
+    const rawOrigin = process.env.SEO_PUBLIC_ORIGIN?.trim();
+
+    if (!rawOrigin) {
+        return null;
+    }
+
+    try {
+        const parsedOrigin = new URL(rawOrigin);
+
+        if (
+            parsedOrigin.protocol !== 'http:' &&
+            parsedOrigin.protocol !== 'https:'
+        ) {
+            return null;
+        }
+
+        return parsedOrigin.origin;
+    } catch {
+        return null;
+    }
+})();
+
+const localSeoHostnames = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+const isAllowedSeoHostname = (hostname: string): boolean =>
+    localSeoHostnames.has(hostname) ||
+    hostname === 'up.railway.app' ||
+    hostname.endsWith('.up.railway.app');
+
+const normalizeSeoRequestHost = (
+    value: string | null | undefined,
+): string | null => {
+    const normalizedValue = value?.trim().toLowerCase() || null;
+
+    if (!normalizedValue) {
+        return null;
+    }
+
+    try {
+        const parsedHost = new URL(`http://${normalizedValue}`);
+
+        if (
+            parsedHost.pathname !== '/' ||
+            parsedHost.search ||
+            parsedHost.hash ||
+            parsedHost.username ||
+            parsedHost.password
+        ) {
+            return null;
+        }
+
+        if (!isAllowedSeoHostname(parsedHost.hostname)) {
+            return null;
+        }
+
+        return parsedHost.host.toLowerCase();
+    } catch {
+        return null;
+    }
+};
+
+const resolveSeoRequestBaseUrl = ({
+    fallbackHost,
+    protocol,
+    rawForwardedHostHeader,
+    rawHostHeader,
+}: {
+    fallbackHost: string;
+    protocol: 'http' | 'https';
+    rawForwardedHostHeader: string | null;
+    rawHostHeader: string | undefined;
+}): string => {
+    if (trustedSeoPublicOrigin) {
+        return trustedSeoPublicOrigin;
+    }
+
+    const trustedHost =
+        normalizeSeoRequestHost(rawForwardedHostHeader) ||
+        normalizeSeoRequestHost(rawHostHeader);
+
+    return `${protocol}://${trustedHost || fallbackHost}`;
+};
+
 const createSafeRequestUrl = ({
     fallbackHost,
     protocol,
+    rawForwardedHostHeader,
     rawHostHeader,
     rawRequestUrl,
 }: {
     fallbackHost: string;
     protocol: 'http' | 'https';
+    rawForwardedHostHeader: string | null;
     rawHostHeader: string | undefined;
     rawRequestUrl: string | undefined;
 }): URL => {
-    const fallbackBaseUrl = `${protocol}://${fallbackHost}`;
+    const fallbackBaseUrl = resolveSeoRequestBaseUrl({
+        fallbackHost,
+        protocol,
+        rawForwardedHostHeader,
+        rawHostHeader,
+    });
 
     try {
-        return new URL(
-            rawRequestUrl || '/',
-            `${protocol}://${rawHostHeader || fallbackHost}`,
-        );
+        return new URL(rawRequestUrl || '/', fallbackBaseUrl);
     } catch {
         try {
-            return new URL(rawRequestUrl || '/', fallbackBaseUrl);
-        } catch {
             return new URL('/', fallbackBaseUrl);
+        } catch {
+            return new URL('/', `${protocol}://${fallbackHost}`);
         }
     }
 };
@@ -86,6 +174,9 @@ const start = async (): Promise<void> => {
         const requestUrl = createSafeRequestUrl({
             fallbackHost: `${host}:${port}`,
             protocol,
+            rawForwardedHostHeader: readForwardedHeader(
+                request.headers['x-forwarded-host'],
+            ),
             rawHostHeader: request.headers.host,
             rawRequestUrl: request.url,
         });

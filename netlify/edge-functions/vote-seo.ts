@@ -7,7 +7,15 @@ type EdgeContext = {
     next: () => Promise<Response>;
 };
 
-const seoApiBaseUrl = resolveSeoApiBaseUrl('https://api.sealed.vote');
+const edgeProcessEnv = (
+    globalThis as {
+        process?: {
+            env?: Record<string, string | undefined>;
+        };
+    }
+).process?.env;
+
+const seoApiBaseUrl = resolveSeoApiBaseUrl(edgeProcessEnv?.VITE_API_BASE_URL);
 
 const isHtmlResponse = (response: Response): boolean =>
     (response.headers.get('content-type') || '').includes('text/html');

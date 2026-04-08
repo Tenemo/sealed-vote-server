@@ -166,18 +166,19 @@ export const createVoteSocialImageRows = (
     choices: string[],
     resultScores: number[] = [],
 ): VoteSocialImageRow[] => {
-    const normalizedChoices = choices
-        .map((choice) => normalizeWhitespace(choice))
-        .filter(Boolean);
+    const normalizedChoiceSlots = choices.map((choice) =>
+        normalizeWhitespace(choice),
+    );
+    const normalizedChoices = normalizedChoiceSlots.filter(Boolean);
 
     if (hasVoteSocialImageResults(resultScores)) {
-        const visibleResults = normalizedChoices
+        const visibleResults = normalizedChoiceSlots
             .map((choice, index) => ({
                 choice,
                 index,
                 score: resultScores[index] ?? Number.NEGATIVE_INFINITY,
             }))
-            .filter((entry) => Number.isFinite(entry.score))
+            .filter((entry) => entry.choice && Number.isFinite(entry.score))
             .sort((left, right) => {
                 if (right.score !== left.score) {
                     return right.score - left.score;
@@ -300,17 +301,17 @@ export const createVoteSocialImageSvg = ({
 
 const normalizePollChoices = (value: unknown): string[] =>
     Array.isArray(value)
-        ? value
-              .filter((choice): choice is string => typeof choice === 'string')
-              .map((choice) => normalizeWhitespace(choice))
-              .filter(Boolean)
+        ? value.map((choice) =>
+              typeof choice === 'string' ? normalizeWhitespace(choice) : '',
+          )
         : [];
 
 const normalizePollScores = (value: unknown): number[] =>
     Array.isArray(value)
-        ? value.filter(
-              (score): score is number =>
-                  typeof score === 'number' && Number.isFinite(score),
+        ? value.map((score) =>
+              typeof score === 'number' && Number.isFinite(score)
+                  ? score
+                  : Number.NaN,
           )
         : [];
 

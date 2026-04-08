@@ -64,6 +64,18 @@ describe('createVoteSocialImageRows', () => {
         ]);
     });
 
+    test('preserves choice-to-score indices when invalid placeholders are present', () => {
+        expect(
+            createVoteSocialImageRows(
+                ['Alpha', '', 'Gamma', 'Delta'],
+                [6.5, 9.25, Number.NaN, 8.1],
+            ),
+        ).toEqual([
+            { kind: 'choice', label: 'Delta', scoreLabel: '8.10' },
+            { kind: 'choice', label: 'Alpha', scoreLabel: '6.50' },
+        ]);
+    });
+
     test('falls back to generic rows when the vote has no usable choices', () => {
         expect(createVoteSocialImageRows(['', '   '])).toEqual([
             {

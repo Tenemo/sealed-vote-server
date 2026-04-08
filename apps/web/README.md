@@ -34,6 +34,10 @@ pnpm --filter @sealed-vote/web build
 
 The frontend only needs one user-configured environment variable: `VITE_API_BASE_URL` for deployed builds that talk to the backend on a different origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
 
+When serving built frontend assets behind a proxy or preview domain, you can
+also set `SEO_PUBLIC_ORIGIN` so request-aware canonical, Open Graph, and
+Twitter URLs use a trusted public origin instead of request headers.
+
 For deployed static serving outside Vite, the workspace also provides:
 
 ```bash
