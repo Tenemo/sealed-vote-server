@@ -1,6 +1,13 @@
 # sealed.vote
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/431089b8-8373-4038-8b80-fb3a7aa02c6e/deploy-status)](https://app.netlify.com/projects/sealed-vote/deploys)
+[![CI](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/ci.yml?branch=master&label=ci)](https://github.com/Tenemo/sealed-vote/actions/workflows/ci.yml)
+[![Production e2e](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/production-e2e.yml?branch=master&label=production%20e2e)](https://github.com/Tenemo/sealed-vote/actions/workflows/production-e2e.yml)
+[![Web deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed.vote%20%2F%20production?label=web%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed.vote+%2F+production)
+[![API deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed-vote-preview%20%2F%20production?label=api%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed-vote-preview+%2F+production)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/coverage.json)](https://github.com/Tenemo/sealed-vote/actions/workflows/readme-badges.yml)
+[![License](https://img.shields.io/github/license/Tenemo/sealed-vote)](./LICENSE)
+[![Node](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
+[![pnpm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/pnpm.json)](./package.json)
 
 [sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around homomorphic encryption. Voters score each choice from 1 to 10, and the system is designed so that individual votes remain hidden from everyone, including the server, while the final tally can still be computed.
 

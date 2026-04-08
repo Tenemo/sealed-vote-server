@@ -30,6 +30,7 @@
         "threshold-elgamal": "catalog:"
     },
     "devDependencies": {
+        "@vitest/coverage-v8": "catalog:",
         "rimraf": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",
