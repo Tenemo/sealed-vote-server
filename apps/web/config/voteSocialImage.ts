@@ -433,6 +433,43 @@ const createFallbackVoteSocialImagePayload = (): VoteSocialImagePayload => ({
     resultScores: [],
 });
 
+export const renderVoteSocialImagePngWithFallback = ({
+    payload,
+    renderImpl = renderVoteSocialImagePng,
+}: {
+    payload: VoteSocialImagePayload;
+    renderImpl?: (payload: VoteSocialImagePayload) => Uint8Array;
+}): {
+    body: Uint8Array;
+    renderedPayload: VoteSocialImagePayload;
+} => {
+    try {
+        return {
+            body: renderImpl(payload),
+            renderedPayload: payload,
+        };
+    } catch (renderError) {
+        const fallbackPayload = createFallbackVoteSocialImagePayload();
+
+        try {
+            return {
+                body: renderImpl(fallbackPayload),
+                renderedPayload: fallbackPayload,
+            };
+        } catch (fallbackRenderError) {
+            throw new Error(
+                'Failed to render vote social image, including fallback image.',
+                {
+                    cause: {
+                        fallbackRenderError,
+                        renderError,
+                    },
+                },
+            );
+        }
+    }
+};
+
 const buildVoteSocialImageHeaders = ({
     byteLength,
     isFallback,
@@ -468,15 +505,9 @@ export const createVoteSocialImageResponse = async ({
             pollSlug,
             signal,
         })) || createFallbackVoteSocialImagePayload();
-    let renderedPayload = payload;
-    let body: Uint8Array;
-
-    try {
-        body = renderVoteSocialImagePng(payload);
-    } catch {
-        renderedPayload = createFallbackVoteSocialImagePayload();
-        body = renderVoteSocialImagePng(renderedPayload);
-    }
+    const { body, renderedPayload } = renderVoteSocialImagePngWithFallback({
+        payload,
+    });
 
     return {
         body,

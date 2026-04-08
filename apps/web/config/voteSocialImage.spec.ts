@@ -7,6 +7,7 @@ import {
     createVoteSocialImageRows,
     createVoteSocialImageSvg,
     extractVoteSocialImageSlugFromPathname,
+    renderVoteSocialImagePngWithFallback,
     wrapVoteSocialImageTitle,
 } from './voteSocialImage';
 
@@ -196,5 +197,34 @@ describe('createVoteSocialImageResponse', () => {
             'public, durable, max-age=3600, stale-while-revalidate=600',
         );
         expect(Buffer.from(response.body).subarray(0, 8)).toEqual(pngSignature);
+    });
+});
+
+describe('renderVoteSocialImagePngWithFallback', () => {
+    test('throws a clear error when both the main and fallback renders fail', () => {
+        const renderImpl = vi
+            .fn()
+            .mockImplementationOnce(() => {
+                throw new Error('main render failed');
+            })
+            .mockImplementationOnce(() => {
+                throw new Error('fallback render failed');
+            });
+
+        expect(() =>
+            renderVoteSocialImagePngWithFallback({
+                payload: {
+                    choices: ['Alpha'],
+                    isComplete: false,
+                    isFallback: false,
+                    pollTitle: 'Quarterly roadmap',
+                    resultScores: [],
+                },
+                renderImpl,
+            }),
+        ).toThrow(
+            'Failed to render vote social image, including fallback image.',
+        );
+        expect(renderImpl).toHaveBeenCalledTimes(2);
     });
 });

@@ -45,6 +45,10 @@ export default async (
         const headers = new Headers(response.headers);
 
         headers.set('content-type', 'text/html; charset=utf-8');
+        headers.delete('content-encoding');
+        headers.delete('content-length');
+        headers.delete('etag');
+        headers.delete('last-modified');
 
         return new Response(updatedHtml, {
             headers,
