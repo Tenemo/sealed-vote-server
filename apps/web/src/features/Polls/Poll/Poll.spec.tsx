@@ -172,4 +172,54 @@ describe('Poll page', () => {
             }),
         );
     });
+
+    it('shows a non-blocking connection toast when polling fails after data has loaded', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: basePoll,
+            error: {
+                error: 'TypeError: Failed to fetch',
+                status: 'FETCH_ERROR',
+            },
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        expect(
+            screen.getByRole('heading', { name: 'Best fruit' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                'Connection to the server was lost. Showing the latest available vote state and retrying in the background.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('TypeError: Failed to fetch'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('shows a friendly reconnect state when the poll cannot be loaded because the connection was lost', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: undefined,
+            error: {
+                error: 'TypeError: Failed to fetch',
+                status: 'FETCH_ERROR',
+            },
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        expect(
+            screen.getByRole('heading', { name: 'Connection lost' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                /The app will keep retrying in the background and will recover automatically once the connection is back\./i,
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('TypeError: Failed to fetch'),
+        ).not.toBeInTheDocument();
+    });
 });

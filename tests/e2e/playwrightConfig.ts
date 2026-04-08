@@ -14,6 +14,7 @@ const chromiumOnlySpecs = [
     '**/duplicate-voter-name.spec.ts',
     '**/legacy-route.spec.ts',
     '**/mixed-platform-poll.spec.ts',
+    '**/polling-offline.spec.ts',
     '**/refresh-resume.spec.ts',
     '**/share-link.spec.ts',
 ];
