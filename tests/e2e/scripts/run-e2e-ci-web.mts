@@ -35,7 +35,19 @@ if (!fs.existsSync(builtIndexPath)) {
 }
 
 const localWebBaseUrl = process.env.PLAYWRIGHT_WEB_BASE_URL?.trim();
-const parsedWebBaseUrl = localWebBaseUrl ? new URL(localWebBaseUrl) : null;
+let parsedWebBaseUrl: URL | null = null;
+
+if (localWebBaseUrl) {
+    try {
+        parsedWebBaseUrl = new URL(localWebBaseUrl);
+    } catch {
+        console.error(
+            'PLAYWRIGHT_WEB_BASE_URL must be a valid absolute URL when set.',
+        );
+        process.exit(1);
+    }
+}
+
 const webHost = parsedWebBaseUrl?.hostname || '127.0.0.1';
 const webPort =
     parsedWebBaseUrl?.port ||
