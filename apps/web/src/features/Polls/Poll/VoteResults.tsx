@@ -97,7 +97,14 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
                     Ordered by geometric mean across all submitted votes.
                 </p>
             </div>
-            {verificationState.verification?.isVerified ? (
+            {verificationState.error ? (
+                <Alert>
+                    <AlertDescription>
+                        Public verification could not be completed locally.
+                        Showing the published scores anyway.
+                    </AlertDescription>
+                </Alert>
+            ) : verificationState.verification?.isVerified ? (
                 <Alert variant="info">
                     <AlertDescription>
                         Public verification passed. The published tallies and

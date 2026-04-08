@@ -75,21 +75,47 @@ const normalizeBaseUrl = (baseUrl: string, label: string): string => {
     return parsedBaseUrl.origin;
 };
 
+const resolveLocalWebBaseUrl = (
+    baseUrl: string,
+    label: string,
+): {
+    baseUrl: string;
+    host: string;
+    port: string;
+} => {
+    const parsedBaseUrl = parseBaseUrl(baseUrl, label);
+
+    if (
+        parsedBaseUrl.protocol !== 'http:' &&
+        parsedBaseUrl.protocol !== 'https:'
+    ) {
+        throw new TypeError(`${label} must use the http or https protocol.`);
+    }
+
+    const port =
+        parsedBaseUrl.port ||
+        (parsedBaseUrl.protocol === 'https:' ? '443' : '3000');
+    const normalizedBaseUrl =
+        parsedBaseUrl.port || parsedBaseUrl.protocol === 'https:'
+            ? parsedBaseUrl.origin
+            : `${parsedBaseUrl.protocol}//${parsedBaseUrl.hostname}:${port}`;
+
+    return {
+        baseUrl: normalizedBaseUrl,
+        host: parsedBaseUrl.hostname,
+        port,
+    };
+};
+
 const localApiBaseUrl = normalizeBaseUrl(
     process.env.VITE_API_BASE_URL?.trim() || 'http://127.0.0.1:4000',
     'VITE_API_BASE_URL',
 );
-const localWebBaseUrl = normalizeBaseUrl(
+const resolvedLocalWebServer = resolveLocalWebBaseUrl(
     process.env.PLAYWRIGHT_WEB_BASE_URL?.trim() || 'http://127.0.0.1:3000',
     'PLAYWRIGHT_WEB_BASE_URL',
 );
-const localWebServerUrl = parseBaseUrl(
-    localWebBaseUrl,
-    'PLAYWRIGHT_WEB_BASE_URL',
-);
-const localWebPort =
-    localWebServerUrl.port ||
-    (localWebServerUrl.protocol === 'https:' ? '443' : '80');
+const localWebBaseUrl = resolvedLocalWebServer.baseUrl;
 
 const projects: Project[] = [
     {
@@ -176,7 +202,7 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
                   reuseExistingServer: false,
               },
               {
-                  command: `pnpm --filter @sealed-vote/web dev -- --host ${localWebServerUrl.hostname} --port ${localWebPort}`,
+                  command: `pnpm --filter @sealed-vote/web dev -- --host ${resolvedLocalWebServer.host} --port ${resolvedLocalWebServer.port}`,
                   timeout: 120_000,
                   url: localWebBaseUrl,
                   reuseExistingServer: false,
