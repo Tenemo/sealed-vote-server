@@ -63,7 +63,7 @@ describe('pollSlug utilities', () => {
         ]);
     });
 
-    test('retries fresh four-character slugs before falling back to longer suffixes', () => {
+    test('retries fresh four-character slugs without switching to longer suffixes', () => {
         const generatedIds = [
             'aaaaaaaa-aaaa-4aaa-8aaa-111111111111',
             'bbbbbbbb-bbbb-4bbb-8bbb-222222222222',
@@ -86,10 +86,6 @@ describe('pollSlug utilities', () => {
         expect(slugAttempts[2]).toEqual({
             id: 'cccccccc-cccc-4ccc-8ccc-333344445555',
             slug: 'same-title--5555',
-        });
-        expect(slugAttempts[3]).toEqual({
-            id: 'cccccccc-cccc-4ccc-8ccc-333344445555',
-            slug: 'same-title--44445555',
         });
         expect(generatedIds).toEqual([]);
     });

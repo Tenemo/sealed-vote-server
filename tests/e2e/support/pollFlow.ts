@@ -1,7 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 export const connectionToastMessage =
-    'Connection to the server was lost. Showing the latest available vote state and retrying in the background.';
+    'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';
 export const reconnectingWorkflowMessage =
     'Connection lost. Reconnecting and resuming in the background...';
 
