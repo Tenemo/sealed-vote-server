@@ -34,18 +34,25 @@ const selectPollResult = (
         state[pollsApi.reducerPath].queries,
     ) as PollQueryState[];
 
-    const freshestMatchingQuery = queryStates
-        .filter(
-            (queryState) =>
-                queryState.endpointName === 'getPoll' &&
-                isPollResponse(queryState.data) &&
-                queryState.data.id === pollId,
-        )
-        .sort(
-            (leftQueryState, rightQueryState) =>
-                getPollQueryTimestamp(rightQueryState) -
-                getPollQueryTimestamp(leftQueryState),
-        )[0];
+    let freshestMatchingQuery: PollQueryState | undefined;
+
+    for (const queryState of queryStates) {
+        if (
+            queryState.endpointName !== 'getPoll' ||
+            !isPollResponse(queryState.data) ||
+            queryState.data.id !== pollId
+        ) {
+            continue;
+        }
+
+        if (
+            !freshestMatchingQuery ||
+            getPollQueryTimestamp(queryState) >
+                getPollQueryTimestamp(freshestMatchingQuery)
+        ) {
+            freshestMatchingQuery = queryState;
+        }
+    }
 
     if (freshestMatchingQuery && isPollResponse(freshestMatchingQuery.data)) {
         return freshestMatchingQuery.data;

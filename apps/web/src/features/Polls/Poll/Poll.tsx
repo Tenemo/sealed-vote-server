@@ -80,6 +80,8 @@ const PollPage = (): React.JSX.Element => {
     const [isBrowserOnline, setIsBrowserOnline] = useState(
         getBrowserOnlineState,
     );
+    // Voting can advance in another tab or window, so background polling
+    // must continue until the workflow reaches results.
     const {
         data: poll,
         isLoading: isLoadingPoll,

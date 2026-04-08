@@ -57,13 +57,29 @@ export const getCreatePollSlugAttempts = (
         canonicalPollSlugRetryCount > 0
             ? canonicalPollSlugRetryCount
             : defaultCanonicalPollSlugRetryCount;
-    return Array.from({ length: canonicalAttemptCount }, () => {
-        const pollId = createPollId();
-        return {
-            id: pollId,
-            slug: createPollSlug(pollName, pollId, POLL_SLUG_SUFFIX_LENGTHS[0]),
-        };
-    });
+    const canonicalAttempts = Array.from(
+        { length: canonicalAttemptCount },
+        () => {
+            const pollId = createPollId();
+            return {
+                id: pollId,
+                slug: createPollSlug(
+                    pollName,
+                    pollId,
+                    POLL_SLUG_SUFFIX_LENGTHS[0],
+                ),
+            };
+        },
+    );
+    const fallbackPollId = createPollId();
+
+    return [
+        ...canonicalAttempts,
+        ...getPollSlugCandidates(pollName, fallbackPollId).map((slug) => ({
+            id: fallbackPollId,
+            slug,
+        })),
+    ];
 };
 
 export const assignPollSlugs = (
