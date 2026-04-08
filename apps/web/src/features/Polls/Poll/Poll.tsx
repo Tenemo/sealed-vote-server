@@ -94,6 +94,7 @@ const PollPage = (): React.JSX.Element => {
         null;
     const pageSeo = buildVotePageSeo({
         pollPath: `/votes/${effectivePoll?.slug ?? pollSlug}`,
+        pollSlug: effectivePoll?.slug ?? pollSlug,
         pollTitle: effectivePoll?.pollName,
     });
     const onVote = (

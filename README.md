@@ -51,8 +51,9 @@ The Playwright suite covers the recovery model directly:
 ## Social previews
 
 - The root page ships a full static SEO block with canonical, Open Graph, Twitter, and JSON-LD metadata.
-- Vote links publish route-specific HTML metadata before JavaScript runs. Share unfurls for `/votes/<slug>` use the exact vote title in the page title, Open Graph title, Twitter title, canonical URL, and structured data, while still reusing the generic sealed.vote preview image.
-- The same metadata builder is used for the static app shell, the client-side route updates, the Railway built-preview server, and the Netlify `/votes/*` edge path so previews stay consistent across environments.
+- Vote links publish route-specific HTML metadata before JavaScript runs. Share unfurls for `/votes/<slug>` use the exact vote title in the page title, Open Graph title, Twitter title, canonical URL, structured data, and a vote-specific PNG preview at `/social/votes/<slug>.png`.
+- Vote preview images are rendered lazily from the poll title and first choices, then cached aggressively through the Netlify CDN with durable caching so repeated shares of the same vote do not keep regenerating the image.
+- The same metadata and image rendering logic is used for the static app shell, the client-side route updates, the Railway built-preview server, the Netlify `/votes/*` edge path, and the Netlify `/social/votes/:slug.png` function so previews stay consistent across environments.
 
 ## Tech stack
 

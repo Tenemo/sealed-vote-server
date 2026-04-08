@@ -121,6 +121,7 @@ export const resolveDocumentSeoMetadata = async ({
     return buildVotePageSeo({
         origin: requestUrl.origin,
         pollPath: requestUrl.pathname,
+        pollSlug,
         pollTitle,
     });
 };

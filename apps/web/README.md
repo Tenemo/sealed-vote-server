@@ -41,4 +41,5 @@ pnpm --filter @sealed-vote/web serve:dist
 ```
 
 That command serves `dist` with SPA fallback, injects route-aware SEO
-metadata into vote pages, and is used by the Railway preview web service.
+metadata into vote pages, serves per-vote social preview PNGs at
+`/social/votes/<slug>.png`, and is used by the Railway preview web service.

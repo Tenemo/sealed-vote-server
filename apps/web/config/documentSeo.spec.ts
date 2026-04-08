@@ -133,6 +133,9 @@ describe('resolveDocumentSeoMetadata', () => {
         expect(metadata.canonicalUrl).toBe(
             'https://sealed.vote/votes/budget-roadmap',
         );
+        expect(metadata.imageUrl).toBe(
+            'https://sealed.vote/social/votes/budget-roadmap.png',
+        );
         expect(metadata.robots).toBe('noindex, nofollow, noarchive');
     });
 
@@ -142,6 +145,9 @@ describe('resolveDocumentSeoMetadata', () => {
         });
 
         expect(metadata.title).toBe('sealed.vote');
+        expect(metadata.imageUrl).toBe(
+            'https://sealed.vote/social/og-home.png',
+        );
         expect(metadata.robots).toBe('index, follow');
         expect(metadata.canonicalUrl).toBe('https://sealed.vote/');
     });
@@ -164,6 +170,9 @@ describe('renderDocumentHtml', () => {
             '<title>Team &lt;sync&gt; &quot;Q2&quot; | sealed.vote</title>',
         );
         expect(html).toContain('content="https://sealed.vote/votes/team-sync"');
+        expect(html).toContain(
+            'content="https://sealed.vote/social/votes/team-sync.png"',
+        );
         expect(html).toContain('Team \\u003csync\\u003e \\"Q2\\"');
         expect(html).not.toContain('<title>placeholder</title>');
     });

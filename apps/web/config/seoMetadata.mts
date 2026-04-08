@@ -11,6 +11,7 @@ export const defaultKeywords =
 export const socialImagePath = '/social/og-home.png';
 export const socialImageAlt =
     'sealed.vote homepage showing the vote creation interface.';
+export const voteSocialImagePathPrefix = '/social/votes/';
 export const socialImageWidth = 1200;
 export const socialImageHeight = 630;
 export const homePageDescription =
@@ -19,6 +20,14 @@ export const votePageFallbackDescription =
     'Confidential participant vote page on sealed.vote.';
 
 type StructuredData = Record<string, unknown>;
+
+type SeoImage = {
+    alt: string;
+    height: number;
+    type: string;
+    url: string;
+    width: number;
+};
 
 export type SeoMetadata = {
     canonicalUrl: string;
@@ -33,6 +42,21 @@ export type SeoMetadata = {
     structuredData: StructuredData[];
     title: string;
     url: string;
+};
+
+export const createVoteSocialImagePath = (pollSlug: string): string =>
+    `${voteSocialImagePathPrefix}${encodeURIComponent(pollSlug)}.png`;
+
+export const createVoteSocialImageAlt = (
+    pollTitle: string | null | undefined,
+): string => {
+    const normalizedPollTitle = pollTitle?.trim() || null;
+
+    if (!normalizedPollTitle) {
+        return socialImageAlt;
+    }
+
+    return `Preview image for "${normalizedPollTitle}" on sealed.vote.`;
 };
 
 const normalizeOrigin = (origin: string | undefined): string => {
@@ -64,24 +88,26 @@ export const serializeStructuredData = (value: unknown): string =>
         .replaceAll('>', '\\u003e')
         .replaceAll('&', '\\u0026');
 
-const createImageObject = (origin: string): StructuredData => {
-    const imageUrl = createAbsoluteUrl(origin, socialImagePath);
-
+const createImageObject = ({
+    alt,
+    height,
+    url,
+    width,
+}: SeoImage): StructuredData => {
     return {
         '@type': 'ImageObject',
-        '@id': `${origin}/#social-image`,
-        caption: socialImageAlt,
-        contentUrl: imageUrl,
+        caption: alt,
+        contentUrl: url,
         height: {
             '@type': 'QuantitativeValue',
             unitText: 'px',
-            value: socialImageHeight,
+            value: height,
         },
-        url: imageUrl,
+        url,
         width: {
             '@type': 'QuantitativeValue',
             unitText: 'px',
-            value: socialImageWidth,
+            value: width,
         },
     };
 };
@@ -102,13 +128,14 @@ const createWebApplicationObject = (
     origin: string,
     url: string,
     description: string,
+    imageUrl: string,
 ): StructuredData => ({
     '@type': 'WebApplication',
     '@id': `${origin}/#webapp`,
     applicationCategory: 'SecurityApplication',
     browserRequirements: 'JavaScript required',
     description,
-    image: createAbsoluteUrl(origin, socialImagePath),
+    image: imageUrl,
     inLanguage: 'en',
     isPartOf: {
         '@id': `${origin}/#website`,
@@ -122,13 +149,14 @@ const createWebPageObject = (
     origin: string,
     url: string,
     description: string,
+    imageId: string,
     name: string,
 ): StructuredData => ({
     '@type': 'WebPage',
     '@id': `${url}#webpage`,
     description,
     image: {
-        '@id': `${origin}/#social-image`,
+        '@id': imageId,
     },
     inLanguage: 'en',
     isPartOf: {
@@ -136,7 +164,7 @@ const createWebPageObject = (
     },
     name,
     primaryImageOfPage: {
-        '@id': `${origin}/#social-image`,
+        '@id': imageId,
     },
     url,
 });
@@ -145,13 +173,31 @@ const buildStructuredData = (
     origin: string,
     url: string,
     description: string,
+    image: SeoImage,
     pageName: string,
 ): StructuredData[] => [
     createWebSiteObject(origin, description),
-    createWebPageObject(origin, url, description, pageName),
-    createWebApplicationObject(origin, url, description),
-    createImageObject(origin),
+    createWebPageObject(
+        origin,
+        url,
+        description,
+        `${url}#social-image`,
+        pageName,
+    ),
+    createWebApplicationObject(origin, url, description, image.url),
+    {
+        ...createImageObject(image),
+        '@id': `${url}#social-image`,
+    },
 ];
+
+const createVotePageImageUrl = (
+    origin: string,
+    pollSlug: string | null,
+): string =>
+    pollSlug
+        ? createAbsoluteUrl(origin, createVoteSocialImagePath(pollSlug))
+        : createAbsoluteUrl(origin, socialImagePath);
 
 export const buildHomePageSeo = ({
     origin,
@@ -177,6 +223,13 @@ export const buildHomePageSeo = ({
             normalizedOrigin,
             url,
             homePageDescription,
+            {
+                alt: socialImageAlt,
+                height: socialImageHeight,
+                type: 'image/png',
+                url: createAbsoluteUrl(normalizedOrigin, socialImagePath),
+                width: socialImageWidth,
+            },
             siteName,
         ),
         title: siteName,
@@ -197,16 +250,24 @@ const createVotePageDescription = (pollTitle: string | null): string => {
 export const buildVotePageSeo = ({
     origin,
     pollPath,
+    pollSlug,
     pollTitle,
 }: {
     origin?: string;
     pollPath: string;
+    pollSlug?: string | null;
     pollTitle?: string | null;
 }): SeoMetadata => {
     const normalizedOrigin = normalizeOrigin(origin);
+    const normalizedPollSlug = pollSlug?.trim() || null;
     const normalizedPollTitle = pollTitle?.trim() || null;
     const url = createAbsoluteUrl(normalizedOrigin, pollPath);
     const description = createVotePageDescription(normalizedPollTitle);
+    const imageAlt = createVoteSocialImageAlt(normalizedPollTitle);
+    const imageUrl = createVotePageImageUrl(
+        normalizedOrigin,
+        normalizedPollSlug,
+    );
     const title = normalizedPollTitle
         ? `${normalizedPollTitle} | ${siteName}`
         : `Vote | ${siteName}`;
@@ -214,10 +275,10 @@ export const buildVotePageSeo = ({
     return {
         canonicalUrl: url,
         description,
-        imageAlt: socialImageAlt,
+        imageAlt,
         imageHeight: socialImageHeight,
         imageType: 'image/png',
-        imageUrl: createAbsoluteUrl(normalizedOrigin, socialImagePath),
+        imageUrl,
         imageWidth: socialImageWidth,
         keywords: defaultKeywords,
         robots: 'noindex, nofollow, noarchive',
@@ -225,6 +286,13 @@ export const buildVotePageSeo = ({
             normalizedOrigin,
             url,
             description,
+            {
+                alt: imageAlt,
+                height: socialImageHeight,
+                type: 'image/png',
+                url: imageUrl,
+                width: socialImageWidth,
+            },
             normalizedPollTitle || title,
         ),
         title,

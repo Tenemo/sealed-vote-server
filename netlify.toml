@@ -11,6 +11,9 @@
 [context.deploy-preview.environment]
   VITE_API_BASE_URL = "https://api.sealed.vote"
 
+[functions]
+  included_files = ["apps/web/src/fonts/Roboto-Regular.ttf"]
+
 [[edge_functions]]
   function = "vote-seo"
   path = "/votes/*"

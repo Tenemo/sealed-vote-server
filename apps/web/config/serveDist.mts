@@ -9,6 +9,10 @@ import {
     assertBuiltDistExists,
     resolveServeDistOptions,
 } from './serveDistConfig.ts';
+import {
+    createVoteSocialImageResponse,
+    extractVoteSocialImageSlugFromPathname,
+} from './voteSocialImage.ts';
 
 const readForwardedHeader = (
     value: string | string[] | undefined,
@@ -29,7 +33,9 @@ const start = async (): Promise<void> => {
 
     await assertBuiltDistExists();
     const baseHtmlPath = path.resolve(distDirectory, 'index.html');
+    const serviceWorkerPath = path.resolve(distDirectory, 'service-worker.js');
     const baseHtml = await fs.readFile(baseHtmlPath, 'utf8');
+    const serviceWorker = await fs.readFile(serviceWorkerPath);
     const seoApiBaseUrl = resolveSeoApiBaseUrl(process.env.VITE_API_BASE_URL);
 
     const serveStatic = sirv(distDirectory, {
@@ -45,9 +51,60 @@ const start = async (): Promise<void> => {
             request.url || '/',
             `${protocol}://${request.headers.host || `${host}:${port}`}`,
         );
+        const voteSocialImageSlug = extractVoteSocialImageSlugFromPathname(
+            requestUrl.pathname,
+        );
         const isDocumentRequest =
             (request.method === 'GET' || request.method === 'HEAD') &&
             path.extname(requestUrl.pathname) === '';
+
+        if (
+            requestUrl.pathname === '/service-worker.js' &&
+            (request.method === 'GET' || request.method === 'HEAD')
+        ) {
+            response.statusCode = 200;
+            response.setHeader(
+                'Content-Type',
+                'application/javascript; charset=utf-8',
+            );
+            response.end(request.method === 'HEAD' ? undefined : serviceWorker);
+            return;
+        }
+
+        if (
+            voteSocialImageSlug &&
+            (request.method === 'GET' || request.method === 'HEAD')
+        ) {
+            try {
+                const voteSocialImageResponse =
+                    await createVoteSocialImageResponse({
+                        apiBaseUrl: seoApiBaseUrl,
+                        pollSlug: voteSocialImageSlug,
+                        signal: AbortSignal.timeout(5000),
+                    });
+
+                response.statusCode = 200;
+
+                Object.entries(voteSocialImageResponse.headers).forEach(
+                    ([headerName, headerValue]) => {
+                        response.setHeader(headerName, headerValue);
+                    },
+                );
+
+                response.end(
+                    request.method === 'HEAD'
+                        ? undefined
+                        : voteSocialImageResponse.body,
+                );
+                return;
+            } catch (error) {
+                console.error(
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to render vote social image.',
+                );
+            }
+        }
 
         if (isDocumentRequest) {
             try {
