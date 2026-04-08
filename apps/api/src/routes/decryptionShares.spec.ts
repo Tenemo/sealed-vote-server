@@ -154,6 +154,45 @@ describe('POST /polls/:pollId/decryption-shares', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('returns the decryption phase error when shares are submitted before tallies exist', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Early decryption shares'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+        const [alice] = context.voters;
+        if (!alice?.privateKey) {
+            throw new Error('Expected a private key for Alice.');
+        }
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: ['1', '2'],
+                voterToken: alice.voterToken,
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            ERROR_MESSAGES.decryptionPhaseClosed,
+        );
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('replays the same decryption shares idempotently after results are computed', async () => {
         const builder = new TestPollBuilder(fastify)
             .withPollName(getUniquePollName('Idempotent decryption replay'))
@@ -284,6 +323,76 @@ describe('POST /polls/:pollId/decryption-shares', () => {
             (JSON.parse(conflictingResponse.body) as { message: string })
                 .message,
         ).toBe(ERROR_MESSAGES.decryptionSharesConflict);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('handles the last decryption share submissions correctly when they arrive together', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Concurrent final decryption'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+        await builder.submitVotes();
+
+        const context = builder.getContext();
+        if (!context.poll) {
+            throw new Error('Poll state is missing.');
+        }
+
+        const [alice, bob] = context.voters;
+        if (!alice?.privateKey || !bob?.privateKey) {
+            throw new Error('Expected private keys for all voters.');
+        }
+        const alicePrivateKey = alice.privateKey;
+        const bobPrivateKey = bob.privateKey;
+
+        const aliceShares = context.poll.encryptedTallies.map((tally) =>
+            createDecryptionShare(
+                deserializeEncryptedMessage(tally),
+                BigInt(alicePrivateKey),
+            ).toString(),
+        );
+        const bobShares = context.poll.encryptedTallies.map((tally) =>
+            createDecryptionShare(
+                deserializeEncryptedMessage(tally),
+                BigInt(bobPrivateKey),
+            ).toString(),
+        );
+
+        const [aliceResponse, bobResponse] = await Promise.all([
+            fastify.inject({
+                method: 'POST',
+                url: `/api/polls/${context.pollId}/decryption-shares`,
+                payload: {
+                    decryptionShares: aliceShares,
+                    voterToken: alice.voterToken,
+                },
+            }),
+            fastify.inject({
+                method: 'POST',
+                url: `/api/polls/${context.pollId}/decryption-shares`,
+                payload: {
+                    decryptionShares: bobShares,
+                    voterToken: bob.voterToken,
+                },
+            }),
+        ]);
+
+        expect(aliceResponse.statusCode).toBe(201);
+        expect(bobResponse.statusCode).toBe(201);
+
+        const pollData = await fetchPoll(fastify, context.pollId);
+        expect(pollData.resultScores).toHaveLength(context.choices.length);
 
         const deleteResult = await deletePoll(
             fastify,

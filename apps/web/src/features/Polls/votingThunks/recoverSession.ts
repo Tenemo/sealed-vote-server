@@ -4,6 +4,7 @@ import { fetchFreshPoll } from '../pollQuery';
 import { pollsApi } from '../pollsApi';
 import { applyRecoveredSession, upsertPollSnapshot } from '../votingSlice';
 import {
+    getRecoveryRequestData,
     getResumableVoterName,
     hasPendingVotingIntent,
     selectVoteStateByPollId,
@@ -28,13 +29,7 @@ export const recoverSession = createAsyncThunk<
     }
 >(recoverSessionTypePrefix, async ({ pollId }, { dispatch, getState }) => {
     const voteState = selectVoteStateByPollId(getState().voting, pollId);
-    const recoveryData = voteState.voterToken
-        ? { voterToken: voteState.voterToken }
-        : voteState.pendingVoterToken
-          ? { voterToken: voteState.pendingVoterToken }
-          : voteState.creatorToken
-            ? { creatorToken: voteState.creatorToken }
-            : null;
+    const recoveryData = getRecoveryRequestData(voteState);
 
     if (!recoveryData) {
         return;

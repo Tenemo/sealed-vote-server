@@ -1,5 +1,4 @@
 import { configureStore, type EnhancedStore } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
@@ -224,21 +223,21 @@ describe('Poll page', () => {
         expect(within(participantsList).getByText('Bob')).toBeVisible();
     });
 
-    it('shows not found for legacy uuid vote links', () => {
-        renderPoll({}, '/votes/11111111-1111-4111-8111-111111111111');
+    it('shows not found when the server reports that the poll does not exist', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: undefined,
+            error: {
+                status: 404,
+            },
+            isLoading: false,
+        });
+
+        renderPoll();
 
         expect(
             screen.getByRole('heading', { name: 'Page not found' }),
         ).toBeInTheDocument();
-        expect(
-            screen.getByText('/votes/11111111-1111-4111-8111-111111111111'),
-        ).toBeInTheDocument();
-        expect(mockedUseGetPollQuery).toHaveBeenCalledWith(
-            skipToken,
-            expect.objectContaining({
-                pollingInterval: 5000,
-            }),
-        );
+        expect(screen.getByText('/votes/best-fruit--1111')).toBeInTheDocument();
     });
 
     it('stops polling once results are available', async () => {

@@ -26,7 +26,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 ```
 
 - failure responses:
-- `400` for invalid input such as blank trimmed names, fewer than two choices, duplicate choice names after trimming, or unexpected legacy fields like `maxParticipants`
+- `400` for invalid input such as blank trimmed names, fewer than two choices, duplicate choice names after trimming, or unexpected extra fields
 - notes:
   - the participant cap is now server-owned; new polls default to `20` participants
 

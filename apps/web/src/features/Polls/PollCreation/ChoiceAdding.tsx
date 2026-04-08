@@ -1,3 +1,7 @@
+import {
+    normalizeTrimmedString,
+    normalizeTrimmedStrings,
+} from '@sealed-vote/contracts';
 import { Plus, Trash2 } from 'lucide-react';
 import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
@@ -19,8 +23,9 @@ const ChoiceAdding = ({
     onRemoveChoice,
 }: ChoiceAddingProps): React.JSX.Element => {
     const [choiceName, setChoiceName] = useState('');
-    const normalizedChoiceName = choiceName.trim();
-    const isChoiceDuplicate = choices.includes(normalizedChoiceName);
+    const normalizedChoiceName = normalizeTrimmedString(choiceName);
+    const normalizedChoices = normalizeTrimmedStrings(choices);
+    const isChoiceDuplicate = normalizedChoices.includes(normalizedChoiceName);
     const isChoiceNameValid = !!normalizedChoiceName && !isChoiceDuplicate;
 
     const handleAddChoice = (): void => {

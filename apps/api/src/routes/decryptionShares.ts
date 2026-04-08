@@ -19,17 +19,19 @@ import {
 } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import { areStringArraysEqual } from '../utils/idempotency.js';
+import { countPollVoters } from '../utils/pollCounts.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import {
-    countPollVoters,
     getExistingDecryptionShares,
+    getExistingDecryptionSharesReadOnly,
     getOrderedPollDecryptionShares,
-    lockPollById,
-} from '../utils/polls.js';
+} from '../utils/pollSubmissions.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import { authenticateVoter } from '../utils/voterAuth.js';
 import {
-    authenticateVoter,
-    findVoterByTokenReadOnly,
-} from '../utils/voterAuth.js';
+    recoverDuplicateVoterSubmission,
+    resolveExistingVoterSubmission,
+} from '../utils/voterSubmission.js';
 
 import {
     MessageResponseSchema,
@@ -71,6 +73,9 @@ export const decryptionShares = async (
             }>,
             reply: FastifyReply,
         ): Promise<DecryptionSharesResponse> => {
+            const successResponse = {
+                message: 'Decryption shares submitted successfully.',
+            } satisfies DecryptionSharesResponse;
             try {
                 const { pollId } = req.params;
                 const { decryptionShares: shares, voterToken } = req.body;
@@ -96,21 +101,24 @@ export const decryptionShares = async (
                         pollId,
                         voter.id,
                     );
+                    const replayedSubmission = resolveExistingVoterSubmission({
+                        existingSubmission: existingShares,
+                        incomingValue: shares,
+                        isEquivalent: (
+                            { shares: existingSharesValue },
+                            nextShares,
+                        ) =>
+                            areStringArraysEqual(
+                                existingSharesValue,
+                                nextShares,
+                            ),
+                        conflictMessage:
+                            ERROR_MESSAGES.decryptionSharesConflict,
+                        successResponse,
+                    });
 
-                    if (existingShares) {
-                        if (
-                            !areStringArraysEqual(existingShares.shares, shares)
-                        ) {
-                            throw createError(
-                                409,
-                                ERROR_MESSAGES.decryptionSharesConflict,
-                            );
-                        }
-
-                        return {
-                            message:
-                                'Decryption shares submitted successfully.',
-                        };
+                    if (replayedSubmission) {
+                        return replayedSubmission;
                     }
 
                     if (
@@ -162,9 +170,7 @@ export const decryptionShares = async (
                             .where(eq(polls.id, pollId));
                     }
 
-                    return {
-                        message: 'Decryption shares submitted successfully.',
-                    };
+                    return successResponse;
                 });
 
                 void reply.code(201);
@@ -180,47 +186,40 @@ export const decryptionShares = async (
                         'unique_decryption_shares_per_voter',
                     )
                 ) {
-                    const voter = await findVoterByTokenReadOnly(
-                        fastify.db,
-                        req.params.pollId,
-                        req.body.voterToken,
-                    );
+                    const response = await recoverDuplicateVoterSubmission({
+                        db: fastify.db,
+                        pollId: req.params.pollId,
+                        voterToken: req.body.voterToken,
+                        incomingValue: req.body.decryptionShares,
+                        loadExistingSubmission: async ({
+                            db,
+                            pollId,
+                            voterId,
+                        }) =>
+                            await getExistingDecryptionSharesReadOnly(
+                                db,
+                                pollId,
+                                voterId,
+                            ),
+                        isEquivalent: (
+                            { shares: existingSharesValue },
+                            nextShares,
+                        ) =>
+                            areStringArraysEqual(
+                                existingSharesValue,
+                                nextShares,
+                            ),
+                        conflictMessage:
+                            ERROR_MESSAGES.decryptionSharesConflict,
+                        successResponse,
+                    });
 
-                    const existingShares =
-                        voter &&
-                        (await fastify.db.query.decryptionShares.findFirst({
-                            where: (fields, { and, eq: isEqual }) =>
-                                and(
-                                    isEqual(fields.pollId, req.params.pollId),
-                                    isEqual(fields.voterId, voter.id),
-                                ),
-                            columns: {
-                                shares: true,
-                            },
-                        }));
-
-                    if (
-                        existingShares &&
-                        areStringArraysEqual(
-                            existingShares.shares,
-                            req.body.decryptionShares,
-                        )
-                    ) {
-                        void reply.code(201);
-                        void maybeDropTestResponseAfterCommit({
-                            reply,
-                            request: req,
-                        });
-                        return {
-                            message:
-                                'Decryption shares submitted successfully.',
-                        };
-                    }
-
-                    throw createError(
-                        409,
-                        ERROR_MESSAGES.decryptionSharesConflict,
-                    );
+                    void reply.code(201);
+                    void maybeDropTestResponseAfterCommit({
+                        reply,
+                        request: req,
+                    });
+                    return response;
                 }
 
                 throw error;

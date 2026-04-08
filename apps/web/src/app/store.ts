@@ -27,7 +27,7 @@ export const rootReducer = combineSlices(pollsApi, votingSlice);
 
 export type RootState = ReturnType<typeof rootReducer>;
 
-const persistVersion = 2;
+const persistVersion = 3;
 
 const votingSessionTransform = createTransform(
     sanitizeVotingStateForPersistence,
@@ -44,7 +44,7 @@ const persistConfig = {
     version: persistVersion,
     migrate: createMigrate(
         {
-            2: () => undefined,
+            3: () => undefined,
         },
         {
             debug: false,

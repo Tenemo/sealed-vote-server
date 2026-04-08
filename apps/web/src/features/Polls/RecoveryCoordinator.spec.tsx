@@ -86,6 +86,28 @@ describe('RecoveryCoordinator', () => {
                 pollSlug: 'best-fruit--1111',
                 selectedScores: { Apples: 7 },
                 shouldResumeWorkflow: true,
+                voterName: 'Alice',
+                voterIndex: 0,
+                voterToken: 'voter-token',
+            },
+        });
+
+        await waitFor(() => {
+            expect(mockedRecoverSession).toHaveBeenCalledWith({
+                pollId: 'poll-1',
+            });
+        });
+        expect(mockedVote).not.toHaveBeenCalled();
+    });
+
+    it('retries persisted registered voter sessions even before the resume flag is rebuilt', async () => {
+        renderCoordinator({
+            'poll-1': {
+                ...initialVoteState,
+                pollSlug: 'best-fruit--1111',
+                selectedScores: { Apples: 7 },
+                voterName: 'Alice',
+                voterIndex: 0,
                 voterToken: 'voter-token',
             },
         });

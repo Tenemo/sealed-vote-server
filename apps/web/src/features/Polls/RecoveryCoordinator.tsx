@@ -1,7 +1,11 @@
 import React, { useEffect, useEffectEvent, useRef } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
-import { hasPublishedResults } from 'features/Polls/pollData';
+import {
+    hasPendingRegistrationRecovery,
+    shouldAttemptRecovery,
+    shouldRecoverViaSessionRequest,
+} from 'features/Polls/votingState';
 import { recoverSession } from 'features/Polls/votingThunks/recoverSession';
 import { vote } from 'features/Polls/votingThunks/vote';
 
@@ -27,26 +31,14 @@ const RecoveryCoordinator = (): React.JSX.Element => {
             latestVotingStateRef.current,
         )) {
             if (
-                hasPublishedResults(voteState.pollSnapshot) ||
-                voteState.isVotingInProgress ||
-                recoveringPollIdsRef.current.has(pollId)
+                recoveringPollIdsRef.current.has(pollId) ||
+                !shouldAttemptRecovery(voteState)
             ) {
                 continue;
             }
 
             recoveringPollIdsRef.current.add(pollId);
-            if (voteState.voterToken) {
-                void dispatch(recoverSession({ pollId })).finally(() => {
-                    recoveringPollIdsRef.current.delete(pollId);
-                });
-                continue;
-            }
-
-            if (
-                voteState.pendingVoterToken &&
-                voteState.pendingVoterName &&
-                voteState.selectedScores
-            ) {
+            if (hasPendingRegistrationRecovery(voteState)) {
                 void dispatch(
                     vote({
                         pollId,
@@ -59,7 +51,7 @@ const RecoveryCoordinator = (): React.JSX.Element => {
                 continue;
             }
 
-            if (voteState.creatorToken) {
+            if (shouldRecoverViaSessionRequest(voteState)) {
                 void dispatch(recoverSession({ pollId })).finally(() => {
                     recoveringPollIdsRef.current.delete(pollId);
                 });
@@ -76,27 +68,7 @@ const RecoveryCoordinator = (): React.JSX.Element => {
 
     useEffect(() => {
         const shouldRunRecovery = Object.values(votingState).some(
-            (voteState) => {
-                if (
-                    hasPublishedResults(voteState.pollSnapshot) ||
-                    voteState.isVotingInProgress
-                ) {
-                    return false;
-                }
-
-                if (
-                    voteState.pendingVoterToken &&
-                    voteState.pendingVoterName &&
-                    voteState.selectedScores
-                ) {
-                    return true;
-                }
-
-                return Boolean(
-                    voteState.shouldResumeWorkflow &&
-                    (voteState.voterToken || voteState.creatorToken),
-                );
-            },
+            shouldAttemptRecovery,
         );
 
         if (shouldRunRecovery) {
