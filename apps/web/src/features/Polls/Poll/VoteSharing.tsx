@@ -84,7 +84,7 @@ const VoteSharing = (): React.JSX.Element => {
     return (
         <Field>
             <FieldLabel
-                className="text-sm font-medium text-secondary"
+                className="text-sm font-medium text-muted-foreground"
                 htmlFor="voteLink"
             >
                 Vote link
@@ -115,9 +115,15 @@ const VoteSharing = (): React.JSX.Element => {
                                 variant="ghost"
                             >
                                 {copyStatus === 'success' ? (
-                                    <Check className="size-4" />
+                                    <Check
+                                        aria-hidden="true"
+                                        className="size-4"
+                                    />
                                 ) : (
-                                    <Copy className="size-4" />
+                                    <Copy
+                                        aria-hidden="true"
+                                        className="size-4"
+                                    />
                                 )}
                             </Button>
                         </TooltipTrigger>

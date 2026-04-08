@@ -67,12 +67,12 @@ describe('pollSlug utilities', () => {
         const generatedIds = [
             'aaaaaaaa-aaaa-4aaa-8aaa-111111111111',
             'bbbbbbbb-bbbb-4bbb-8bbb-222222222222',
-            'cccccccc-cccc-4ccc-8ccc-333344445555',
+            'cccccccc-cccc-4ccc-8ccc-333344441111',
         ];
         const slugAttempts = getCreatePollSlugAttempts(
             'Same title',
             () => generatedIds.shift()!,
-            3,
+            2,
         );
 
         expect(slugAttempts[0]).toEqual({
@@ -84,12 +84,12 @@ describe('pollSlug utilities', () => {
             slug: 'same-title--2222',
         });
         expect(slugAttempts[2]).toEqual({
-            id: 'cccccccc-cccc-4ccc-8ccc-333344445555',
-            slug: 'same-title--5555',
+            id: 'cccccccc-cccc-4ccc-8ccc-333344441111',
+            slug: 'same-title--1111',
         });
         expect(slugAttempts[3]).toEqual({
-            id: 'cccccccc-cccc-4ccc-8ccc-333344445555',
-            slug: 'same-title--44445555',
+            id: 'cccccccc-cccc-4ccc-8ccc-333344441111',
+            slug: 'same-title--44441111',
         });
         expect(generatedIds).toEqual([]);
     });

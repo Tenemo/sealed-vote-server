@@ -1,6 +1,6 @@
 import { configureStore, type EnhancedStore } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -156,21 +156,83 @@ describe('Poll page', () => {
             },
         });
 
-        expect(
-            screen.getByText('Public key share submission failed.'),
-        ).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Public key share submission failed.',
+        );
+    });
+
+    it('renders workflow progress as a polite status message', () => {
+        renderPoll({
+            '11111111-1111-4111-8111-111111111111': {
+                ...initialVoteState,
+                progressMessage: 'Waiting for common public key...',
+            },
+        });
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Waiting for common public key...',
+        );
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('renders participants as individual list items', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: {
+                ...basePoll,
+                voters: ['Alice', 'Bob'],
+            },
+            error: undefined,
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        const participantsRegion = screen.getByRole('region', {
+            name: 'Participants',
+        });
+        const participantsList = within(participantsRegion).getByRole('list');
+
+        expect(within(participantsList).getByText('Alice')).toBeVisible();
+        expect(within(participantsList).getByText('Bob')).toBeVisible();
     });
 
     it('shows not found for legacy uuid vote links', () => {
         renderPoll({}, '/votes/11111111-1111-4111-8111-111111111111');
 
-        expect(screen.getByText(/not found\./i)).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Page not found' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('/votes/11111111-1111-4111-8111-111111111111'),
+        ).toBeInTheDocument();
         expect(mockedUseGetPollQuery).toHaveBeenCalledWith(
             skipToken,
             expect.objectContaining({
-                pollingInterval: 3000,
+                pollingInterval: 5000,
             }),
         );
+    });
+
+    it('stops polling once results are available', async () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: {
+                ...basePoll,
+                results: [12],
+            },
+            error: undefined,
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        await waitFor(() => {
+            expect(mockedUseGetPollQuery).toHaveBeenLastCalledWith(
+                'best-fruit--1111',
+                expect.objectContaining({
+                    pollingInterval: 0,
+                }),
+            );
+        });
     });
 
     it('shows a non-blocking connection toast when polling fails after data has loaded', () => {
@@ -188,11 +250,10 @@ describe('Poll page', () => {
         expect(
             screen.getByRole('heading', { name: 'Best fruit' }),
         ).toBeVisible();
-        expect(
-            screen.getByText(
-                /The connection to the server was lost\.\s+Showing the latest available vote state and retrying in the background\./i,
-            ),
-        ).toBeVisible();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /The connection to the server was lost\.\s+Showing the latest available vote state and retrying in the background\./i,
+        );
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         expect(
             screen.queryByText('TypeError: Failed to fetch'),
         ).not.toBeInTheDocument();

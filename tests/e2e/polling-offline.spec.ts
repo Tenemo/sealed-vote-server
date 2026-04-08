@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 
+import { expectNoAxeViolations } from './support/a11y';
 import {
     beginVote,
     createPoll,
     deletePolls,
     expectConnectionToastHidden,
     expectConnectionToastVisible,
+    expectParticipantsVisible,
     expectResultsVisible,
     joinPoll,
     type CreatedPoll,
@@ -57,6 +59,10 @@ test('keeps the voting flow usable across disconnects before and after the vote 
             await expect(
                 participant.page.getByText('Waiting for the vote to be started...'),
             ).toBeVisible();
+            await expectNoAxeViolations(
+                participant.page,
+                'participant waiting page with connection toast',
+            );
             await participant.context.setOffline(false);
             await expectConnectionToastHidden(participant.page);
 
@@ -83,11 +89,10 @@ test('keeps the voting flow usable across disconnects before and after the vote 
 
             await expectResultsVisible(page);
             await expectResultsVisible(participant.page);
-            await expect(
-                page.getByText(
-                    `Voters in this poll: ${creatorName}, ${participantName}`,
-                ),
-            ).toBeVisible();
+            await expectParticipantsVisible(page, [
+                creatorName,
+                participantName,
+            ]);
         } finally {
             await page.context().setOffline(false);
             await participant.context.setOffline(false);

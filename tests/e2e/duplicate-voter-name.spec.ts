@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { expectNoAxeViolations } from './support/a11y';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -59,6 +60,10 @@ test('blocks duplicate voter names before registration submission', async ({
             participant.page.getByText('This voter name already exists'),
         ).toBeVisible();
         await expect(secondVoteButton).toBeDisabled();
+        await expectNoAxeViolations(
+            participant.page,
+            'duplicate voter name validation state',
+        );
 
         await participant.page.getByLabel('Voter name').fill(secondVoterName);
 

@@ -34,7 +34,7 @@ const isNotFoundError = (error: unknown): boolean =>
     'status' in error &&
     error.status === 404;
 
-const defaultPollPollingIntervalMs = 3000;
+const defaultPollPollingIntervalMs = 5000;
 const minimumPollPollingIntervalMs = 250;
 
 const resolvePollPollingIntervalMs = (rawValue: string | undefined): number => {
@@ -65,6 +65,8 @@ const getBrowserOnlineState = (): boolean =>
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
     const { pollSlug } = useParams();
+    const participantsHeadingId = React.useId();
+
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
     }
@@ -72,18 +74,22 @@ const PollPage = (): React.JSX.Element => {
     const hasResumedVotingRef = useRef(false);
     const shouldResumeOnResolvedPollRef = useRef(false);
     const resolvedPollIdRef = useRef<string | null>(null);
+    const [activePollingIntervalMs, setActivePollingIntervalMs] = useState(
+        pollPollingIntervalMs,
+    );
     const [isBrowserOnline, setIsBrowserOnline] = useState(
         getBrowserOnlineState,
     );
+    // Voting can advance in another tab or window, so background polling
+    // must continue until the workflow reaches results.
     const {
         data: poll,
         isLoading: isLoadingPoll,
         error: pollError,
     } = useGetPollQuery(isLegacyPollLink ? skipToken : pollSlug, {
-        pollingInterval: pollPollingIntervalMs,
+        pollingInterval: activePollingIntervalMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
-        skipPollingIfUnfocused: true,
     });
     const pollId = poll?.id ?? null;
     const votingState = useAppSelector((state) =>
@@ -156,6 +162,13 @@ const PollPage = (): React.JSX.Element => {
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
+
+    useEffect(() => {
+        const hasResults =
+            !!poll?.results.length || !!votingState.results?.length;
+
+        setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
+    }, [poll?.results.length, votingState.results]);
 
     useEffect(() => {
         if (
@@ -231,7 +244,7 @@ const PollPage = (): React.JSX.Element => {
                         <h1 className="text-2xl font-semibold tracking-tight">
                             Connection lost
                         </h1>
-                        <p className="text-sm leading-7 text-secondary sm:text-base">
+                        <p className="text-sm leading-7 text-muted-foreground sm:text-base">
                             We lost the connection to the server. The app will
                             keep retrying in the background and will recover
                             automatically once the connection is back.
@@ -251,15 +264,37 @@ const PollPage = (): React.JSX.Element => {
                     <PollHeader poll={poll} pollId={pollId} />
                     <Voting onVote={onVote} poll={poll} pollId={pollId} />
                     <VoteResults poll={poll} pollId={pollId} />
-                    <Panel padding="compact" tone="subtle">
-                        <h2 className="text-lg font-semibold tracking-tight">
+                    <Panel
+                        aria-labelledby={participantsHeadingId}
+                        padding="compact"
+                        tone="surface"
+                    >
+                        <h2
+                            className="text-lg font-semibold tracking-tight"
+                            id={participantsHeadingId}
+                        >
                             Participants
                         </h2>
-                        <p className="mt-2 text-sm leading-7 text-secondary">
-                            {poll.voters.length
-                                ? `Voters in this poll: ${poll.voters.join(', ')}`
-                                : 'No voters yet.'}
-                        </p>
+                        {poll.voters.length ? (
+                            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {poll.voters.map((voterName) => (
+                                    <Panel
+                                        asChild
+                                        className="min-w-0 break-words text-sm leading-6 text-foreground"
+                                        key={voterName}
+                                        padding="row"
+                                        radius="compact"
+                                        tone="subtle"
+                                    >
+                                        <li>{voterName}</li>
+                                    </Panel>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                                No voters yet.
+                            </p>
+                        )}
                     </Panel>
                 </div>
             )}

@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 import type { Plugin } from 'vite';
 
 const deploymentCommitShaEnvKeys = [
@@ -9,8 +11,24 @@ const commitShaPattern = /^[0-9a-f]{7,40}$/i;
 
 export const versionJsonFileName = 'version.json';
 
+const resolveGitHeadSha = (): string | null => {
+    try {
+        const rawCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
+
+        return commitShaPattern.test(rawCommitSha)
+            ? rawCommitSha.toLowerCase()
+            : null;
+    } catch {
+        return null;
+    }
+};
+
 export const resolveDeploymentCommitSha = (
     env: NodeJS.ProcessEnv = process.env,
+    resolveFallbackCommitSha: () => string | null = resolveGitHeadSha,
 ): string | null => {
     for (const envKey of deploymentCommitShaEnvKeys) {
         const rawCommitSha = env[envKey]?.trim();
@@ -18,6 +36,12 @@ export const resolveDeploymentCommitSha = (
         if (rawCommitSha && commitShaPattern.test(rawCommitSha)) {
             return rawCommitSha.toLowerCase();
         }
+    }
+
+    const fallbackCommitSha = resolveFallbackCommitSha()?.trim();
+
+    if (fallbackCommitSha && commitShaPattern.test(fallbackCommitSha)) {
+        return fallbackCommitSha.toLowerCase();
     }
 
     return null;

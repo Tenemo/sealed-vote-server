@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { computeGeometricMean } from '../results';
+import { computeGeometricMean } from '../src/results';
 
 describe('computeGeometricMean', () => {
     test('computes geometric means using the voter count', () => {

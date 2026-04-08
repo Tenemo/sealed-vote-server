@@ -6,7 +6,7 @@ import {
     createDecryptionSharesForTallies,
     decryptTallies,
     serializeVotes,
-} from '../crypto';
+} from '../src/crypto';
 
 describe('crypto helpers', () => {
     test('serializes votes in choice order and decrypts tallies', () => {
