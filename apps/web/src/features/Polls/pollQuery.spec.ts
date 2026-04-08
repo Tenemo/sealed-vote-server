@@ -141,6 +141,44 @@ describe('fetchFreshPoll', () => {
         expect(result).toEqual(freshSlugPoll);
     });
 
+    test('prefers the most recently fulfilled cached poll over an in-flight refetch with older data', async () => {
+        const olderInFlightPoll = createPoll('fulfilled-poll');
+        const newestFulfilledPoll = {
+            ...olderInFlightPoll,
+            commonPublicKey: '12345',
+            isOpen: false,
+            publicKeyShareCount: 2,
+        };
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => {
+                throw new Error('Network error');
+            },
+        })) as never;
+
+        mockedGetState.mockReturnValue({
+            polls: {
+                queries: {
+                    inFlightRefetch: {
+                        data: olderInFlightPoll,
+                        endpointName: 'getPoll',
+                        fulfilledTimeStamp: 10,
+                        startedTimeStamp: 30,
+                    },
+                    fulfilledQuery: {
+                        data: newestFulfilledPoll,
+                        endpointName: 'getPoll',
+                        fulfilledTimeStamp: 20,
+                        startedTimeStamp: 20,
+                    },
+                },
+            },
+        });
+
+        const result = await fetchFreshPoll(dispatch, newestFulfilledPoll.id);
+
+        expect(result).toEqual(newestFulfilledPoll);
+    });
+
     test('falls back to a matching cached poll from another query state', async () => {
         const cachedPoll = createPoll('cached-query-poll');
         const dispatch = vi.fn(() => ({
@@ -159,6 +197,32 @@ describe('fetchFreshPoll', () => {
                     cachedPollQuery: {
                         endpointName: 'getPoll',
                         data: cachedPoll,
+                    },
+                },
+            },
+        });
+
+        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
+
+        expect(result).toEqual(cachedPoll);
+    });
+
+    test('ignores undefined query substates when scanning cached poll results', async () => {
+        const cachedPoll = createPoll('cached-query-poll');
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => {
+                throw new Error('Network error');
+            },
+        })) as never;
+
+        mockedGetState.mockReturnValue({
+            polls: {
+                queries: {
+                    undefinedQuery: undefined,
+                    cachedPollQuery: {
+                        endpointName: 'getPoll',
+                        data: cachedPoll,
+                        fulfilledTimeStamp: 20,
                     },
                 },
             },

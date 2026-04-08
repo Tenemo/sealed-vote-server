@@ -20,11 +20,10 @@ type PollQueryState = {
     data?: unknown;
     endpointName?: string;
     fulfilledTimeStamp?: number;
-    startedTimeStamp?: number;
 };
 
 const getPollQueryTimestamp = (queryState: PollQueryState): number =>
-    queryState.fulfilledTimeStamp ?? queryState.startedTimeStamp ?? 0;
+    queryState.fulfilledTimeStamp ?? 0;
 
 const selectPollResult = (
     state: RootState,
@@ -32,12 +31,13 @@ const selectPollResult = (
 ): PollResponse | null => {
     const queryStates = Object.values(
         state[pollsApi.reducerPath].queries,
-    ) as PollQueryState[];
+    ) as Array<PollQueryState | undefined>;
 
     let freshestMatchingQuery: PollQueryState | undefined;
 
     for (const queryState of queryStates) {
         if (
+            !queryState ||
             queryState.endpointName !== 'getPoll' ||
             !isPollResponse(queryState.data) ||
             queryState.data.id !== pollId

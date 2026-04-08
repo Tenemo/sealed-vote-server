@@ -14,7 +14,7 @@
                 "$TURBO_DEFAULT$",
                 ".git/HEAD",
                 ".git/packed-refs",
-                ".git/refs/**"
+                ".git/refs/heads/**"
             ],
             "outputs": ["dist/**"]
         },
