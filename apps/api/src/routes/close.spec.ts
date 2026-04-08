@@ -107,6 +107,35 @@ describe('POST /polls/:pollId/close', () => {
         await deletePoll(fastify, pollId, creatorToken);
     });
 
+    test('replays close idempotently after the poll is already closed', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+        const replayResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+
+        expect(firstResponse.statusCode).toBe(200);
+        expect(replayResponse.statusCode).toBe(200);
+        expect(
+            (JSON.parse(replayResponse.body) as ClosePollResponse).message,
+        ).toBe('Poll closed successfully');
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+
     test('should return an error for closing a non-existing poll', async () => {
         const nonExistingPollId = '48a16d54-0000-0000-0000-67083a00e107';
         const creatorToken = 'some-creator-token';

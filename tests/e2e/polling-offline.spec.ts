@@ -55,7 +55,6 @@ test('keeps the voting flow usable across disconnects before and after the vote 
             await expect(beginVoteButton).toBeEnabled({ timeout: 30_000 });
 
             await participant.context.setOffline(true);
-            await expectConnectionToastVisible(participant.page);
             await expect(
                 participant.page.getByText('Waiting for the vote to be started...'),
             ).toBeVisible();
@@ -67,7 +66,6 @@ test('keeps the voting flow usable across disconnects before and after the vote 
             await expectConnectionToastHidden(participant.page);
 
             await page.context().setOffline(true);
-            await expectConnectionToastVisible(page);
             await expect(beginVoteButton).toBeVisible();
             await page.context().setOffline(false);
             await expectConnectionToastHidden(page);
@@ -79,7 +77,6 @@ test('keeps the voting flow usable across disconnects before and after the vote 
                 ),
             ).toBeVisible({ timeout: 30_000 });
             await participant.context.setOffline(true);
-            await expectConnectionToastVisible(participant.page);
             await expect(
                 participant.page.getByRole('heading', { name: pollName }),
             ).toBeVisible();

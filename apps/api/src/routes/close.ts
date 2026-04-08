@@ -6,7 +6,7 @@ import type {
 import { canClose } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { eq } from 'drizzle-orm';
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { polls } from '../db/schema.js';
@@ -15,6 +15,7 @@ import {
     countPollVoters,
     lockPollByIdForCreatorAction,
 } from '../utils/polls.js';
+import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
 import {
@@ -50,11 +51,12 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                 Params: PollIdParams;
                 Body: ClosePollBody;
             }>,
+            reply: FastifyReply,
         ): Promise<ClosePollResponse> => {
             const { pollId } = req.params;
             const { creatorToken } = req.body;
 
-            return await withTransaction(fastify, async (client) => {
+            const response = await withTransaction(fastify, async (client) => {
                 const poll = await lockPollByIdForCreatorAction(client, pollId);
                 if (!poll) {
                     throw createError(
@@ -67,11 +69,11 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                     throw createError(403, ERROR_MESSAGES.invalidCreatorToken);
                 }
 
-                if (!poll.isOpen) {
-                    throw createError(400, ERROR_MESSAGES.pollAlreadyClosed);
-                }
-
                 const voterCount = await countPollVoters(client, pollId);
+
+                if (!poll.isOpen) {
+                    return { message: 'Poll closed successfully' };
+                }
 
                 if (
                     !canClose({
@@ -96,6 +98,13 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
 
                 return { message: 'Poll closed successfully' };
             });
+
+            void maybeDropTestResponseAfterCommit({
+                reply,
+                request: req,
+            });
+
+            return response;
         },
     );
 };

@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -6,6 +8,8 @@ import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
 
 import { CreatePollResponse } from './create';
 import { PollResponse } from './fetch';
+
+const generateToken = (): string => randomBytes(32).toString('hex');
 
 describe('GET /polls/:pollRef', () => {
     let fastify: FastifyInstance;
@@ -130,6 +134,7 @@ describe('GET /polls/:pollRef', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['Option 1', 'Option 2'],
+                creatorToken: generateToken(),
                 pollName,
             },
         });
@@ -138,6 +143,7 @@ describe('GET /polls/:pollRef', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['Option 1', 'Option 2'],
+                creatorToken: generateToken(),
                 pollName,
             },
         });

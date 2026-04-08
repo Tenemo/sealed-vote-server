@@ -5,6 +5,11 @@ import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import PollCreation from './PollCreation';
 
 const mockedCreatePoll = vi.fn();
+const mockedGenerateClientToken = vi.fn();
+
+vi.mock('features/Polls/clientToken', () => ({
+    generateClientToken: () => mockedGenerateClientToken(),
+}));
 
 vi.mock('features/Polls/pollsApi', () => ({
     useCreatePollMutation: () => [
@@ -21,6 +26,7 @@ const PollLocation = (): React.JSX.Element => {
 describe('PollCreation', () => {
     beforeEach(() => {
         mockedCreatePoll.mockReset();
+        mockedGenerateClientToken.mockReset();
     });
 
     it('navigates to the slug-based vote route after create', async () => {
@@ -65,6 +71,57 @@ describe('PollCreation', () => {
 
         await waitFor(() => {
             expect(screen.getByText('best-fruit--1111')).toBeInTheDocument();
+        });
+    });
+
+    it('reuses the same creator token when create is retried without changing the form', async () => {
+        const user = userEvent.setup();
+
+        mockedGenerateClientToken.mockReturnValue('creator-token-1');
+        mockedCreatePoll.mockReturnValue({
+            unwrap: () => new Promise<void>(() => undefined),
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/']}>
+                <Routes>
+                    <Route element={<PollCreation />} path="/" />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        await user.type(
+            screen.getByRole('textbox', { name: /^Vote name/i }),
+            'Best fruit',
+        );
+        await user.type(
+            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
+            'Apples',
+        );
+        await user.click(
+            screen.getByRole('button', { name: 'Add new choice' }),
+        );
+        await user.type(
+            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
+            'Bananas',
+        );
+        await user.click(
+            screen.getByRole('button', { name: 'Add new choice' }),
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Create vote' }));
+        await user.click(screen.getByRole('button', { name: 'Create vote' }));
+
+        expect(mockedGenerateClientToken).toHaveBeenCalledTimes(1);
+        expect(mockedCreatePoll).toHaveBeenNthCalledWith(1, {
+            choices: ['Apples', 'Bananas'],
+            creatorToken: 'creator-token-1',
+            pollName: 'Best fruit',
+        });
+        expect(mockedCreatePoll).toHaveBeenNthCalledWith(2, {
+            choices: ['Apples', 'Bananas'],
+            creatorToken: 'creator-token-1',
+            pollName: 'Best fruit',
         });
     });
 });

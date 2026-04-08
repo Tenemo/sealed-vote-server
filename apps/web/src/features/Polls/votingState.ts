@@ -1,6 +1,10 @@
+import type { PollResponse } from '@sealed-vote/contracts';
+
 export type VoteState = {
     creatorToken: string | null;
     pendingVoterName: string | null;
+    pollSlug: string | null;
+    pollSnapshot: PollResponse | null;
     selectedScores: Record<string, number> | null;
     voterName: string | null;
     voterIndex: number | null;
@@ -23,6 +27,8 @@ export type VotingState = Record<string, VoteState>;
 export const initialVoteState: VoteState = {
     creatorToken: null,
     pendingVoterName: null,
+    pollSlug: null,
+    pollSnapshot: null,
     selectedScores: null,
     isVotingInProgress: false,
     voterName: null,
@@ -45,6 +51,16 @@ export const selectVoteStateByPollId = (
     pollId: string,
 ): VoteState => state[pollId] ?? initialVoteState;
 
+export const selectVoteStateByPollSlug = (
+    state: VotingState,
+    pollSlug: string,
+): VoteState =>
+    Object.values(state).find(
+        (voteState) =>
+            voteState.pollSlug === pollSlug ||
+            voteState.pollSnapshot?.slug === pollSlug,
+    ) ?? initialVoteState;
+
 export const getResumableVoterName = (voteState: VoteState): string | null =>
     voteState.voterName ?? voteState.pendingVoterName;
 
@@ -61,6 +77,7 @@ export const hasPendingVotingIntent = (voteState: VoteState): boolean =>
     Boolean(
         voteState.selectedScores &&
         getResumableVoterName(voteState) &&
+        voteState.voterToken &&
         !voteState.results,
     );
 

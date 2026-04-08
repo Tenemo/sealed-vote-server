@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { isUuid } from '@sealed-vote/contracts';
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
@@ -17,10 +17,9 @@ import { useGetPollQuery } from 'features/Polls/pollsApi';
 import {
     getResumableVoterName,
     hasPendingVotingIntent,
-    hasResumableVotingSession,
-    initialVoteState,
-    selectVoteStateByPollId,
+    selectVoteStateByPollSlug,
 } from 'features/Polls/votingState';
+import { recoverSession } from 'features/Polls/votingThunks/recoverSession';
 import { vote } from 'features/Polls/votingThunks/vote';
 import {
     connectionLostMessage,
@@ -71,9 +70,6 @@ const PollPage = (): React.JSX.Element => {
         throw new Error('Poll slug missing.');
     }
     const isLegacyPollLink = isUuid(pollSlug);
-    const hasResumedVotingRef = useRef(false);
-    const shouldResumeOnResolvedPollRef = useRef(false);
-    const resolvedPollIdRef = useRef<string | null>(null);
     const [activePollingIntervalMs, setActivePollingIntervalMs] = useState(
         pollPollingIntervalMs,
     );
@@ -91,12 +87,11 @@ const PollPage = (): React.JSX.Element => {
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
-    const pollId = poll?.id ?? null;
     const votingState = useAppSelector((state) =>
-        pollId
-            ? selectVoteStateByPollId(state.voting, pollId)
-            : initialVoteState,
+        selectVoteStateByPollSlug(state.voting, pollSlug),
     );
+    const effectivePoll = poll ?? votingState.pollSnapshot;
+    const pollId = effectivePoll?.id ?? null;
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -113,38 +108,6 @@ const PollPage = (): React.JSX.Element => {
             }),
         );
     };
-
-    useLayoutEffect(() => {
-        if (!pollId || resolvedPollIdRef.current === pollId) {
-            return;
-        }
-
-        resolvedPollIdRef.current = pollId;
-        shouldResumeOnResolvedPollRef.current =
-            hasResumableVotingSession(votingState);
-        hasResumedVotingRef.current = false;
-    }, [pollId, votingState]);
-
-    useEffect(() => {
-        if (!pollId) {
-            return;
-        }
-
-        if (
-            !hasResumedVotingRef.current &&
-            shouldResumeOnResolvedPollRef.current &&
-            hasResumableVotingSession(votingState)
-        ) {
-            hasResumedVotingRef.current = true;
-            void dispatch(
-                vote({
-                    pollId,
-                    voterName: votingState.voterName!,
-                    selectedScores: votingState.selectedScores!,
-                }),
-            );
-        }
-    }, [dispatch, pollId, votingState]);
 
     useEffect(() => {
         const handleOnline = (): void => {
@@ -165,10 +128,10 @@ const PollPage = (): React.JSX.Element => {
 
     useEffect(() => {
         const hasResults =
-            !!poll?.results.length || !!votingState.results?.length;
+            !!effectivePoll?.results.length || !!votingState.results?.length;
 
         setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
-    }, [poll?.results.length, votingState.results]);
+    }, [effectivePoll?.results.length, votingState.results]);
 
     useEffect(() => {
         if (
@@ -186,20 +149,14 @@ const PollPage = (): React.JSX.Element => {
             return;
         }
 
-        void dispatch(
-            vote({
-                pollId,
-                voterName: resumableVoterName,
-                selectedScores: votingState.selectedScores,
-            }),
-        );
+        void dispatch(recoverSession({ pollId }));
     }, [dispatch, isBrowserOnline, pollId, votingState]);
 
     if (isLegacyPollLink || isNotFoundError(pollError)) {
         return <NotFound />;
     }
 
-    const hasPollData = !!pollId && !!poll;
+    const hasPollData = !!pollId && !!effectivePoll;
     const hasConnectionError = isConnectionError(pollError);
     const shouldShowConnectionToast = hasPollData && hasConnectionError;
     const shouldShowConnectionState =
@@ -209,7 +166,7 @@ const PollPage = (): React.JSX.Element => {
     return (
         <>
             <Helmet>
-                <title>{poll ? poll.pollName : 'Vote'}</title>
+                <title>{effectivePoll ? effectivePoll.pollName : 'Vote'}</title>
             </Helmet>
             {isLoadingPoll && !hasPollData && (
                 <div className="flex min-h-[40vh] items-center justify-center">
@@ -259,11 +216,15 @@ const PollPage = (): React.JSX.Element => {
                     </AlertDescription>
                 </Alert>
             )}
-            {pollId && poll && (
+            {pollId && effectivePoll && (
                 <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-                    <PollHeader poll={poll} pollId={pollId} />
-                    <Voting onVote={onVote} poll={poll} pollId={pollId} />
-                    <VoteResults poll={poll} pollId={pollId} />
+                    <PollHeader poll={effectivePoll} pollId={pollId} />
+                    <Voting
+                        onVote={onVote}
+                        poll={effectivePoll}
+                        pollId={pollId}
+                    />
+                    <VoteResults poll={effectivePoll} pollId={pollId} />
                     <Panel
                         aria-labelledby={participantsHeadingId}
                         padding="compact"
@@ -275,9 +236,9 @@ const PollPage = (): React.JSX.Element => {
                         >
                             Participants
                         </h2>
-                        {poll.voters.length ? (
+                        {effectivePoll.voters.length ? (
                             <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {poll.voters.map((voterName) => (
+                                {effectivePoll.voters.map((voterName) => (
                                     <Panel
                                         asChild
                                         className="min-w-0 break-words text-sm leading-6 text-foreground"

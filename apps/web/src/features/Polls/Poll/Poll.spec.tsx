@@ -22,15 +22,26 @@ const mockedVote = vi.fn((payload: unknown) => ({
 }));
 const mockedUseGetPollQuery = vi.fn();
 const mockedUseClosePollMutation = vi.fn();
+const mockedRecoverSession = vi.fn((payload: unknown) => ({
+    payload,
+    type: 'voting/recoverSession',
+}));
 
 vi.mock('features/Polls/votingThunks/vote', () => ({
     vote: (payload: unknown) => mockedVote(payload),
+}));
+
+vi.mock('features/Polls/votingThunks/recoverSession', () => ({
+    recoverSession: (payload: unknown) => mockedRecoverSession(payload),
 }));
 
 vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
         endpoints: {
             createPoll: {
+                matchFulfilled: () => false,
+            },
+            getPoll: {
                 matchFulfilled: () => false,
             },
         },
@@ -91,6 +102,7 @@ describe('Poll page', () => {
         mockedVote.mockClear();
         mockedUseGetPollQuery.mockReset();
         mockedUseClosePollMutation.mockReset();
+        mockedRecoverSession.mockReset();
 
         mockedUseGetPollQuery.mockReturnValue({
             data: basePoll,
@@ -103,10 +115,11 @@ describe('Poll page', () => {
         ]);
     });
 
-    it('resumes a persisted voting session that already existed on mount', async () => {
+    it('does not auto-resume a persisted voting session on mount', () => {
         renderPoll({
             '11111111-1111-4111-8111-111111111111': {
                 ...initialVoteState,
+                pollSlug: 'best-fruit--1111',
                 selectedScores: {
                     Apples: 7,
                 },
@@ -116,17 +129,16 @@ describe('Poll page', () => {
             },
         });
 
-        await waitFor(() => {
-            expect(mockedVote).toHaveBeenCalledWith({
-                pollId: '11111111-1111-4111-8111-111111111111',
-                selectedScores: { Apples: 7 },
-                voterName: 'Alice',
-            });
-        });
+        expect(mockedVote).not.toHaveBeenCalled();
     });
 
     it('does not auto-resume when the voting session appears only after mount', async () => {
-        const store = renderPoll();
+        const store = renderPoll({
+            '11111111-1111-4111-8111-111111111111': {
+                ...initialVoteState,
+                pollSlug: 'best-fruit--1111',
+            },
+        });
 
         await act(async () => {
             store.dispatch(
@@ -257,6 +269,32 @@ describe('Poll page', () => {
         expect(
             screen.queryByText('TypeError: Failed to fetch'),
         ).not.toBeInTheDocument();
+    });
+
+    it('falls back to the persisted poll snapshot when reconnecting offline', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: undefined,
+            error: {
+                error: 'TypeError: Failed to fetch',
+                status: 'FETCH_ERROR',
+            },
+            isLoading: false,
+        });
+
+        renderPoll({
+            '11111111-1111-4111-8111-111111111111': {
+                ...initialVoteState,
+                pollSlug: 'best-fruit--1111',
+                pollSnapshot: basePoll,
+            },
+        });
+
+        expect(
+            screen.getByRole('heading', { name: 'Best fruit' }),
+        ).toBeVisible();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /The connection to the server was lost\.\s+Showing the latest available vote state and retrying in the background\./i,
+        );
     });
 
     it('shows a friendly reconnect state when the poll cannot be loaded because the connection was lost', () => {

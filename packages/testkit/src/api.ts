@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { POLL_ROUTES } from '@sealed-vote/contracts';
 import type {
     CreatePollResponse,
@@ -15,6 +17,8 @@ export const getUniquePollName = (baseName?: string): string => {
     return `${baseName ?? 'Test-poll'}-${Date.now()}-${randomHex}`;
 };
 
+const generateClientToken = (): string => randomBytes(32).toString('hex');
+
 export const createPoll = async (
     fastify: FastifyInstance,
     pollName?: string,
@@ -29,11 +33,13 @@ export const createPoll = async (
 }> => {
     const requestedChoices = choices ?? ['Option 1', 'Option 2'];
     const requestedPollName = pollName ?? `Test poll ${getUniquePollName()}`;
+    const creatorToken = generateClientToken();
     const createResponse = await fastify.inject({
         method: 'POST',
         url: POLL_ROUTES.create,
         payload: {
             choices: requestedChoices,
+            creatorToken,
             pollName: requestedPollName,
             maxParticipants,
         },
@@ -46,7 +52,7 @@ export const createPoll = async (
         choices: requestedChoices.map((choice) => choice.trim()),
         pollId: createResponseBody.id,
         pollSlug: createResponseBody.slug,
-        creatorToken: createResponseBody.creatorToken,
+        creatorToken,
     };
 };
 
@@ -91,11 +97,13 @@ export const registerVoter = async (
     | ({ success: true } & RegisterVoterResponse)
     | { success: false; message?: string }
 > => {
+    const voterToken = generateClientToken();
     const response = await fastify.inject({
         method: 'POST',
         url: POLL_ROUTES.register(pollId),
         payload: {
             voterName,
+            voterToken,
         },
     });
 

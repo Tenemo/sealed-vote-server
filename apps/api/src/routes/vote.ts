@@ -6,19 +6,22 @@ import type {
 import { canVote, computeEncryptedTallies } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { eq } from 'drizzle-orm';
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { encryptedVotes, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { areEncryptedMessagesEqual } from '../utils/idempotency.js';
 import {
     countPollChoices,
     countPollEncryptedVotes,
     countPollVoters,
+    getExistingEncryptedVote,
     getOrderedPollEncryptedVotes,
     lockPollById,
 } from '../utils/polls.js';
-import { authenticateVoter } from '../utils/voterAuth.js';
+import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
 
 import {
     EncryptedMessageSchema,
@@ -58,85 +61,161 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                 Body: VoteRequest;
                 Params: PollIdParams;
             }>,
+            reply: FastifyReply,
         ): Promise<VoteResponse> => {
             try {
                 const { votes, voterToken } = req.body;
                 const { pollId } = req.params;
 
-                return await withTransaction(fastify, async (client) => {
-                    const poll = await lockPollById(client, pollId);
-                    if (!poll) {
-                        throw createError(
-                            404,
-                            `Poll with ID ${pollId} does not exist.`,
+                const response = await withTransaction(
+                    fastify,
+                    async (client) => {
+                        const poll = await lockPollById(client, pollId);
+                        if (!poll) {
+                            throw createError(
+                                404,
+                                `Poll with ID ${pollId} does not exist.`,
+                            );
+                        }
+
+                        const [voterCount, encryptedVoteCount] =
+                            await Promise.all([
+                                countPollVoters(client, pollId),
+                                countPollEncryptedVotes(client, pollId),
+                            ]);
+
+                        const voter = await authenticateVoter(
+                            client,
+                            pollId,
+                            voterToken,
                         );
-                    }
 
-                    const [voterCount, encryptedVoteCount] = await Promise.all([
-                        countPollVoters(client, pollId),
-                        countPollEncryptedVotes(client, pollId),
-                    ]);
-
-                    if (
-                        !canVote({
-                            isOpen: poll.isOpen,
-                            commonPublicKey: poll.commonPublicKey,
-                            voterCount,
-                            encryptedVoteCount,
-                            encryptedTallyCount: poll.encryptedTallies.length,
-                            resultCount: poll.results.length,
-                        })
-                    ) {
-                        throw createError(
-                            400,
-                            ERROR_MESSAGES.votingPhaseClosed,
+                        const existingVote = await getExistingEncryptedVote(
+                            client,
+                            pollId,
+                            voter.id,
                         );
-                    }
 
-                    const voter = await authenticateVoter(
-                        client,
-                        pollId,
-                        voterToken,
-                    );
+                        if (existingVote) {
+                            if (
+                                !areEncryptedMessagesEqual(
+                                    existingVote.votes,
+                                    votes,
+                                )
+                            ) {
+                                throw createError(
+                                    409,
+                                    ERROR_MESSAGES.voteConflict,
+                                );
+                            }
 
-                    const choiceCount = await countPollChoices(client, pollId);
+                            return 'Vote submitted successfully';
+                        }
 
-                    if (votes.length !== choiceCount) {
-                        throw createError(
-                            400,
-                            ERROR_MESSAGES.voteVectorLengthMismatch,
-                        );
-                    }
-
-                    await client.insert(encryptedVotes).values({
-                        pollId,
-                        voterId: voter.id,
-                        votes,
-                    });
-
-                    const encryptedVoteRows =
-                        await getOrderedPollEncryptedVotes(client, pollId);
-
-                    if (encryptedVoteRows.length === voterCount) {
-                        const encryptedTallies = computeEncryptedTallies(
-                            encryptedVoteRows.map(
-                                ({ votes: encryptedVoteSet }) =>
-                                    encryptedVoteSet,
-                            ),
-                        );
-                        await client
-                            .update(polls)
-                            .set({
-                                encryptedTallies,
+                        if (
+                            !canVote({
+                                isOpen: poll.isOpen,
+                                commonPublicKey: poll.commonPublicKey,
+                                voterCount,
+                                encryptedVoteCount,
+                                encryptedTallyCount:
+                                    poll.encryptedTallies.length,
+                                resultCount: poll.results.length,
                             })
-                            .where(eq(polls.id, pollId));
-                    }
+                        ) {
+                            throw createError(
+                                400,
+                                ERROR_MESSAGES.votingPhaseClosed,
+                            );
+                        }
 
-                    return 'Vote submitted successfully';
+                        const choiceCount = await countPollChoices(
+                            client,
+                            pollId,
+                        );
+
+                        if (votes.length !== choiceCount) {
+                            throw createError(
+                                400,
+                                ERROR_MESSAGES.voteVectorLengthMismatch,
+                            );
+                        }
+
+                        await client.insert(encryptedVotes).values({
+                            pollId,
+                            voterId: voter.id,
+                            votes,
+                        });
+
+                        const encryptedVoteRows =
+                            await getOrderedPollEncryptedVotes(client, pollId);
+
+                        if (encryptedVoteRows.length === voterCount) {
+                            const encryptedTallies = computeEncryptedTallies(
+                                encryptedVoteRows.map(
+                                    ({ votes: encryptedVoteSet }) =>
+                                        encryptedVoteSet,
+                                ),
+                            );
+                            await client
+                                .update(polls)
+                                .set({
+                                    encryptedTallies,
+                                })
+                                .where(eq(polls.id, pollId));
+                        }
+
+                        return 'Vote submitted successfully';
+                    },
+                );
+
+                void maybeDropTestResponseAfterCommit({
+                    reply,
+                    request: req,
                 });
+
+                return response;
             } catch (error) {
                 if (isConstraintViolation(error, 'unique_vote_per_voter')) {
-                    throw createError(409, ERROR_MESSAGES.voteAlreadySubmitted);
+                    const voter = await fastify.db.query.voters.findFirst({
+                        where: (fields, { and, eq: isEqual }) =>
+                            and(
+                                isEqual(fields.pollId, req.params.pollId),
+                                isEqual(
+                                    fields.voterTokenHash,
+                                    hashSecureToken(req.body.voterToken),
+                                ),
+                            ),
+                    });
+
+                    const existingVote =
+                        voter &&
+                        (await fastify.db.query.encryptedVotes.findFirst({
+                            where: (fields, { and, eq: isEqual }) =>
+                                and(
+                                    isEqual(fields.pollId, req.params.pollId),
+                                    isEqual(fields.voterId, voter.id),
+                                ),
+                            columns: {
+                                votes: true,
+                            },
+                        }));
+
+                    if (
+                        existingVote &&
+                        areEncryptedMessagesEqual(
+                            existingVote.votes,
+                            req.body.votes,
+                        )
+                    ) {
+                        void maybeDropTestResponseAfterCommit({
+                            reply,
+                            request: req,
+                        });
+                        return 'Vote submitted successfully';
+                    }
+
+                    throw createError(409, ERROR_MESSAGES.voteConflict);
                 }
 
                 throw error;

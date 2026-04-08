@@ -7,6 +7,8 @@ import {
     type DecryptionSharesRequest,
     type PollResponse,
     type PublicKeyShareRequest,
+    type RecoverSessionRequest,
+    type RecoverSessionResponse,
     type RegisterVoterRequest,
     type RegisterVoterResponse,
     type VoteRequest,
@@ -50,6 +52,16 @@ export const pollsApi = createApi({
             invalidatesTags: (_result, _error, { pollId }) => [
                 { type: 'Poll', id: pollId },
             ],
+        }),
+        recoverSession: build.mutation<
+            RecoverSessionResponse,
+            { pollId: string; recoveryData: RecoverSessionRequest }
+        >({
+            query: ({ pollId, recoveryData }) => ({
+                url: POLL_ROUTES.recoverSession(pollId),
+                method: 'POST',
+                body: recoveryData,
+            }),
         }),
         closePoll: build.mutation<
             void,
@@ -113,6 +125,7 @@ export const {
     useCreatePollMutation,
     useGetPollQuery,
     useRegisterVoterMutation,
+    useRecoverSessionMutation,
     useClosePollMutation,
     useSubmitPublicKeyShareMutation,
     useVoteMutation,

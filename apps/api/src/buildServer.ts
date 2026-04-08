@@ -18,6 +18,7 @@ import { deletePoll } from './routes/delete.js';
 import { fetch } from './routes/fetch.js';
 import { healthCheck } from './routes/health-check.js';
 import { publicKeyShare } from './routes/publicKeyShare.js';
+import { recoverSession } from './routes/recoverSession.js';
 import { register } from './routes/register.js';
 import { vote } from './routes/vote.js';
 
@@ -167,6 +168,7 @@ export const buildServer = async (
     await fastify.register(fetch, { prefix: '/api' });
     await fastify.register(deletePoll, { prefix: '/api' });
     await fastify.register(register, { prefix: '/api' });
+    await fastify.register(recoverSession, { prefix: '/api' });
     await fastify.register(close, { prefix: '/api' });
     await fastify.register(publicKeyShare, { prefix: '/api' });
     await fastify.register(decryptionShares, { prefix: '/api' });

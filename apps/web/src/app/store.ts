@@ -4,6 +4,7 @@ import {
     persistStore,
     persistReducer,
     createTransform,
+    createMigrate,
     FLUSH,
     REHYDRATE,
     PAUSE,
@@ -13,7 +14,7 @@ import {
 } from 'redux-persist';
 
 import { rootPersistStateReconciler } from './persistStateReconciler';
-import { sessionPersistStorage } from './persistStorage';
+import { localPersistStorage } from './persistStorage';
 import { shouldEnableReduxDevTools } from './reduxDevTools';
 
 import { pollsApi } from 'features/Polls/pollsApi';
@@ -26,6 +27,8 @@ export const rootReducer = combineSlices(pollsApi, votingSlice);
 
 export type RootState = ReturnType<typeof rootReducer>;
 
+const persistVersion = 2;
+
 const votingSessionTransform = createTransform(
     sanitizeVotingStateForPersistence,
     (outboundState) => outboundState,
@@ -34,11 +37,19 @@ const votingSessionTransform = createTransform(
 
 const persistConfig = {
     key: 'root',
-    storage: sessionPersistStorage,
+    storage: localPersistStorage,
     stateReconciler: rootPersistStateReconciler,
     blacklist: [pollsApi.reducerPath],
     transforms: [votingSessionTransform],
-    version: 1,
+    version: persistVersion,
+    migrate: createMigrate(
+        {
+            2: () => undefined,
+        },
+        {
+            debug: false,
+        },
+    ),
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

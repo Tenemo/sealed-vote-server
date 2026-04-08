@@ -3,6 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 
 const mockedCanRegister = vi.fn();
 const mockedFetchFreshPoll = vi.fn();
+const mockedGenerateClientToken = vi.fn();
 const mockedRegisterVoterInitiate = vi.fn();
 const mockedRunProcessPublicPrivateKeys = vi.fn();
 const mockedRunEncryptVotesGenerateShares = vi.fn();
@@ -17,6 +18,10 @@ vi.mock('features/Polls/pollQuery', () => ({
     waitForPoll: vi.fn(),
 }));
 
+vi.mock('../clientToken', () => ({
+    generateClientToken: () => mockedGenerateClientToken(),
+}));
+
 vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
         reducerPath: 'polls',
@@ -26,6 +31,9 @@ vi.mock('features/Polls/pollsApi', () => ({
                 next(action),
         endpoints: {
             createPoll: {
+                matchFulfilled: () => false,
+            },
+            getPoll: {
                 matchFulfilled: () => false,
             },
             registerVoter: {
@@ -67,10 +75,12 @@ describe('vote thunk', () => {
     beforeEach(() => {
         mockedCanRegister.mockReset();
         mockedFetchFreshPoll.mockReset();
+        mockedGenerateClientToken.mockReset();
         mockedRegisterVoterInitiate.mockReset();
         mockedRunProcessPublicPrivateKeys.mockReset();
         mockedRunEncryptVotesGenerateShares.mockReset();
         mockedRunDecryptResults.mockReset();
+        mockedGenerateClientToken.mockReturnValue('generated-voter-token');
     });
 
     it('stores voter registration data and runs the voting workflow', async () => {
@@ -129,7 +139,10 @@ describe('vote thunk', () => {
         );
         expect(mockedRegisterVoterInitiate).toHaveBeenCalledWith({
             pollId: 'poll-1',
-            voterData: { voterName: 'Alice' },
+            voterData: {
+                voterName: 'Alice',
+                voterToken: 'generated-voter-token',
+            },
         });
         expect(mockedRunProcessPublicPrivateKeys).toHaveBeenCalled();
         expect(mockedRunEncryptVotesGenerateShares).toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { FastifyInstance } from 'fastify';
 import {
     createDecryptionShare,
@@ -114,5 +115,144 @@ describe('POST /polls/:pollId/decryption-shares', () => {
             },
         });
         expect(response.statusCode).toBe(404);
+    });
+
+    test('replays the same decryption shares idempotently after results are computed', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Idempotent decryption replay'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+        await builder.submitVotes();
+
+        const context = builder.getContext();
+        if (!context.poll) {
+            throw new Error('Poll state is missing.');
+        }
+
+        const [alice, bob] = context.voters;
+        if (!alice?.privateKey || !bob?.privateKey) {
+            throw new Error('Expected private keys for all voters.');
+        }
+        const alicePrivateKey = alice.privateKey;
+        const bobPrivateKey = bob.privateKey;
+
+        const aliceShares = context.poll.encryptedTallies.map((tally) =>
+            createDecryptionShare(
+                deserializeEncryptedMessage(tally),
+                BigInt(alicePrivateKey),
+            ).toString(),
+        );
+        const bobShares = context.poll.encryptedTallies.map((tally) =>
+            createDecryptionShare(
+                deserializeEncryptedMessage(tally),
+                BigInt(bobPrivateKey),
+            ).toString(),
+        );
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: aliceShares,
+                voterToken: alice.voterToken,
+            },
+        });
+        const secondResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: bobShares,
+                voterToken: bob.voterToken,
+            },
+        });
+        const replayResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: aliceShares,
+                voterToken: alice.voterToken,
+            },
+        });
+
+        expect(firstResponse.statusCode).toBe(201);
+        expect(secondResponse.statusCode).toBe(201);
+        expect(replayResponse.statusCode).toBe(201);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('rejects replaying different decryption shares for the same voter', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Conflicting decryption replay'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+        await builder.submitVotes();
+
+        const context = builder.getContext();
+        if (!context.poll) {
+            throw new Error('Poll state is missing.');
+        }
+
+        const [alice] = context.voters;
+        if (!alice?.privateKey) {
+            throw new Error('Expected a private key for Alice.');
+        }
+        const alicePrivateKey = alice.privateKey;
+
+        const firstShares = context.poll.encryptedTallies.map((tally) =>
+            createDecryptionShare(
+                deserializeEncryptedMessage(tally),
+                BigInt(alicePrivateKey),
+            ).toString(),
+        );
+        const conflictingShares = firstShares.map((share) =>
+            (BigInt(share) + 1n).toString(),
+        );
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: firstShares,
+                voterToken: alice.voterToken,
+            },
+        });
+        const conflictingResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: conflictingShares,
+                voterToken: alice.voterToken,
+            },
+        });
+
+        expect(firstResponse.statusCode).toBe(201);
+        expect(conflictingResponse.statusCode).toBe(409);
+        expect(
+            (JSON.parse(conflictingResponse.body) as { message: string })
+                .message,
+        ).toBe(ERROR_MESSAGES.decryptionSharesConflict);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
     });
 });

@@ -1,12 +1,13 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { canRegister } from '@sealed-vote/protocol';
 
+import { generateClientToken } from '../clientToken';
 import { fetchFreshPoll } from '../pollQuery';
 import { pollsApi } from '../pollsApi';
 import {
     clearWorkflowError,
     setKeys,
-    setPendingVoterName,
+    setPendingVoterRegistration,
     setProgressMessage,
     setResults,
     setSelectedScores,
@@ -25,6 +26,7 @@ import { voteThunkTypePrefix } from './voteTypes';
 
 import { type AppDispatch, type RootState } from 'app/store';
 import {
+    isConnectionError,
     isConnectionErrorMessage,
     reconnectingWorkflowMessage,
 } from 'utils/utils';
@@ -65,11 +67,19 @@ export const vote = createAsyncThunk<
                 );
             }
 
+            const existingVoteState = selectVoteStateByPollId(
+                getState().voting,
+                pollId,
+            );
+            const voterToken =
+                existingVoteState.voterToken ?? generateClientToken();
+
             dispatch(clearWorkflowError({ pollId }));
             dispatch(
-                setPendingVoterName({
+                setPendingVoterRegistration({
                     pollId,
                     voterName: normalizedVoterName,
+                    voterToken,
                 }),
             );
             dispatch(
@@ -79,17 +89,10 @@ export const vote = createAsyncThunk<
                 }),
             );
 
-            const {
-                voterName: stateVoterName,
-                voterIndex: stateVoterIndex,
-                voterToken: stateVoterToken,
-            } = selectVoteStateByPollId(getState().voting, pollId);
+            const { voterName: stateVoterName, voterIndex: stateVoterIndex } =
+                selectVoteStateByPollId(getState().voting, pollId);
 
-            if (
-                stateVoterIndex === null ||
-                !stateVoterToken ||
-                !stateVoterName
-            ) {
+            if (stateVoterIndex === null || !voterToken || !stateVoterName) {
                 dispatch(
                     setProgressMessage({
                         pollId,
@@ -108,6 +111,7 @@ export const vote = createAsyncThunk<
                         pollId,
                         voterData: {
                             voterName: normalizedVoterName,
+                            voterToken,
                         },
                     }),
                 ).unwrap();
@@ -149,13 +153,17 @@ export const vote = createAsyncThunk<
             const message =
                 error instanceof Error
                     ? error.message
-                    : 'Unknown voting error.';
+                    : typeof error === 'string'
+                      ? error
+                      : 'Unknown voting error.';
+            const shouldResumeWorkflow =
+                isConnectionError(error) || isConnectionErrorMessage(message);
 
             return rejectWithValue({
-                message: isConnectionErrorMessage(message)
+                message: shouldResumeWorkflow
                     ? reconnectingWorkflowMessage
                     : message,
-                shouldResumeWorkflow: isConnectionErrorMessage(message),
+                shouldResumeWorkflow,
             });
         }
     },

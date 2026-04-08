@@ -13,6 +13,10 @@ export type AuthenticatedVoter = {
     voterIndex: number;
 };
 
+export type AuthenticatedCreator = {
+    pollId: string;
+};
+
 export const generateSecureToken = (): string =>
     crypto.randomBytes(32).toString('hex');
 
@@ -46,3 +50,6 @@ export const authenticateVoter = async (
 
     return voter;
 };
+
+export const isSecureToken = (value: string): boolean =>
+    typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);

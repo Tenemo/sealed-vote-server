@@ -10,6 +10,7 @@ import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { generateClientToken } from 'features/Polls/clientToken';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/utils';
 
@@ -28,26 +29,33 @@ const PollCreationPage = (): React.JSX.Element => {
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
 
     const [form, setForm] = useState<Form>(initialForm);
+    const [creatorToken, setCreatorToken] = useState<string | null>(null);
     const { pollName, choices } = form;
 
     const onFormChange = ({
         target: { id, value },
-    }: ChangeEvent<HTMLInputElement>): void =>
+    }: ChangeEvent<HTMLInputElement>): void => {
+        setCreatorToken(null);
         setForm((previousForm) => ({ ...previousForm, [id]: value }));
+    };
 
-    const onAddChoice = (choice: string): void =>
+    const onAddChoice = (choice: string): void => {
+        setCreatorToken(null);
         setForm((prev) => ({
             ...prev,
             choices: [...prev.choices, choice],
         }));
+    };
 
-    const onRemoveChoice = (choice: string): void =>
+    const onRemoveChoice = (choice: string): void => {
+        setCreatorToken(null);
         setForm((prev) => ({
             ...prev,
             choices: prev.choices.filter(
                 (currentChoice) => currentChoice !== choice,
             ),
         }));
+    };
 
     const isFormValid = !!pollName.trim() && choices.length > 1;
 
@@ -58,9 +66,13 @@ const PollCreationPage = (): React.JSX.Element => {
             return;
         }
 
+        const nextCreatorToken = creatorToken ?? generateClientToken();
+        setCreatorToken(nextCreatorToken);
+
         void createPoll({
             pollName: form.pollName.trim(),
             choices: form.choices,
+            creatorToken: nextCreatorToken,
         })
             .unwrap()
             .then(({ slug }) => {

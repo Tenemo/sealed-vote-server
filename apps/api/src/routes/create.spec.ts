@@ -1,3 +1,6 @@
+import { randomBytes } from 'node:crypto';
+
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
@@ -6,6 +9,8 @@ import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
 
 import { CreatePollResponse } from './create';
 import { PollResponse } from './fetch';
+
+const generateToken = (): string => randomBytes(32).toString('hex');
 
 describe('POST /polls/create', () => {
     let fastify: FastifyInstance;
@@ -49,6 +54,7 @@ describe('POST /polls/create', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['Dog'],
+                creatorToken: generateToken(),
                 pollName,
             },
         });
@@ -64,11 +70,13 @@ describe('POST /polls/create', () => {
             'Coffee',
             'Tea',
         ]);
+        const duplicateCreatorToken = generateToken();
         const duplicateResponse = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
             payload: {
                 choices: ['Coffee', 'Tea'],
+                creatorToken: duplicateCreatorToken,
                 pollName,
             },
         });
@@ -103,6 +111,7 @@ describe('POST /polls/create', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['  Dog  ', ' Cat '],
+                creatorToken: generateToken(),
                 pollName: `  ${pollName}  `,
             },
         });
@@ -135,6 +144,7 @@ describe('POST /polls/create', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['Dog', 'Cat'],
+                creatorToken: generateToken(),
                 pollName: '   ',
             },
         });
@@ -151,6 +161,7 @@ describe('POST /polls/create', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['Dog', '   '],
+                creatorToken: generateToken(),
                 pollName: getUniquePollName('Blank choice poll'),
             },
         });
@@ -166,6 +177,7 @@ describe('POST /polls/create', () => {
             url: '/api/polls/create',
             payload: {
                 choices: ['Dog', ' Dog '],
+                creatorToken: generateToken(),
                 pollName: getUniquePollName('Duplicate trimmed choice poll'),
             },
         });
@@ -175,5 +187,86 @@ describe('POST /polls/create', () => {
             (JSON.parse(duplicateChoiceResponse.body) as { message: string })
                 .message,
         ).toBe('Choice names must be unique.');
+    });
+
+    test('replays the same create request idempotently for the same creator token', async () => {
+        const creatorToken = generateToken();
+        const pollName = getUniquePollName('Idempotent create poll');
+        const payload = {
+            choices: ['Dog', 'Cat'],
+            creatorToken,
+            pollName,
+        };
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload,
+        });
+        const secondResponse = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload,
+        });
+
+        expect(firstResponse.statusCode).toBe(201);
+        expect(secondResponse.statusCode).toBe(201);
+
+        const firstBody = JSON.parse(firstResponse.body) as CreatePollResponse;
+        const secondBody = JSON.parse(
+            secondResponse.body,
+        ) as CreatePollResponse;
+
+        expect(secondBody.id).toBe(firstBody.id);
+        expect(secondBody.slug).toBe(firstBody.slug);
+        expect(secondBody.creatorToken).toBe(creatorToken);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            firstBody.id,
+            creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('rejects a repeated creator token when the poll payload changes', async () => {
+        const creatorToken = generateToken();
+        const pollName = getUniquePollName('Conflicting create poll');
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', 'Cat'],
+                creatorToken,
+                pollName,
+            },
+        });
+        const conflictingResponse = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', 'Bird'],
+                creatorToken,
+                pollName,
+            },
+        });
+
+        expect(firstResponse.statusCode).toBe(201);
+        expect(conflictingResponse.statusCode).toBe(409);
+        expect(
+            (JSON.parse(conflictingResponse.body) as { message: string })
+                .message,
+        ).toBe(ERROR_MESSAGES.creatorTokenConflict);
+
+        const createdPoll = JSON.parse(
+            firstResponse.body,
+        ) as CreatePollResponse;
+        const deleteResult = await deletePoll(
+            fastify,
+            createdPoll.id,
+            creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
     });
 });
