@@ -244,7 +244,7 @@ const createVotePageDescription = (pollTitle: string | null): string => {
         return votePageFallbackDescription;
     }
 
-    return `Join the confidential vote "${normalizedPollTitle}" on sealed.vote. Score each choice from 1 to 10 in the browser with homomorphic encryption, offline recovery, and public verification.`;
+    return `Join the confidential vote "${normalizedPollTitle}" on sealed.vote. Score each choice from 1 to 10 in the browser with homomorphic encryption and public verification.`;
 };
 
 export const buildVotePageSeo = ({

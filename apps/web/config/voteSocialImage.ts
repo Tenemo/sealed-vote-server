@@ -195,7 +195,7 @@ const createTitleTspans = (titleLines: string[]): string =>
 const createChoiceRowsSvg = (rows: VoteSocialImageRow[]): string =>
     rows
         .map((row, index) => {
-            const y = 334 + index * 70;
+            const y = 304 + index * 70;
             const badgeText = row.kind === 'choice' ? `${index + 1}` : '+';
             const rowFill = row.kind === 'choice' ? '#1c1c1c' : '#181818';
             const badgeFill = row.kind === 'choice' ? '#f2f2f2' : '#2d2d2d';
@@ -212,29 +212,19 @@ const createChoiceRowsSvg = (rows: VoteSocialImageRow[]): string =>
 
 export const createVoteSocialImageSvg = ({
     choices,
-    isFallback,
     pollTitle,
 }: VoteSocialImagePayload): string => {
     const titleLines = wrapVoteSocialImageTitle(pollTitle || siteName);
     const choiceRows = createVoteSocialImageRows(choices);
-    const subtitle = isFallback
-        ? 'Confidential 1-10 score voting'
-        : 'Vote preview';
-    const footer = isFallback
-        ? 'Homomorphic encryption | offline recovery | public verification'
-        : 'Share this link to let participants join';
 
     return `
         <svg xmlns="http://www.w3.org/2000/svg" width="${socialImageWidth}" height="${socialImageHeight}" viewBox="0 0 ${socialImageWidth} ${socialImageHeight}">
             <rect width="${socialImageWidth}" height="${socialImageHeight}" fill="#121212" />
             <rect x="0" y="96" width="${socialImageWidth}" height="1" fill="#303030" />
             <text x="72" y="72" font-size="54" font-weight="700" fill="#ffffff">${siteName}</text>
-            <text x="72" y="130" font-size="24" fill="#8f8f8f">${escapeXml(subtitle)}</text>
-            <text x="72" y="214" font-size="72" font-weight="700" fill="#ffffff">${createTitleTspans(titleLines)}</text>
-            <text x="72" y="304" font-size="24" fill="#8f8f8f">Choices</text>
-            <rect x="72" y="324" width="1056" height="286" rx="10" fill="#161616" stroke="#343434" />
+            <text x="72" y="176" font-size="72" font-weight="700" fill="#ffffff">${createTitleTspans(titleLines)}</text>
+            <text x="72" y="274" font-size="24" fill="#8f8f8f">Choices</text>
             ${createChoiceRowsSvg(choiceRows)}
-            <text x="72" y="590" font-size="20" fill="#8f8f8f">${escapeXml(footer)}</text>
         </svg>
     `;
 };

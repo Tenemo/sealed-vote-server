@@ -77,8 +77,16 @@ describe('createVoteSocialImageSvg', () => {
         });
 
         expect(svg).toContain('sealed.vote');
-        expect(svg).toContain('Confidential 1-10 score voting');
         expect(svg).toContain('Public verification');
+        expect(svg).not.toContain('Vote preview');
+        expect(svg).not.toContain('Share this link to let participants join');
+        expect(svg).not.toContain('Confidential 1-10 score voting');
+        expect(svg).not.toContain(
+            'Homomorphic encryption | offline recovery | public verification',
+        );
+        expect(svg).not.toContain(
+            'width="1056" height="286" rx="10" fill="#161616" stroke="#343434"',
+        );
     });
 });
 

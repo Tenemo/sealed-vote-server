@@ -130,6 +130,7 @@ describe('resolveDocumentSeoMetadata', () => {
 
         expect(metadata.title).toBe('Budget & roadmap | sealed.vote');
         expect(metadata.description).toContain('Budget & roadmap');
+        expect(metadata.description).not.toContain('offline recovery');
         expect(metadata.canonicalUrl).toBe(
             'https://sealed.vote/votes/budget-roadmap',
         );
