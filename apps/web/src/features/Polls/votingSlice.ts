@@ -33,13 +33,20 @@ const applyRegistration = (
         voterToken: string;
     },
 ): void => {
+    voteState.pendingVoterName = payload.voterName;
     voteState.voterName = payload.voterName;
     voteState.voterIndex = payload.voterIndex;
     voteState.voterToken = payload.voterToken;
     voteState.workflowError = null;
+    voteState.shouldResumeWorkflow = false;
     voteState.hasSubmittedPublicKeyShare = false;
     voteState.hasSubmittedVote = false;
     voteState.hasSubmittedDecryptionShares = false;
+};
+
+export type VoteThunkRejectValue = {
+    message: string;
+    shouldResumeWorkflow: boolean;
 };
 
 type VoteThunkMeta = {
@@ -90,6 +97,16 @@ export const votingSlice = createSlice({
             }>,
         ) => {
             ensureVoteState(state, action.payload.pollId).workflowError = null;
+        },
+        setPendingVoterName: (
+            state,
+            action: PayloadAction<{
+                pollId: string;
+                voterName: string | null;
+            }>,
+        ) => {
+            const { pollId, voterName } = action.payload;
+            ensureVoteState(state, pollId).pendingVoterName = voterName;
         },
         setKeys: (
             state,
@@ -203,6 +220,7 @@ export const votingSlice = createSlice({
                     );
                     voteState.isVotingInProgress = true;
                     voteState.workflowError = null;
+                    voteState.shouldResumeWorkflow = false;
                 },
             )
             .addMatcher(
@@ -218,13 +236,14 @@ export const votingSlice = createSlice({
 
                     voteState.isVotingInProgress = false;
                     voteState.progressMessage = null;
+                    voteState.shouldResumeWorkflow = false;
                 },
             )
             .addMatcher(
                 (
                     action,
                 ): action is PayloadAction<
-                    string | undefined,
+                    VoteThunkRejectValue | undefined,
                     string,
                     VoteThunkMeta
                 > => isVoteThunkAction(action, 'rejected'),
@@ -235,11 +254,17 @@ export const votingSlice = createSlice({
                     );
 
                     voteState.isVotingInProgress = false;
+                    if (action.payload?.shouldResumeWorkflow) {
+                        voteState.progressMessage = action.payload.message;
+                        voteState.workflowError = null;
+                        voteState.shouldResumeWorkflow = true;
+                        return;
+                    }
+
                     voteState.progressMessage = null;
                     voteState.workflowError =
-                        typeof action.payload === 'string'
-                            ? action.payload
-                            : 'Unknown voting error.';
+                        action.payload?.message ?? 'Unknown voting error.';
+                    voteState.shouldResumeWorkflow = false;
                 },
             );
     },
@@ -247,6 +272,7 @@ export const votingSlice = createSlice({
 
 export const {
     clearWorkflowError,
+    setPendingVoterName,
     setKeys,
     setProgressMessage,
     setResults,

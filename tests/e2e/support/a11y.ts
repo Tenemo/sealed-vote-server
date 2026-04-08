@@ -46,7 +46,7 @@ export const expectNoAxeViolations = async (
     const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
     const message = results.violations.length
         ? `Axe violations on ${pageLabel}:\n\n${formatViolations(results.violations)}`
-        : `Axe violations on ${pageLabel}.`;
+        : `Expected no Axe violations on ${pageLabel}.`;
 
     expect(results.violations, message).toEqual([]);
 };

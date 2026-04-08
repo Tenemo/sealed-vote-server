@@ -69,6 +69,21 @@ describe('fetchFreshPoll', () => {
         });
     });
 
+    test('falls back to cached poll data when the refetch resolves without a poll payload', async () => {
+        const cachedPoll = createPoll('cached-after-empty-response');
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => undefined,
+        })) as never;
+
+        mockedSelect.mockReturnValue(() => ({
+            data: cachedPoll,
+        }));
+
+        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
+
+        expect(result).toEqual(cachedPoll);
+    });
+
     test('falls back to the cached direct poll when the refetch fails', async () => {
         const cachedPoll = createPoll('cached-direct-poll');
         const expectedError = new Error('Network error');
@@ -125,6 +140,16 @@ describe('fetchFreshPoll', () => {
 
         await expect(fetchFreshPoll(dispatch, 'missing-poll')).rejects.toBe(
             expectedError,
+        );
+    });
+
+    test('throws when the refetch resolves without a poll payload and no cached poll is available', async () => {
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => undefined,
+        })) as never;
+
+        await expect(fetchFreshPoll(dispatch, 'missing-poll')).rejects.toThrow(
+            'Poll missing-poll could not be fetched.',
         );
     });
 });

@@ -24,17 +24,20 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
         Record<string, number>
     >(buildDefaultScores(poll.choices));
     const {
+        pendingVoterName,
         progressMessage,
         selectedScores: persistedSelectedScores,
         voterName: persistedVoterName,
     } = useAppSelector((state) => selectVotingStateByPollId(state, pollId));
-    const [voterName, setVoterName] = useState(persistedVoterName ?? '');
+    const [voterName, setVoterName] = useState(
+        persistedVoterName ?? pendingVoterName ?? '',
+    );
 
     useEffect(() => {
-        if (persistedVoterName) {
-            setVoterName(persistedVoterName);
+        if (persistedVoterName ?? pendingVoterName) {
+            setVoterName(persistedVoterName ?? pendingVoterName ?? '');
         }
-    }, [persistedVoterName]);
+    }, [pendingVoterName, persistedVoterName]);
 
     useEffect(() => {
         setSelectedScoresForm((currentScores) => {

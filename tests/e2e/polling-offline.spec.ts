@@ -1,15 +1,31 @@
 import { expect, test } from '@playwright/test';
 
-import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
+import {
+    beginVote,
+    createPoll,
+    deletePolls,
+    expectConnectionToastHidden,
+    expectConnectionToastVisible,
+    expectResultsVisible,
+    joinPoll,
+    type CreatedPoll,
+} from './support/pollFlow';
+import {
+    closeParticipant,
+    openProjectParticipant,
+} from './support/participants';
 import { createPollName, createTestNamespace } from './support/testData';
 
-test('keeps the vote page usable when polling loses the server connection', async ({
+test('keeps the voting flow usable across disconnects before and after the vote starts', async ({
+    browser,
     page,
     request,
 }, testInfo) => {
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
-    const pollName = createPollName('Offline tolerance', namespace);
+    const creatorName = `alice-${namespace}`;
+    const participantName = `bob-${namespace}`;
+    const pollName = createPollName('Reconnect tolerance', namespace);
 
     try {
         const createdPoll = await createPoll({
@@ -18,29 +34,65 @@ test('keeps the vote page usable when polling loses the server connection', asyn
         });
         createdPolls.push(createdPoll);
 
-        await expect(
-            page.getByRole('heading', { name: pollName }),
-        ).toBeVisible();
+        const participant = await openProjectParticipant(browser, testInfo);
 
-        await page.context().setOffline(true);
+        try {
+            await joinPoll({
+                page,
+                voterName: creatorName,
+            });
+            await joinPoll({
+                page: participant.page,
+                pollUrl: createdPoll.pollUrl,
+                voterName: participantName,
+            });
 
-        await expect(
-            page.locator('[data-slot="connection-toast"]'),
-        ).toBeVisible({ timeout: 15_000 });
-        await expect(
-            page.getByText(
-                'Connection to the server was lost. Showing the latest available vote state and retrying in the background.',
-            ),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('heading', { name: pollName }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('textbox', { name: 'Vote link' }),
-        ).toBeVisible();
-        await expect(
-            page.getByText('TypeError: Failed to fetch'),
-        ).not.toBeVisible();
+            const beginVoteButton = page.getByRole('button', {
+                name: 'Begin vote',
+            });
+            await expect(beginVoteButton).toBeEnabled({ timeout: 30_000 });
+
+            await participant.context.setOffline(true);
+            await expectConnectionToastVisible(participant.page);
+            await expect(
+                participant.page.getByText('Waiting for the vote to be started...'),
+            ).toBeVisible();
+            await participant.context.setOffline(false);
+            await expectConnectionToastHidden(participant.page);
+
+            await page.context().setOffline(true);
+            await expectConnectionToastVisible(page);
+            await expect(beginVoteButton).toBeVisible();
+            await page.context().setOffline(false);
+            await expectConnectionToastHidden(page);
+
+            await beginVote(page);
+            await expect(
+                page.getByText(
+                    /Waiting for common public key\.\.\.|Waiting for encrypted tallies\.\.\.|Waiting for all decryption shares and results\.\.\./i,
+                ),
+            ).toBeVisible({ timeout: 30_000 });
+            await participant.context.setOffline(true);
+            await expectConnectionToastVisible(participant.page);
+            await expect(
+                participant.page.getByRole('heading', { name: pollName }),
+            ).toBeVisible();
+
+            await participant.context.setOffline(false);
+            await expectConnectionToastHidden(participant.page);
+
+            await expectResultsVisible(page);
+            await expectResultsVisible(participant.page);
+            await expect(
+                page.getByText(
+                    `Voters in this poll: ${creatorName}, ${participantName}`,
+                ),
+            ).toBeVisible();
+        } finally {
+            await page.context().setOffline(false);
+            await participant.context.setOffline(false);
+            await closeParticipant(participant);
+        }
     } finally {
         await page.context().setOffline(false);
         await deletePolls(request, createdPolls);

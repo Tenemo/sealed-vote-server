@@ -190,7 +190,7 @@ describe('Poll page', () => {
         ).toBeVisible();
         expect(
             screen.getByText(
-                'Connection to the server was lost. Showing the latest available vote state and retrying in the background.',
+                /The connection to the server was lost\.\s+Showing the latest available vote state and retrying in the background\./i,
             ),
         ).toBeVisible();
         expect(

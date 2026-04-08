@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { isUuid } from '@sealed-vote/contracts';
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
@@ -15,18 +15,52 @@ import { useAppDispatch, useAppSelector } from 'app/hooks';
 import NotFound from 'components/NotFound/NotFound';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import {
+    getResumableVoterName,
+    hasPendingVotingIntent,
     hasResumableVotingSession,
     initialVoteState,
     selectVoteStateByPollId,
 } from 'features/Polls/votingState';
 import { vote } from 'features/Polls/votingThunks/vote';
-import { isConnectionError, renderError } from 'utils/utils';
+import {
+    connectionLostMessage,
+    isConnectionError,
+    renderError,
+} from 'utils/utils';
 
 const isNotFoundError = (error: unknown): boolean =>
     !!error &&
     typeof error === 'object' &&
     'status' in error &&
     error.status === 404;
+
+const defaultPollPollingIntervalMs = 3000;
+const minimumPollPollingIntervalMs = 250;
+
+const resolvePollPollingIntervalMs = (rawValue: string | undefined): number => {
+    if (!rawValue) {
+        return defaultPollPollingIntervalMs;
+    }
+
+    const parsedValue = Number(rawValue);
+
+    if (
+        !Number.isFinite(parsedValue) ||
+        !Number.isInteger(parsedValue) ||
+        parsedValue < minimumPollPollingIntervalMs
+    ) {
+        return defaultPollPollingIntervalMs;
+    }
+
+    return parsedValue;
+};
+
+const pollPollingIntervalMs = resolvePollPollingIntervalMs(
+    import.meta.env.VITE_POLLING_INTERVAL_MS,
+);
+
+const getBrowserOnlineState = (): boolean =>
+    typeof navigator === 'undefined' ? true : navigator.onLine;
 
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
@@ -38,12 +72,15 @@ const PollPage = (): React.JSX.Element => {
     const hasResumedVotingRef = useRef(false);
     const shouldResumeOnResolvedPollRef = useRef(false);
     const resolvedPollIdRef = useRef<string | null>(null);
+    const [isBrowserOnline, setIsBrowserOnline] = useState(
+        getBrowserOnlineState,
+    );
     const {
         data: poll,
         isLoading: isLoadingPoll,
         error: pollError,
     } = useGetPollQuery(isLegacyPollLink ? skipToken : pollSlug, {
-        pollingInterval: 3000,
+        pollingInterval: pollPollingIntervalMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
         skipPollingIfUnfocused: true,
@@ -103,6 +140,48 @@ const PollPage = (): React.JSX.Element => {
         }
     }, [dispatch, pollId, votingState]);
 
+    useEffect(() => {
+        const handleOnline = (): void => {
+            setIsBrowserOnline(true);
+        };
+        const handleOffline = (): void => {
+            setIsBrowserOnline(false);
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (
+            !pollId ||
+            !isBrowserOnline ||
+            votingState.isVotingInProgress ||
+            !votingState.shouldResumeWorkflow ||
+            !hasPendingVotingIntent(votingState)
+        ) {
+            return;
+        }
+
+        const resumableVoterName = getResumableVoterName(votingState);
+        if (!resumableVoterName || !votingState.selectedScores) {
+            return;
+        }
+
+        void dispatch(
+            vote({
+                pollId,
+                voterName: resumableVoterName,
+                selectedScores: votingState.selectedScores,
+            }),
+        );
+    }, [dispatch, isBrowserOnline, pollId, votingState]);
+
     if (isLegacyPollLink || isNotFoundError(pollError)) {
         return <NotFound />;
     }
@@ -139,9 +218,8 @@ const PollPage = (): React.JSX.Element => {
                             role="presentation"
                         />
                         <AlertDescription>
-                            Connection to the server was lost. Showing the
-                            latest available vote state and retrying in the
-                            background.
+                            {connectionLostMessage} Showing the latest available
+                            vote state and retrying in the background.
                         </AlertDescription>
                     </Alert>
                 </div>

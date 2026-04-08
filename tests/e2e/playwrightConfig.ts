@@ -128,8 +128,8 @@ const getCommonConfig = (
     use: {
         baseURL,
         screenshot: 'only-on-failure' as const,
-        trace: isCi ? ('retain-on-failure' as const) : ('on-first-retry' as const),
-        video: 'retain-on-failure' as const,
+        trace: isCi ? ('retain-on-failure' as const) : ('off' as const),
+        video: isCi ? ('retain-on-failure' as const) : ('off' as const),
     },
     workers: isCi
         ? parseWorkerCount(process.env.PLAYWRIGHT_CI_WORKERS, 4)
