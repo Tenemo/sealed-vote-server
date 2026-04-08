@@ -31,6 +31,8 @@ const Header = (): React.JSX.Element => {
                 aria-label="Open the sealed.vote repository on GitHub"
                 className="absolute right-4 top-1/2 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color] hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:right-6"
                 href="https://github.com/Tenemo/sealed-vote"
+                rel="noopener noreferrer"
+                target="_blank"
             >
                 <GitHubIcon className="size-[18px]" />
             </a>
