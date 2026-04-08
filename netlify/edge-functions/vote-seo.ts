@@ -35,7 +35,7 @@ export default async (
     }
 
     try {
-        const html = await response.text();
+        const html = await response.clone().text();
         const updatedHtml = await renderDocumentHtml({
             apiBaseUrl: seoApiBaseUrl,
             baseHtml: html,
