@@ -12,6 +12,10 @@
     --color-destructive: hsl(4 90% 58%);
     --color-border: hsla(0 0% 100% / 0.23);
     --font-sans: 'Roboto', Helvetica, Arial, sans-serif;
+    --radius-sm: 0.125rem;
+    --radius-lg: 0.25rem;
+    --radius-xl: 0.375rem;
+    --radius-2xl: 0.5rem;
 }
 
 @font-face {
@@ -25,13 +29,14 @@
 html,
 body,
 #root {
-    height: 100%;
     font-size: 16px;
 }
 
 html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: var(--color-background);
+    min-height: 100%;
 }
 
 *,
@@ -47,11 +52,12 @@ html {
 body {
     @apply text-foreground font-sans;
     background-color: var(--color-background);
-    height: 100%;
     display: flex;
     flex-direction: column;
+    min-height: 100svh;
 }
 
 #root {
-    min-height: 100%;
+    background-color: var(--color-background);
+    min-height: 100svh;
 }

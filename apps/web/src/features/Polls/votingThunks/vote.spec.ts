@@ -3,6 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 
 const mockedCanRegister = vi.fn();
 const mockedFetchFreshPoll = vi.fn();
+const mockedGenerateClientToken = vi.fn();
 const mockedRegisterVoterInitiate = vi.fn();
 const mockedRunProcessPublicPrivateKeys = vi.fn();
 const mockedRunEncryptVotesGenerateShares = vi.fn();
@@ -17,6 +18,10 @@ vi.mock('features/Polls/pollQuery', () => ({
     waitForPoll: vi.fn(),
 }));
 
+vi.mock('../clientToken', () => ({
+    generateClientToken: () => mockedGenerateClientToken(),
+}));
+
 vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
         reducerPath: 'polls',
@@ -26,6 +31,9 @@ vi.mock('features/Polls/pollsApi', () => ({
                 next(action),
         endpoints: {
             createPoll: {
+                matchFulfilled: () => false,
+            },
+            getPoll: {
                 matchFulfilled: () => false,
             },
             registerVoter: {
@@ -50,7 +58,7 @@ import { initialVoteState, votingSlice } from '../votingSlice';
 import { vote } from './vote';
 
 import type { VotingState } from 'features/Polls/votingState';
-import { reconnectingWorkflowMessage } from 'utils/utils';
+import { reconnectingWorkflowMessage } from 'utils/networkErrors';
 
 const createTestStore = (): EnhancedStore<{ voting: VotingState }> =>
     configureStore({
@@ -67,10 +75,12 @@ describe('vote thunk', () => {
     beforeEach(() => {
         mockedCanRegister.mockReset();
         mockedFetchFreshPoll.mockReset();
+        mockedGenerateClientToken.mockReset();
         mockedRegisterVoterInitiate.mockReset();
         mockedRunProcessPublicPrivateKeys.mockReset();
         mockedRunEncryptVotesGenerateShares.mockReset();
         mockedRunDecryptResults.mockReset();
+        mockedGenerateClientToken.mockReturnValue('generated-voter-token');
     });
 
     it('stores voter registration data and runs the voting workflow', async () => {
@@ -98,7 +108,9 @@ describe('vote thunk', () => {
             decryptionShareCount: 0,
             commonPublicKey: null,
             encryptedTallies: [],
-            results: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
         });
         mockedRegisterVoterInitiate.mockReturnValue({
             type: 'registerVoter',
@@ -124,19 +136,26 @@ describe('vote thunk', () => {
         await voteResult.unwrap();
 
         expect(mockedFetchFreshPoll).toHaveBeenCalledWith(
-            expect.any(Function),
-            'poll-1',
+            expect.objectContaining({
+                dispatch: expect.any(Function),
+                getState: expect.any(Function),
+                pollId: 'poll-1',
+            }),
         );
         expect(mockedRegisterVoterInitiate).toHaveBeenCalledWith({
             pollId: 'poll-1',
-            voterData: { voterName: 'Alice' },
+            voterData: {
+                voterName: 'Alice',
+                voterToken: 'generated-voter-token',
+            },
         });
         expect(mockedRunProcessPublicPrivateKeys).toHaveBeenCalled();
         expect(mockedRunEncryptVotesGenerateShares).toHaveBeenCalled();
         expect(mockedRunDecryptResults).toHaveBeenCalled();
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
-            pendingVoterName: 'Alice',
+            pendingVoterName: null,
+            pendingVoterToken: null,
             selectedScores,
             voterName: 'Alice',
             voterIndex: 1,
@@ -171,7 +190,9 @@ describe('vote thunk', () => {
             decryptionShareCount: 0,
             commonPublicKey: null,
             encryptedTallies: [],
-            results: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
         });
         mockedRegisterVoterInitiate.mockReturnValue({
             type: 'registerVoter',
@@ -194,11 +215,59 @@ describe('vote thunk', () => {
 
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
-            pendingVoterName: 'Alice',
+            pendingVoterName: null,
+            pendingVoterToken: null,
             selectedScores,
             voterName: 'Alice',
             voterIndex: 1,
             voterToken: 'voter-token',
+            isVotingInProgress: false,
+            progressMessage: reconnectingWorkflowMessage,
+            shouldResumeWorkflow: true,
+        });
+    });
+
+    it('keeps the pending voter token when registration is interrupted before a response arrives', async () => {
+        const store = createTestStore();
+
+        mockedCanRegister.mockReturnValue(true);
+        mockedFetchFreshPoll.mockResolvedValue({
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples'],
+            voters: [],
+            isOpen: true,
+            publicKeyShareCount: 0,
+            encryptedVoteCount: 0,
+            decryptionShareCount: 0,
+            commonPublicKey: null,
+            encryptedTallies: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
+        });
+        mockedRegisterVoterInitiate.mockReturnValue({
+            type: 'registerVoter',
+            unwrap: async () => {
+                throw new Error('TypeError: Failed to fetch');
+            },
+        });
+
+        await store.dispatch(
+            vote({
+                pollId: 'poll-1',
+                voterName: 'Alice',
+                selectedScores: { Apples: 7 },
+            }) as never,
+        );
+
+        expect(store.getState().voting['poll-1']).toEqual({
+            ...initialVoteState,
+            pendingVoterName: 'Alice',
+            pendingVoterToken: 'generated-voter-token',
+            selectedScores: { Apples: 7 },
             isVotingInProgress: false,
             progressMessage: reconnectingWorkflowMessage,
             shouldResumeWorkflow: true,

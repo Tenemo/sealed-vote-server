@@ -5,6 +5,8 @@ export const POLL_ROUTES = {
     poll: (pollRef: string): string => `${API_PREFIX}/polls/${pollRef}`,
     register: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/register`,
+    recoverSession: (pollId: string): string =>
+        `${API_PREFIX}/polls/${pollId}/recover-session`,
     close: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/close`,
     publicKeyShare: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/public-key-share`,

@@ -7,6 +7,7 @@ import { createPoll, deletePoll } from '../testUtils';
 
 describe('DELETE /polls/:pollId', () => {
     let fastify: FastifyInstance;
+    const wrongButValidCreatorToken = 'a'.repeat(64);
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -29,13 +30,12 @@ describe('DELETE /polls/:pollId', () => {
 
     test('should not delete a poll with incorrect creator token', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
-        const wrongCreatorToken = 'wrong-token';
 
         const invalidDeleteResponse = await fastify.inject({
             method: 'DELETE',
             url: `/api/polls/${pollId}`,
             payload: {
-                creatorToken: wrongCreatorToken,
+                creatorToken: wrongButValidCreatorToken,
             },
         });
 
@@ -44,6 +44,23 @@ describe('DELETE /polls/:pollId', () => {
             (JSON.parse(invalidDeleteResponse.body) as { message: string })
                 .message,
         ).toBe(ERROR_MESSAGES.invalidCreatorToken);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('should reject an invalid creator token format', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const invalidDeleteResponse = await fastify.inject({
+            method: 'DELETE',
+            url: `/api/polls/${pollId}`,
+            payload: {
+                creatorToken: 'short-token',
+            },
+        });
+
+        expect(invalidDeleteResponse.statusCode).toBe(400);
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

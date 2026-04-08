@@ -11,12 +11,16 @@ import { pollsApi, type PollResponse } from './pollsApi';
 import { selectVoteStateByPollId } from './votingState';
 
 import { type AppDispatch, type RootState } from 'app/store';
+import {
+    isConnectionError,
+    isConnectionErrorMessage,
+} from 'utils/networkErrors';
 
 type VotingWorkflowActionCreators = {
     setKeys: typeof import('./votingSlice').setKeys;
     setProgressMessage: typeof import('./votingSlice').setProgressMessage;
-    setResults: typeof import('./votingSlice').setResults;
     setSubmissionStatus: typeof import('./votingSlice').setSubmissionStatus;
+    upsertPollSnapshot: typeof import('./votingSlice').upsertPollSnapshot;
 };
 
 type VotingWorkflowContext = {
@@ -50,16 +54,18 @@ const getErrorMessage = (error: unknown): string => {
 
 const waitForPollPhase = async ({
     dispatch,
+    getState,
     pollId,
     predicate,
     signal,
 }: {
     dispatch: AppDispatch;
+    getState: () => RootState;
     pollId: string;
     predicate: (poll: PollResponse) => boolean;
     signal?: AbortSignal;
 }): Promise<PollResponse> =>
-    await waitForPoll({ dispatch, pollId, predicate, signal });
+    await waitForPoll({ dispatch, getState, pollId, predicate, signal });
 
 export const runProcessPublicPrivateKeys = async ({
     pollId,
@@ -74,12 +80,16 @@ export const runProcessPublicPrivateKeys = async ({
         const {
             privateKey: statePrivateKey,
             publicKey: statePublicKey,
-            commonPublicKey: stateCommonPublicKey,
+            pollSnapshot,
             hasSubmittedPublicKeyShare,
             voterToken,
         } = getVotingState(getState, pollId);
 
-        if (statePrivateKey && statePublicKey && stateCommonPublicKey) {
+        if (
+            statePrivateKey &&
+            statePublicKey &&
+            pollSnapshot?.commonPublicKey
+        ) {
             return;
         }
 
@@ -90,11 +100,16 @@ export const runProcessPublicPrivateKeys = async ({
             }),
         );
 
-        let poll = await fetchFreshPoll(dispatch, pollId);
+        let poll = await fetchFreshPoll({
+            dispatch,
+            getState,
+            pollId,
+        });
 
         if (derivePollPhase(poll) === 'registration') {
             poll = await waitForPollPhase({
                 dispatch,
+                getState,
                 pollId,
                 predicate: (currentPoll) =>
                     derivePollPhase(currentPoll) !== 'registration',
@@ -128,7 +143,6 @@ export const runProcessPublicPrivateKeys = async ({
                     pollId,
                     privateKey,
                     publicKey,
-                    commonPublicKey: stateCommonPublicKey,
                 }),
             );
         }
@@ -161,14 +175,7 @@ export const runProcessPublicPrivateKeys = async ({
         }
 
         if (poll.commonPublicKey) {
-            dispatch(
-                actions.setKeys({
-                    pollId,
-                    privateKey,
-                    publicKey,
-                    commonPublicKey: poll.commonPublicKey,
-                }),
-            );
+            dispatch(actions.upsertPollSnapshot({ pollId, poll }));
             return;
         }
 
@@ -181,22 +188,23 @@ export const runProcessPublicPrivateKeys = async ({
 
         const pollWithCommonKey = await waitForPollPhase({
             dispatch,
+            getState,
             pollId,
             predicate: (currentPoll) => Boolean(currentPoll.commonPublicKey),
             signal,
         });
 
         dispatch(
-            actions.setKeys({
-                pollId,
-                privateKey,
-                publicKey,
-                commonPublicKey: pollWithCommonKey.commonPublicKey,
-            }),
+            actions.upsertPollSnapshot({ pollId, poll: pollWithCommonKey }),
         );
     } catch (error) {
+        const message = getErrorMessage(error);
+        if (isConnectionError(error) || isConnectionErrorMessage(message)) {
+            throw error;
+        }
+
         throw new Error(
-            `Failed during public/private key processing: ${getErrorMessage(error)}`,
+            `Failed during public/private key processing: ${message}`,
         );
     }
 };
@@ -213,18 +221,24 @@ export const runEncryptVotesGenerateShares = async ({
     try {
         const {
             selectedScores,
-            commonPublicKey,
             privateKey,
             voterToken,
             hasSubmittedVote,
             hasSubmittedDecryptionShares,
         } = getVotingState(getState, pollId);
 
-        if (!selectedScores || !commonPublicKey || !privateKey || !voterToken) {
+        if (!selectedScores || !privateKey || !voterToken) {
             throw new Error('Selected scores missing.');
         }
 
-        const poll = await fetchFreshPoll(dispatch, pollId);
+        const poll = await fetchFreshPoll({
+            dispatch,
+            getState,
+            pollId,
+        });
+        if (!poll.commonPublicKey) {
+            throw new Error('Common public key is missing.');
+        }
 
         if (!hasSubmittedVote) {
             dispatch(
@@ -237,7 +251,7 @@ export const runEncryptVotesGenerateShares = async ({
             const encryptedVotes = serializeVotes(
                 selectedScores,
                 poll.choices,
-                BigInt(commonPublicKey),
+                BigInt(poll.commonPublicKey),
             );
 
             dispatch(
@@ -277,6 +291,7 @@ export const runEncryptVotesGenerateShares = async ({
             ? poll
             : await waitForPollPhase({
                   dispatch,
+                  getState,
                   pollId,
                   predicate: canSubmitDecryptionShares,
                   signal,
@@ -326,8 +341,13 @@ export const runEncryptVotesGenerateShares = async ({
             );
         }
     } catch (error) {
+        const message = getErrorMessage(error);
+        if (isConnectionError(error) || isConnectionErrorMessage(message)) {
+            throw error;
+        }
+
         throw new Error(
-            `Failed during vote encryption/decryption-share flow: ${getErrorMessage(error)}`,
+            `Failed during vote encryption/decryption-share flow: ${message}`,
         );
     }
 };
@@ -335,6 +355,7 @@ export const runEncryptVotesGenerateShares = async ({
 export const runDecryptResults = async ({
     pollId,
     dispatch,
+    getState,
     signal,
     actions,
 }: VotingWorkflowContext & {
@@ -351,21 +372,20 @@ export const runDecryptResults = async ({
 
         const poll = await waitForPollPhase({
             dispatch,
+            getState,
             pollId,
             predicate: (currentPoll) =>
                 derivePollPhase(currentPoll) === 'complete',
             signal,
         });
 
-        dispatch(
-            actions.setResults({
-                pollId,
-                results: poll.results,
-            }),
-        );
+        dispatch(actions.upsertPollSnapshot({ pollId, poll }));
     } catch (error) {
-        throw new Error(
-            `Failed during result decryption wait: ${getErrorMessage(error)}`,
-        );
+        const message = getErrorMessage(error);
+        if (isConnectionError(error) || isConnectionErrorMessage(message)) {
+            throw error;
+        }
+
+        throw new Error(`Failed during result decryption wait: ${message}`);
     }
 };

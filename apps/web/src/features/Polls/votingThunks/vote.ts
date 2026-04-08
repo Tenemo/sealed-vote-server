@@ -1,17 +1,18 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { canRegister } from '@sealed-vote/protocol';
 
+import { generateClientToken } from '../clientToken';
 import { fetchFreshPoll } from '../pollQuery';
 import { pollsApi } from '../pollsApi';
 import {
     clearWorkflowError,
     setKeys,
-    setPendingVoterName,
+    setPendingVoterRegistration,
     setProgressMessage,
-    setResults,
     setSelectedScores,
     setSubmissionStatus,
     setVoterSession,
+    upsertPollSnapshot,
     type VoteThunkRejectValue,
 } from '../votingSlice';
 import { selectVoteStateByPollId } from '../votingState';
@@ -25,9 +26,10 @@ import { voteThunkTypePrefix } from './voteTypes';
 
 import { type AppDispatch, type RootState } from 'app/store';
 import {
+    isConnectionError,
     isConnectionErrorMessage,
     reconnectingWorkflowMessage,
-} from 'utils/utils';
+} from 'utils/networkErrors';
 
 export type VoteThunkArg = {
     pollId: string;
@@ -38,8 +40,8 @@ export type VoteThunkArg = {
 const workflowActions = {
     setKeys,
     setProgressMessage,
-    setResults,
     setSubmissionStatus,
+    upsertPollSnapshot,
 };
 
 export const vote = createAsyncThunk<
@@ -65,10 +67,20 @@ export const vote = createAsyncThunk<
                 );
             }
 
+            const existingVoteState = selectVoteStateByPollId(
+                getState().voting,
+                pollId,
+            );
+            const pendingVoterToken =
+                existingVoteState.pendingVoterToken ??
+                existingVoteState.voterToken ??
+                generateClientToken();
+
             dispatch(clearWorkflowError({ pollId }));
             dispatch(
-                setPendingVoterName({
+                setPendingVoterRegistration({
                     pollId,
+                    pendingVoterToken,
                     voterName: normalizedVoterName,
                 }),
             );
@@ -82,12 +94,12 @@ export const vote = createAsyncThunk<
             const {
                 voterName: stateVoterName,
                 voterIndex: stateVoterIndex,
-                voterToken: stateVoterToken,
+                voterToken: confirmedVoterToken,
             } = selectVoteStateByPollId(getState().voting, pollId);
 
             if (
                 stateVoterIndex === null ||
-                !stateVoterToken ||
+                !confirmedVoterToken ||
                 !stateVoterName
             ) {
                 dispatch(
@@ -97,7 +109,11 @@ export const vote = createAsyncThunk<
                     }),
                 );
 
-                const poll = await fetchFreshPoll(dispatch, pollId);
+                const poll = await fetchFreshPoll({
+                    dispatch,
+                    getState,
+                    pollId,
+                });
 
                 if (!canRegister(poll)) {
                     throw new Error('Poll is closed for new registrations.');
@@ -108,6 +124,7 @@ export const vote = createAsyncThunk<
                         pollId,
                         voterData: {
                             voterName: normalizedVoterName,
+                            voterToken: pendingVoterToken,
                         },
                     }),
                 ).unwrap();
@@ -149,13 +166,17 @@ export const vote = createAsyncThunk<
             const message =
                 error instanceof Error
                     ? error.message
-                    : 'Unknown voting error.';
+                    : typeof error === 'string'
+                      ? error
+                      : 'Unknown voting error.';
+            const shouldResumeWorkflow =
+                isConnectionError(error) || isConnectionErrorMessage(message);
 
             return rejectWithValue({
-                message: isConnectionErrorMessage(message)
+                message: shouldResumeWorkflow
                     ? reconnectingWorkflowMessage
                     : message,
-                shouldResumeWorkflow: isConnectionErrorMessage(message),
+                shouldResumeWorkflow,
             });
         }
     },

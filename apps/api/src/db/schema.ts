@@ -4,6 +4,7 @@ import {
     boolean,
     char,
     check,
+    doublePrecision,
     foreignKey,
     integer,
     jsonb,
@@ -30,10 +31,14 @@ export const polls = pgTable(
             .$type<EncryptedMessage[]>()
             .notNull()
             .default(sql`'[]'::jsonb`),
-        results: integer('results')
+        resultTallies: text('result_tallies')
             .array()
             .notNull()
-            .default(sql`'{}'::integer[]`),
+            .default(sql`'{}'::text[]`),
+        resultScores: doublePrecision('result_scores')
+            .array()
+            .notNull()
+            .default(sql`'{}'::double precision[]`),
         createdAt: timestamp('created_at', {
             mode: 'date',
             withTimezone: false,
@@ -43,6 +48,7 @@ export const polls = pgTable(
     },
     (table) => [
         unique('unique_poll_slug').on(table.slug),
+        unique('unique_creator_token_hash').on(table.creatorTokenHash),
         check(
             'polls_max_participants_check',
             sql`${table.maxParticipants} >= 2`,

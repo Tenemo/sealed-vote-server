@@ -18,16 +18,20 @@ import { deletePoll } from './routes/delete.js';
 import { fetch } from './routes/fetch.js';
 import { healthCheck } from './routes/health-check.js';
 import { publicKeyShare } from './routes/publicKeyShare.js';
+import { recoverSession } from './routes/recoverSession.js';
 import { register } from './routes/register.js';
 import { vote } from './routes/vote.js';
 
 config();
 
-const logger = {
+const developmentLogger = {
     level: 'info',
     transport: {
         target: 'pino-pretty',
     },
+};
+const productionLogger = {
+    level: 'info',
 };
 
 const allowedProductionOrigins = new Set([
@@ -126,7 +130,16 @@ export const buildServer = async (
         isLoggingEnabled ?? process.env.NODE_ENV !== 'test';
     const configuredWebAppOrigin = getConfiguredWebAppOrigin();
     const fastify = Fastify({
-        logger: shouldEnableLogging ? logger : false,
+        ajv: {
+            customOptions: {
+                removeAdditional: false,
+            },
+        },
+        logger: shouldEnableLogging
+            ? process.env.NODE_ENV === 'development'
+                ? developmentLogger
+                : productionLogger
+            : false,
     });
     fastify.setErrorHandler((error, _request, reply) => {
         if (isPollIdValidationError(error)) {
@@ -157,7 +170,7 @@ export const buildServer = async (
             callback(null, isAllowedCorsOrigin(origin, configuredWebAppOrigin));
         },
         methods: ['GET', 'HEAD', 'POST', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'sentry-trace', 'baggage'],
+        allowedHeaders: ['Content-Type'],
         maxAge: 86_400,
     });
     await databasePlugin(fastify);
@@ -167,6 +180,7 @@ export const buildServer = async (
     await fastify.register(fetch, { prefix: '/api' });
     await fastify.register(deletePoll, { prefix: '/api' });
     await fastify.register(register, { prefix: '/api' });
+    await fastify.register(recoverSession, { prefix: '/api' });
     await fastify.register(close, { prefix: '/api' });
     await fastify.register(publicKeyShare, { prefix: '/api' });
     await fastify.register(decryptionShares, { prefix: '/api' });

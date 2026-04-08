@@ -36,8 +36,8 @@ vi.mock('./pollsApi', () => ({
 import {
     setKeys,
     setProgressMessage,
-    setResults,
     setSubmissionStatus,
+    upsertPollSnapshot,
 } from './votingSlice';
 import { initialVoteState } from './votingState';
 import type { VotingState } from './votingState';
@@ -49,7 +49,6 @@ const createVotingState = (
     'poll-1': {
         ...initialVoteState,
         selectedScores: { Apples: 7 },
-        commonPublicKey: '33',
         privateKey: '11',
         voterToken: 'voter-token',
         ...overrides,
@@ -73,8 +72,8 @@ describe('runEncryptVotesGenerateShares', () => {
         const actions = {
             setKeys,
             setProgressMessage,
-            setResults,
             setSubmissionStatus,
+            upsertPollSnapshot,
         };
 
         mockedFetchFreshPoll.mockResolvedValue({
@@ -90,7 +89,9 @@ describe('runEncryptVotesGenerateShares', () => {
             encryptedVoteCount: 0,
             encryptedTallies: [],
             decryptionShareCount: 0,
-            results: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
         });
         mockedWaitForPoll.mockResolvedValue({
             id: '11111111-1111-4111-8111-111111111111',
@@ -105,7 +106,9 @@ describe('runEncryptVotesGenerateShares', () => {
             encryptedVoteCount: 1,
             encryptedTallies: [{ c1: '9', c2: '8' }],
             decryptionShareCount: 0,
-            results: [],
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
         });
         mockedVoteInitiate.mockReturnValue({
             unwrap: async () => undefined,
@@ -124,7 +127,11 @@ describe('runEncryptVotesGenerateShares', () => {
             actions,
         });
 
-        expect(mockedFetchFreshPoll).toHaveBeenCalledWith(dispatch, 'poll-1');
+        expect(mockedFetchFreshPoll).toHaveBeenCalledWith({
+            dispatch,
+            getState: expect.any(Function),
+            pollId: 'poll-1',
+        });
         expect(mockedSerializeVotes).toHaveBeenCalledWith(
             { Apples: 7 },
             ['Apples'],

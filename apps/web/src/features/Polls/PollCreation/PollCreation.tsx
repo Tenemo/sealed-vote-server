@@ -10,8 +10,10 @@ import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { generateClientToken } from 'features/Polls/clientToken';
+import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
-import { renderError } from 'utils/utils';
+import { renderError } from 'utils/networkErrors';
 
 type Form = {
     pollName: string;
@@ -28,26 +30,33 @@ const PollCreationPage = (): React.JSX.Element => {
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
 
     const [form, setForm] = useState<Form>(initialForm);
+    const [creatorToken, setCreatorToken] = useState<string | null>(null);
     const { pollName, choices } = form;
 
     const onFormChange = ({
         target: { id, value },
-    }: ChangeEvent<HTMLInputElement>): void =>
+    }: ChangeEvent<HTMLInputElement>): void => {
+        setCreatorToken(null);
         setForm((previousForm) => ({ ...previousForm, [id]: value }));
+    };
 
-    const onAddChoice = (choice: string): void =>
+    const onAddChoice = (choice: string): void => {
+        setCreatorToken(null);
         setForm((prev) => ({
             ...prev,
             choices: [...prev.choices, choice],
         }));
+    };
 
-    const onRemoveChoice = (choice: string): void =>
+    const onRemoveChoice = (choice: string): void => {
+        setCreatorToken(null);
         setForm((prev) => ({
             ...prev,
             choices: prev.choices.filter(
                 (currentChoice) => currentChoice !== choice,
             ),
         }));
+    };
 
     const isFormValid = !!pollName.trim() && choices.length > 1;
 
@@ -58,20 +67,36 @@ const PollCreationPage = (): React.JSX.Element => {
             return;
         }
 
+        const nextCreatorToken = creatorToken ?? generateClientToken();
+        setCreatorToken(nextCreatorToken);
+
         void createPoll({
             pollName: form.pollName.trim(),
             choices: form.choices,
+            creatorToken: nextCreatorToken,
         })
             .unwrap()
-            .then(({ slug }) => {
+            .then(({ creatorToken: confirmedCreatorToken, id, slug }) => {
+                saveCreatorSession({
+                    creatorToken: confirmedCreatorToken,
+                    pollId: id,
+                    pollSlug: slug,
+                });
                 void navigate(`/votes/${slug}`);
-            });
+            })
+            .catch(() => undefined);
     };
 
     return (
         <>
             <Helmet>
-                <title>Vote creation</title>
+                <title>Create a new vote | sealed.vote</title>
+                <meta
+                    content="Create a confidential 1-10 score vote in the browser and share one link with every participant."
+                    name="description"
+                />
+                <meta content="index, follow" name="robots" />
+                <link href="https://sealed.vote/" rel="canonical" />
             </Helmet>
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">

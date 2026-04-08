@@ -7,24 +7,36 @@ import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppSelector } from 'app/hooks';
+import { hasPublishedResults } from 'features/Polls/pollData';
 import {
     useClosePollMutation,
     type PollResponse,
 } from 'features/Polls/pollsApi';
 import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
-import { renderError } from 'utils/utils';
+import { renderError } from 'utils/networkErrors';
 
 type PollHeaderProps = {
+    creatorToken: string | null;
     poll: PollResponse;
     pollId: string;
 };
 
-const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
-    const { creatorToken, progressMessage, results, workflowError } =
-        useAppSelector((state) => selectVotingStateByPollId(state, pollId));
+const formatPollCreationDate = (createdAt: string): string =>
+    createdAt.slice(0, 10);
+
+const PollHeader = ({
+    creatorToken,
+    poll,
+    pollId,
+}: PollHeaderProps): React.JSX.Element => {
+    const { progressMessage, workflowError } = useAppSelector((state) =>
+        selectVotingStateByPollId(state, pollId),
+    );
+    const hasResults = hasPublishedResults(poll);
 
     const [closePoll, { isLoading: isClosingPoll, error: closeError }] =
         useClosePollMutation();
+
     const onClosePoll = (): void => {
         if (!creatorToken) {
             return;
@@ -42,12 +54,15 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                     {poll.pollName}
                 </h1>
+                <p className="text-sm font-medium text-muted-foreground">
+                    Created {formatPollCreationDate(poll.createdAt)}
+                </p>
                 <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                     Share the link below with participants. Once everyone has
-                    voted, the results are ranked by geometric mean.
+                    voted, the results are ordered by geometric mean.
                 </p>
             </div>
-            <VoteSharing />
+            <VoteSharing pollTitle={poll.pollName} />
             {creatorToken && poll.isOpen && (
                 <Panel
                     asChild
@@ -87,7 +102,7 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
             <div className="space-y-3">
                 {progressMessage && (
                     <Alert aria-live="polite" role="status" variant="info">
-                        {!results && (
+                        {!hasResults && (
                             <Spinner
                                 aria-hidden="true"
                                 className="size-4"

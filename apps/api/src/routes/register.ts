@@ -7,19 +7,23 @@ import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
+import type { DatabaseTransaction } from '../db/client.js';
 import { voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import { countPollVoters, lockPollById } from '../utils/polls.js';
-import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
+import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import { hashSecureToken } from '../utils/voterAuth.js';
 
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const RegisterRequestSchema = Type.Object({
     voterName: Type.String({ minLength: 1, maxLength: 32 }),
+    voterToken: SecureTokenSchema,
 });
 
 const RegisterResponseSchema = Type.Object({
@@ -44,6 +48,33 @@ const schema = {
 export type RegisterRequest = RegisterVoterRequestContract;
 export type RegisterResponse = RegisterVoterResponseContract;
 
+const getExistingRegistration = async ({
+    pollId,
+    tx,
+    voterTokenHash,
+}: {
+    pollId: string;
+    tx: DatabaseTransaction;
+    voterTokenHash: string;
+}): Promise<
+    | {
+          voterIndex: number;
+          voterName: string;
+      }
+    | undefined
+> =>
+    await tx.query.voters.findFirst({
+        where: (fields, { and: andOperator, eq: isEqual }) =>
+            andOperator(
+                isEqual(fields.pollId, pollId),
+                isEqual(fields.voterTokenHash, voterTokenHash),
+            ),
+        columns: {
+            voterIndex: true,
+            voterName: true,
+        },
+    });
+
 export const register = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
         '/polls/:pollId/register',
@@ -57,13 +88,13 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
         ): Promise<RegisterResponse> => {
             try {
                 const voterName = req.body.voterName.trim();
+                const { voterToken } = req.body;
                 const { pollId } = req.params;
 
                 if (!voterName) {
                     throw createError(400, 'Voter name is required.');
                 }
 
-                const voterToken = generateSecureToken();
                 const voterTokenHash = hashSecureToken(voterToken);
 
                 const response = await withTransaction(fastify, async (tx) => {
@@ -73,6 +104,29 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                             404,
                             `Poll with ID ${pollId} does not exist.`,
                         );
+                    }
+
+                    const existingRegistration = await getExistingRegistration({
+                        pollId,
+                        tx,
+                        voterTokenHash,
+                    });
+
+                    if (existingRegistration) {
+                        if (existingRegistration.voterName !== voterName) {
+                            throw createError(
+                                409,
+                                ERROR_MESSAGES.voterTokenConflict,
+                            );
+                        }
+
+                        return {
+                            message: 'Voter registered successfully',
+                            voterIndex: existingRegistration.voterIndex,
+                            voterName,
+                            pollId,
+                            voterToken,
+                        } satisfies RegisterResponse;
                     }
 
                     if (!poll.isOpen) {
@@ -106,12 +160,63 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                 });
 
                 void reply.code(201);
+                void maybeDropTestResponseAfterCommit({
+                    reply,
+                    request: req,
+                });
                 return response;
             } catch (error) {
                 if (
                     isConstraintViolation(error, 'unique_voter_name_per_poll')
                 ) {
                     throw createError(409, ERROR_MESSAGES.duplicateVoterName);
+                }
+
+                if (
+                    isConstraintViolation(
+                        error,
+                        'unique_voter_token_hash_per_poll',
+                    )
+                ) {
+                    const voterTokenHash = hashSecureToken(req.body.voterToken);
+                    const existingRegistration =
+                        await fastify.db.query.voters.findFirst({
+                            where: (
+                                fields,
+                                { and: andOperator, eq: isEqual },
+                            ) =>
+                                andOperator(
+                                    isEqual(fields.pollId, req.params.pollId),
+                                    isEqual(
+                                        fields.voterTokenHash,
+                                        voterTokenHash,
+                                    ),
+                                ),
+                            columns: {
+                                voterIndex: true,
+                                voterName: true,
+                            },
+                        });
+
+                    if (
+                        existingRegistration?.voterName ===
+                        req.body.voterName.trim()
+                    ) {
+                        void reply.code(201);
+                        void maybeDropTestResponseAfterCommit({
+                            reply,
+                            request: req,
+                        });
+                        return {
+                            message: 'Voter registered successfully',
+                            voterIndex: existingRegistration.voterIndex,
+                            voterName: existingRegistration.voterName,
+                            pollId: req.params.pollId,
+                            voterToken: req.body.voterToken,
+                        };
+                    }
+
+                    throw createError(409, ERROR_MESSAGES.voterTokenConflict);
                 }
 
                 throw error;

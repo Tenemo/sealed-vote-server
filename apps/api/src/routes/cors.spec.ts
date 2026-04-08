@@ -108,8 +108,7 @@ describe('CORS configuration', () => {
             headers: {
                 origin: 'https://www.sealed.vote',
                 'access-control-request-method': 'POST',
-                'access-control-request-headers':
-                    'content-type,sentry-trace,baggage',
+                'access-control-request-headers': 'content-type',
             },
         });
 
@@ -123,12 +122,6 @@ describe('CORS configuration', () => {
         expect(
             response.headers['access-control-allow-headers']?.toLowerCase(),
         ).toContain('content-type');
-        expect(
-            response.headers['access-control-allow-headers']?.toLowerCase(),
-        ).toContain('sentry-trace');
-        expect(
-            response.headers['access-control-allow-headers']?.toLowerCase(),
-        ).toContain('baggage');
     });
 
     test('handles deploy preview preflight requests', async () => {

@@ -2,8 +2,8 @@ import type { EncryptedMessage } from './vote.js';
 
 export type CreatePollRequest = {
     choices: string[];
+    creatorToken: string;
     pollName: string;
-    maxParticipants?: number;
 };
 
 export type CreatePollResponse = {
@@ -25,11 +25,14 @@ export type PollResponse = {
     decryptionShareCount: number;
     commonPublicKey: string | null;
     encryptedTallies: EncryptedMessage[];
-    results: number[];
+    publishedDecryptionShares: string[][];
+    resultTallies: string[];
+    resultScores: number[];
 };
 
 export type RegisterVoterRequest = {
     voterName: string;
+    voterToken: string;
 };
 
 export type RegisterVoterResponse = {
@@ -42,4 +45,34 @@ export type RegisterVoterResponse = {
 
 export type ClosePollRequest = {
     creatorToken: string;
+};
+
+export type RecoverSessionRequest =
+    | {
+          creatorToken: string;
+          voterToken?: never;
+      }
+    | {
+          creatorToken?: never;
+          voterToken: string;
+      };
+
+export type RecoverSessionResponse = {
+    role: 'creator' | 'voter';
+    pollId: string;
+    pollSlug: string;
+    phase:
+        | 'registration'
+        | 'key-generation'
+        | 'voting'
+        | 'tallying'
+        | 'decryption'
+        | 'complete';
+    isOpen: boolean;
+    voterName: string | null;
+    voterIndex: number | null;
+    hasSubmittedPublicKeyShare: boolean;
+    hasSubmittedVote: boolean;
+    hasSubmittedDecryptionShares: boolean;
+    resultsAvailable: boolean;
 };

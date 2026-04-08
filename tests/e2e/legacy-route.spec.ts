@@ -5,7 +5,7 @@ import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/monitoring';
+} from './support/errorTracking';
 
 test('rejects legacy uuid vote routes in the browser', async ({ page }) => {
     const tracker = createUnexpectedErrorTracker();

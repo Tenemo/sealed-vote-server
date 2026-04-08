@@ -14,7 +14,7 @@ import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/monitoring';
+} from './support/errorTracking';
 import {
     createPollName,
     createTestNamespace,

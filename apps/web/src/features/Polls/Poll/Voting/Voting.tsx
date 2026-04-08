@@ -96,9 +96,9 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                         Cast your vote
                     </h2>
                     <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                        Rate choices from 1 to 10. The results will be ranked by
-                        geometric mean of all votes per item. All voters need to
-                        be present in order to complete the vote.
+                        Rate choices from 1 to 10. The results will be ordered
+                        by geometric mean of all votes per item. All voters need
+                        to be present in order to complete the vote.
                     </p>
                 </div>
                 <ul className="space-y-4">

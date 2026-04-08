@@ -8,7 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 const renderVoteSharing = (): void => {
     render(
         <TooltipProvider>
-            <VoteSharing />
+            <VoteSharing pollTitle="Best fruit" />
         </TooltipProvider>,
     );
 };
@@ -35,6 +35,10 @@ describe('VoteSharing', () => {
             value: {
                 writeText: vi.fn().mockResolvedValue(undefined),
             },
+        });
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            value: vi.fn().mockResolvedValue(undefined),
         });
     });
 
@@ -73,5 +77,28 @@ describe('VoteSharing', () => {
                 'Copy failed. Please copy the link manually.',
             ),
         ).toBeInTheDocument();
+    });
+
+    it('shares the vote link with the poll title when the share api is available', async () => {
+        const user = userEvent.setup();
+        const shareSpy = vi.fn().mockResolvedValue(undefined);
+
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            value: shareSpy,
+        });
+
+        renderVoteSharing();
+
+        await user.click(
+            screen.getByRole('button', { name: 'Share vote link' }),
+        );
+
+        expect(shareSpy).toHaveBeenCalledWith({
+            title: 'Best fruit',
+            text: 'Best fruit',
+            url: window.location.href,
+        });
+        expect(screen.getByText('Vote link shared.')).toBeInTheDocument();
     });
 });

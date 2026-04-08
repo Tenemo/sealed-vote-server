@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { isUuid } from '@sealed-vote/contracts';
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
@@ -13,54 +13,35 @@ import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import NotFound from 'components/NotFound/NotFound';
+import {
+    findCreatorSessionByPollId,
+    findCreatorSessionByPollSlug,
+    removeCreatorSession,
+    saveCreatorSession,
+} from 'features/Polls/creatorSessionStorage';
+import {
+    hasPublishedResults,
+    normalizePollResponse,
+} from 'features/Polls/pollData';
+import { pollPollingIntervalMs } from 'features/Polls/pollQuery';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
 import {
-    getResumableVoterName,
-    hasPendingVotingIntent,
-    hasResumableVotingSession,
-    initialVoteState,
-    selectVoteStateByPollId,
-} from 'features/Polls/votingState';
+    restoreCreatorSession,
+    selectVotingStateByPollId,
+} from 'features/Polls/votingSlice';
+import { selectVoteStateByPollSlug } from 'features/Polls/votingState';
 import { vote } from 'features/Polls/votingThunks/vote';
 import {
     connectionLostMessage,
     isConnectionError,
     renderError,
-} from 'utils/utils';
+} from 'utils/networkErrors';
 
 const isNotFoundError = (error: unknown): boolean =>
     !!error &&
     typeof error === 'object' &&
     'status' in error &&
     error.status === 404;
-
-const defaultPollPollingIntervalMs = 5000;
-const minimumPollPollingIntervalMs = 250;
-
-const resolvePollPollingIntervalMs = (rawValue: string | undefined): number => {
-    if (!rawValue) {
-        return defaultPollPollingIntervalMs;
-    }
-
-    const parsedValue = Number(rawValue);
-
-    if (
-        !Number.isFinite(parsedValue) ||
-        !Number.isInteger(parsedValue) ||
-        parsedValue < minimumPollPollingIntervalMs
-    ) {
-        return defaultPollPollingIntervalMs;
-    }
-
-    return parsedValue;
-};
-
-const pollPollingIntervalMs = resolvePollPollingIntervalMs(
-    import.meta.env.VITE_POLLING_INTERVAL_MS,
-);
-
-const getBrowserOnlineState = (): boolean =>
-    typeof navigator === 'undefined' ? true : navigator.onLine;
 
 const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
@@ -71,14 +52,8 @@ const PollPage = (): React.JSX.Element => {
         throw new Error('Poll slug missing.');
     }
     const isLegacyPollLink = isUuid(pollSlug);
-    const hasResumedVotingRef = useRef(false);
-    const shouldResumeOnResolvedPollRef = useRef(false);
-    const resolvedPollIdRef = useRef<string | null>(null);
     const [activePollingIntervalMs, setActivePollingIntervalMs] = useState(
         pollPollingIntervalMs,
-    );
-    const [isBrowserOnline, setIsBrowserOnline] = useState(
-        getBrowserOnlineState,
     );
     // Voting can advance in another tab or window, so background polling
     // must continue until the workflow reaches results.
@@ -91,12 +66,31 @@ const PollPage = (): React.JSX.Element => {
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
-    const pollId = poll?.id ?? null;
     const votingState = useAppSelector((state) =>
-        pollId
-            ? selectVoteStateByPollId(state.voting, pollId)
-            : initialVoteState,
+        selectVoteStateByPollSlug(state.voting, pollSlug),
     );
+    const effectivePoll = normalizePollResponse(
+        poll ?? votingState.pollSnapshot,
+    );
+    const pollId = effectivePoll?.id ?? null;
+    const hasResults = hasPublishedResults(effectivePoll);
+    const currentVoteState = useAppSelector((state) =>
+        pollId ? selectVotingStateByPollId(state, pollId) : votingState,
+    );
+    const fallbackCreatorSession = React.useMemo(() => {
+        if (!effectivePoll || hasResults || currentVoteState.creatorToken) {
+            return null;
+        }
+
+        return (
+            findCreatorSessionByPollId(effectivePoll.id) ??
+            findCreatorSessionByPollSlug(effectivePoll.slug)
+        );
+    }, [currentVoteState.creatorToken, effectivePoll, hasResults]);
+    const effectiveCreatorToken =
+        currentVoteState.creatorToken ??
+        fallbackCreatorSession?.creatorToken ??
+        null;
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -114,92 +108,55 @@ const PollPage = (): React.JSX.Element => {
         );
     };
 
-    useLayoutEffect(() => {
-        if (!pollId || resolvedPollIdRef.current === pollId) {
-            return;
-        }
-
-        resolvedPollIdRef.current = pollId;
-        shouldResumeOnResolvedPollRef.current =
-            hasResumableVotingSession(votingState);
-        hasResumedVotingRef.current = false;
-    }, [pollId, votingState]);
-
     useEffect(() => {
-        if (!pollId) {
-            return;
-        }
-
-        if (
-            !hasResumedVotingRef.current &&
-            shouldResumeOnResolvedPollRef.current &&
-            hasResumableVotingSession(votingState)
-        ) {
-            hasResumedVotingRef.current = true;
-            void dispatch(
-                vote({
-                    pollId,
-                    voterName: votingState.voterName!,
-                    selectedScores: votingState.selectedScores!,
-                }),
-            );
-        }
-    }, [dispatch, pollId, votingState]);
-
-    useEffect(() => {
-        const handleOnline = (): void => {
-            setIsBrowserOnline(true);
-        };
-        const handleOffline = (): void => {
-            setIsBrowserOnline(false);
-        };
-
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
-
-    useEffect(() => {
-        const hasResults =
-            !!poll?.results.length || !!votingState.results?.length;
-
         setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
-    }, [poll?.results.length, votingState.results]);
+    }, [hasResults]);
 
     useEffect(() => {
-        if (
-            !pollId ||
-            !isBrowserOnline ||
-            votingState.isVotingInProgress ||
-            !votingState.shouldResumeWorkflow ||
-            !hasPendingVotingIntent(votingState)
-        ) {
+        if (!effectivePoll) {
             return;
         }
 
-        const resumableVoterName = getResumableVoterName(votingState);
-        if (!resumableVoterName || !votingState.selectedScores) {
+        if (hasResults) {
+            removeCreatorSession(effectivePoll.id);
             return;
         }
 
-        void dispatch(
-            vote({
-                pollId,
-                voterName: resumableVoterName,
-                selectedScores: votingState.selectedScores,
+        if (currentVoteState.creatorToken) {
+            saveCreatorSession({
+                creatorToken: currentVoteState.creatorToken,
+                pollId: effectivePoll.id,
+                pollSlug: effectivePoll.slug,
+            });
+            return;
+        }
+
+        if (!fallbackCreatorSession) {
+            return;
+        }
+
+        dispatch(
+            restoreCreatorSession({
+                creatorToken: fallbackCreatorSession.creatorToken,
+                pollId: effectivePoll.id,
+                pollSlug: effectivePoll.slug,
             }),
         );
-    }, [dispatch, isBrowserOnline, pollId, votingState]);
+    }, [
+        currentVoteState.creatorToken,
+        dispatch,
+        effectivePoll,
+        effectivePoll?.id,
+        effectivePoll?.slug,
+        fallbackCreatorSession,
+        hasResults,
+    ]);
 
     if (isLegacyPollLink || isNotFoundError(pollError)) {
         return <NotFound />;
     }
 
-    const hasPollData = !!pollId && !!poll;
+    const hasPollData = !!pollId && !!effectivePoll;
     const hasConnectionError = isConnectionError(pollError);
     const shouldShowConnectionToast = hasPollData && hasConnectionError;
     const shouldShowConnectionState =
@@ -209,7 +166,16 @@ const PollPage = (): React.JSX.Element => {
     return (
         <>
             <Helmet>
-                <title>{poll ? poll.pollName : 'Vote'}</title>
+                <title>
+                    {effectivePoll
+                        ? `${effectivePoll.pollName} | sealed.vote`
+                        : 'Vote | sealed.vote'}
+                </title>
+                <meta
+                    content="Confidential participant vote page on sealed.vote."
+                    name="description"
+                />
+                <meta content="noindex, nofollow, noarchive" name="robots" />
             </Helmet>
             {isLoadingPoll && !hasPollData && (
                 <div className="flex min-h-[40vh] items-center justify-center">
@@ -259,11 +225,19 @@ const PollPage = (): React.JSX.Element => {
                     </AlertDescription>
                 </Alert>
             )}
-            {pollId && poll && (
+            {pollId && effectivePoll && (
                 <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-                    <PollHeader poll={poll} pollId={pollId} />
-                    <Voting onVote={onVote} poll={poll} pollId={pollId} />
-                    <VoteResults poll={poll} pollId={pollId} />
+                    <PollHeader
+                        creatorToken={effectiveCreatorToken}
+                        poll={effectivePoll}
+                        pollId={pollId}
+                    />
+                    <Voting
+                        onVote={onVote}
+                        poll={effectivePoll}
+                        pollId={pollId}
+                    />
+                    <VoteResults poll={effectivePoll} pollId={pollId} />
                     <Panel
                         aria-labelledby={participantsHeadingId}
                         padding="compact"
@@ -275,9 +249,9 @@ const PollPage = (): React.JSX.Element => {
                         >
                             Participants
                         </h2>
-                        {poll.voters.length ? (
+                        {effectivePoll.voters.length ? (
                             <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {poll.voters.map((voterName) => (
+                                {effectivePoll.voters.map((voterName) => (
                                     <Panel
                                         asChild
                                         className="min-w-0 break-words text-sm leading-6 text-foreground"

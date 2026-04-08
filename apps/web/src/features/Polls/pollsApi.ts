@@ -7,6 +7,8 @@ import {
     type DecryptionSharesRequest,
     type PollResponse,
     type PublicKeyShareRequest,
+    type RecoverSessionRequest,
+    type RecoverSessionResponse,
     type RegisterVoterRequest,
     type RegisterVoterResponse,
     type VoteRequest,
@@ -14,6 +16,7 @@ import {
 } from '@sealed-vote/contracts';
 
 import { apiBaseUrl } from 'app/apiConfig';
+import { normalizePollResponse } from 'features/Polls/pollData';
 
 export const pollsApi = createApi({
     reducerPath: 'polls',
@@ -35,6 +38,8 @@ export const pollsApi = createApi({
                 url: POLL_ROUTES.poll(pollRef),
                 method: 'GET',
             }),
+            transformResponse: (response: PollResponse) =>
+                normalizePollResponse(response)!,
             providesTags: (result) =>
                 result ? [{ type: 'Poll', id: result.id }] : [],
         }),
@@ -50,6 +55,16 @@ export const pollsApi = createApi({
             invalidatesTags: (_result, _error, { pollId }) => [
                 { type: 'Poll', id: pollId },
             ],
+        }),
+        recoverSession: build.mutation<
+            RecoverSessionResponse,
+            { pollId: string; recoveryData: RecoverSessionRequest }
+        >({
+            query: ({ pollId, recoveryData }) => ({
+                url: POLL_ROUTES.recoverSession(pollId),
+                method: 'POST',
+                body: recoveryData,
+            }),
         }),
         closePoll: build.mutation<
             void,
@@ -109,12 +124,5 @@ export const pollsApi = createApi({
 
 export type { PollResponse, RegisterVoterResponse };
 
-export const {
-    useCreatePollMutation,
-    useGetPollQuery,
-    useRegisterVoterMutation,
-    useClosePollMutation,
-    useSubmitPublicKeyShareMutation,
-    useVoteMutation,
-    useSubmitDecryptionSharesMutation,
-} = pollsApi;
+export const { useCreatePollMutation, useGetPollQuery, useClosePollMutation } =
+    pollsApi;

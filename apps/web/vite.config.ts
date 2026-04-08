@@ -54,10 +54,6 @@ const getManualChunk = (id: string): string | undefined => {
         return 'state';
     }
 
-    if (normalizedId.includes('/node_modules/@sentry/')) {
-        return 'sentry';
-    }
-
     if (normalizedId.includes('/node_modules/')) {
         return 'vendor';
     }

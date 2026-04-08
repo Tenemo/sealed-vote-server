@@ -1,23 +1,47 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background-color: #121212; color-scheme: dark">
     <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="author" content="piotr@piech.dev" />
+        <meta name="apple-mobile-web-app-title" content="sealed.vote" />
+        <meta name="color-scheme" content="dark" />
         <meta
             name="description"
-            content="A browser-based application relying on homomorphic encryption allowing for ranked-choice voting with ranking choices from 1 to 10 in a way such that nobody, including the server, can know what the individual choices were. Only the result is publicly known."
+            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
         />
+        <meta name="format-detection" content="telephone=no" />
+        <meta
+            name="keywords"
+            content="confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery"
+        />
+        <meta name="robots" content="index, follow" />
+        <meta name="theme-color" content="#121212" />
+        <meta property="og:site_name" content="sealed.vote" />
         <meta property="og:title" content="sealed.vote" />
         <meta
             property="og:description"
-            content="A browser-based application relying on homomorphic encryption allowing for ranked-choice voting with ranking choices from 1 to 10 in a way such that nobody, including the server, can know what the individual choices were."
+            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
         />
-        <meta property="og:url" content="https://sealed.vote" />
+        <meta property="og:image" content="https://sealed.vote/social/og-home.png" />
+        <meta property="og:image:alt" content="sealed.vote shown on a dark interface with a vote creation form." />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://sealed.vote/" />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta
-            name="keywords"
-            content="cryptography, encryption, homomorphic-encryption, secure-computation, threshold-cryptography, elgamal, elgamal-encryption, ranked-choice voting"
+            name="twitter:description"
+            content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
         />
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="twitter:image" content="https://sealed.vote/social/og-home.png" />
+        <meta
+            name="twitter:image:alt"
+            content="sealed.vote shown on a dark interface with a vote creation form."
+        />
+        <meta name="twitter:title" content="sealed.vote" />
+        <link rel="canonical" href="https://sealed.vote/" />
         <link
             rel="icon"
             type="image/png"
@@ -31,19 +55,40 @@
             sizes="180x180"
             href="/favicon/apple-touch-icon.png"
         />
-        <meta name="apple-mobile-web-app-title" content="sealed.vote" />
         <link rel="manifest" href="/favicon/site.webmanifest" />
         <title>sealed.vote</title>
-        <script>
-            if (window.MSCompatibleInfo) {
-                const error =
-                    'Internet Explorer is not supported. Please use a modern browser instead.';
-                document.querySelector('html').innerHTML = error;
-                throw new Error(error);
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@graph": [
+                    {
+                        "@type": "WebSite",
+                        "@id": "https://sealed.vote/#website",
+                        "url": "https://sealed.vote/",
+                        "name": "sealed.vote",
+                        "description": "Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result.",
+                        "inLanguage": "en"
+                    },
+                    {
+                        "@type": "WebApplication",
+                        "@id": "https://sealed.vote/#webapp",
+                        "applicationCategory": "SecurityApplication",
+                        "browserRequirements": "JavaScript required",
+                        "description": "Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result.",
+                        "image": "https://sealed.vote/social/og-home.png",
+                        "isPartOf": {
+                            "@id": "https://sealed.vote/#website"
+                        },
+                        "name": "sealed.vote",
+                        "operatingSystem": "Any",
+                        "url": "https://sealed.vote/"
+                    }
+                ]
             }
         </script>
+        <script defer src="/browser-guard.js"></script>
     </head>
-    <body>
+    <body style="background-color: #121212; color: #ffffff">
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
         <script type="module" src="/src/main.tsx"></script>

@@ -28,7 +28,41 @@ describe('crypto helpers', () => {
             createDecryptionSharesForTallies(tallies, voter2.privateKey),
         ];
 
-        expect(decryptTallies(tallies, shares)).toEqual([27, 8]);
+        expect(decryptTallies(tallies, shares)).toEqual([27n, 8n]);
+    });
+
+    test('decrypts tallies above Number.MAX_SAFE_INTEGER without precision loss', () => {
+        const voter1 = generateKeys(1, 2);
+        const voter2 = generateKeys(2, 2);
+        const commonPublicKey = combinePublicKeys([
+            voter1.publicKey,
+            voter2.publicKey,
+        ]);
+
+        const votes = [
+            serializeVotes(
+                {
+                    Huge: 9007199254740991,
+                },
+                ['Huge'],
+                commonPublicKey,
+            ),
+            serializeVotes(
+                {
+                    Huge: 10,
+                },
+                ['Huge'],
+                commonPublicKey,
+            ),
+        ];
+
+        const tallies = computeEncryptedTallies(votes);
+        const shares = [
+            createDecryptionSharesForTallies(tallies, voter1.privateKey),
+            createDecryptionSharesForTallies(tallies, voter2.privateKey),
+        ];
+
+        expect(decryptTallies(tallies, shares)).toEqual([90071992547409910n]);
     });
 
     test('throws when a score is missing for one of the choices', () => {
