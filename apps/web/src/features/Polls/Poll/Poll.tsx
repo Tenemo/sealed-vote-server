@@ -101,7 +101,6 @@ const PollPage = (): React.JSX.Element => {
         pollSlug: effectivePoll?.slug ?? pollSlug,
         pollTitle: effectivePoll?.pollName,
         resultScores: effectivePoll?.resultScores,
-        resultTallies: effectivePoll?.resultTallies,
     });
     const onVote = (
         newVoterName: string,

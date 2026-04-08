@@ -8,18 +8,19 @@ export const siteAuthor = 'piotr@piech.dev';
 export const siteOrigin = 'https://sealed.vote';
 export const siteThemeColor = '#121212';
 export const siteLocale = 'en_US';
+export const defaultSeoTitle = `${siteName} | 1-10 score voting app`;
 export const defaultKeywords =
     'confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification';
 export const socialImagePath = '/social/og-home.png';
 export const socialImageAlt =
-    'sealed.vote homepage showing the vote creation interface.';
+    'Screenshot of the sealed.vote app showing a 1-10 score vote ready to share.';
 export const voteSocialImagePathPrefix = '/social/votes/';
 export const socialImageWidth = 1200;
 export const socialImageHeight = 630;
 export const homePageDescription =
-    'Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result.';
-export const votePageFallbackDescription =
-    'Confidential participant vote page on sealed.vote.';
+    'Create and share 1-10 score votes, collect responses, and reveal results when you are ready.';
+export const votePageFallbackDescription = 'Vote - score options from 1 to 10.';
+export const voteResultsFallbackDescription = 'Voting results on sealed.vote.';
 
 type StructuredData = Record<string, unknown>;
 
@@ -46,95 +47,42 @@ export type SeoMetadata = {
     url: string;
 };
 
-const normalizeVoteSocialImageVersion = (
-    imageVersion: string | null | undefined,
-): string | null => {
-    const normalizedImageVersion = imageVersion?.trim() || null;
-
-    return normalizedImageVersion ? normalizedImageVersion : null;
-};
-
-const hashVoteSocialImageVersion = (value: string): string => {
-    let hash = 0x811c9dc5;
-
-    for (let index = 0; index < value.length; index += 1) {
-        hash ^= value.charCodeAt(index);
-        hash = Math.imul(hash, 0x01000193);
-    }
-
-    return (hash >>> 0).toString(36);
-};
-
-const normalizeVoteSocialImageScores = (value: unknown): number[] =>
-    Array.isArray(value)
-        ? value.filter(
-              (score): score is number =>
-                  typeof score === 'number' && Number.isFinite(score),
-          )
-        : [];
-
-const normalizeVoteSocialImageTallies = (value: unknown): string[] =>
-    Array.isArray(value)
-        ? value.filter(
-              (tally): tally is string =>
-                  typeof tally === 'string' && tally.trim().length > 0,
-          )
-        : [];
-
-export const createVoteSocialImageVersion = ({
-    resultScores,
-    resultTallies,
-}: {
-    resultScores?: unknown;
-    resultTallies?: unknown;
-}): string | null => {
-    const normalizedTallies = normalizeVoteSocialImageTallies(resultTallies);
-
-    if (normalizedTallies.length > 0) {
-        return `results-${hashVoteSocialImageVersion(
-            `t:${normalizedTallies.join('|')}`,
-        )}`;
-    }
-
-    const normalizedScores = normalizeVoteSocialImageScores(resultScores);
-
-    if (normalizedScores.length === 0) {
-        return null;
-    }
-
-    return `results-${hashVoteSocialImageVersion(
-        `s:${normalizedScores.map((score) => score.toFixed(6)).join('|')}`,
-    )}`;
-};
+const hasPublishedResults = (value: unknown): boolean =>
+    Array.isArray(value) &&
+    value.some((score) => typeof score === 'number' && Number.isFinite(score));
 
 export const createVoteSocialImagePath = (
     pollSlug: string,
-    imageVersion?: string | null,
+    options: {
+        isComplete?: boolean;
+    } = {},
 ): string => {
     const pathname = `${voteSocialImagePathPrefix}${encodeURIComponent(pollSlug)}.png`;
-    const normalizedImageVersion =
-        normalizeVoteSocialImageVersion(imageVersion);
 
-    if (!normalizedImageVersion) {
+    if (!options.isComplete) {
         return pathname;
     }
 
-    return `${pathname}?v=${encodeURIComponent(normalizedImageVersion)}`;
+    return `${pathname}?v=complete`;
 };
 
 export const createVoteSocialImageAlt = (
     pollTitle: string | null | undefined,
-    isComplete?: boolean,
+    options: {
+        isComplete?: boolean;
+    } = {},
 ): string => {
     const normalizedPollTitle = pollTitle?.trim() || null;
 
     if (!normalizedPollTitle) {
-        return socialImageAlt;
+        return options.isComplete
+            ? 'Final results preview on sealed.vote.'
+            : 'Preview image on sealed.vote.';
     }
 
-    return isComplete
-        ? `Results image for "${normalizedPollTitle}" on sealed.vote.`
-        : `Preview image for "${normalizedPollTitle}" on sealed.vote.`;
+    return options.isComplete
+        ? `Final results preview for ${normalizedPollTitle} on sealed.vote.`
+        : `Preview image for ${normalizedPollTitle} on sealed.vote.`;
 };
 
 const normalizeOrigin = (origin: string | undefined): string => {
@@ -272,12 +220,14 @@ const buildStructuredData = (
 const createVotePageImageUrl = (
     origin: string,
     pollSlug: string | null,
-    imageVersion: string | null,
+    isComplete: boolean,
 ): string =>
     pollSlug
         ? createAbsoluteUrl(
               origin,
-              createVoteSocialImagePath(pollSlug, imageVersion),
+              createVoteSocialImagePath(pollSlug, {
+                  isComplete,
+              }),
           )
         : createAbsoluteUrl(origin, socialImagePath);
 
@@ -290,6 +240,7 @@ export const buildHomePageSeo = ({
 } = {}): SeoMetadata => {
     const normalizedOrigin = normalizeOrigin(origin);
     const url = createAbsoluteUrl(normalizedOrigin, pathname);
+    const imageUrl = createAbsoluteUrl(normalizedOrigin, socialImagePath);
 
     return {
         canonicalUrl: url,
@@ -297,7 +248,7 @@ export const buildHomePageSeo = ({
         imageAlt: socialImageAlt,
         imageHeight: socialImageHeight,
         imageType: 'image/png',
-        imageUrl: createAbsoluteUrl(normalizedOrigin, socialImagePath),
+        imageUrl,
         imageWidth: socialImageWidth,
         keywords: defaultKeywords,
         robots: 'index, follow',
@@ -309,24 +260,34 @@ export const buildHomePageSeo = ({
                 alt: socialImageAlt,
                 height: socialImageHeight,
                 type: 'image/png',
-                url: createAbsoluteUrl(normalizedOrigin, socialImagePath),
+                url: imageUrl,
                 width: socialImageWidth,
             },
-            siteName,
+            defaultSeoTitle,
         ),
-        title: siteName,
+        title: defaultSeoTitle,
         url,
     };
 };
 
-const createVotePageDescription = (pollTitle: string | null): string => {
+const createVotePageDescription = ({
+    isComplete,
+    pollTitle,
+}: {
+    isComplete: boolean;
+    pollTitle: string | null;
+}): string => {
     const normalizedPollTitle = pollTitle?.trim() || null;
 
     if (!normalizedPollTitle) {
-        return votePageFallbackDescription;
+        return isComplete
+            ? voteResultsFallbackDescription
+            : votePageFallbackDescription;
     }
 
-    return `Join the confidential vote "${normalizedPollTitle}" on sealed.vote. Score each choice from 1 to 10 in the browser with homomorphic encryption and public verification.`;
+    return isComplete
+        ? `Voting results for ${normalizedPollTitle}`
+        : `${normalizedPollTitle} - score options from 1 to 10.`;
 };
 
 export const buildVotePageSeo = ({
@@ -334,37 +295,36 @@ export const buildVotePageSeo = ({
     pollPath,
     pollSlug,
     resultScores,
-    resultTallies,
     pollTitle,
 }: {
     origin?: string;
     pollPath: string;
     pollSlug?: string | null;
     resultScores?: unknown;
-    resultTallies?: unknown;
     pollTitle?: string | null;
 }): SeoMetadata => {
     const normalizedOrigin = normalizeOrigin(origin);
     const normalizedPollSlug = pollSlug?.trim() || null;
     const normalizedPollTitle = pollTitle?.trim() || null;
-    const imageVersion = createVoteSocialImageVersion({
-        resultScores,
-        resultTallies,
-    });
+    const isComplete = hasPublishedResults(resultScores);
     const url = createAbsoluteUrl(normalizedOrigin, pollPath);
-    const description = createVotePageDescription(normalizedPollTitle);
-    const imageAlt = createVoteSocialImageAlt(
-        normalizedPollTitle,
-        imageVersion !== null,
-    );
+    const description = createVotePageDescription({
+        isComplete,
+        pollTitle: normalizedPollTitle,
+    });
+    const imageAlt = createVoteSocialImageAlt(normalizedPollTitle, {
+        isComplete,
+    });
     const imageUrl = createVotePageImageUrl(
         normalizedOrigin,
         normalizedPollSlug,
-        imageVersion,
+        isComplete,
     );
     const title = normalizedPollTitle
         ? `${normalizedPollTitle} | ${siteName}`
-        : `Vote | ${siteName}`;
+        : isComplete
+          ? `Voting results | ${siteName}`
+          : `Vote | ${siteName}`;
 
     return {
         canonicalUrl: url,

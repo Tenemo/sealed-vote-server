@@ -62,8 +62,9 @@ const PollHeader = ({
                     Created {formatPollCreationDate(poll.createdAt)}
                 </p>
                 <p className={cn(mutedBodyClassName, 'max-w-3xl')}>
-                    Share the link below with participants. Once everyone has
-                    voted, the results are ordered by geometric mean.
+                    {hasResults
+                        ? 'Voting has completed. The results below are ordered by geometric mean.'
+                        : 'Share the link below with participants. Once everyone has voted, the results are ordered by geometric mean.'}
                 </p>
             </div>
             <VoteSharing pollTitle={poll.pollName} />
