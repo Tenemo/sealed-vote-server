@@ -21,7 +21,7 @@ const NotFound = (): React.JSX.Element => {
                     <p className="text-sm leading-7 text-muted-foreground sm:text-base">
                         The requested path does not exist.
                     </p>
-                    <p className="break-all rounded-xl bg-accent px-4 py-3 text-sm font-medium text-foreground">
+                    <p className="break-all rounded-md bg-accent px-4 py-3 text-sm font-medium text-foreground">
                         {pathname}
                     </p>
                 </div>

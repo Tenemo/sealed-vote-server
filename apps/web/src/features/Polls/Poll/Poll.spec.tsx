@@ -322,15 +322,16 @@ describe('Poll page', () => {
 
         const store = renderPoll();
 
+        expect(
+            screen.getByRole('button', { name: 'Begin vote' }),
+        ).toBeVisible();
+
         await waitFor(() => {
             expect(
                 selectVotingState(store.getState(), basePoll.id).creatorToken,
             ).toBe('creator-token');
         });
 
-        expect(
-            screen.getByRole('button', { name: 'Begin vote' }),
-        ).toBeVisible();
         expect(mockedFindCreatorSessionByPollId).toHaveBeenCalledWith(
             basePoll.id,
         );

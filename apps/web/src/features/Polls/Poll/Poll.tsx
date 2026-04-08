@@ -77,6 +77,20 @@ const PollPage = (): React.JSX.Element => {
     const currentVoteState = useAppSelector((state) =>
         pollId ? selectVotingStateByPollId(state, pollId) : votingState,
     );
+    const fallbackCreatorSession = React.useMemo(() => {
+        if (!effectivePoll || hasResults || currentVoteState.creatorToken) {
+            return null;
+        }
+
+        return (
+            findCreatorSessionByPollId(effectivePoll.id) ??
+            findCreatorSessionByPollSlug(effectivePoll.slug)
+        );
+    }, [currentVoteState.creatorToken, effectivePoll, hasResults]);
+    const effectiveCreatorToken =
+        currentVoteState.creatorToken ??
+        fallbackCreatorSession?.creatorToken ??
+        null;
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -117,17 +131,13 @@ const PollPage = (): React.JSX.Element => {
             return;
         }
 
-        const storedCreatorSession =
-            findCreatorSessionByPollId(effectivePoll.id) ??
-            findCreatorSessionByPollSlug(effectivePoll.slug);
-
-        if (!storedCreatorSession) {
+        if (!fallbackCreatorSession) {
             return;
         }
 
         dispatch(
             restoreCreatorSession({
-                creatorToken: storedCreatorSession.creatorToken,
+                creatorToken: fallbackCreatorSession.creatorToken,
                 pollId: effectivePoll.id,
                 pollSlug: effectivePoll.slug,
             }),
@@ -138,6 +148,7 @@ const PollPage = (): React.JSX.Element => {
         effectivePoll,
         effectivePoll?.id,
         effectivePoll?.slug,
+        fallbackCreatorSession,
         hasResults,
     ]);
 
@@ -216,7 +227,11 @@ const PollPage = (): React.JSX.Element => {
             )}
             {pollId && effectivePoll && (
                 <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-                    <PollHeader poll={effectivePoll} pollId={pollId} />
+                    <PollHeader
+                        creatorToken={effectiveCreatorToken}
+                        poll={effectivePoll}
+                        pollId={pollId}
+                    />
                     <Voting
                         onVote={onVote}
                         poll={effectivePoll}

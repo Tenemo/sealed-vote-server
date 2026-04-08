@@ -18,8 +18,8 @@ const panelVariants = cva('border border-border/70', {
             subtle: 'bg-accent',
         },
         radius: {
-            default: 'rounded-2xl',
-            compact: 'rounded-xl',
+            default: 'rounded-lg',
+            compact: 'rounded-md',
         },
         borderStyle: {
             solid: '',

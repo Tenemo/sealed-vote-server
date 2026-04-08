@@ -62,7 +62,7 @@ const VersionBadge = (): React.JSX.Element => {
     }
 
     return (
-        <div className="pointer-events-none fixed bottom-3 right-3 z-40 rounded-lg border border-border/70 bg-background/90 px-2.5 py-1 font-mono text-xs text-muted-foreground backdrop-blur">
+        <div className="pointer-events-none fixed bottom-3 right-3 z-40 rounded-md border border-border/70 bg-background/90 px-2.5 py-1 font-mono text-xs text-muted-foreground backdrop-blur">
             Version: {displayedVersion}
         </div>
     );

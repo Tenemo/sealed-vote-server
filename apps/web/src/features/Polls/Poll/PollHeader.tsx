@@ -16,6 +16,7 @@ import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
 import { renderError } from 'utils/networkErrors';
 
 type PollHeaderProps = {
+    creatorToken: string | null;
     poll: PollResponse;
     pollId: string;
 };
@@ -23,9 +24,13 @@ type PollHeaderProps = {
 const formatPollCreationDate = (createdAt: string): string =>
     createdAt.slice(0, 10);
 
-const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
-    const { creatorToken, progressMessage, workflowError } = useAppSelector(
-        (state) => selectVotingStateByPollId(state, pollId),
+const PollHeader = ({
+    creatorToken,
+    poll,
+    pollId,
+}: PollHeaderProps): React.JSX.Element => {
+    const { progressMessage, workflowError } = useAppSelector((state) =>
+        selectVotingStateByPollId(state, pollId),
     );
     const hasResults = hasPublishedResults(poll);
 
