@@ -1,14 +1,20 @@
-import { ContentCopy as CopyIcon } from '@mui/icons-material';
-import {
-    FormControl,
-    FormHelperText,
-    Grid,
-    IconButton,
-    InputAdornment,
-    OutlinedInput,
-    Tooltip,
-} from '@mui/material';
+import { Check, Copy } from 'lucide-react';
 import React from 'react';
+
+import { Button } from '@/components/ui/button';
+import {
+    Field,
+    FieldContent,
+    FieldDescription,
+    FieldLabel,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const copyTextToClipboard = async (text: string): Promise<void> => {
     if (navigator.clipboard?.writeText) {
@@ -24,59 +30,113 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
 
     document.body.append(textArea);
     textArea.select();
-    document.execCommand('copy');
+    const didCopy = document.execCommand('copy');
     textArea.remove();
+
+    if (!didCopy) {
+        throw new Error('Clipboard copy failed.');
+    }
 };
 
 const VoteSharing = (): React.JSX.Element => {
-    const handleCopyLink = (): void => {
-        void copyTextToClipboard(window.location.href);
+    const [copyStatus, setCopyStatus] = React.useState<
+        'idle' | 'success' | 'error'
+    >('idle');
+    const resetStatusTimeoutRef = React.useRef<number | undefined>(undefined);
+
+    const scheduleStatusReset = (): void => {
+        window.clearTimeout(resetStatusTimeoutRef.current);
+        resetStatusTimeoutRef.current = window.setTimeout(() => {
+            setCopyStatus('idle');
+        }, 2500);
     };
 
+    React.useEffect(() => {
+        return () => {
+            window.clearTimeout(resetStatusTimeoutRef.current);
+        };
+    }, []);
+
+    const handleCopyLink = async (): Promise<void> => {
+        try {
+            await copyTextToClipboard(window.location.href);
+            setCopyStatus('success');
+        } catch {
+            setCopyStatus('error');
+        }
+
+        scheduleStatusReset();
+    };
+
+    const helperText =
+        copyStatus === 'success'
+            ? 'Vote link copied to clipboard.'
+            : copyStatus === 'error'
+              ? 'Copy failed. Please copy the link manually.'
+              : 'Link to the vote to share with others';
+    const tooltipText =
+        copyStatus === 'success'
+            ? 'Copied'
+            : copyStatus === 'error'
+              ? 'Copy failed'
+              : 'Copy to clipboard';
+
     return (
-        <Grid
-            container
-            sx={{
-                display: 'flex',
-                justifyContent: 'center',
-            }}
-        >
-            <Grid
-                size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
-                sx={{ width: '100%', p: 2 }}
+        <Field>
+            <FieldLabel
+                className="text-sm font-medium text-secondary"
+                htmlFor="voteLink"
             >
-                <FormControl
-                    sx={{
-                        alignSelf: 'flex-start',
-                        width: '100%',
-                    }}
-                    variant="filled"
-                >
-                    <OutlinedInput
+                Vote link
+            </FieldLabel>
+            <FieldContent>
+                <div className="relative">
+                    <Input
                         aria-describedby="copy-page-link-helper-text"
-                        endAdornment={
-                            <InputAdornment position="end">
-                                <Tooltip title="Copy to clipboard">
-                                    <IconButton
-                                        aria-label="Copy vote link"
-                                        edge="end"
-                                        onClick={handleCopyLink}
-                                    >
-                                        <CopyIcon />
-                                    </IconButton>
-                                </Tooltip>
-                            </InputAdornment>
-                        }
+                        className="pr-12"
+                        id="voteLink"
                         readOnly
-                        size="small"
                         value={window.location.href}
                     />
-                    <FormHelperText id="copy-page-link-helper-text">
-                        Link to the vote to share with others
-                    </FormHelperText>
-                </FormControl>
-            </Grid>
-        </Grid>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                aria-label={
+                                    copyStatus === 'success'
+                                        ? 'Vote link copied'
+                                        : 'Copy vote link'
+                                }
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2"
+                                onClick={() => {
+                                    void handleCopyLink();
+                                }}
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                            >
+                                {copyStatus === 'success' ? (
+                                    <Check className="size-4" />
+                                ) : (
+                                    <Copy className="size-4" />
+                                )}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{tooltipText}</TooltipContent>
+                    </Tooltip>
+                </div>
+                <FieldDescription
+                    aria-live="polite"
+                    className={cn(
+                        'mt-2 text-sm leading-6',
+                        copyStatus === 'error' && 'text-destructive',
+                        copyStatus === 'success' && 'text-foreground',
+                    )}
+                    id="copy-page-link-helper-text"
+                >
+                    {helperText}
+                </FieldDescription>
+            </FieldContent>
+        </Field>
     );
 };
 

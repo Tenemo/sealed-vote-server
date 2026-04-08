@@ -69,7 +69,7 @@ export const joinPoll = async ({
         await page.goto(pollUrl);
     }
 
-    await page.getByLabel('Voter name*').fill(voterName);
+    await page.getByLabel('Voter name').fill(voterName);
     await page.getByRole('button', { exact: true, name: 'Vote' }).click();
     await expect(
         page.getByText('Waiting for the vote to be started...'),

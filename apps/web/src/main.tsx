@@ -1,54 +1,38 @@
-import { CircularProgress, CssBaseline, ThemeProvider } from '@mui/material';
 import * as Sentry from '@sentry/react';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 import { PersistGate } from 'redux-persist/integration/react';
 
-import { sentryTracePropagationTargets } from 'app/apiConfig';
+import { Spinner } from '@/components/ui/spinner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { apiBaseUrl, sentryTracePropagationTargets } from 'app/apiConfig';
 import App from 'app/App';
+import { resolveSentryEnabled } from 'app/sentryConfig';
 import { store, persistor } from 'app/store';
-import { darkTheme } from 'styles/theme';
 
-import 'styles/global.scss';
+import './index.css';
 
 export const Root = (): React.JSX.Element => {
-    useEffect(() => {
-        // https://stackoverflow.com/questions/31402576/enable-focus-only-on-keyboard-use-or-tab-press
-        const handleMouseDown = (): void => {
-            document.body.classList.add('using-mouse');
-        };
-        const handleKeyDown = (event: KeyboardEvent): void => {
-            if (event.key === 'Tab') {
-                document.body.classList.remove('using-mouse');
-            }
-        };
-
-        document.body.addEventListener('mousedown', handleMouseDown);
-        document.body.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            document.body.removeEventListener('mousedown', handleMouseDown);
-            document.body.removeEventListener('keydown', handleKeyDown);
-        };
-    }, []);
-
     return (
         <React.StrictMode>
             <Provider store={store}>
                 <PersistGate
-                    loading={<CircularProgress />}
+                    loading={
+                        <div className="flex min-h-screen items-center justify-center">
+                            <Spinner className="size-10" />
+                        </div>
+                    }
                     persistor={persistor}
                 >
                     <HelmetProvider>
-                        <ThemeProvider theme={darkTheme}>
-                            <CssBaseline enableColorScheme />
+                        <TooltipProvider>
                             <BrowserRouter>
                                 <App />
                             </BrowserRouter>
-                        </ThemeProvider>
+                        </TooltipProvider>
                     </HelmetProvider>
                 </PersistGate>
             </Provider>
@@ -57,9 +41,13 @@ export const Root = (): React.JSX.Element => {
 };
 
 Sentry.init({
-    enabled:
-        import.meta.env.MODE !== 'development' &&
-        import.meta.env.MODE !== 'test',
+    enabled: resolveSentryEnabled({
+        apiBaseUrl,
+        configuredValue: import.meta.env.VITE_SENTRY_ENABLED,
+        currentHostname: window.location.hostname,
+        currentOrigin: window.location.origin,
+        mode: import.meta.env.MODE,
+    }),
     dsn: 'https://dce8580406e67b8cfe162b02e3d16e58@o502294.ingest.sentry.io/4506770255642624',
     integrations: [
         Sentry.browserTracingIntegration(),

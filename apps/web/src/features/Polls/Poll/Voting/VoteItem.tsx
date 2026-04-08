@@ -1,5 +1,7 @@
-import { ListItem, Button, Typography, Box } from '@mui/material';
-import React from 'react';
+import React, { useId } from 'react';
+
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 type Props = {
     choiceName: string;
@@ -14,28 +16,48 @@ const VoteItem = ({
     onVote,
     selectedScore,
 }: Props): React.JSX.Element => {
+    const radioGroupName = useId();
+
     return (
-        <ListItem sx={{ display: 'flex', flexDirection: 'column', mb: 3 }}>
-            <Typography sx={{ display: 'block' }} variant="h6">
-                {choiceName}
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-                {SCORE_CHOICES.map((scoreChoice) => (
-                    <Button
-                        key={scoreChoice}
-                        onClick={() => onVote(choiceName, scoreChoice)}
-                        sx={{ m: 1, padding: '3px 5px', textTransform: 'none' }}
-                        variant={
-                            scoreChoice === selectedScore
-                                ? 'contained'
-                                : 'outlined'
-                        }
-                    >
-                        {scoreChoice === 1 ? 'Abstain' : scoreChoice}
-                    </Button>
-                ))}
-            </Box>
-        </ListItem>
+        <li className="rounded-xl border border-border/70 bg-background/25 p-4 sm:p-5">
+            <fieldset className="space-y-4">
+                <legend className="sr-only">{`Score for ${choiceName}`}</legend>
+                <h3 className="text-lg font-semibold tracking-tight sm:text-xl">
+                    {choiceName}
+                </h3>
+                <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+                    {SCORE_CHOICES.map((scoreChoice) => (
+                        <div className="relative" key={scoreChoice}>
+                            <input
+                                aria-label={`Score ${scoreChoice} for ${choiceName}`}
+                                checked={scoreChoice === selectedScore}
+                                className="peer sr-only"
+                                id={`${radioGroupName}-${scoreChoice}`}
+                                name={radioGroupName}
+                                onChange={() => onVote(choiceName, scoreChoice)}
+                                type="radio"
+                                value={scoreChoice}
+                            />
+                            <label
+                                className={cn(
+                                    buttonVariants({
+                                        size: 'default',
+                                        variant:
+                                            scoreChoice === selectedScore
+                                                ? 'default'
+                                                : 'outline',
+                                    }),
+                                    'h-11 w-full cursor-pointer px-0 text-base peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
+                                )}
+                                htmlFor={`${radioGroupName}-${scoreChoice}`}
+                            >
+                                {scoreChoice}
+                            </label>
+                        </div>
+                    ))}
+                </div>
+            </fieldset>
+        </li>
     );
 };
 

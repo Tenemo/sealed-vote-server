@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import Poll from './Poll';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
 import {
     initialVoteState,
     setSelectedScores,
@@ -71,11 +72,13 @@ const renderPoll = (
     render(
         <Provider store={store}>
             <HelmetProvider>
-                <MemoryRouter initialEntries={[initialEntry]}>
-                    <Routes>
-                        <Route element={<Poll />} path="/votes/:pollSlug" />
-                    </Routes>
-                </MemoryRouter>
+                <TooltipProvider>
+                    <MemoryRouter initialEntries={[initialEntry]}>
+                        <Routes>
+                            <Route element={<Poll />} path="/votes/:pollSlug" />
+                        </Routes>
+                    </MemoryRouter>
+                </TooltipProvider>
             </HelmetProvider>
         </Provider>,
     );

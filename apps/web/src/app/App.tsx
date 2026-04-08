@@ -1,10 +1,9 @@
-import { Box, CircularProgress } from '@mui/material';
 import React, { Suspense, lazy } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Helmet } from 'react-helmet-async';
 import { Route, Routes } from 'react-router-dom';
-import 'normalize.css';
 
+import { Spinner } from '@/components/ui/spinner';
 import Header from 'components/Header/Header';
 import NotFound from 'components/NotFound/NotFound';
 import PollCreation from 'features/Polls/PollCreation/PollCreation';
@@ -17,41 +16,41 @@ const App = (): React.JSX.Element => {
             <Helmet>
                 <title>sealed.vote</title>
             </Helmet>
-            <ErrorBoundary
-                fallback={
-                    <div>
-                        The application has crashed due to a rendering error.
-                    </div>
-                }
-                onError={(error) => console.error(error)}
-            >
-                <Header />
-                <Box
-                    component="main"
-                    sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                    }}
+            <div className="flex min-h-full flex-col">
+                <ErrorBoundary
+                    fallback={
+                        <div>
+                            The application has crashed due to a rendering
+                            error.
+                        </div>
+                    }
+                    onError={(error) => console.error(error)}
                 >
-                    <Routes>
-                        <Route element={<PollCreation />} path="/" />
-                        <Route
-                            element={
-                                <Suspense
-                                    fallback={
-                                        <CircularProgress sx={{ mt: 5 }} />
+                    <Header />
+                    <main className="flex flex-1 justify-center px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-8">
+                        <div className="w-full max-w-4xl">
+                            <Routes>
+                                <Route element={<PollCreation />} path="/" />
+                                <Route
+                                    element={
+                                        <Suspense
+                                            fallback={
+                                                <div className="flex min-h-[50vh] items-center justify-center">
+                                                    <Spinner className="size-10" />
+                                                </div>
+                                            }
+                                        >
+                                            <Poll />
+                                        </Suspense>
                                     }
-                                >
-                                    <Poll />
-                                </Suspense>
-                            }
-                            path="votes/:pollSlug"
-                        />
-                        <Route element={<NotFound />} path="*" />
-                    </Routes>
-                </Box>
-            </ErrorBoundary>
+                                    path="votes/:pollSlug"
+                                />
+                                <Route element={<NotFound />} path="*" />
+                            </Routes>
+                        </div>
+                    </main>
+                </ErrorBoundary>
+            </div>
         </>
     );
 };

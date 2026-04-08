@@ -31,6 +31,9 @@ const sharedProjects = [
 const prettierRule = [
     ERROR,
     {
+        tabWidth: 4,
+        printWidth: 80,
+        endOfLine: 'lf',
         useTabs: false,
         semi: true,
         singleQuote: true,
@@ -225,13 +228,6 @@ module.exports = defineConfig(
         files: ['**/*.d.ts'],
         rules: {
             '@typescript-eslint/consistent-type-definitions': OFF,
-        },
-    },
-    {
-        files: ['**/*.scss.d.ts'],
-        rules: {
-            'prettier/prettier': OFF,
-            '@typescript-eslint/no-empty-object-type': OFF,
         },
     },
 );

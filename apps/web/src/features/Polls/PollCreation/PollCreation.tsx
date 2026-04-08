@@ -1,17 +1,15 @@
-import {
-    Typography,
-    Button,
-    TextField,
-    Alert,
-    CircularProgress,
-    Grid,
-} from '@mui/material';
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 
 import ChoiceAdding from './ChoiceAdding';
 
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { OutlinedInputField } from '@/components/ui/outlined-input-field';
+import { Panel } from '@/components/ui/panel';
+import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/utils';
 
@@ -20,7 +18,7 @@ type Form = {
     choices: string[];
 };
 
-const initialForm = {
+const initialForm: Form = {
     pollName: '',
     choices: [],
 };
@@ -35,7 +33,7 @@ const PollCreationPage = (): React.JSX.Element => {
     const onFormChange = ({
         target: { id, value },
     }: ChangeEvent<HTMLInputElement>): void =>
-        setForm({ ...form, [id]: value });
+        setForm((previousForm) => ({ ...previousForm, [id]: value }));
 
     const onAddChoice = (choice: string): void =>
         setForm((prev) => ({
@@ -46,10 +44,20 @@ const PollCreationPage = (): React.JSX.Element => {
     const onRemoveChoice = (choice: string): void =>
         setForm((prev) => ({
             ...prev,
-            choices: prev.choices.filter((c) => c !== choice),
+            choices: prev.choices.filter(
+                (currentChoice) => currentChoice !== choice,
+            ),
         }));
 
-    const onCreatePoll = (): void => {
+    const isFormValid = !!pollName.trim() && choices.length > 1;
+
+    const onCreatePoll = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+
+        if (!isFormValid || isLoading) {
+            return;
+        }
+
         void createPoll({
             pollName: form.pollName.trim(),
             choices: form.choices,
@@ -60,70 +68,77 @@ const PollCreationPage = (): React.JSX.Element => {
             });
     };
 
-    const isFormValid = pollName.trim() && choices.length > 1 && !isLoading;
-
     return (
         <>
             <Helmet>
                 <title>Vote creation</title>
             </Helmet>
-            <Typography
-                sx={{
-                    mb: 2,
-                    mt: 4,
-                }}
-                variant="h5"
-            >
-                Create a new vote
-            </Typography>
-            <Grid
-                container
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    width: '100%',
-                }}
-            >
-                <Grid
-                    size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
-                    sx={{ width: '100%', p: 1 }}
-                >
-                    <TextField
-                        autoComplete="off"
-                        helperText={
-                            pollName ? '' : 'What would you like to vote on?'
-                        }
-                        id="pollName"
-                        inputProps={{ maxLength: 64 }}
-                        label="Vote name"
-                        name="pollName"
-                        onChange={onFormChange}
-                        required
-                        sx={{ mb: 1, minHeight: 80, width: '100%' }}
-                        value={pollName}
-                    />
-                </Grid>
-            </Grid>
-            <ChoiceAdding
-                choices={form.choices}
-                onAddChoice={onAddChoice}
-                onRemoveChoice={onRemoveChoice}
-            />
-            <Button
-                disabled={!isFormValid}
-                onClick={onCreatePoll}
-                size="large"
-                sx={{ m: 2 }}
-                variant="contained"
-            >
-                Create vote
-            </Button>
-            {error && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                    {renderError(error)}
-                </Alert>
-            )}
-            {isLoading && <CircularProgress sx={{ mt: 2 }} />}
+            <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
+                <div className="space-y-3 text-center">
+                    <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                        Create a new vote
+                    </h1>
+                    <p className="mx-auto max-w-2xl text-base leading-7 text-secondary sm:text-lg">
+                        Give the vote a clear name, add a few choices, and share
+                        the generated link when you are ready.
+                    </p>
+                </div>
+                <form className="space-y-6" onSubmit={onCreatePoll}>
+                    <Panel className="space-y-6">
+                        <OutlinedInputField
+                            autoComplete="off"
+                            helperText={
+                                !pollName
+                                    ? 'What would you like to vote on?'
+                                    : undefined
+                            }
+                            id="pollName"
+                            label="Vote name"
+                            maxLength={64}
+                            name="pollName"
+                            onChange={onFormChange}
+                            required
+                            value={pollName}
+                        />
+                        <ChoiceAdding
+                            choices={form.choices}
+                            onAddChoice={onAddChoice}
+                            onRemoveChoice={onRemoveChoice}
+                        />
+                    </Panel>
+                    {error && (
+                        <Alert variant="destructive">
+                            <AlertDescription>
+                                {renderError(error)}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    <div className="flex justify-end">
+                        <Button
+                            className="w-full sm:w-auto"
+                            disabled={!isFormValid || isLoading}
+                            size="lg"
+                            type="submit"
+                        >
+                            <span className="grid grid-cols-[1.25rem_auto_1.25rem] items-center gap-2">
+                                <Spinner
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'size-5',
+                                        !isLoading && 'invisible',
+                                    )}
+                                />
+                                <span>
+                                    {isLoading
+                                        ? 'Creating vote'
+                                        : 'Create vote'}
+                                </span>
+                                <span aria-hidden="true" className="size-5" />
+                            </span>
+                        </Button>
+                    </div>
+                </form>
+            </section>
         </>
     );
 };

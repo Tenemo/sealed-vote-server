@@ -1,17 +1,9 @@
-import { Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import {
-    useTheme,
-    Grid,
-    Box,
-    TextField,
-    Button,
-    List,
-    ListItem,
-    ListItemText,
-    IconButton,
-    Typography,
-} from '@mui/material';
-import React, { useState, ChangeEvent, KeyboardEvent } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { FieldDescription } from '@/components/ui/field';
+import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 
 type ChoiceAddingProps = {
     choices: string[];
@@ -24,7 +16,6 @@ const ChoiceAdding = ({
     onAddChoice,
     onRemoveChoice,
 }: ChoiceAddingProps): React.JSX.Element => {
-    const theme = useTheme();
     const [choiceName, setChoiceName] = useState('');
     const normalizedChoiceName = choiceName.trim();
     const isChoiceDuplicate = choices.includes(normalizedChoiceName);
@@ -51,104 +42,83 @@ const ChoiceAdding = ({
     };
 
     return (
-        <Grid
-            container
-            sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                width: '100%',
-            }}
-        >
-            <Grid
-                size={{ sm: 10, md: 8, lg: 6, xl: 4 }}
-                sx={{
-                    width: '100%',
-                    p: 1,
-                    backgroundColor: theme.palette.action.hover,
-                    borderRadius: 1,
-                }}
-            >
-                <Box
-                    sx={{
-                        display: 'flex',
-                        minHeight: 100,
-                        flexWrap: 'wrap',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
+        <div className="space-y-5">
+            <div className="space-y-2 text-center">
+                <h2 className="text-xl font-semibold tracking-tight">
+                    Choices
+                </h2>
+                <p className="text-sm leading-7 text-secondary sm:text-base">
+                    Each participant will rank every option from 1 to 10.
+                </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <OutlinedInputField
+                    aria-invalid={isChoiceDuplicate}
+                    autoComplete="off"
+                    errorText={
+                        isChoiceDuplicate
+                            ? 'This choice already exists'
+                            : undefined
+                    }
+                    id="choiceName"
+                    inputClassName="text-base"
+                    label="Choice to vote for"
+                    maxLength={64}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    value={choiceName}
+                />
+                <Button
+                    className="w-full sm:mt-2 sm:w-auto"
+                    disabled={!isChoiceNameValid}
+                    onClick={handleAddChoice}
+                    type="button"
+                    variant="outline"
                 >
-                    <TextField
-                        autoComplete="off"
-                        error={isChoiceDuplicate}
-                        helperText={
-                            isChoiceDuplicate
-                                ? 'This choice already exists'
-                                : undefined
-                        }
-                        id="choiceName"
-                        inputProps={{ maxLength: 64 }}
-                        label="Choice to vote for"
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        sx={{ m: 1, alignSelf: 'flex-start' }}
-                        value={choiceName}
-                    />
-                    <Button
-                        disabled={!isChoiceNameValid}
-                        onClick={handleAddChoice}
-                        startIcon={<AddIcon />}
-                        sx={{ m: 1, mb: 2 }}
-                        variant="outlined"
-                    >
-                        Add new choice
-                    </Button>
-                </Box>
-                {choices.length === 0 && (
-                    <Typography sx={{ m: 1 }} variant="body1">
-                        To create a vote, add choices that each participant will
-                        be able to rank from 1 to 10.
-                    </Typography>
-                )}
-                {!!choices.length && (
-                    <>
-                        <Typography sx={{ m: 1 }} variant="body1">
-                            Choices currently in the vote:
-                        </Typography>
-                        <List sx={{ px: 2, py: 1 }}>
-                            {choices.map((choice) => (
-                                <ListItem
-                                    key={choice}
-                                    secondaryAction={
-                                        <IconButton
-                                            aria-label="delete"
-                                            edge="end"
-                                            onClick={() =>
-                                                onRemoveChoice(choice)
-                                            }
-                                        >
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    }
-                                    sx={{
-                                        border: `1px solid ${theme.palette.secondary.main}`,
-                                        borderRadius: 1,
-                                        my: 1,
-                                    }}
+                    <Plus className="mr-2 size-4" />
+                    Add new choice
+                </Button>
+            </div>
+            {choices.length === 0 && (
+                <FieldDescription className="rounded-xl border border-dashed border-border/70 bg-background/20 px-4 py-3 text-sm leading-7 text-secondary">
+                    To create a vote, add choices that each participant will be
+                    able to rank from 1 to 10.
+                </FieldDescription>
+            )}
+            {!!choices.length && (
+                <div className="space-y-3">
+                    <p className="text-sm font-medium text-secondary">
+                        Choices currently in the vote:
+                    </p>
+                    <ul className="space-y-2">
+                        {choices.map((choice) => (
+                            <li
+                                className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/30 px-4 py-3"
+                                key={choice}
+                            >
+                                <span className="min-w-0 flex-1 break-words text-base text-foreground">
+                                    {choice}
+                                </span>
+                                <Button
+                                    aria-label={`Remove choice ${choice}`}
+                                    onClick={() => onRemoveChoice(choice)}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
                                 >
-                                    <ListItemText primary={choice} />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </>
-                )}
-                {choices.length === 1 && (
-                    <Typography sx={{ m: 1 }} variant="body1">
-                        There need to be at least two possible choices in a
-                        vote.
-                    </Typography>
-                )}
-            </Grid>
-        </Grid>
+                                    <Trash2 className="size-4" />
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {choices.length === 1 && (
+                <p className="text-sm leading-7 text-secondary">
+                    There need to be at least two possible choices in a vote.
+                </p>
+            )}
+        </div>
     );
 };
 

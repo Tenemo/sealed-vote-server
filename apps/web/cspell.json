@@ -1,9 +1,6 @@
 {
     "version": "0.2",
-    "ignorePaths": [
-        "node_modules",
-        ".git"
-    ],
+    "ignorePaths": ["node_modules", ".git"],
     "dictionaryDefinitions": [],
     "dictionaries": [],
     "words": [

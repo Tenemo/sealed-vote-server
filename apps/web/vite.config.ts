@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -25,10 +26,8 @@ const getManualChunk = (id: string): string | undefined => {
     }
 
     if (
-        normalizedId.includes('/node_modules/@mui/') ||
-        normalizedId.includes('/node_modules/@emotion/') ||
-        normalizedId.includes('/node_modules/@floating-ui/') ||
-        normalizedId.includes('/node_modules/@popperjs/')
+        normalizedId.includes('/node_modules/@radix-ui/') ||
+        normalizedId.includes('/node_modules/@floating-ui/')
     ) {
         return 'ui';
     }
@@ -67,14 +66,14 @@ const getManualChunk = (id: string): string | undefined => {
 };
 
 export default defineConfig({
-    plugins: [react(), createDeploymentVersionPlugin()],
+    plugins: [react(), tailwindcss(), createDeploymentVersionPlugin()],
     resolve: {
         alias: {
+            '@': resolveFromSrc(),
             app: resolveFromSrc('app'),
             components: resolveFromSrc('components'),
             features: resolveFromSrc('features'),
             fonts: resolveFromSrc('fonts'),
-            styles: resolveFromSrc('styles'),
             typings: resolveFromSrc('typings'),
             utils: resolveFromSrc('utils'),
         },
@@ -93,13 +92,6 @@ export default defineConfig({
     preview: {
         host: '0.0.0.0',
         port: 4173,
-    },
-    css: {
-        preprocessorOptions: {
-            scss: {
-                loadPaths: [resolveFromSrc('styles')],
-            },
-        },
     },
     build: {
         outDir: 'dist',
