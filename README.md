@@ -5,9 +5,11 @@
 [![Web deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed.vote%20%2F%20production?label=web%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed.vote+%2F+production)
 [![API deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed-vote-preview%20%2F%20production?label=api%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed-vote-preview+%2F+production)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/coverage.json)](https://github.com/Tenemo/sealed-vote/actions/workflows/readme-badges.yml)
+[![Node version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
+
+---
+
 [![License](https://img.shields.io/github/license/Tenemo/sealed-vote)](./LICENSE)
-[![Node](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
-[![pnpm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/pnpm.json)](./package.json)
 
 [sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around homomorphic encryption. Voters score each choice from 1 to 10, and the system is designed so that individual votes remain hidden from everyone, including the server, while the final tally can still be computed.
 

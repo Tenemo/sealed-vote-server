@@ -13,10 +13,6 @@ type CoverageSummary = {
     };
 };
 
-type PackageManifest = {
-    packageManager?: string;
-};
-
 type BadgePayload = {
     color: string;
     label: string;
@@ -121,23 +117,6 @@ const readNodeVersion = async (): Promise<string> => {
     return nodeVersion.replace(/^v/i, '');
 };
 
-const readPnpmVersion = async (): Promise<string> => {
-    const packageManifestPath = path.resolve(repoRoot, 'package.json');
-    const packageManifest = await readJsonFile<PackageManifest>(
-        packageManifestPath,
-    );
-    const packageManager = packageManifest.packageManager?.trim() || '';
-    const match = /^pnpm@(.+)$/.exec(packageManager);
-
-    if (!match?.[1]) {
-        throw new Error(
-            'Root package.json is missing a pnpm packageManager declaration.',
-        );
-    }
-
-    return match[1];
-};
-
 const writeBadgeFile = async (
     fileName: string,
     payload: BadgePayload,
@@ -156,7 +135,6 @@ const main = async (): Promise<void> => {
 
     const coveragePercent = await readCoveragePercent();
     const nodeVersion = await readNodeVersion();
-    const pnpmVersion = await readPnpmVersion();
 
     await Promise.all([
         writeBadgeFile(
@@ -170,10 +148,6 @@ const main = async (): Promise<void> => {
         writeBadgeFile(
             'node.json',
             createBadgePayload('node', nodeVersion, '5FA04E'),
-        ),
-        writeBadgeFile(
-            'pnpm.json',
-            createBadgePayload('pnpm', pnpmVersion, 'F69220'),
         ),
     ]);
 };
