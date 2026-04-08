@@ -5,7 +5,7 @@ export const connectionToastMessage =
 export const reconnectingWorkflowMessage =
     'Connection lost. Reconnecting and resuming in the background...';
 
-const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{8,32}$/;
+const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
 
 type CreatePollResponse = {

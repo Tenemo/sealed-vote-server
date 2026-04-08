@@ -42,7 +42,7 @@ vi.mock('features/Polls/pollsApi', () => ({
 
 const basePoll = {
     id: '11111111-1111-4111-8111-111111111111',
-    slug: 'best-fruit--11111111',
+    slug: 'best-fruit--1111',
     pollName: 'Best fruit',
     createdAt: '2026-01-01T00:00:00.000Z',
     choices: ['Apples'],
@@ -58,7 +58,7 @@ const basePoll = {
 
 const renderPoll = (
     preloadedVotingState: VotingState = {},
-    initialEntry: string = '/votes/best-fruit--11111111',
+    initialEntry: string = '/votes/best-fruit--1111',
 ): EnhancedStore<{ voting: VotingState }> => {
     const store = configureStore({
         preloadedState: {

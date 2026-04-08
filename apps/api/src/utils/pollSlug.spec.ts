@@ -8,6 +8,7 @@ import {
     assignPollSlugs,
     backfillMissingPollSlugs,
     createPollSlug,
+    getCreatePollSlugAttempts,
     toPollSlugTitleSegment,
 } from './pollSlug';
 
@@ -33,33 +34,64 @@ describe('pollSlug utilities', () => {
             createPollSlug(
                 'Best fruit',
                 '11111111-1111-4111-8111-abcdefabcdef',
-                8,
+                4,
             ),
-        ).toBe('best-fruit--efabcdef');
+        ).toBe('best-fruit--cdef');
     });
 
     test('escalates to longer id suffixes when shorter slug candidates collide', () => {
         const slugAssignments = assignPollSlugs([
             {
-                id: 'aaaaaaaa-aaaa-4aaa-8aaa-111122223333',
+                id: 'aaaaaaaa-aaaa-4aaa-8aaa-1111aaaa2222',
                 pollName: 'Same title',
             },
             {
-                id: 'bbbbbbbb-bbbb-4bbb-8bbb-444422223333',
+                id: 'bbbbbbbb-bbbb-4bbb-8bbb-4444cccc2222',
                 pollName: 'Same title',
             },
         ]);
 
         expect(slugAssignments).toEqual([
             {
-                id: 'aaaaaaaa-aaaa-4aaa-8aaa-111122223333',
-                slug: 'same-title--22223333',
+                id: 'aaaaaaaa-aaaa-4aaa-8aaa-1111aaaa2222',
+                slug: 'same-title--2222',
             },
             {
-                id: 'bbbbbbbb-bbbb-4bbb-8bbb-444422223333',
-                slug: 'same-title--444422223333',
+                id: 'bbbbbbbb-bbbb-4bbb-8bbb-4444cccc2222',
+                slug: 'same-title--cccc2222',
             },
         ]);
+    });
+
+    test('retries fresh four-character slugs before falling back to longer suffixes', () => {
+        const generatedIds = [
+            'aaaaaaaa-aaaa-4aaa-8aaa-111111111111',
+            'bbbbbbbb-bbbb-4bbb-8bbb-222222222222',
+            'cccccccc-cccc-4ccc-8ccc-333344445555',
+        ];
+        const slugAttempts = getCreatePollSlugAttempts(
+            'Same title',
+            () => generatedIds.shift()!,
+            3,
+        );
+
+        expect(slugAttempts[0]).toEqual({
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-111111111111',
+            slug: 'same-title--1111',
+        });
+        expect(slugAttempts[1]).toEqual({
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-222222222222',
+            slug: 'same-title--2222',
+        });
+        expect(slugAttempts[2]).toEqual({
+            id: 'cccccccc-cccc-4ccc-8ccc-333344445555',
+            slug: 'same-title--5555',
+        });
+        expect(slugAttempts[3]).toEqual({
+            id: 'cccccccc-cccc-4ccc-8ccc-333344445555',
+            slug: 'same-title--44445555',
+        });
+        expect(generatedIds).toEqual([]);
     });
 });
 

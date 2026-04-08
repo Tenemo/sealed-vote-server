@@ -27,7 +27,7 @@ vi.mock('app/store', () => ({
 
 const createPoll = (id: string): PollResponse => ({
     id,
-    slug: `poll-${id}--12345678`,
+    slug: `poll-${id}--1234`,
     pollName: `Poll ${id}`,
     createdAt: '2026-01-01T00:00:00.000Z',
     choices: ['A', 'B'],

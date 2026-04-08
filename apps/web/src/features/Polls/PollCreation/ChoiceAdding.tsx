@@ -68,16 +68,19 @@ const ChoiceAdding = ({
                     onKeyDown={handleKeyDown}
                     value={choiceName}
                 />
-                <Button
-                    className="w-full sm:mt-2 sm:w-auto"
-                    disabled={!isChoiceNameValid}
-                    onClick={handleAddChoice}
-                    type="button"
-                    variant="outline"
-                >
-                    <Plus className="mr-2 size-4" />
-                    Add new choice
-                </Button>
+                <div className="sm:pt-7">
+                    <Button
+                        className="w-full justify-center sm:w-auto enabled:border-border/70 enabled:bg-accent enabled:hover:bg-white/12 enabled:hover:text-foreground enabled:active:bg-white/14"
+                        disabled={!isChoiceNameValid}
+                        onClick={handleAddChoice}
+                        size="lg"
+                        type="button"
+                        variant="outline"
+                    >
+                        <Plus className="mr-2 size-4" />
+                        Add new choice
+                    </Button>
+                </div>
             </div>
             {choices.length === 0 && (
                 <FieldDescription className="rounded-xl border border-dashed border-border/70 bg-background/20 px-4 py-3 text-sm leading-7 text-secondary">
