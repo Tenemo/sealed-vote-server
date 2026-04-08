@@ -17,6 +17,7 @@ import {
 
 describe('POST /polls/:pollId/decryption-shares', () => {
     let fastify: FastifyInstance;
+    const wrongButValidVoterToken = 'a'.repeat(64);
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -100,7 +101,10 @@ describe('POST /polls/:pollId/decryption-shares', () => {
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/invalid-poll-id/decryption-shares',
-            payload: { decryptionShares: [], voterToken: 'invalid-token' },
+            payload: {
+                decryptionShares: [],
+                voterToken: wrongButValidVoterToken,
+            },
         });
         expect(response.statusCode).toBe(400);
     });
@@ -111,10 +115,43 @@ describe('POST /polls/:pollId/decryption-shares', () => {
             url: '/api/polls/48a16d54-1a44-1234-1234-67083a00e107/decryption-shares',
             payload: {
                 decryptionShares: [''],
-                voterToken: 'invalid-token',
+                voterToken: wrongButValidVoterToken,
             },
         });
         expect(response.statusCode).toBe(404);
+    });
+
+    test('should reject an invalid voter token format', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Invalid decryption token'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+        await builder.submitVotes();
+
+        const context = builder.getContext();
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: [],
+                voterToken: 'short-token',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
     });
 
     test('replays the same decryption shares idempotently after results are computed', async () => {

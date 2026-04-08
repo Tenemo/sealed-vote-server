@@ -22,12 +22,13 @@ import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const RecoverSessionRequestSchema = Type.Object({
-    creatorToken: Type.Optional(Type.String()),
-    voterToken: Type.Optional(Type.String()),
+    creatorToken: Type.Optional(SecureTokenSchema),
+    voterToken: Type.Optional(SecureTokenSchema),
 });
 
 const RecoverSessionResponseSchema = Type.Object({

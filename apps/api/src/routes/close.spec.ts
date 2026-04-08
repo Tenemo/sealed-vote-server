@@ -10,6 +10,7 @@ import { PollResponse } from './fetch';
 
 describe('POST /polls/:pollId/close', () => {
     let fastify: FastifyInstance;
+    const wrongButValidCreatorToken = 'a'.repeat(64);
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -89,13 +90,12 @@ describe('POST /polls/:pollId/close', () => {
 
     test('should not close the poll with incorrect creatorToken', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
-        const wrongCreatorToken = 'wrong-token';
 
         const closeResponse = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/close`,
             payload: {
-                creatorToken: wrongCreatorToken,
+                creatorToken: wrongButValidCreatorToken,
             },
         });
 
@@ -103,6 +103,22 @@ describe('POST /polls/:pollId/close', () => {
         expect(
             (JSON.parse(closeResponse.body) as ClosePollResponse).message,
         ).toBe(ERROR_MESSAGES.invalidCreatorToken);
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+
+    test('should reject an invalid creator token format', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const closeResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken: 'short-token',
+            },
+        });
+
+        expect(closeResponse.statusCode).toBe(400);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -138,7 +154,7 @@ describe('POST /polls/:pollId/close', () => {
 
     test('should return an error for closing a non-existing poll', async () => {
         const nonExistingPollId = '48a16d54-0000-0000-0000-67083a00e107';
-        const creatorToken = 'some-creator-token';
+        const creatorToken = wrongButValidCreatorToken;
 
         const closeResponse = await fastify.inject({
             method: 'POST',

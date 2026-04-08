@@ -30,12 +30,13 @@ import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const DecryptionSharesRequestSchema = Type.Object({
     decryptionShares: Type.Array(Type.String()),
-    voterToken: Type.String(),
+    voterToken: SecureTokenSchema,
 });
 
 const schema = {

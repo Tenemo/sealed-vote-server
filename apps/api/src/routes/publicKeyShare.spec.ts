@@ -11,6 +11,7 @@ import { PublicKeyShareResponse } from './publicKeyShare';
 
 describe('POST /polls/:pollId/public-key-share', () => {
     let fastify: FastifyInstance;
+    const wrongButValidVoterToken = 'a'.repeat(64);
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -65,7 +66,7 @@ describe('POST /polls/:pollId/public-key-share', () => {
             url: `/api/polls/${invalidPollId}/public-key-share`,
             payload: {
                 publicKeyShare: publicKey.toString(),
-                voterToken: 'invalid-token',
+                voterToken: wrongButValidVoterToken,
             },
         });
 
@@ -84,7 +85,7 @@ describe('POST /polls/:pollId/public-key-share', () => {
             url: `/api/polls/${nonExistentPollId}/public-key-share`,
             payload: {
                 publicKeyShare: publicKey.toString(),
-                voterToken: 'invalid-token',
+                voterToken: wrongButValidVoterToken,
             },
         });
 
@@ -93,6 +94,32 @@ describe('POST /polls/:pollId/public-key-share', () => {
         expect(responseBody.message).toBe(
             `Poll with ID ${nonExistentPollId} does not exist.`,
         );
+    });
+
+    test('should reject an invalid voter token format', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        const voter = await registerVoter(fastify, pollId, 'Alice');
+        expect(voter.success).toBe(true);
+        if (!voter.success) {
+            throw new Error('Failed to register the voter.');
+        }
+
+        await closePoll(fastify, pollId, creatorToken);
+
+        const { publicKey } = generateKeys(1, 1);
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/public-key-share`,
+            payload: {
+                publicKeyShare: publicKey.toString(),
+                voterToken: 'short-token',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
     });
 
     test('should combine public keys when all voters have submitted in a closed poll, and verify combined public key', async () => {

@@ -59,10 +59,6 @@ const applyPollSnapshot = (voteState: VoteState, poll: PollResponse): void => {
 
     voteState.results = poll.results;
     Object.assign(voteState, clearCompletedSensitiveFields(voteState));
-    voteState.pollSlug = poll.slug;
-    voteState.pollSnapshot = poll;
-    voteState.commonPublicKey = poll.commonPublicKey;
-    voteState.results = poll.results;
 };
 
 export type VoteThunkRejectValue = {

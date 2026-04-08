@@ -15,11 +15,11 @@ import { getCreatePollSlugAttempts } from '../utils/pollSlug.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
-import { MessageResponseSchema } from './schemas.js';
+import { MessageResponseSchema, SecureTokenSchema } from './schemas.js';
 
 const CreatePollRequestSchema = Type.Object({
     choices: Type.Array(Type.String()),
-    creatorToken: Type.String(),
+    creatorToken: SecureTokenSchema,
     pollName: Type.String(),
     maxParticipants: Type.Optional(Type.Number({ minimum: 2 })),
 });

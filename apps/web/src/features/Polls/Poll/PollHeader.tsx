@@ -22,6 +22,9 @@ type PollHeaderProps = {
     pollId: string;
 };
 
+const formatPollCreationDate = (createdAt: string): string =>
+    createdAt.slice(0, 10);
+
 const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
     const dispatch = useAppDispatch();
     const {
@@ -72,6 +75,9 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                     {poll.pollName}
                 </h1>
+                <p className="text-sm font-medium text-muted-foreground">
+                    Created {formatPollCreationDate(poll.createdAt)}
+                </p>
                 <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                     Share the link below with participants. Once everyone has
                     voted, the results are ranked by geometric mean.

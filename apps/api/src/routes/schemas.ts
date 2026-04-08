@@ -17,6 +17,12 @@ export const EncryptedMessageSchema = Type.Object({
     c2: Type.String(),
 });
 
+export const SecureTokenSchema = Type.String({
+    minLength: 64,
+    maxLength: 64,
+    pattern: '^[A-Fa-f0-9]{64}$',
+});
+
 export const MessageResponseSchema = Type.Object({
     message: Type.String(),
 });

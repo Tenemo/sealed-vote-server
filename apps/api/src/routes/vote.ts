@@ -27,12 +27,13 @@ import {
     EncryptedMessageSchema,
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 export const VoteRequestSchema = Type.Object({
     votes: Type.Array(EncryptedMessageSchema),
-    voterToken: Type.String(),
+    voterToken: SecureTokenSchema,
 });
 
 const VoteResponseSchema = Type.String();

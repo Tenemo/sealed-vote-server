@@ -59,3 +59,24 @@ export const resolveSentryEnabled = ({
 
     return true;
 };
+
+export const resolveSentryReplayEnabled = ({
+    configuredValue,
+    isAutomatedBrowser,
+}: {
+    configuredValue: string | undefined;
+    isAutomatedBrowser: boolean;
+}): boolean => {
+    const normalizedConfiguredValue =
+        normalizeConfiguredSentryValue(configuredValue);
+
+    if (normalizedConfiguredValue === 'true') {
+        return true;
+    }
+
+    if (normalizedConfiguredValue === 'false') {
+        return false;
+    }
+
+    return !isAutomatedBrowser;
+};

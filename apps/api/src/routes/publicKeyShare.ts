@@ -24,12 +24,13 @@ import { authenticateVoter, hashSecureToken } from '../utils/voterAuth.js';
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const PublicKeyShareRequestSchema = Type.Object({
     publicKeyShare: Type.String(),
-    voterToken: Type.String(),
+    voterToken: SecureTokenSchema,
 });
 
 const schema = {

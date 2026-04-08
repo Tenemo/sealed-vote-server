@@ -132,6 +132,29 @@ describe('Poll page', () => {
         expect(mockedVote).not.toHaveBeenCalled();
     });
 
+    it('starts session recovery for resumable workflows instead of replaying the vote directly', async () => {
+        renderPoll({
+            '11111111-1111-4111-8111-111111111111': {
+                ...initialVoteState,
+                pollSlug: 'best-fruit--1111',
+                selectedScores: {
+                    Apples: 7,
+                },
+                shouldResumeWorkflow: true,
+                voterName: 'Alice',
+                voterIndex: 1,
+                voterToken: 'a'.repeat(64),
+            },
+        });
+
+        await waitFor(() => {
+            expect(mockedRecoverSession).toHaveBeenCalledWith({
+                pollId: '11111111-1111-4111-8111-111111111111',
+            });
+        });
+        expect(mockedVote).not.toHaveBeenCalled();
+    });
+
     it('does not auto-resume when the voting session appears only after mount', async () => {
         const store = renderPoll({
             '11111111-1111-4111-8111-111111111111': {
@@ -185,6 +208,12 @@ describe('Poll page', () => {
             'Waiting for common public key...',
         );
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('renders the poll creation date as a YYYY-MM-DD subheading', () => {
+        renderPoll();
+
+        expect(screen.getByText('Created 2026-01-01')).toBeVisible();
     });
 
     it('renders participants as individual list items', () => {

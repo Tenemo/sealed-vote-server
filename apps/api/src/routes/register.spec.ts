@@ -77,6 +77,24 @@ describe('Register voter endpoint', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('rejects an invalid voter token format', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/register`,
+            payload: {
+                voterName: 'Alice',
+                voterToken: 'short-token',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('Cannot register a voter for a closed poll', async () => {
         const { pollId, creatorToken } = await createPoll(
             fastify,

@@ -13,11 +13,12 @@ import { hashSecureToken } from '../utils/voterAuth.js';
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const DeletePollBody = Type.Object({
-    creatorToken: Type.String(),
+    creatorToken: SecureTokenSchema,
 });
 
 export type DeletePollBody = Static<typeof DeletePollBody>;

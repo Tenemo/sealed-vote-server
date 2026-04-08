@@ -64,6 +64,20 @@ describe('POST /polls/create', () => {
         expect(responseBody.message).toBe('Not enough choices.');
     });
 
+    test('should reject an invalid creator token format', async () => {
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', 'Cat'],
+                creatorToken: 'short-token',
+                pollName: getUniquePollName('Invalid creator token'),
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
+
     test('should allow duplicate poll names and generate distinct slugs', async () => {
         const pollName = getUniquePollName('Create poll');
         const firstPoll = await createPoll(fastify, pollName, [

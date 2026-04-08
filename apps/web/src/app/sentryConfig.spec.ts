@@ -1,4 +1,7 @@
-import { resolveSentryEnabled } from './sentryConfig';
+import {
+    resolveSentryEnabled,
+    resolveSentryReplayEnabled,
+} from './sentryConfig';
 
 describe('resolveSentryEnabled', () => {
     it('disables Sentry in development mode', () => {
@@ -79,6 +82,42 @@ describe('resolveSentryEnabled', () => {
                 currentHostname: 'sealed.vote',
                 currentOrigin: 'https://sealed.vote',
                 mode: 'production',
+            }),
+        ).toBe(false);
+    });
+});
+
+describe('resolveSentryReplayEnabled', () => {
+    it('disables replay in automated browsers by default', () => {
+        expect(
+            resolveSentryReplayEnabled({
+                configuredValue: undefined,
+                isAutomatedBrowser: true,
+            }),
+        ).toBe(false);
+    });
+
+    it('enables replay for regular browsers by default', () => {
+        expect(
+            resolveSentryReplayEnabled({
+                configuredValue: undefined,
+                isAutomatedBrowser: false,
+            }),
+        ).toBe(true);
+    });
+
+    it('allows explicit replay overrides', () => {
+        expect(
+            resolveSentryReplayEnabled({
+                configuredValue: 'true',
+                isAutomatedBrowser: true,
+            }),
+        ).toBe(true);
+
+        expect(
+            resolveSentryReplayEnabled({
+                configuredValue: 'false',
+                isAutomatedBrowser: false,
             }),
         ).toBe(false);
     });

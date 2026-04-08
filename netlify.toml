@@ -17,6 +17,7 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Cross-Origin-Opener-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.sealed.vote https://o502294.ingest.sentry.io; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; manifest-src 'self'; object-src 'none'; script-src 'self' 'sha256-aONSHYemkGO+m90Nb5yIWw3l7SZGJ8boP3Pxwe0VG6c='; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:;"
 
 [[headers]]
   for = "/index.html"

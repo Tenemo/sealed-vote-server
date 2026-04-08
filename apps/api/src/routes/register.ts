@@ -17,12 +17,13 @@ import { hashSecureToken } from '../utils/voterAuth.js';
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const RegisterRequestSchema = Type.Object({
     voterName: Type.String({ minLength: 1, maxLength: 32 }),
-    voterToken: Type.String(),
+    voterToken: SecureTokenSchema,
 });
 
 const RegisterResponseSchema = Type.Object({

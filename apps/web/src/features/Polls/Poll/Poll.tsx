@@ -65,6 +65,7 @@ const PollPage = (): React.JSX.Element => {
     const dispatch = useAppDispatch();
     const { pollSlug } = useParams();
     const participantsHeadingId = React.useId();
+    const isRecoveringSessionRef = React.useRef(false);
 
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
@@ -92,6 +93,11 @@ const PollPage = (): React.JSX.Element => {
     );
     const effectivePoll = poll ?? votingState.pollSnapshot;
     const pollId = effectivePoll?.id ?? null;
+    const hasPendingVotingState = hasPendingVotingIntent(votingState);
+    const resumableVoterName = getResumableVoterName(votingState);
+    const selectedScores = votingState.selectedScores;
+    const shouldResumeWorkflow = votingState.shouldResumeWorkflow;
+    const isVotingInProgress = votingState.isVotingInProgress;
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -137,20 +143,34 @@ const PollPage = (): React.JSX.Element => {
         if (
             !pollId ||
             !isBrowserOnline ||
-            votingState.isVotingInProgress ||
-            !votingState.shouldResumeWorkflow ||
-            !hasPendingVotingIntent(votingState)
+            isVotingInProgress ||
+            isRecoveringSessionRef.current ||
+            !shouldResumeWorkflow ||
+            !hasPendingVotingState
         ) {
             return;
         }
 
-        const resumableVoterName = getResumableVoterName(votingState);
-        if (!resumableVoterName || !votingState.selectedScores) {
+        if (!resumableVoterName || !selectedScores) {
             return;
         }
 
-        void dispatch(recoverSession({ pollId }));
-    }, [dispatch, isBrowserOnline, pollId, votingState]);
+        isRecoveringSessionRef.current = true;
+        void Promise.resolve(dispatch(recoverSession({ pollId }))).finally(
+            () => {
+                isRecoveringSessionRef.current = false;
+            },
+        );
+    }, [
+        dispatch,
+        hasPendingVotingState,
+        isBrowserOnline,
+        isVotingInProgress,
+        pollId,
+        resumableVoterName,
+        selectedScores,
+        shouldResumeWorkflow,
+    ]);
 
     if (isLegacyPollLink || isNotFoundError(pollError)) {
         return <NotFound />;

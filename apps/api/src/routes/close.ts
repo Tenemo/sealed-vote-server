@@ -21,11 +21,12 @@ import { hashSecureToken } from '../utils/voterAuth.js';
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const ClosePollBodySchema = Type.Object({
-    creatorToken: Type.String(),
+    creatorToken: SecureTokenSchema,
 });
 
 const schema = {

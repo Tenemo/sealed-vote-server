@@ -12,6 +12,7 @@ import {
 
 describe('POST /polls/:pollId/recover-session', () => {
     let fastify: FastifyInstance;
+    const wrongButValidToken = 'a'.repeat(64);
 
     beforeAll(async () => {
         fastify = await buildServer();
@@ -120,7 +121,7 @@ describe('POST /polls/:pollId/recover-session', () => {
             url: `/api/polls/${pollId}/recover-session`,
             payload: {
                 creatorToken,
-                voterToken: 'abc',
+                voterToken: wrongButValidToken,
             },
         });
 
@@ -130,6 +131,23 @@ describe('POST /polls/:pollId/recover-session', () => {
             (JSON.parse(missingTokenResponse.body) as { message: string })
                 .message,
         ).toBe(ERROR_MESSAGES.recoverSessionTokenRequired);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('rejects an invalid recovery token format before attempting auth', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const recoveryResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/recover-session`,
+            payload: {
+                voterToken: 'short-token',
+            },
+        });
+
+        expect(recoveryResponse.statusCode).toBe(400);
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

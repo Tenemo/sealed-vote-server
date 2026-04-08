@@ -13,6 +13,7 @@ import {
 
 describe('POST /polls/:pollId/vote', () => {
     let fastify: FastifyInstance;
+    const wrongButValidVoterToken = 'a'.repeat(64);
     beforeAll(async () => {
         fastify = await buildServer();
     });
@@ -88,7 +89,7 @@ describe('POST /polls/:pollId/vote', () => {
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/invalid-poll-id/vote',
-            payload: { votes: [], voterToken: 'invalid-token' },
+            payload: { votes: [], voterToken: wrongButValidVoterToken },
         });
         expect(response.statusCode).toBe(400);
     });
@@ -97,9 +98,38 @@ describe('POST /polls/:pollId/vote', () => {
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/00000000-0000-0000-0000-000000000000/vote',
-            payload: { votes: [], voterToken: 'invalid-token' },
+            payload: { votes: [], voterToken: wrongButValidVoterToken },
         });
         expect(response.statusCode).toBe(404);
+    });
+
+    test('should reject an invalid voter token format', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Invalid vote token'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: { votes: [], voterToken: 'short-token' },
+        });
+
+        expect(response.statusCode).toBe(400);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
     });
 
     test('should return 400 for voting in an open poll', async () => {
