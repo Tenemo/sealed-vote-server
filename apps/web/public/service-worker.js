@@ -8,6 +8,7 @@ const staticAssetCacheName = 'sealed-vote-static-v1';
 const appShellUrls = [
     '/',
     '/index.html',
+    '/version.json',
     '/favicon/favicon-96x96.png',
     '/favicon/favicon.svg',
     '/favicon/favicon.ico',

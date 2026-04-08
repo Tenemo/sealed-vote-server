@@ -6,15 +6,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
+import { useAppSelector } from 'app/hooks';
 import {
     useClosePollMutation,
     type PollResponse,
 } from 'features/Polls/pollsApi';
-import {
-    forgetLocalVoteState,
-    selectVotingStateByPollId,
-} from 'features/Polls/votingSlice';
+import { selectVotingStateByPollId } from 'features/Polls/votingSlice';
 import { renderError } from 'utils/utils';
 
 type PollHeaderProps = {
@@ -26,34 +23,11 @@ const formatPollCreationDate = (createdAt: string): string =>
     createdAt.slice(0, 10);
 
 const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
-    const dispatch = useAppDispatch();
-    const {
-        creatorToken,
-        pendingVoterName,
-        pollSnapshot,
-        privateKey,
-        progressMessage,
-        publicKey,
-        results,
-        selectedScores,
-        voterName,
-        voterToken,
-        workflowError,
-    } = useAppSelector((state) => selectVotingStateByPollId(state, pollId));
+    const { creatorToken, progressMessage, results, workflowError } =
+        useAppSelector((state) => selectVotingStateByPollId(state, pollId));
 
     const [closePoll, { isLoading: isClosingPoll, error: closeError }] =
         useClosePollMutation();
-    const hasLocalVoteData = Boolean(
-        creatorToken ||
-        pendingVoterName ||
-        pollSnapshot ||
-        privateKey ||
-        publicKey ||
-        results ||
-        selectedScores ||
-        voterName ||
-        voterToken,
-    );
 
     const onClosePoll = (): void => {
         if (!creatorToken) {
@@ -61,9 +35,6 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
         }
 
         void closePoll({ pollId, closeData: { creatorToken } });
-    };
-    const onForgetLocalData = (): void => {
-        dispatch(forgetLocalVoteState({ pollId }));
     };
 
     return (
@@ -109,15 +80,6 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                             >
                                 Begin vote
                             </Button>
-                            {hasLocalVoteData && (
-                                <Button
-                                    className="w-full sm:w-auto"
-                                    onClick={onForgetLocalData}
-                                    variant="outline"
-                                >
-                                    Forget local vote data
-                                </Button>
-                            )}
                         </div>
                         {closeError && (
                             <Alert variant="destructive">
@@ -128,13 +90,6 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                         )}
                     </div>
                 </Panel>
-            )}
-            {!creatorToken && hasLocalVoteData && (
-                <div className="flex justify-end">
-                    <Button onClick={onForgetLocalData} variant="outline">
-                        Forget local vote data
-                    </Button>
-                </div>
             )}
             <div className="space-y-3">
                 {progressMessage && (

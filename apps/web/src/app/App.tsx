@@ -3,6 +3,8 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { Helmet } from 'react-helmet-async';
 import { Route, Routes } from 'react-router-dom';
 
+import VersionBadge from './VersionBadge';
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
 import Header from 'components/Header/Header';
@@ -57,6 +59,7 @@ const App = (): React.JSX.Element => {
                             </Routes>
                         </div>
                     </main>
+                    <VersionBadge />
                 </ErrorBoundary>
             </div>
         </>

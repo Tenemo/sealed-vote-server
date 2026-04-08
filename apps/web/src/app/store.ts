@@ -19,7 +19,6 @@ import { shouldEnableReduxDevTools } from './reduxDevTools';
 
 import { pollsApi } from 'features/Polls/pollsApi';
 import {
-    restoreVotingStateFromPersistence,
     sanitizeVotingStateForPersistence,
     votingSlice,
 } from 'features/Polls/votingSlice';
@@ -32,7 +31,7 @@ const persistVersion = 2;
 
 const votingSessionTransform = createTransform(
     sanitizeVotingStateForPersistence,
-    restoreVotingStateFromPersistence,
+    (outboundState) => outboundState,
     { whitelist: ['voting'] },
 );
 

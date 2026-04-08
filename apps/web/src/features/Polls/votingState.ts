@@ -5,7 +5,6 @@ export type VoteState = {
     pendingVoterName: string | null;
     pollSlug: string | null;
     pollSnapshot: PollResponse | null;
-    lastUpdatedAt: number | null;
     selectedScores: Record<string, number> | null;
     voterName: string | null;
     voterIndex: number | null;
@@ -25,14 +24,11 @@ export type VoteState = {
 
 export type VotingState = Record<string, VoteState>;
 
-export const votingStatePersistenceTtlMs = 30 * 24 * 60 * 60 * 1000;
-
 export const initialVoteState: VoteState = {
     creatorToken: null,
     pendingVoterName: null,
     pollSlug: null,
     pollSnapshot: null,
-    lastUpdatedAt: null,
     selectedScores: null,
     isVotingInProgress: false,
     voterName: null,
@@ -101,57 +97,23 @@ export const clearCompletedSensitiveFields = (
     isVotingInProgress: false,
 });
 
-export const touchVoteState = (
-    voteState: VoteState,
-    updatedAt: number = Date.now(),
-): void => {
-    voteState.lastUpdatedAt = updatedAt;
-};
-
-const normalizeVoteStateForPersistence = (voteState: VoteState): VoteState =>
-    voteState.results
-        ? {
-              ...initialVoteState,
-              ...clearCompletedSensitiveFields(voteState),
-          }
-        : {
-              ...initialVoteState,
-              ...voteState,
-              isVotingInProgress: false,
-              progressMessage: null,
-              workflowError: null,
-          };
-
-const isExpiredPersistedVoteState = (
-    voteState: VoteState,
-    currentTime: number,
-): boolean =>
-    voteState.lastUpdatedAt === null ||
-    currentTime - voteState.lastUpdatedAt > votingStatePersistenceTtlMs;
-
 export const sanitizeVotingStateForPersistence = (
     state: VotingState,
 ): VotingState =>
     Object.fromEntries(
         Object.entries(state).map(([pollId, voteState]) => [
             pollId,
-            normalizeVoteStateForPersistence(voteState),
+            voteState.results
+                ? {
+                      ...initialVoteState,
+                      ...clearCompletedSensitiveFields(voteState),
+                  }
+                : {
+                      ...initialVoteState,
+                      ...voteState,
+                      isVotingInProgress: false,
+                      progressMessage: null,
+                      workflowError: null,
+                  },
         ]),
-    );
-
-export const restoreVotingStateFromPersistence = (
-    state: VotingState | undefined,
-    currentTime: number = Date.now(),
-): VotingState =>
-    Object.fromEntries(
-        Object.entries(state ?? {}).flatMap(([pollId, voteState]) => {
-            const normalizedVoteState =
-                normalizeVoteStateForPersistence(voteState);
-
-            if (isExpiredPersistedVoteState(normalizedVoteState, currentTime)) {
-                return [];
-            }
-
-            return [[pollId, normalizedVoteState] as const];
-        }),
     );

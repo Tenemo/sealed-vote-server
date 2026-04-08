@@ -12,6 +12,10 @@
     --color-destructive: hsl(4 90% 58%);
     --color-border: hsla(0 0% 100% / 0.23);
     --font-sans: 'Roboto', Helvetica, Arial, sans-serif;
+    --radius-sm: 0.1875rem;
+    --radius-lg: 0.4375rem;
+    --radius-xl: 0.625rem;
+    --radius-2xl: 0.875rem;
 }
 
 @font-face {
