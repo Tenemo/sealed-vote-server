@@ -45,7 +45,7 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
 
     await page.goto(firstPoll.pollUrl);
     await page
-        .getByLabel('Voter name*')
+        .getByLabel('Voter name')
         .fill(createVoterName('alice', namespace));
     await page.getByRole('button', { exact: true, name: 'Vote' }).click();
     await expect(page.getByText(/Voters in this poll: .*alice/i)).toBeVisible();
@@ -56,7 +56,7 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
     try {
         await participant.page.goto(secondPoll.pollUrl);
         await participant.page
-            .getByLabel('Voter name*')
+            .getByLabel('Voter name')
             .fill(createVoterName('bob', namespace));
         await participant.page
             .getByRole('button', { exact: true, name: 'Vote' })

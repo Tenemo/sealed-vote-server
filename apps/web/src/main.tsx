@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
@@ -12,46 +12,27 @@ import { apiBaseUrl, sentryTracePropagationTargets } from 'app/apiConfig';
 import App from 'app/App';
 import { resolveSentryEnabled } from 'app/sentryConfig';
 import { store, persistor } from 'app/store';
-import { ThemeProvider } from 'components/ThemeProvider';
 
 import './index.css';
 
 export const Root = (): React.JSX.Element => {
-    useEffect(() => {
-        // https://stackoverflow.com/questions/31402576/enable-focus-only-on-keyboard-use-or-tab-press
-        const handleMouseDown = (): void => {
-            document.body.classList.add('using-mouse');
-        };
-        const handleKeyDown = (event: KeyboardEvent): void => {
-            if (event.key === 'Tab') {
-                document.body.classList.remove('using-mouse');
-            }
-        };
-
-        document.body.addEventListener('mousedown', handleMouseDown);
-        document.body.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            document.body.removeEventListener('mousedown', handleMouseDown);
-            document.body.removeEventListener('keydown', handleKeyDown);
-        };
-    }, []);
-
     return (
         <React.StrictMode>
             <Provider store={store}>
                 <PersistGate
-                    loading={<Spinner className="size-6" />}
+                    loading={
+                        <div className="flex min-h-screen items-center justify-center">
+                            <Spinner className="size-10" />
+                        </div>
+                    }
                     persistor={persistor}
                 >
                     <HelmetProvider>
-                        <ThemeProvider defaultTheme="dark">
-                            <TooltipProvider>
-                                <BrowserRouter>
-                                    <App />
-                                </BrowserRouter>
-                            </TooltipProvider>
-                        </ThemeProvider>
+                        <TooltipProvider>
+                            <BrowserRouter>
+                                <App />
+                            </BrowserRouter>
+                        </TooltipProvider>
                     </HelmetProvider>
                 </PersistGate>
             </Provider>

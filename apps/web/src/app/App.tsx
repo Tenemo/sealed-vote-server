@@ -35,7 +35,9 @@ const App = (): React.JSX.Element => {
                                     element={
                                         <Suspense
                                             fallback={
-                                                <Spinner className="mt-5 size-6" />
+                                                <div className="flex min-h-[50vh] items-center justify-center">
+                                                    <Spinner className="size-10" />
+                                                </div>
                                             }
                                         >
                                             <Poll />

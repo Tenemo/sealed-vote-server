@@ -1,8 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
     --color-background: hsl(0 0% 7.1%);
     --color-foreground: hsl(0 0% 100%);
@@ -62,10 +60,4 @@ body {
 
 #root {
     min-height: 100%;
-}
-
-body.using-mouse :focus,
-body.using-mouse [class$='-is-focused'] {
-    outline: none;
-    box-shadow: initial;
 }

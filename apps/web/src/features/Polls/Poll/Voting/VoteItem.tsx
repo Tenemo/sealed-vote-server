@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useId } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -16,34 +16,47 @@ const VoteItem = ({
     onVote,
     selectedScore,
 }: Props): React.JSX.Element => {
+    const radioGroupName = useId();
+
     return (
         <li className="rounded-xl border border-border/70 bg-background/25 p-4 sm:p-5">
-            <div className="space-y-4">
+            <fieldset className="space-y-4">
+                <legend className="sr-only">{`Score for ${choiceName}`}</legend>
                 <h3 className="text-lg font-semibold tracking-tight sm:text-xl">
                     {choiceName}
                 </h3>
                 <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
                     {SCORE_CHOICES.map((scoreChoice) => (
-                        <Button
-                            aria-pressed={scoreChoice === selectedScore}
-                            className={cn(
-                                'h-11 w-full px-0 text-base',
-                                scoreChoice === selectedScore &&
-                                    'shadow-[0_16px_32px_rgba(255,255,255,0.08)]',
-                            )}
-                            key={scoreChoice}
-                            onClick={() => onVote(choiceName, scoreChoice)}
-                            variant={
-                                scoreChoice === selectedScore
-                                    ? 'default'
-                                    : 'outline'
-                            }
-                        >
-                            {scoreChoice}
-                        </Button>
+                        <div className="relative" key={scoreChoice}>
+                            <input
+                                aria-label={`Score ${scoreChoice} for ${choiceName}`}
+                                checked={scoreChoice === selectedScore}
+                                className="peer sr-only"
+                                id={`${radioGroupName}-${scoreChoice}`}
+                                name={radioGroupName}
+                                onChange={() => onVote(choiceName, scoreChoice)}
+                                type="radio"
+                                value={scoreChoice}
+                            />
+                            <label
+                                className={cn(
+                                    buttonVariants({
+                                        size: 'default',
+                                        variant:
+                                            scoreChoice === selectedScore
+                                                ? 'default'
+                                                : 'outline',
+                                    }),
+                                    'h-11 w-full cursor-pointer px-0 text-base peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
+                                )}
+                                htmlFor={`${radioGroupName}-${scoreChoice}`}
+                            >
+                                {scoreChoice}
+                            </label>
+                        </div>
                     ))}
                 </div>
-            </div>
+            </fieldset>
         </li>
     );
 };

@@ -37,19 +37,6 @@ const Alert = ({
     );
 };
 
-const AlertTitle = ({
-    className,
-    ...props
-}: React.ComponentProps<'div'>): React.JSX.Element => {
-    return (
-        <div
-            className={cn('font-medium', className)}
-            data-slot="alert-title"
-            {...props}
-        />
-    );
-};
-
 const AlertDescription = ({
     className,
     ...props
@@ -63,17 +50,4 @@ const AlertDescription = ({
     );
 };
 
-const AlertAction = ({
-    className,
-    ...props
-}: React.ComponentProps<'div'>): React.JSX.Element => {
-    return (
-        <div
-            className={cn('absolute right-2 top-2', className)}
-            data-slot="alert-action"
-            {...props}
-        />
-    );
-};
-
-export { Alert, AlertTitle, AlertDescription, AlertAction };
+export { Alert, AlertDescription };

@@ -112,7 +112,11 @@ const PollPage = (): React.JSX.Element => {
             <Helmet>
                 <title>{poll ? poll.pollName : 'Vote'}</title>
             </Helmet>
-            {isLoadingPoll && <Spinner className="mx-auto mt-8 size-6" />}
+            {isLoadingPoll && (
+                <div className="flex min-h-[40vh] items-center justify-center">
+                    <Spinner className="size-10" />
+                </div>
+            )}
             {pollError && (
                 <Alert className="mx-auto mt-6 max-w-3xl" variant="destructive">
                     <AlertDescription>

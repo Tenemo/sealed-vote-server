@@ -100,7 +100,7 @@ const ChoiceAdding = ({
                                     {choice}
                                 </span>
                                 <Button
-                                    aria-label="delete"
+                                    aria-label={`Remove choice ${choice}`}
                                     onClick={() => onRemoveChoice(choice)}
                                     size="icon-sm"
                                     type="button"

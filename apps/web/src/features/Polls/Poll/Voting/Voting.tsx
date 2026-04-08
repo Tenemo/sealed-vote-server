@@ -1,5 +1,5 @@
 import { canRegister } from '@sealed-vote/protocol';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, type FormEvent } from 'react';
 
 import VoteItem from './VoteItem';
 
@@ -56,14 +56,6 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
         }));
     };
 
-    const onSubmit = (): void => {
-        void onVote(voterName.trim(), selectedScores);
-    };
-
-    if (progressMessage || !canRegister(poll)) {
-        return <></>;
-    }
-
     const normalizedVoterName = voterName.trim();
     const isVoterNameDuplicate =
         !!normalizedVoterName &&
@@ -75,52 +67,76 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
         !!normalizedVoterName &&
         !isVoterNameDuplicate;
 
+    const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+
+        if (!isSubmitEnabled) {
+            return;
+        }
+
+        void onVote(voterName.trim(), selectedScores);
+    };
+
+    if (progressMessage || !canRegister(poll)) {
+        return <></>;
+    }
+
     return (
-        <Panel className="space-y-6">
-            <div className="space-y-2">
-                <h2 className="text-2xl font-semibold tracking-tight">
-                    Cast your vote
-                </h2>
-                <p className="text-sm leading-7 text-secondary sm:text-base">
-                    Rate choices from 1 to 10. The results will be ranked by
-                    geometric mean of all votes per item. All voters need to be
-                    present in order to complete the vote.
-                </p>
-            </div>
-            <ul className="space-y-4">
-                {poll.choices.map((choiceName) => (
-                    <VoteItem
-                        choiceName={choiceName}
-                        key={choiceName}
-                        onVote={onVoteSelect}
-                        selectedScore={selectedScores[choiceName]}
+        <Panel>
+            <form className="space-y-6" onSubmit={onSubmit}>
+                <div className="space-y-2">
+                    <h2 className="text-2xl font-semibold tracking-tight">
+                        Cast your vote
+                    </h2>
+                    <p className="text-sm leading-7 text-secondary sm:text-base">
+                        Rate choices from 1 to 10. The results will be ranked by
+                        geometric mean of all votes per item. All voters need to
+                        be present in order to complete the vote.
+                    </p>
+                </div>
+                <ul className="space-y-4">
+                    {poll.choices.map((choiceName) => (
+                        <VoteItem
+                            choiceName={choiceName}
+                            key={choiceName}
+                            onVote={onVoteSelect}
+                            selectedScore={selectedScores[choiceName]}
+                        />
+                    ))}
+                </ul>
+                <div className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                    <OutlinedInputField
+                        aria-invalid={isVoterNameDuplicate}
+                        errorText={
+                            isVoterNameDuplicate
+                                ? 'This voter name already exists'
+                                : undefined
+                        }
+                        helperText={
+                            !isVoterNameDuplicate
+                                ? 'Use a unique name visible to other voters.'
+                                : undefined
+                        }
+                        id="voterName"
+                        label="Voter name"
+                        maxLength={32}
+                        name="voterName"
+                        onChange={({ target: { value } }) =>
+                            setVoterName(value)
+                        }
+                        required
+                        value={voterName}
                     />
-                ))}
-            </ul>
-            <div className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <OutlinedInputField
-                    aria-invalid={isVoterNameDuplicate}
-                    errorText={
-                        isVoterNameDuplicate
-                            ? 'This voter name already exists'
-                            : undefined
-                    }
-                    id="voterName"
-                    label="Voter name*"
-                    maxLength={32}
-                    name="voterName"
-                    onChange={({ target: { value } }) => setVoterName(value)}
-                    value={voterName}
-                />
-                <Button
-                    className="w-full sm:w-auto sm:min-w-32"
-                    disabled={!isSubmitEnabled}
-                    onClick={onSubmit}
-                    size="lg"
-                >
-                    Vote
-                </Button>
-            </div>
+                    <Button
+                        className="w-full sm:mt-7 sm:w-auto sm:min-w-32"
+                        disabled={!isSubmitEnabled}
+                        size="lg"
+                        type="submit"
+                    >
+                        Vote
+                    </Button>
+                </div>
+            </form>
         </Panel>
     );
 };

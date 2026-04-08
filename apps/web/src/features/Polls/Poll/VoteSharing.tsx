@@ -1,4 +1,4 @@
-import { Copy } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const copyTextToClipboard = async (text: string): Promise<void> => {
     if (navigator.clipboard?.writeText) {
@@ -29,14 +30,56 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
 
     document.body.append(textArea);
     textArea.select();
-    document.execCommand('copy');
+    const didCopy = document.execCommand('copy');
     textArea.remove();
+
+    if (!didCopy) {
+        throw new Error('Clipboard copy failed.');
+    }
 };
 
 const VoteSharing = (): React.JSX.Element => {
-    const handleCopyLink = (): void => {
-        void copyTextToClipboard(window.location.href);
+    const [copyStatus, setCopyStatus] = React.useState<
+        'idle' | 'success' | 'error'
+    >('idle');
+    const resetStatusTimeoutRef = React.useRef<number | undefined>(undefined);
+
+    const scheduleStatusReset = (): void => {
+        window.clearTimeout(resetStatusTimeoutRef.current);
+        resetStatusTimeoutRef.current = window.setTimeout(() => {
+            setCopyStatus('idle');
+        }, 2500);
     };
+
+    React.useEffect(() => {
+        return () => {
+            window.clearTimeout(resetStatusTimeoutRef.current);
+        };
+    }, []);
+
+    const handleCopyLink = async (): Promise<void> => {
+        try {
+            await copyTextToClipboard(window.location.href);
+            setCopyStatus('success');
+        } catch {
+            setCopyStatus('error');
+        }
+
+        scheduleStatusReset();
+    };
+
+    const helperText =
+        copyStatus === 'success'
+            ? 'Vote link copied to clipboard.'
+            : copyStatus === 'error'
+              ? 'Copy failed. Please copy the link manually.'
+              : 'Link to the vote to share with others';
+    const tooltipText =
+        copyStatus === 'success'
+            ? 'Copied'
+            : copyStatus === 'error'
+              ? 'Copy failed'
+              : 'Copy to clipboard';
 
     return (
         <Field>
@@ -58,24 +101,39 @@ const VoteSharing = (): React.JSX.Element => {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
-                                aria-label="Copy vote link"
+                                aria-label={
+                                    copyStatus === 'success'
+                                        ? 'Vote link copied'
+                                        : 'Copy vote link'
+                                }
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2"
-                                onClick={handleCopyLink}
+                                onClick={() => {
+                                    void handleCopyLink();
+                                }}
                                 size="icon-sm"
                                 type="button"
                                 variant="ghost"
                             >
-                                <Copy className="size-4" />
+                                {copyStatus === 'success' ? (
+                                    <Check className="size-4" />
+                                ) : (
+                                    <Copy className="size-4" />
+                                )}
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Copy to clipboard</TooltipContent>
+                        <TooltipContent>{tooltipText}</TooltipContent>
                     </Tooltip>
                 </div>
                 <FieldDescription
-                    className="mt-2 text-sm leading-6"
+                    aria-live="polite"
+                    className={cn(
+                        'mt-2 text-sm leading-6',
+                        copyStatus === 'error' && 'text-destructive',
+                        copyStatus === 'success' && 'text-foreground',
+                    )}
                     id="copy-page-link-helper-text"
                 >
-                    Link to the vote to share with others
+                    {helperText}
                 </FieldDescription>
             </FieldContent>
         </Field>

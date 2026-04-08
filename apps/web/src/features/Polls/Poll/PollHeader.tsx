@@ -58,7 +58,6 @@ const PollHeader = ({ poll, pollId }: PollHeaderProps): React.JSX.Element => {
                             className="w-full sm:w-auto"
                             disabled={isClosingPoll || poll.voters.length < 2}
                             onClick={onClosePoll}
-                            variant="warning"
                         >
                             Begin vote
                         </Button>

@@ -39,7 +39,7 @@ test('blocks duplicate voter names before registration submission', async ({
     });
     createdPolls.push(createdPoll);
 
-    await page.getByLabel('Voter name*').fill(firstVoterName);
+    await page.getByLabel('Voter name').fill(firstVoterName);
     await page.getByRole('button', { exact: true, name: 'Vote' }).click();
 
     const participant = await openProjectParticipant(browser, testInfo);
@@ -53,14 +53,14 @@ test('blocks duplicate voter names before registration submission', async ({
             name: 'Vote',
         });
 
-        await participant.page.getByLabel('Voter name*').fill(firstVoterName);
+        await participant.page.getByLabel('Voter name').fill(firstVoterName);
 
         await expect(
             participant.page.getByText('This voter name already exists'),
         ).toBeVisible();
         await expect(secondVoteButton).toBeDisabled();
 
-        await participant.page.getByLabel('Voter name*').fill(secondVoterName);
+        await participant.page.getByLabel('Voter name').fill(secondVoterName);
 
         await expect(
             participant.page.getByText('This voter name already exists'),

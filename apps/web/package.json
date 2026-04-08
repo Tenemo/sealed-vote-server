@@ -17,7 +17,8 @@
         "clean": "rimraf ./dist",
         "eslint": "pnpm --workspace-root exec eslint apps/web",
         "eslint:fix": "pnpm --workspace-root exec eslint apps/web --fix",
-        "lint": "pnpm run eslint",
+        "stylelint": "pnpm --workspace-root exec stylelint apps/web/src/index.css",
+        "lint": "pnpm run eslint && pnpm run stylelint",
         "typecheck": "tsc",
         "test": "vitest run --reporter verbose",
         "test:update": "vitest run --update",
@@ -69,6 +70,8 @@
         "@vitest/coverage-v8": "catalog:",
         "jsdom": "^29.0.1",
         "rimraf": "catalog:",
+        "stylelint": "^16.26.0",
+        "stylelint-config-standard": "^39.0.1",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "catalog:"

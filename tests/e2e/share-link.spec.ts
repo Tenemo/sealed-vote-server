@@ -47,7 +47,7 @@ test('keeps copied share links slug-based across platforms', async ({
     try {
         await participant.page.goto(copiedShareLink);
         await participant.page
-            .getByLabel('Voter name*')
+            .getByLabel('Voter name')
             .fill(createVoterName('bob', namespace));
         await participant.page
             .getByRole('button', { exact: true, name: 'Vote' })

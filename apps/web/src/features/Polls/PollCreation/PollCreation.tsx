@@ -1,4 +1,4 @@
-import React, { useState, type ChangeEvent } from 'react';
+import React, { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/utils';
 
@@ -32,7 +33,7 @@ const PollCreationPage = (): React.JSX.Element => {
     const onFormChange = ({
         target: { id, value },
     }: ChangeEvent<HTMLInputElement>): void =>
-        setForm({ ...form, [id]: value });
+        setForm((previousForm) => ({ ...previousForm, [id]: value }));
 
     const onAddChoice = (choice: string): void =>
         setForm((prev) => ({
@@ -48,7 +49,15 @@ const PollCreationPage = (): React.JSX.Element => {
             ),
         }));
 
-    const onCreatePoll = (): void => {
+    const isFormValid = !!pollName.trim() && choices.length > 1;
+
+    const onCreatePoll = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+
+        if (!isFormValid || isLoading) {
+            return;
+        }
+
         void createPoll({
             pollName: form.pollName.trim(),
             choices: form.choices,
@@ -58,8 +67,6 @@ const PollCreationPage = (): React.JSX.Element => {
                 void navigate(`/votes/${slug}`);
             });
     };
-
-    const isFormValid = pollName.trim() && choices.length > 1 && !isLoading;
 
     return (
         <>
@@ -76,50 +83,61 @@ const PollCreationPage = (): React.JSX.Element => {
                         the generated link when you are ready.
                     </p>
                 </div>
-                <Panel className="space-y-6">
-                    <OutlinedInputField
-                        autoComplete="off"
-                        helperText={
-                            !pollName
-                                ? 'What would you like to vote on?'
-                                : undefined
-                        }
-                        id="pollName"
-                        label="Vote name"
-                        maxLength={64}
-                        name="pollName"
-                        onChange={onFormChange}
-                        required
-                        value={pollName}
-                    />
-                    <ChoiceAdding
-                        choices={form.choices}
-                        onAddChoice={onAddChoice}
-                        onRemoveChoice={onRemoveChoice}
-                    />
-                </Panel>
-                {(error || isLoading) && (
-                    <div className="space-y-3">
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertDescription>
-                                    {renderError(error)}
-                                </AlertDescription>
-                            </Alert>
-                        )}
-                        {isLoading && <Spinner className="size-6" />}
+                <form className="space-y-6" onSubmit={onCreatePoll}>
+                    <Panel className="space-y-6">
+                        <OutlinedInputField
+                            autoComplete="off"
+                            helperText={
+                                !pollName
+                                    ? 'What would you like to vote on?'
+                                    : undefined
+                            }
+                            id="pollName"
+                            label="Vote name"
+                            maxLength={64}
+                            name="pollName"
+                            onChange={onFormChange}
+                            required
+                            value={pollName}
+                        />
+                        <ChoiceAdding
+                            choices={form.choices}
+                            onAddChoice={onAddChoice}
+                            onRemoveChoice={onRemoveChoice}
+                        />
+                    </Panel>
+                    {error && (
+                        <Alert variant="destructive">
+                            <AlertDescription>
+                                {renderError(error)}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    <div className="flex justify-end">
+                        <Button
+                            className="w-full sm:w-auto"
+                            disabled={!isFormValid || isLoading}
+                            size="lg"
+                            type="submit"
+                        >
+                            <span className="grid grid-cols-[1.25rem_auto_1.25rem] items-center gap-2">
+                                <Spinner
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'size-5',
+                                        !isLoading && 'invisible',
+                                    )}
+                                />
+                                <span>
+                                    {isLoading
+                                        ? 'Creating vote'
+                                        : 'Create vote'}
+                                </span>
+                                <span aria-hidden="true" className="size-5" />
+                            </span>
+                        </Button>
                     </div>
-                )}
-                <div className="flex justify-end">
-                    <Button
-                        className="w-full sm:w-auto"
-                        disabled={!isFormValid}
-                        onClick={onCreatePoll}
-                        size="lg"
-                    >
-                        Create vote
-                    </Button>
-                </div>
+                </form>
             </section>
         </>
     );
