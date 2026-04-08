@@ -11,6 +11,7 @@ import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { generateClientToken } from 'features/Polls/clientToken';
+import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
 
@@ -75,7 +76,12 @@ const PollCreationPage = (): React.JSX.Element => {
             creatorToken: nextCreatorToken,
         })
             .unwrap()
-            .then(({ slug }) => {
+            .then(({ creatorToken: confirmedCreatorToken, id, slug }) => {
+                saveCreatorSession({
+                    creatorToken: confirmedCreatorToken,
+                    pollId: id,
+                    pollSlug: slug,
+                });
                 void navigate(`/votes/${slug}`);
             })
             .catch(() => undefined);
@@ -84,7 +90,13 @@ const PollCreationPage = (): React.JSX.Element => {
     return (
         <>
             <Helmet>
-                <title>Vote creation</title>
+                <title>Create a new vote | sealed.vote</title>
+                <meta
+                    content="Create a confidential 1-10 score vote in the browser and share one link with every participant."
+                    name="description"
+                />
+                <meta content="index, follow" name="robots" />
+                <link href="https://sealed.vote/" rel="canonical" />
             </Helmet>
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">

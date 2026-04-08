@@ -15,11 +15,25 @@ const mockedVote = vi.fn((payload: unknown) => ({
     payload,
     type: 'voting/vote',
 }));
+const mockedFindCreatorSessionByPollId = vi.fn();
+const mockedFindCreatorSessionByPollSlug = vi.fn();
+const mockedRemoveCreatorSession = vi.fn();
+const mockedSaveCreatorSession = vi.fn();
 const mockedUseGetPollQuery = vi.fn();
 const mockedUseClosePollMutation = vi.fn();
 
 vi.mock('features/Polls/votingThunks/vote', () => ({
     vote: (payload: unknown) => mockedVote(payload),
+}));
+
+vi.mock('features/Polls/creatorSessionStorage', () => ({
+    findCreatorSessionByPollId: (pollId: string) =>
+        mockedFindCreatorSessionByPollId(pollId),
+    findCreatorSessionByPollSlug: (pollSlug: string) =>
+        mockedFindCreatorSessionByPollSlug(pollSlug),
+    removeCreatorSession: (pollId: string) =>
+        mockedRemoveCreatorSession(pollId),
+    saveCreatorSession: (payload: unknown) => mockedSaveCreatorSession(payload),
 }));
 
 vi.mock('features/Polls/pollsApi', () => ({
@@ -86,9 +100,18 @@ const renderPoll = (
     return store;
 };
 
+const selectVotingState = (
+    state: { voting: VotingState },
+    pollId: string,
+): VotingState[string] => state.voting[pollId] ?? initialVoteState;
+
 describe('Poll page', () => {
     beforeEach(() => {
         mockedVote.mockClear();
+        mockedFindCreatorSessionByPollId.mockReset();
+        mockedFindCreatorSessionByPollSlug.mockReset();
+        mockedRemoveCreatorSession.mockReset();
+        mockedSaveCreatorSession.mockReset();
         mockedUseGetPollQuery.mockReset();
         mockedUseClosePollMutation.mockReset();
 
@@ -101,6 +124,8 @@ describe('Poll page', () => {
             vi.fn(),
             { error: undefined, isLoading: false },
         ]);
+        mockedFindCreatorSessionByPollId.mockReturnValue(null);
+        mockedFindCreatorSessionByPollSlug.mockReturnValue(null);
     });
 
     it('renders workflow failures from state', () => {
@@ -277,5 +302,37 @@ describe('Poll page', () => {
         expect(
             screen.queryByText('TypeError: Failed to fetch'),
         ).not.toBeInTheDocument();
+    });
+
+    it('restores creator controls from the direct creator-session fallback', async () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: {
+                ...basePoll,
+                isOpen: true,
+                voters: ['Alice', 'Bob'],
+            },
+            error: undefined,
+            isLoading: false,
+        });
+        mockedFindCreatorSessionByPollId.mockReturnValue({
+            creatorToken: 'creator-token',
+            pollId: basePoll.id,
+            pollSlug: basePoll.slug,
+        });
+
+        const store = renderPoll();
+
+        await waitFor(() => {
+            expect(
+                selectVotingState(store.getState(), basePoll.id).creatorToken,
+            ).toBe('creator-token');
+        });
+
+        expect(
+            screen.getByRole('button', { name: 'Begin vote' }),
+        ).toBeVisible();
+        expect(mockedFindCreatorSessionByPollId).toHaveBeenCalledWith(
+            basePoll.id,
+        );
     });
 });

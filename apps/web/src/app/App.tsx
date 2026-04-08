@@ -18,6 +18,12 @@ const App = (): React.JSX.Element => {
         <>
             <Helmet>
                 <title>sealed.vote</title>
+                <meta
+                    content="Confidential 1-10 score voting in the browser, with homomorphic encryption, offline recovery, and public verification of the published final result."
+                    name="description"
+                />
+                <link href="https://sealed.vote/" rel="canonical" />
+                <meta content="index, follow" name="robots" />
             </Helmet>
             <div className="flex min-h-full flex-col">
                 <ErrorBoundary

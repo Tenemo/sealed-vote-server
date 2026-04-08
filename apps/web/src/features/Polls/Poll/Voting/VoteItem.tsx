@@ -45,11 +45,11 @@ const VoteItem = ({
                                     className={cn(
                                         buttonVariants({
                                             size: 'default',
-                                            variant:
-                                                scoreChoice === selectedScore
-                                                    ? 'default'
-                                                    : 'outline',
+                                            variant: 'outline',
                                         }),
+                                        scoreChoice === selectedScore
+                                            ? 'border-white bg-white text-black hover:border-white hover:bg-white hover:text-black'
+                                            : 'border-border bg-transparent text-foreground hover:bg-accent hover:text-foreground',
                                         'h-11 w-full cursor-pointer px-0 text-base peer-focus-visible:ring-2 peer-focus-visible:ring-foreground/55 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
                                     )}
                                     htmlFor={`${radioGroupName}-${scoreChoice}`}

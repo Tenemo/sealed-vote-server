@@ -27,6 +27,7 @@ describe('PollCreation', () => {
     beforeEach(() => {
         mockedCreatePoll.mockReset();
         mockedGenerateClientToken.mockReset();
+        window.localStorage.clear();
     });
 
     it('navigates to the slug-based vote route after create', async () => {

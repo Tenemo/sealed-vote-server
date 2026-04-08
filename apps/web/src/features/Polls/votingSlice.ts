@@ -165,6 +165,20 @@ export const votingSlice = createSlice({
             voteState.privateKey = privateKey;
             voteState.publicKey = publicKey;
         },
+        restoreCreatorSession: (
+            state,
+            action: PayloadAction<{
+                creatorToken: string;
+                pollId: string;
+                pollSlug: string;
+            }>,
+        ) => {
+            const { creatorToken, pollId, pollSlug } = action.payload;
+            const voteState = ensureVoteState(state, pollId);
+
+            voteState.creatorToken = creatorToken;
+            voteState.pollSlug = pollSlug;
+        },
         setPendingVoterRegistration: (
             state,
             action: PayloadAction<{
@@ -350,6 +364,7 @@ export const votingSlice = createSlice({
 export const {
     applyRecoveredSession,
     clearWorkflowError,
+    restoreCreatorSession,
     setKeys,
     setPendingVoterRegistration,
     setProgressMessage,

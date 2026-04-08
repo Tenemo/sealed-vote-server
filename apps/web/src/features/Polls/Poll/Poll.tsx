@@ -13,8 +13,18 @@ import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import NotFound from 'components/NotFound/NotFound';
+import {
+    findCreatorSessionByPollId,
+    findCreatorSessionByPollSlug,
+    removeCreatorSession,
+    saveCreatorSession,
+} from 'features/Polls/creatorSessionStorage';
 import { pollPollingIntervalMs } from 'features/Polls/pollQuery';
 import { useGetPollQuery } from 'features/Polls/pollsApi';
+import {
+    restoreCreatorSession,
+    selectVotingStateByPollId,
+} from 'features/Polls/votingSlice';
 import { selectVoteStateByPollSlug } from 'features/Polls/votingState';
 import { vote } from 'features/Polls/votingThunks/vote';
 import {
@@ -57,6 +67,9 @@ const PollPage = (): React.JSX.Element => {
     );
     const effectivePoll = poll ?? votingState.pollSnapshot;
     const pollId = effectivePoll?.id ?? null;
+    const currentVoteState = useAppSelector((state) =>
+        pollId ? selectVotingStateByPollId(state, pollId) : votingState,
+    );
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -79,6 +92,49 @@ const PollPage = (): React.JSX.Element => {
         setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
     }, [effectivePoll?.resultScores.length]);
 
+    useEffect(() => {
+        if (!effectivePoll) {
+            return;
+        }
+
+        if (effectivePoll.resultScores.length) {
+            removeCreatorSession(effectivePoll.id);
+            return;
+        }
+
+        if (currentVoteState.creatorToken) {
+            saveCreatorSession({
+                creatorToken: currentVoteState.creatorToken,
+                pollId: effectivePoll.id,
+                pollSlug: effectivePoll.slug,
+            });
+            return;
+        }
+
+        const storedCreatorSession =
+            findCreatorSessionByPollId(effectivePoll.id) ??
+            findCreatorSessionByPollSlug(effectivePoll.slug);
+
+        if (!storedCreatorSession) {
+            return;
+        }
+
+        dispatch(
+            restoreCreatorSession({
+                creatorToken: storedCreatorSession.creatorToken,
+                pollId: effectivePoll.id,
+                pollSlug: effectivePoll.slug,
+            }),
+        );
+    }, [
+        currentVoteState.creatorToken,
+        dispatch,
+        effectivePoll,
+        effectivePoll?.id,
+        effectivePoll?.resultScores.length,
+        effectivePoll?.slug,
+    ]);
+
     if (isLegacyPollLink || isNotFoundError(pollError)) {
         return <NotFound />;
     }
@@ -93,7 +149,16 @@ const PollPage = (): React.JSX.Element => {
     return (
         <>
             <Helmet>
-                <title>{effectivePoll ? effectivePoll.pollName : 'Vote'}</title>
+                <title>
+                    {effectivePoll
+                        ? `${effectivePoll.pollName} | sealed.vote`
+                        : 'Vote | sealed.vote'}
+                </title>
+                <meta
+                    content="Confidential participant vote page on sealed.vote."
+                    name="description"
+                />
+                <meta content="noindex, nofollow, noarchive" name="robots" />
             </Helmet>
             {isLoadingPoll && !hasPollData && (
                 <div className="flex min-h-[40vh] items-center justify-center">

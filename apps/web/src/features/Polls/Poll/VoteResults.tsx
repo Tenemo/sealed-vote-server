@@ -13,31 +13,6 @@ type VoteResultsProps = {
     pollId: string;
 };
 
-const reportVerificationMismatch = async ({
-    pollId,
-    verification,
-}: {
-    pollId: string;
-    verification: PublishedResultVerification;
-}): Promise<void> => {
-    const message = `Public result verification failed for poll ${pollId}.`;
-    console.error(message, verification);
-
-    try {
-        const Sentry = await import('@sentry/react');
-        Sentry.captureMessage(message, {
-            extra: verification,
-            level: 'error',
-            tags: {
-                area: 'vote-results',
-                pollId,
-            },
-        });
-    } catch {
-        // Ignore reporting failures so the results UI keeps working.
-    }
-};
-
 const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
     const headingId = React.useId();
     const verificationState = React.useMemo(() => {
@@ -89,10 +64,12 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
             return;
         }
 
-        void reportVerificationMismatch({
-            pollId,
-            verification: verificationState.verification,
-        });
+        const verification: PublishedResultVerification =
+            verificationState.verification;
+        console.error(
+            `Public result verification failed for poll ${pollId}.`,
+            verification,
+        );
     }, [pollId, verificationState]);
 
     if (!poll.resultScores.length) {

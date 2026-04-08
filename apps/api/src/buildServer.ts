@@ -170,7 +170,7 @@ export const buildServer = async (
             callback(null, isAllowedCorsOrigin(origin, configuredWebAppOrigin));
         },
         methods: ['GET', 'HEAD', 'POST', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'sentry-trace', 'baggage'],
+        allowedHeaders: ['Content-Type'],
         maxAge: 86_400,
     });
     await databasePlugin(fastify);
