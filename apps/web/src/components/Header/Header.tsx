@@ -1,4 +1,4 @@
-import { SiGithub } from '@icons-pack/react-simple-icons';
+import { GitBranch } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -21,7 +21,7 @@ const Header = (): React.JSX.Element => {
                         rel="noopener noreferrer"
                         target="_blank"
                     >
-                        <SiGithub aria-hidden="true" className="size-4" />
+                        <GitBranch aria-hidden="true" className="size-4" />
                     </a>
                 </Button>
             </div>

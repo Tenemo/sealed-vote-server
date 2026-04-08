@@ -91,6 +91,11 @@ export const expectResultsVisible = async (page: Page): Promise<void> => {
     await expect(
         page.getByRole('heading', { name: 'Results' }),
     ).toBeVisible({ timeout: 120_000 });
+    await expect(
+        page.getByText(
+            'Public verification passed. The published tallies and scores match the encrypted tallies and published decryption shares.',
+        ),
+    ).toBeVisible({ timeout: 120_000 });
 };
 
 export const expectParticipantsVisible = async (

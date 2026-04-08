@@ -25,7 +25,9 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     encryptedVoteCount: 0,
     encryptedTallies: [],
     decryptionShareCount: 0,
-    results: [],
+    publishedDecryptionShares: [],
+    resultTallies: [],
+    resultScores: [],
     ...overrides,
 });
 
@@ -37,7 +39,7 @@ describe('toPollPhaseState', () => {
             voterCount: 2,
             encryptedVoteCount: 0,
             encryptedTallyCount: 0,
-            resultCount: 0,
+            resultScoreCount: 0,
         });
     });
 });
@@ -94,7 +96,7 @@ describe('derivePollPhase', () => {
                 createPoll({
                     isOpen: false,
                     commonPublicKey: '123',
-                    results: [42],
+                    resultScores: [42],
                 }),
             ),
         ).toBe('complete');
@@ -108,7 +110,7 @@ describe('derivePollPhase', () => {
                 voterCount: 3,
                 encryptedVoteCount: 3,
                 encryptedTallyCount: 0,
-                resultCount: 0,
+                resultScoreCount: 0,
             }),
         ).toBe('tallying');
     });
@@ -137,7 +139,7 @@ describe('guards', () => {
                 voterCount: 1,
                 encryptedVoteCount: 0,
                 encryptedTallyCount: 0,
-                resultCount: 0,
+                resultScoreCount: 0,
             }),
         ).toBe(false);
     });

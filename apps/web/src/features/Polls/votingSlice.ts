@@ -3,7 +3,12 @@ import {
     type PayloadAction,
     type UnknownAction,
 } from '@reduxjs/toolkit';
+import type {
+    PollResponse,
+    RecoverSessionResponse,
+} from '@sealed-vote/contracts';
 
+import { hasPublishedResults, normalizePollResponse } from './pollData';
 import { pollsApi } from './pollsApi';
 import {
     clearCompletedSensitiveFields,
@@ -33,7 +38,8 @@ const applyRegistration = (
         voterToken: string;
     },
 ): void => {
-    voteState.pendingVoterName = payload.voterName;
+    voteState.pendingVoterName = null;
+    voteState.pendingVoterToken = null;
     voteState.voterName = payload.voterName;
     voteState.voterIndex = payload.voterIndex;
     voteState.voterToken = payload.voterToken;
@@ -42,6 +48,23 @@ const applyRegistration = (
     voteState.hasSubmittedPublicKeyShare = false;
     voteState.hasSubmittedVote = false;
     voteState.hasSubmittedDecryptionShares = false;
+};
+
+const applyPollSnapshot = (voteState: VoteState, poll: PollResponse): void => {
+    const normalizedPoll = normalizePollResponse(poll);
+
+    if (!normalizedPoll) {
+        return;
+    }
+
+    voteState.pollSlug = normalizedPoll.slug;
+    voteState.pollSnapshot = normalizedPoll;
+
+    if (!hasPublishedResults(normalizedPoll)) {
+        return;
+    }
+
+    Object.assign(voteState, clearCompletedSensitiveFields(voteState));
 };
 
 export type VoteThunkRejectValue = {
@@ -90,6 +113,44 @@ export const votingSlice = createSlice({
             selectVoteStateByPollId(state, pollId),
     },
     reducers: {
+        applyRecoveredSession: (
+            state,
+            action: PayloadAction<{
+                pollId: string;
+                recovery: RecoverSessionResponse;
+            }>,
+        ) => {
+            const { pollId, recovery } = action.payload;
+            const voteState = ensureVoteState(state, pollId);
+
+            voteState.pollSlug = recovery.pollSlug;
+            voteState.workflowError = null;
+
+            if (recovery.role === 'voter') {
+                voteState.pendingVoterName =
+                    recovery.voterName ?? voteState.pendingVoterName;
+                voteState.voterName = recovery.voterName ?? voteState.voterName;
+                voteState.voterIndex =
+                    recovery.voterIndex ?? voteState.voterIndex;
+                if (!voteState.voterToken && voteState.pendingVoterToken) {
+                    voteState.voterToken = voteState.pendingVoterToken;
+                    voteState.pendingVoterToken = null;
+                }
+                voteState.hasSubmittedPublicKeyShare =
+                    recovery.hasSubmittedPublicKeyShare;
+                voteState.hasSubmittedVote = recovery.hasSubmittedVote;
+                voteState.hasSubmittedDecryptionShares =
+                    recovery.hasSubmittedDecryptionShares;
+                voteState.shouldResumeWorkflow = Boolean(
+                    voteState.selectedScores &&
+                    voteState.voterToken &&
+                    !recovery.resultsAvailable,
+                );
+                return;
+            }
+
+            voteState.shouldResumeWorkflow = false;
+        },
         clearWorkflowError: (
             state,
             action: PayloadAction<{
@@ -98,31 +159,49 @@ export const votingSlice = createSlice({
         ) => {
             ensureVoteState(state, action.payload.pollId).workflowError = null;
         },
-        setPendingVoterName: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                voterName: string | null;
-            }>,
-        ) => {
-            const { pollId, voterName } = action.payload;
-            ensureVoteState(state, pollId).pendingVoterName = voterName;
-        },
         setKeys: (
             state,
             action: PayloadAction<{
                 pollId: string;
                 privateKey: string;
                 publicKey: string;
-                commonPublicKey: string | null;
             }>,
         ) => {
-            const { pollId, privateKey, publicKey, commonPublicKey } =
-                action.payload;
+            const { pollId, privateKey, publicKey } = action.payload;
             const voteState = ensureVoteState(state, pollId);
             voteState.privateKey = privateKey;
             voteState.publicKey = publicKey;
-            voteState.commonPublicKey = commonPublicKey;
+        },
+        restoreCreatorSession: (
+            state,
+            action: PayloadAction<{
+                creatorToken: string;
+                pollId: string;
+                pollSlug: string;
+            }>,
+        ) => {
+            const { creatorToken, pollId, pollSlug } = action.payload;
+            const voteState = ensureVoteState(state, pollId);
+
+            voteState.creatorToken = creatorToken;
+            voteState.pollSlug = pollSlug;
+        },
+        setPendingVoterRegistration: (
+            state,
+            action: PayloadAction<{
+                pollId: string;
+                voterName: string;
+                pendingVoterToken: string;
+            }>,
+        ) => {
+            const { pollId, voterName, pendingVoterToken } = action.payload;
+            const voteState = ensureVoteState(state, pollId);
+
+            voteState.pendingVoterName = voterName;
+            voteState.pendingVoterToken = voteState.voterToken
+                ? null
+                : pendingVoterToken;
+            voteState.workflowError = null;
         },
         setProgressMessage: (
             state,
@@ -134,18 +213,6 @@ export const votingSlice = createSlice({
             const { pollId, progressMessage } = action.payload;
             ensureVoteState(state, pollId).progressMessage = progressMessage;
         },
-        setResults: (
-            state,
-            action: PayloadAction<{
-                results: number[];
-                pollId: string;
-            }>,
-        ) => {
-            const { pollId, results } = action.payload;
-            const voteState = ensureVoteState(state, pollId);
-            voteState.results = results;
-            Object.assign(voteState, clearCompletedSensitiveFields(voteState));
-        },
         setSelectedScores: (
             state,
             action: PayloadAction<{
@@ -155,6 +222,17 @@ export const votingSlice = createSlice({
         ) => {
             const { pollId, selectedScores } = action.payload;
             ensureVoteState(state, pollId).selectedScores = selectedScores;
+        },
+        setShouldResumeWorkflow: (
+            state,
+            action: PayloadAction<{
+                pollId: string;
+                shouldResumeWorkflow: boolean;
+            }>,
+        ) => {
+            const { pollId, shouldResumeWorkflow } = action.payload;
+            ensureVoteState(state, pollId).shouldResumeWorkflow =
+                shouldResumeWorkflow;
         },
         setSubmissionStatus: (
             state,
@@ -198,14 +276,34 @@ export const votingSlice = createSlice({
                 voterToken,
             });
         },
+        upsertPollSnapshot: (
+            state,
+            action: PayloadAction<{
+                pollId: string;
+                poll: PollResponse;
+            }>,
+        ) => {
+            const { pollId, poll } = action.payload;
+            applyPollSnapshot(ensureVoteState(state, pollId), poll);
+        },
     },
     extraReducers: (builder) => {
         builder
             .addMatcher(
                 pollsApi.endpoints.createPoll.matchFulfilled,
                 (state, { payload }) => {
-                    ensureVoteState(state, payload.id).creatorToken =
-                        payload.creatorToken;
+                    const voteState = ensureVoteState(state, payload.id);
+                    voteState.creatorToken = payload.creatorToken;
+                    voteState.pollSlug = payload.slug;
+                },
+            )
+            .addMatcher(
+                pollsApi.endpoints.getPoll.matchFulfilled,
+                (state, { payload }) => {
+                    applyPollSnapshot(
+                        ensureVoteState(state, payload.id),
+                        payload,
+                    );
                 },
             )
             .addMatcher(
@@ -271,14 +369,17 @@ export const votingSlice = createSlice({
 });
 
 export const {
+    applyRecoveredSession,
     clearWorkflowError,
-    setPendingVoterName,
+    restoreCreatorSession,
     setKeys,
+    setPendingVoterRegistration,
     setProgressMessage,
-    setResults,
     setSelectedScores,
+    setShouldResumeWorkflow,
     setSubmissionStatus,
     setVoterSession,
+    upsertPollSnapshot,
 } = votingSlice.actions;
 
 export const { selectVotingStateByPollId } = votingSlice.selectors;

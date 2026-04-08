@@ -22,6 +22,20 @@
       "when": 1775481414679,
       "tag": "0002_spotty_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775619560611,
+      "tag": "0003_light_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775666988000,
+      "tag": "0004_published_results",
+      "breakpoints": true
     }
   ]
 }

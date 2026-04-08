@@ -1,4 +1,4 @@
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Share2 } from 'lucide-react';
 import React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -38,16 +38,30 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
     }
 };
 
-const VoteSharing = (): React.JSX.Element => {
-    const [copyStatus, setCopyStatus] = React.useState<
-        'idle' | 'success' | 'error'
+const isAbortError = (error: unknown): boolean =>
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name: unknown }).name === 'AbortError';
+
+type VoteSharingProps = {
+    pollTitle: string;
+};
+
+const VoteSharing = ({ pollTitle }: VoteSharingProps): React.JSX.Element => {
+    const [shareStatus, setShareStatus] = React.useState<
+        'idle' | 'copy-success' | 'copy-error' | 'share-success' | 'share-error'
     >('idle');
     const resetStatusTimeoutRef = React.useRef<number | undefined>(undefined);
+    const supportsNativeShare =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function';
+    const voteUrl = window.location.href;
 
     const scheduleStatusReset = (): void => {
         window.clearTimeout(resetStatusTimeoutRef.current);
         resetStatusTimeoutRef.current = window.setTimeout(() => {
-            setCopyStatus('idle');
+            setShareStatus('idle');
         }, 2500);
     };
 
@@ -59,27 +73,61 @@ const VoteSharing = (): React.JSX.Element => {
 
     const handleCopyLink = async (): Promise<void> => {
         try {
-            await copyTextToClipboard(window.location.href);
-            setCopyStatus('success');
+            await copyTextToClipboard(voteUrl);
+            setShareStatus('copy-success');
         } catch {
-            setCopyStatus('error');
+            setShareStatus('copy-error');
         }
 
         scheduleStatusReset();
     };
 
+    const handleShareLink = async (): Promise<void> => {
+        if (!supportsNativeShare) {
+            return;
+        }
+
+        try {
+            await navigator.share({
+                title: pollTitle,
+                text: pollTitle,
+                url: voteUrl,
+            });
+            setShareStatus('share-success');
+            scheduleStatusReset();
+        } catch (error) {
+            if (isAbortError(error)) {
+                setShareStatus('idle');
+                return;
+            }
+
+            setShareStatus('share-error');
+            scheduleStatusReset();
+        }
+    };
+
     const helperText =
-        copyStatus === 'success'
+        shareStatus === 'copy-success'
             ? 'Vote link copied to clipboard.'
-            : copyStatus === 'error'
+            : shareStatus === 'copy-error'
               ? 'Copy failed. Please copy the link manually.'
-              : 'Link to the vote to share with others';
-    const tooltipText =
-        copyStatus === 'success'
+              : shareStatus === 'share-success'
+                ? 'Vote link shared.'
+                : shareStatus === 'share-error'
+                  ? 'Share failed. Please use copy instead.'
+                  : 'Link to the vote to share with others';
+    const copyTooltipText =
+        shareStatus === 'copy-success'
             ? 'Copied'
-            : copyStatus === 'error'
+            : shareStatus === 'copy-error'
               ? 'Copy failed'
               : 'Copy to clipboard';
+    const shareTooltipText =
+        shareStatus === 'share-success'
+            ? 'Shared'
+            : shareStatus === 'share-error'
+              ? 'Share failed'
+              : 'Share link';
 
     return (
         <Field>
@@ -93,49 +141,88 @@ const VoteSharing = (): React.JSX.Element => {
                 <div className="relative">
                     <Input
                         aria-describedby="copy-page-link-helper-text"
-                        className="pr-12"
+                        className={supportsNativeShare ? 'pr-24' : 'pr-12'}
                         id="voteLink"
                         readOnly
-                        value={window.location.href}
+                        value={voteUrl}
                     />
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                aria-label={
-                                    copyStatus === 'success'
-                                        ? 'Vote link copied'
-                                        : 'Copy vote link'
-                                }
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2"
-                                onClick={() => {
-                                    void handleCopyLink();
-                                }}
-                                size="icon-sm"
-                                type="button"
-                                variant="ghost"
-                            >
-                                {copyStatus === 'success' ? (
-                                    <Check
-                                        aria-hidden="true"
-                                        className="size-4"
-                                    />
-                                ) : (
-                                    <Copy
-                                        aria-hidden="true"
-                                        className="size-4"
-                                    />
-                                )}
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{tooltipText}</TooltipContent>
-                    </Tooltip>
+                    <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-1">
+                        {supportsNativeShare && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        aria-label={
+                                            shareStatus === 'share-success'
+                                                ? 'Vote link shared'
+                                                : 'Share vote link'
+                                        }
+                                        onClick={() => {
+                                            void handleShareLink();
+                                        }}
+                                        size="icon-sm"
+                                        type="button"
+                                        variant="ghost"
+                                    >
+                                        {shareStatus === 'share-success' ? (
+                                            <Check
+                                                aria-hidden="true"
+                                                className="size-4"
+                                            />
+                                        ) : (
+                                            <Share2
+                                                aria-hidden="true"
+                                                className="size-4"
+                                            />
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {shareTooltipText}
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    aria-label={
+                                        shareStatus === 'copy-success'
+                                            ? 'Vote link copied'
+                                            : 'Copy vote link'
+                                    }
+                                    onClick={() => {
+                                        void handleCopyLink();
+                                    }}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    {shareStatus === 'copy-success' ? (
+                                        <Check
+                                            aria-hidden="true"
+                                            className="size-4"
+                                        />
+                                    ) : (
+                                        <Copy
+                                            aria-hidden="true"
+                                            className="size-4"
+                                        />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{copyTooltipText}</TooltipContent>
+                        </Tooltip>
+                    </div>
                 </div>
                 <FieldDescription
                     aria-live="polite"
                     className={cn(
                         'mt-2 text-sm leading-6',
-                        copyStatus === 'error' && 'text-destructive',
-                        copyStatus === 'success' && 'text-foreground',
+                        (shareStatus === 'copy-error' ||
+                            shareStatus === 'share-error') &&
+                            'text-destructive',
+                        (shareStatus === 'copy-success' ||
+                            shareStatus === 'share-success') &&
+                            'text-foreground',
                     )}
                     id="copy-page-link-helper-text"
                 >

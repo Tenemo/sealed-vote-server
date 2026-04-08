@@ -10,10 +10,19 @@ export const ERROR_MESSAGES = {
     notEnoughVotersToClose: 'Not enough voters to close the poll.',
     invalidCreatorToken: 'Invalid creator token.',
     invalidVoterToken: 'Invalid voter token.',
+    creatorTokenConflict:
+        'Creator token was already used for a different vote.',
+    voterTokenConflict:
+        'Voter token was already used for a different voter name.',
     publicKeyAlreadySubmitted: 'Public key share has already been submitted.',
+    publicKeyConflict:
+        'A different public key share has already been submitted.',
     voteAlreadySubmitted: 'Vote has already been submitted.',
+    voteConflict: 'A different vote has already been submitted.',
     decryptionSharesAlreadySubmitted:
         'Decryption shares have already been submitted.',
+    decryptionSharesConflict:
+        'Different decryption shares have already been submitted.',
     publicKeyPhaseClosed:
         'Public key shares can only be submitted during key generation.',
     votingPhaseClosed: 'Votes can only be submitted during voting.',
@@ -25,4 +34,5 @@ export const ERROR_MESSAGES = {
         'Decryption share vector length must match the number of encrypted tallies.',
     maxParticipantsReached:
         'Poll has reached its maximum number of participants.',
+    recoverSessionTokenRequired: 'Exactly one recovery token must be provided.',
 } as const;

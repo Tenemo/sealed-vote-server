@@ -1,6 +1,6 @@
 import { configureStore, type EnhancedStore } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -8,18 +8,17 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Poll from './Poll';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
-import {
-    initialVoteState,
-    setSelectedScores,
-    setVoterSession,
-    votingSlice,
-} from 'features/Polls/votingSlice';
+import { initialVoteState, votingSlice } from 'features/Polls/votingSlice';
 import type { VotingState } from 'features/Polls/votingState';
 
 const mockedVote = vi.fn((payload: unknown) => ({
     payload,
     type: 'voting/vote',
 }));
+const mockedFindCreatorSessionByPollId = vi.fn();
+const mockedFindCreatorSessionByPollSlug = vi.fn();
+const mockedRemoveCreatorSession = vi.fn();
+const mockedSaveCreatorSession = vi.fn();
 const mockedUseGetPollQuery = vi.fn();
 const mockedUseClosePollMutation = vi.fn();
 
@@ -27,10 +26,23 @@ vi.mock('features/Polls/votingThunks/vote', () => ({
     vote: (payload: unknown) => mockedVote(payload),
 }));
 
+vi.mock('features/Polls/creatorSessionStorage', () => ({
+    findCreatorSessionByPollId: (pollId: string) =>
+        mockedFindCreatorSessionByPollId(pollId),
+    findCreatorSessionByPollSlug: (pollSlug: string) =>
+        mockedFindCreatorSessionByPollSlug(pollSlug),
+    removeCreatorSession: (pollId: string) =>
+        mockedRemoveCreatorSession(pollId),
+    saveCreatorSession: (payload: unknown) => mockedSaveCreatorSession(payload),
+}));
+
 vi.mock('features/Polls/pollsApi', () => ({
     pollsApi: {
         endpoints: {
             createPoll: {
+                matchFulfilled: () => false,
+            },
+            getPoll: {
                 matchFulfilled: () => false,
             },
         },
@@ -53,7 +65,9 @@ const basePoll = {
     decryptionShareCount: 0,
     commonPublicKey: null,
     encryptedTallies: [],
-    results: [],
+    publishedDecryptionShares: [],
+    resultTallies: [],
+    resultScores: [],
 };
 
 const renderPoll = (
@@ -86,9 +100,18 @@ const renderPoll = (
     return store;
 };
 
+const selectVotingState = (
+    state: { voting: VotingState },
+    pollId: string,
+): VotingState[string] => state.voting[pollId] ?? initialVoteState;
+
 describe('Poll page', () => {
     beforeEach(() => {
         mockedVote.mockClear();
+        mockedFindCreatorSessionByPollId.mockReset();
+        mockedFindCreatorSessionByPollSlug.mockReset();
+        mockedRemoveCreatorSession.mockReset();
+        mockedSaveCreatorSession.mockReset();
         mockedUseGetPollQuery.mockReset();
         mockedUseClosePollMutation.mockReset();
 
@@ -101,51 +124,8 @@ describe('Poll page', () => {
             vi.fn(),
             { error: undefined, isLoading: false },
         ]);
-    });
-
-    it('resumes a persisted voting session that already existed on mount', async () => {
-        renderPoll({
-            '11111111-1111-4111-8111-111111111111': {
-                ...initialVoteState,
-                selectedScores: {
-                    Apples: 7,
-                },
-                voterName: 'Alice',
-                voterIndex: 1,
-                voterToken: 'voter-token',
-            },
-        });
-
-        await waitFor(() => {
-            expect(mockedVote).toHaveBeenCalledWith({
-                pollId: '11111111-1111-4111-8111-111111111111',
-                selectedScores: { Apples: 7 },
-                voterName: 'Alice',
-            });
-        });
-    });
-
-    it('does not auto-resume when the voting session appears only after mount', async () => {
-        const store = renderPoll();
-
-        await act(async () => {
-            store.dispatch(
-                setSelectedScores({
-                    pollId: '11111111-1111-4111-8111-111111111111',
-                    selectedScores: { Apples: 7 },
-                }),
-            );
-            store.dispatch(
-                setVoterSession({
-                    pollId: '11111111-1111-4111-8111-111111111111',
-                    voterIndex: 1,
-                    voterName: 'Alice',
-                    voterToken: 'voter-token',
-                }),
-            );
-        });
-
-        expect(mockedVote).not.toHaveBeenCalled();
+        mockedFindCreatorSessionByPollId.mockReturnValue(null);
+        mockedFindCreatorSessionByPollSlug.mockReturnValue(null);
     });
 
     it('renders workflow failures from state', () => {
@@ -173,6 +153,12 @@ describe('Poll page', () => {
             'Waiting for common public key...',
         );
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('renders the poll creation date as a YYYY-MM-DD subheading', () => {
+        renderPoll();
+
+        expect(screen.getByText('Created 2026-01-01')).toBeVisible();
     });
 
     it('renders participants as individual list items', () => {
@@ -217,7 +203,15 @@ describe('Poll page', () => {
         mockedUseGetPollQuery.mockReturnValue({
             data: {
                 ...basePoll,
-                results: [12],
+                encryptedTallies: [
+                    {
+                        c1: '1',
+                        c2: '8',
+                    },
+                ],
+                publishedDecryptionShares: [['1']],
+                resultTallies: ['8'],
+                resultScores: [8],
             },
             error: undefined,
             isLoading: false,
@@ -259,6 +253,32 @@ describe('Poll page', () => {
         ).not.toBeInTheDocument();
     });
 
+    it('falls back to the persisted poll snapshot when reconnecting offline', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: undefined,
+            error: {
+                error: 'TypeError: Failed to fetch',
+                status: 'FETCH_ERROR',
+            },
+            isLoading: false,
+        });
+
+        renderPoll({
+            '11111111-1111-4111-8111-111111111111': {
+                ...initialVoteState,
+                pollSlug: 'best-fruit--1111',
+                pollSnapshot: basePoll,
+            },
+        });
+
+        expect(
+            screen.getByRole('heading', { name: 'Best fruit' }),
+        ).toBeVisible();
+        expect(screen.getByRole('status')).toHaveTextContent(
+            /The connection to the server was lost\.\s+Showing the latest available vote state and retrying in the background\./i,
+        );
+    });
+
     it('shows a friendly reconnect state when the poll cannot be loaded because the connection was lost', () => {
         mockedUseGetPollQuery.mockReturnValue({
             data: undefined,
@@ -282,5 +302,38 @@ describe('Poll page', () => {
         expect(
             screen.queryByText('TypeError: Failed to fetch'),
         ).not.toBeInTheDocument();
+    });
+
+    it('restores creator controls from the direct creator-session fallback', async () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: {
+                ...basePoll,
+                isOpen: true,
+                voters: ['Alice', 'Bob'],
+            },
+            error: undefined,
+            isLoading: false,
+        });
+        mockedFindCreatorSessionByPollId.mockReturnValue({
+            creatorToken: 'creator-token',
+            pollId: basePoll.id,
+            pollSlug: basePoll.slug,
+        });
+
+        const store = renderPoll();
+
+        expect(
+            screen.getByRole('button', { name: 'Begin vote' }),
+        ).toBeVisible();
+
+        await waitFor(() => {
+            expect(
+                selectVotingState(store.getState(), basePoll.id).creatorToken,
+            ).toBe('creator-token');
+        });
+
+        expect(mockedFindCreatorSessionByPollId).toHaveBeenCalledWith(
+            basePoll.id,
+        );
     });
 });

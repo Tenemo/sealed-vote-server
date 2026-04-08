@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
     CreatePollRequest as CreatePollRequestContract,
     CreatePollResponse as CreatePollResponseContract,
@@ -10,16 +11,25 @@ import createError from 'http-errors';
 
 import { choices as choicesTable, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { areStringArraysEqual } from '../utils/idempotency.js';
 import { getCreatePollSlugAttempts } from '../utils/pollSlug.js';
-import { generateSecureToken, hashSecureToken } from '../utils/voterAuth.js';
+import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import { hashSecureToken } from '../utils/voterAuth.js';
 
-import { MessageResponseSchema } from './schemas.js';
+import { MessageResponseSchema, SecureTokenSchema } from './schemas.js';
 
-const CreatePollRequestSchema = Type.Object({
-    choices: Type.Array(Type.String()),
-    pollName: Type.String(),
-    maxParticipants: Type.Optional(Type.Number({ minimum: 2 })),
-});
+const defaultMaxParticipants = 20;
+
+const CreatePollRequestSchema = Type.Object(
+    {
+        choices: Type.Array(Type.String()),
+        creatorToken: SecureTokenSchema,
+        pollName: Type.String(),
+    },
+    {
+        additionalProperties: false,
+    },
+);
 
 const CreatePollResponseSchema = Type.Object({
     id: Type.String(),
@@ -32,12 +42,73 @@ const schema = {
     response: {
         201: CreatePollResponseSchema,
         400: MessageResponseSchema,
+        409: MessageResponseSchema,
     },
 };
 
 export type CreatePollRequest = CreatePollRequestContract;
 export type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
+
+const getExistingPollByCreatorTokenHash = async (
+    fastify: FastifyInstance,
+    creatorTokenHash: string,
+): Promise<
+    | {
+          choices: string[];
+          id: string;
+          pollName: string;
+          slug: string;
+      }
+    | undefined
+> => {
+    const poll = await fastify.db.query.polls.findFirst({
+        where: (fields, { eq }) =>
+            eq(fields.creatorTokenHash, creatorTokenHash),
+        columns: {
+            id: true,
+            pollName: true,
+            slug: true,
+        },
+        with: {
+            choices: {
+                columns: {
+                    choiceName: true,
+                },
+                orderBy: (fields, { asc }) => asc(fields.choiceIndex),
+            },
+        },
+    });
+
+    return poll
+        ? {
+              choices: poll.choices.map(({ choiceName }) => choiceName),
+              id: poll.id,
+              pollName: poll.pollName,
+              slug: poll.slug,
+          }
+        : undefined;
+};
+
+const assertMatchingCreateRequest = ({
+    existingPoll,
+    normalizedChoices,
+    pollName,
+}: {
+    existingPoll: {
+        choices: string[];
+        pollName: string;
+    };
+    normalizedChoices: string[];
+    pollName: string;
+}): void => {
+    if (
+        existingPoll.pollName !== pollName ||
+        !areStringArraysEqual(existingPoll.choices, normalizedChoices)
+    ) {
+        throw createError(409, ERROR_MESSAGES.creatorTokenConflict);
+    }
+};
 
 export const create = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
@@ -47,7 +118,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Body: CreatePollRequest }>,
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
-            const { choices, maxParticipants = 20 } = req.body;
+            const { choices, creatorToken } = req.body;
             const pollName = req.body.pollName.trim();
             const normalizedChoices = choices.map((choice) => choice.trim());
 
@@ -67,8 +138,30 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                 throw createError(400, 'Choice names must be unique.');
             }
 
-            const creatorToken = generateSecureToken();
             const creatorTokenHash = hashSecureToken(creatorToken);
+            const existingPoll = await getExistingPollByCreatorTokenHash(
+                fastify,
+                creatorTokenHash,
+            );
+
+            if (existingPoll) {
+                assertMatchingCreateRequest({
+                    existingPoll,
+                    normalizedChoices,
+                    pollName,
+                });
+
+                void reply.code(201);
+                void maybeDropTestResponseAfterCommit({
+                    reply,
+                    request: req,
+                });
+                return {
+                    creatorToken,
+                    id: existingPoll.id,
+                    slug: existingPoll.slug,
+                };
+            }
 
             for (const { id: pollId, slug } of getCreatePollSlugAttempts(
                 pollName,
@@ -84,7 +177,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                                 creatorTokenHash,
                                 pollName,
                                 slug,
-                                maxParticipants,
+                                maxParticipants: defaultMaxParticipants,
                             });
 
                             await tx.insert(choicesTable).values(
@@ -104,8 +197,49 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                     );
 
                     void reply.code(201);
+                    void maybeDropTestResponseAfterCommit({
+                        reply,
+                        request: req,
+                    });
                     return createdPoll;
                 } catch (error) {
+                    if (
+                        isConstraintViolation(
+                            error,
+                            'unique_creator_token_hash',
+                        )
+                    ) {
+                        const conflictingPoll =
+                            await getExistingPollByCreatorTokenHash(
+                                fastify,
+                                creatorTokenHash,
+                            );
+
+                        if (conflictingPoll) {
+                            assertMatchingCreateRequest({
+                                existingPoll: conflictingPoll,
+                                normalizedChoices,
+                                pollName,
+                            });
+
+                            void reply.code(201);
+                            void maybeDropTestResponseAfterCommit({
+                                reply,
+                                request: req,
+                            });
+                            return {
+                                creatorToken,
+                                id: conflictingPoll.id,
+                                slug: conflictingPoll.slug,
+                            };
+                        }
+
+                        throw createError(
+                            409,
+                            ERROR_MESSAGES.creatorTokenConflict,
+                        );
+                    }
+
                     if (isConstraintViolation(error, 'unique_poll_slug')) {
                         continue;
                     }

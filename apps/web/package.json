@@ -33,11 +33,9 @@
     ],
     "type": "module",
     "dependencies": {
-        "@icons-pack/react-simple-icons": "^13.13.0",
         "@reduxjs/toolkit": "^2.11.2",
         "@sealed-vote/contracts": "workspace:*",
         "@sealed-vote/protocol": "workspace:*",
-        "@sentry/react": "^10.47.0",
         "@tailwindcss/vite": "^4.2.2",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",

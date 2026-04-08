@@ -1,0 +1,1 @@
+ALTER TABLE "polls" ADD CONSTRAINT "unique_creator_token_hash" UNIQUE("creator_token_hash");

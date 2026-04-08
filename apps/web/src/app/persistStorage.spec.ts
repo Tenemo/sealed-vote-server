@@ -39,7 +39,7 @@ describe('normalizePersistStorage', () => {
                 },
             }),
         ).toThrow(
-            'redux-persist session storage module did not expose a valid storage adapter.',
+            'redux-persist local storage module did not expose a valid storage adapter.',
         );
     });
 });

@@ -4,8 +4,9 @@ import type {
     MessageResponse,
 } from '@sealed-vote/contracts';
 import {
+    computePublishedResultScores,
     canSubmitDecryptionShares,
-    decryptTallies,
+    decryptTalliesToStrings,
 } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { eq } from 'drizzle-orm';
@@ -17,22 +18,29 @@ import {
     polls,
 } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { areStringArraysEqual } from '../utils/idempotency.js';
 import {
     countPollVoters,
+    getExistingDecryptionShares,
     getOrderedPollDecryptionShares,
     lockPollById,
 } from '../utils/polls.js';
-import { authenticateVoter } from '../utils/voterAuth.js';
+import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import {
+    authenticateVoter,
+    findVoterByTokenReadOnly,
+} from '../utils/voterAuth.js';
 
 import {
     MessageResponseSchema,
     PollIdParamsSchema,
+    SecureTokenSchema,
     type PollIdParams,
 } from './schemas.js';
 
 const DecryptionSharesRequestSchema = Type.Object({
     decryptionShares: Type.Array(Type.String()),
-    voterToken: Type.String(),
+    voterToken: SecureTokenSchema,
 });
 
 const schema = {
@@ -77,6 +85,33 @@ export const decryptionShares = async (
                     }
 
                     const votersCount = await countPollVoters(tx, pollId);
+                    const voter = await authenticateVoter(
+                        tx,
+                        pollId,
+                        voterToken,
+                    );
+
+                    const existingShares = await getExistingDecryptionShares(
+                        tx,
+                        pollId,
+                        voter.id,
+                    );
+
+                    if (existingShares) {
+                        if (
+                            !areStringArraysEqual(existingShares.shares, shares)
+                        ) {
+                            throw createError(
+                                409,
+                                ERROR_MESSAGES.decryptionSharesConflict,
+                            );
+                        }
+
+                        return {
+                            message:
+                                'Decryption shares submitted successfully.',
+                        };
+                    }
 
                     if (
                         !canSubmitDecryptionShares({
@@ -85,7 +120,7 @@ export const decryptionShares = async (
                             voterCount: votersCount,
                             encryptedVoteCount: 0,
                             encryptedTallyCount: poll.encryptedTallies.length,
-                            resultCount: poll.results.length,
+                            resultScoreCount: poll.resultScores.length,
                         })
                     ) {
                         throw createError(
@@ -93,12 +128,6 @@ export const decryptionShares = async (
                             ERROR_MESSAGES.decryptionPhaseClosed,
                         );
                     }
-
-                    const voter = await authenticateVoter(
-                        tx,
-                        pollId,
-                        voterToken,
-                    );
 
                     if (shares.length !== poll.encryptedTallies.length) {
                         throw createError(
@@ -117,15 +146,19 @@ export const decryptionShares = async (
                         await getOrderedPollDecryptionShares(tx, pollId);
 
                     if (decryptionShareRows.length === votersCount) {
-                        const results = decryptTallies(
+                        const resultTallies = decryptTalliesToStrings(
                             poll.encryptedTallies,
                             decryptionShareRows.map(
                                 ({ shares: voterShares }) => voterShares,
                             ),
                         );
+                        const resultScores = computePublishedResultScores(
+                            resultTallies,
+                            votersCount,
+                        );
                         await tx
                             .update(polls)
-                            .set({ results })
+                            .set({ resultTallies, resultScores })
                             .where(eq(polls.id, pollId));
                     }
 
@@ -135,6 +168,10 @@ export const decryptionShares = async (
                 });
 
                 void reply.code(201);
+                void maybeDropTestResponseAfterCommit({
+                    reply,
+                    request: req,
+                });
                 return response;
             } catch (error) {
                 if (
@@ -143,9 +180,46 @@ export const decryptionShares = async (
                         'unique_decryption_shares_per_voter',
                     )
                 ) {
+                    const voter = await findVoterByTokenReadOnly(
+                        fastify.db,
+                        req.params.pollId,
+                        req.body.voterToken,
+                    );
+
+                    const existingShares =
+                        voter &&
+                        (await fastify.db.query.decryptionShares.findFirst({
+                            where: (fields, { and, eq: isEqual }) =>
+                                and(
+                                    isEqual(fields.pollId, req.params.pollId),
+                                    isEqual(fields.voterId, voter.id),
+                                ),
+                            columns: {
+                                shares: true,
+                            },
+                        }));
+
+                    if (
+                        existingShares &&
+                        areStringArraysEqual(
+                            existingShares.shares,
+                            req.body.decryptionShares,
+                        )
+                    ) {
+                        void reply.code(201);
+                        void maybeDropTestResponseAfterCommit({
+                            reply,
+                            request: req,
+                        });
+                        return {
+                            message:
+                                'Decryption shares submitted successfully.',
+                        };
+                    }
+
                     throw createError(
                         409,
-                        ERROR_MESSAGES.decryptionSharesAlreadySubmitted,
+                        ERROR_MESSAGES.decryptionSharesConflict,
                     );
                 }
 

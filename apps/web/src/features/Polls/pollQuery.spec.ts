@@ -1,258 +1,44 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { waitForPoll } from './pollQuery';
 
-import { fetchFreshPoll } from './pollQuery';
-import type { PollResponse } from './pollsApi';
-
-const mockedInitiate = vi.fn();
-const mockedSelect = vi.fn();
-const mockedGetState = vi.fn();
-
-vi.mock('./pollsApi', () => ({
-    pollsApi: {
-        reducerPath: 'polls',
-        endpoints: {
-            getPoll: {
-                initiate: (...args: unknown[]) => mockedInitiate(...args),
-                select: (...args: unknown[]) => mockedSelect(...args),
-            },
-        },
-    },
-}));
-
-vi.mock('app/store', () => ({
-    store: {
-        getState: () => mockedGetState(),
-    },
-}));
-
-const createPoll = (id: string): PollResponse => ({
-    id,
-    slug: `poll-${id}--1234`,
-    pollName: `Poll ${id}`,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    choices: ['A', 'B'],
-    voters: ['Alice', 'Bob'],
-    isOpen: true,
-    publicKeyShareCount: 0,
-    commonPublicKey: null,
-    encryptedVoteCount: 0,
-    encryptedTallies: [],
-    decryptionShareCount: 0,
-    results: [],
-});
-
-describe('fetchFreshPoll', () => {
-    beforeEach(() => {
-        mockedInitiate.mockReset();
-        mockedSelect.mockReset();
-        mockedGetState.mockReset();
-        mockedSelect.mockReturnValue(() => ({ data: undefined }));
-        mockedGetState.mockReturnValue({
-            polls: {
-                queries: {},
-            },
-        });
-    });
-
-    test('returns the freshly fetched poll when the refetch succeeds', async () => {
-        const freshPoll = createPoll('fresh-poll');
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => freshPoll,
-        })) as never;
-
-        const result = await fetchFreshPoll(dispatch, freshPoll.id);
-
-        expect(result).toEqual(freshPoll);
-        expect(mockedInitiate).toHaveBeenCalledWith(freshPoll.id, {
-            forceRefetch: true,
-            subscribe: false,
-        });
-    });
-
-    test('falls back to cached poll data when the refetch resolves without a poll payload', async () => {
-        const cachedPoll = createPoll('cached-after-empty-response');
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => undefined,
-        })) as never;
-
-        mockedSelect.mockReturnValue(() => ({
-            data: cachedPoll,
-        }));
-
-        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
-
-        expect(result).toEqual(cachedPoll);
-    });
-
-    test('falls back to the cached direct poll when the refetch fails', async () => {
-        const cachedPoll = createPoll('cached-direct-poll');
-        const expectedError = new Error('Network error');
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => {
-                throw expectedError;
-            },
-        })) as never;
-
-        mockedSelect.mockReturnValue(() => ({
-            data: cachedPoll,
-        }));
-
-        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
-
-        expect(result).toEqual(cachedPoll);
-    });
-
-    test('prefers the freshest matching cached poll over a stale direct poll cache entry', async () => {
-        const staleDirectPoll = createPoll('freshest-cached-poll');
-        const freshSlugPoll = {
-            ...staleDirectPoll,
-            commonPublicKey: '12345',
-            isOpen: false,
-            publicKeyShareCount: 2,
+describe('waitForPoll', () => {
+    it('returns a cached or persisted poll immediately when it already matches', async () => {
+        const dispatch = vi.fn();
+        const poll = {
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples', 'Bananas'],
+            voters: ['Alice'],
+            isOpen: true,
+            publicKeyShareCount: 0,
+            commonPublicKey: null,
+            encryptedVoteCount: 0,
+            encryptedTallies: [],
+            decryptionShareCount: 0,
+            publishedDecryptionShares: [],
+            resultTallies: [],
+            resultScores: [],
         };
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => {
-                throw new Error('Network error');
-            },
-        })) as never;
 
-        mockedSelect.mockReturnValue(() => ({
-            data: staleDirectPoll,
-        }));
-        mockedGetState.mockReturnValue({
-            polls: {
-                queries: {
-                    directPollQuery: {
-                        data: staleDirectPoll,
-                        endpointName: 'getPoll',
-                        fulfilledTimeStamp: 10,
+        const result = await waitForPoll({
+            dispatch,
+            getState: () =>
+                ({
+                    polls: {
+                        queries: {},
                     },
-                    freshSlugQuery: {
-                        data: freshSlugPoll,
-                        endpointName: 'getPoll',
-                        fulfilledTimeStamp: 20,
+                    voting: {
+                        '11111111-1111-4111-8111-111111111111': {
+                            pollSnapshot: poll,
+                        },
                     },
-                },
-            },
+                }) as never,
+            pollId: '11111111-1111-4111-8111-111111111111',
+            predicate: (currentPoll) => currentPoll.slug === 'best-fruit--1111',
         });
 
-        const result = await fetchFreshPoll(dispatch, freshSlugPoll.id);
-
-        expect(result).toEqual(freshSlugPoll);
-    });
-
-    test('prefers the most recently fulfilled cached poll over an in-flight refetch with older data', async () => {
-        const olderInFlightPoll = createPoll('fulfilled-poll');
-        const newestFulfilledPoll = {
-            ...olderInFlightPoll,
-            commonPublicKey: '12345',
-            isOpen: false,
-            publicKeyShareCount: 2,
-        };
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => {
-                throw new Error('Network error');
-            },
-        })) as never;
-
-        mockedGetState.mockReturnValue({
-            polls: {
-                queries: {
-                    inFlightRefetch: {
-                        data: olderInFlightPoll,
-                        endpointName: 'getPoll',
-                        fulfilledTimeStamp: 10,
-                        startedTimeStamp: 30,
-                    },
-                    fulfilledQuery: {
-                        data: newestFulfilledPoll,
-                        endpointName: 'getPoll',
-                        fulfilledTimeStamp: 20,
-                        startedTimeStamp: 20,
-                    },
-                },
-            },
-        });
-
-        const result = await fetchFreshPoll(dispatch, newestFulfilledPoll.id);
-
-        expect(result).toEqual(newestFulfilledPoll);
-    });
-
-    test('falls back to a matching cached poll from another query state', async () => {
-        const cachedPoll = createPoll('cached-query-poll');
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => {
-                throw new Error('Network error');
-            },
-        })) as never;
-
-        mockedGetState.mockReturnValue({
-            polls: {
-                queries: {
-                    unrelated: {
-                        endpointName: 'listPolls',
-                        data: [createPoll('other-poll')],
-                    },
-                    cachedPollQuery: {
-                        endpointName: 'getPoll',
-                        data: cachedPoll,
-                    },
-                },
-            },
-        });
-
-        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
-
-        expect(result).toEqual(cachedPoll);
-    });
-
-    test('ignores undefined query substates when scanning cached poll results', async () => {
-        const cachedPoll = createPoll('cached-query-poll');
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => {
-                throw new Error('Network error');
-            },
-        })) as never;
-
-        mockedGetState.mockReturnValue({
-            polls: {
-                queries: {
-                    undefinedQuery: undefined,
-                    cachedPollQuery: {
-                        endpointName: 'getPoll',
-                        data: cachedPoll,
-                        fulfilledTimeStamp: 20,
-                    },
-                },
-            },
-        });
-
-        const result = await fetchFreshPoll(dispatch, cachedPoll.id);
-
-        expect(result).toEqual(cachedPoll);
-    });
-
-    test('rethrows the refetch error when no cached poll is available', async () => {
-        const expectedError = new Error('Network error');
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => {
-                throw expectedError;
-            },
-        })) as never;
-
-        await expect(fetchFreshPoll(dispatch, 'missing-poll')).rejects.toBe(
-            expectedError,
-        );
-    });
-
-    test('throws when the refetch resolves without a poll payload and no cached poll is available', async () => {
-        const dispatch = vi.fn(() => ({
-            unwrap: async () => undefined,
-        })) as never;
-
-        await expect(fetchFreshPoll(dispatch, 'missing-poll')).rejects.toThrow(
-            'Poll missing-poll could not be fetched.',
-        );
+        expect(result).toEqual(poll);
+        expect(dispatch).not.toHaveBeenCalled();
     });
 });

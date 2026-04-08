@@ -1,3 +1,4 @@
+import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { FastifyInstance } from 'fastify';
 import { encrypt, serializeEncryptedMessage } from 'threshold-elgamal';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -12,6 +13,7 @@ import {
 
 describe('POST /polls/:pollId/vote', () => {
     let fastify: FastifyInstance;
+    const wrongButValidVoterToken = 'a'.repeat(64);
     beforeAll(async () => {
         fastify = await buildServer();
     });
@@ -87,7 +89,7 @@ describe('POST /polls/:pollId/vote', () => {
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/invalid-poll-id/vote',
-            payload: { votes: [], voterToken: 'invalid-token' },
+            payload: { votes: [], voterToken: wrongButValidVoterToken },
         });
         expect(response.statusCode).toBe(400);
     });
@@ -96,9 +98,38 @@ describe('POST /polls/:pollId/vote', () => {
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/00000000-0000-0000-0000-000000000000/vote',
-            payload: { votes: [], voterToken: 'invalid-token' },
+            payload: { votes: [], voterToken: wrongButValidVoterToken },
         });
         expect(response.statusCode).toBe(404);
+    });
+
+    test('should reject an invalid voter token format', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Invalid vote token'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: { votes: [], voterToken: 'short-token' },
+        });
+
+        expect(response.statusCode).toBe(400);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
     });
 
     test('should return 400 for voting in an open poll', async () => {
@@ -106,16 +137,124 @@ describe('POST /polls/:pollId/vote', () => {
         const builder = new TestPollBuilder(fastify).withPollName(openPollName);
 
         await builder.create();
-        const { creatorToken, pollId } = builder.getContext();
+        await builder.registerVoters();
+        const { creatorToken, pollId, voters } = builder.getContext();
 
         const response = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/vote`,
-            payload: { votes: [], voterToken: 'invalid-token' },
+            payload: { votes: [], voterToken: voters[0].voterToken },
         });
         expect(response.statusCode).toBe(400);
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('replays the same encrypted vote idempotently after the tally phase starts', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Idempotent vote replay'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+        if (!context.poll?.commonPublicKey) {
+            throw new Error('Common public key is missing.');
+        }
+
+        const [alice, bob] = context.voters;
+        const commonPublicKey = BigInt(context.poll.commonPublicKey);
+        const aliceVotes = context.poll.choices.map((_, index) =>
+            serializeEncryptedMessage(encrypt(index + 1, commonPublicKey)),
+        );
+        const bobVotes = context.poll.choices.map((_, index) =>
+            serializeEncryptedMessage(encrypt(index + 2, commonPublicKey)),
+        );
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: { votes: aliceVotes, voterToken: alice.voterToken },
+        });
+        const secondResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: { votes: bobVotes, voterToken: bob.voterToken },
+        });
+        const replayResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: { votes: aliceVotes, voterToken: alice.voterToken },
+        });
+
+        expect(firstResponse.statusCode).toBe(200);
+        expect(secondResponse.statusCode).toBe(200);
+        expect(replayResponse.statusCode).toBe(200);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('rejects replaying a different encrypted vote for the same voter', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Conflicting vote replay'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+        if (!context.poll?.commonPublicKey) {
+            throw new Error('Common public key is missing.');
+        }
+
+        const [alice] = context.voters;
+        const commonPublicKey = BigInt(context.poll.commonPublicKey);
+        const firstVotes = context.poll.choices.map((_, index) =>
+            serializeEncryptedMessage(encrypt(index + 1, commonPublicKey)),
+        );
+        const conflictingVotes = context.poll.choices.map((_, index) =>
+            serializeEncryptedMessage(encrypt(index + 4, commonPublicKey)),
+        );
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: { votes: firstVotes, voterToken: alice.voterToken },
+        });
+        const conflictingResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: {
+                votes: conflictingVotes,
+                voterToken: alice.voterToken,
+            },
+        });
+
+        expect(firstResponse.statusCode).toBe(200);
+        expect(conflictingResponse.statusCode).toBe(409);
+        expect(
+            (JSON.parse(conflictingResponse.body) as { message: string })
+                .message,
+        ).toBe(ERROR_MESSAGES.voteConflict);
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
         expect(deleteResult.success).toBe(true);
     });
 });

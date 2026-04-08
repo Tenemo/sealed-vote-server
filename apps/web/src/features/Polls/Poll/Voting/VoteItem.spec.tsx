@@ -46,4 +46,20 @@ describe('VoteItem', () => {
 
         expect(onVote).toHaveBeenCalledWith('Apples', 2);
     });
+
+    it('renders the selected score with an explicit white highlight', () => {
+        render(
+            <VoteItem choiceName="Apples" onVote={vi.fn()} selectedScore={7} />,
+        );
+
+        const selectedRadio = screen.getByRole('radio', {
+            name: 'Score 7 for Apples',
+        });
+        const selectedLabel = document.querySelector(
+            `label[for="${selectedRadio.getAttribute('id')}"]`,
+        );
+
+        expect(selectedLabel).toHaveClass('bg-white');
+        expect(selectedLabel).toHaveClass('text-black');
+    });
 });

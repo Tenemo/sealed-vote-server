@@ -15,7 +15,7 @@ import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/monitoring';
+} from './support/errorTracking';
 import { createTestNamespace, createVoterName } from './support/testData';
 
 test('keeps duplicate-title polls on distinct slug URLs', async ({

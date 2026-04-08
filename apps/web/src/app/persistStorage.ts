@@ -1,4 +1,4 @@
-import storageSessionModule from 'redux-persist/lib/storage/session';
+import storageLocalModule from 'redux-persist/lib/storage';
 
 type PersistStorage = {
     getItem(key: string): Promise<string | null> | string | null;
@@ -31,12 +31,11 @@ export const normalizePersistStorage = (
 
     if (!isPersistStorage(candidate)) {
         throw new TypeError(
-            'redux-persist session storage module did not expose a valid storage adapter.',
+            'redux-persist local storage module did not expose a valid storage adapter.',
         );
     }
 
     return candidate;
 };
 
-export const sessionPersistStorage =
-    normalizePersistStorage(storageSessionModule);
+export const localPersistStorage = normalizePersistStorage(storageLocalModule);

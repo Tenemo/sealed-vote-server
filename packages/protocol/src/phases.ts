@@ -14,7 +14,7 @@ export type PollPhaseState = {
     voterCount: number;
     encryptedVoteCount: number;
     encryptedTallyCount: number;
-    resultCount: number;
+    resultScoreCount: number;
 };
 
 type PollPhaseInput =
@@ -26,7 +26,7 @@ type PollPhaseInput =
           | 'voters'
           | 'encryptedVoteCount'
           | 'encryptedTallies'
-          | 'results'
+          | 'resultScores'
       >
     | {
           isOpen: boolean;
@@ -34,7 +34,7 @@ type PollPhaseInput =
           voters: PollResponse['voters'];
           encryptedVotes: unknown[];
           encryptedTallies: PollResponse['encryptedTallies'];
-          results: PollResponse['results'];
+          resultScores: PollResponse['resultScores'];
       };
 
 export const toPollPhaseState = (
@@ -46,7 +46,7 @@ export const toPollPhaseState = (
               | 'voters'
               | 'encryptedVoteCount'
               | 'encryptedTallies'
-              | 'results'
+              | 'resultScores'
           >
         | {
               isOpen: boolean;
@@ -54,7 +54,7 @@ export const toPollPhaseState = (
               voters: PollResponse['voters'];
               encryptedVotes: unknown[];
               encryptedTallies: PollResponse['encryptedTallies'];
-              results: PollResponse['results'];
+              resultScores: PollResponse['resultScores'];
           },
 ): PollPhaseState => ({
     isOpen: poll.isOpen,
@@ -65,7 +65,7 @@ export const toPollPhaseState = (
             ? poll.encryptedVoteCount
             : poll.encryptedVotes.length,
     encryptedTallyCount: poll.encryptedTallies.length,
-    resultCount: poll.results.length,
+    resultScoreCount: poll.resultScores.length,
 });
 
 const normalizePollPhaseState = (poll: PollPhaseInput): PollPhaseState =>
@@ -82,7 +82,7 @@ export const derivePollPhase = (poll: PollPhaseInput): PollPhase => {
         return 'key-generation';
     }
 
-    if (state.resultCount > 0) {
+    if (state.resultScoreCount > 0) {
         return 'complete';
     }
 
