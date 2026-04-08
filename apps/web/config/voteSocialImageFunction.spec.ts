@@ -7,10 +7,12 @@ const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const {
     mockCreateVoteSocialImageResponse,
     mockExtractVoteSocialImageSlugFromPathname,
+    mockExtractVoteSocialImageVariantFromSearchParams,
     mockResolveSeoApiBaseUrl,
 } = vi.hoisted(() => ({
     mockCreateVoteSocialImageResponse: vi.fn(),
     mockExtractVoteSocialImageSlugFromPathname: vi.fn(),
+    mockExtractVoteSocialImageVariantFromSearchParams: vi.fn(() => 'open'),
     mockResolveSeoApiBaseUrl: vi.fn(() => 'https://api.sealed.vote'),
 }));
 
@@ -18,6 +20,8 @@ vi.mock('./voteSocialImage.ts', () => ({
     createVoteSocialImageResponse: mockCreateVoteSocialImageResponse,
     extractVoteSocialImageSlugFromPathname:
         mockExtractVoteSocialImageSlugFromPathname,
+    extractVoteSocialImageVariantFromSearchParams:
+        mockExtractVoteSocialImageVariantFromSearchParams,
 }));
 
 vi.mock('./documentSeo.ts', () => ({
@@ -29,6 +33,10 @@ describe('vote social image Netlify function', () => {
         vi.resetModules();
         mockCreateVoteSocialImageResponse.mockReset();
         mockExtractVoteSocialImageSlugFromPathname.mockReset();
+        mockExtractVoteSocialImageVariantFromSearchParams.mockReset();
+        mockExtractVoteSocialImageVariantFromSearchParams.mockReturnValue(
+            'open',
+        );
         mockResolveSeoApiBaseUrl.mockClear();
     });
 
@@ -39,9 +47,9 @@ describe('vote social image Netlify function', () => {
                 'cache-control': 'public, max-age=31536000, immutable',
                 'content-type': 'image/png',
                 'netlify-cdn-cache-control':
-                    'public, durable, max-age=31536000, stale-while-revalidate=604800',
+                    'public, durable, max-age=2592000, stale-while-revalidate=2592000',
             },
-            isFallback: false,
+            status: 200,
         });
 
         const voteSocialImageModule =
@@ -64,40 +72,56 @@ describe('vote social image Netlify function', () => {
             apiBaseUrl: 'https://api.sealed.vote',
             pollSlug: 'test--4a39',
             signal: expect.any(AbortSignal),
+            variant: 'open',
         });
         expect(response.status).toBe(200);
         expect(response.headers.get('content-type')).toBe('image/png');
         expect(Buffer.from(await response.arrayBuffer())).toEqual(pngSignature);
     });
 
-    test('uses the pathname fallback and omits the body on HEAD', async () => {
+    test('uses the pathname fallback, passes the completed variant, and omits the body on HEAD', async () => {
         mockCreateVoteSocialImageResponse.mockResolvedValue({
             body: Uint8Array.from(pngSignature),
             headers: {
                 'cache-control':
-                    'public, max-age=3600, stale-while-revalidate=600',
+                    'public, max-age=3600, stale-while-revalidate=86400',
                 'content-type': 'image/png',
                 'netlify-cdn-cache-control':
-                    'public, durable, max-age=3600, stale-while-revalidate=600',
+                    'public, durable, max-age=3600, stale-while-revalidate=86400',
             },
-            isFallback: true,
+            status: 200,
         });
         mockExtractVoteSocialImageSlugFromPathname.mockReturnValue(
             'budget-roadmap',
+        );
+        mockExtractVoteSocialImageVariantFromSearchParams.mockReturnValue(
+            'complete',
         );
 
         const voteSocialImageModule =
             await import('../../../netlify/functions/vote-social-image');
         const response = await voteSocialImageModule.default(
-            new Request('https://sealed.vote/social/votes/budget-roadmap.png', {
-                method: 'HEAD',
-            }),
+            new Request(
+                'https://sealed.vote/social/votes/budget-roadmap.png?v=complete',
+                {
+                    method: 'HEAD',
+                },
+            ),
             {},
         );
 
         expect(mockExtractVoteSocialImageSlugFromPathname).toHaveBeenCalledWith(
             '/social/votes/budget-roadmap.png',
         );
+        expect(
+            mockExtractVoteSocialImageVariantFromSearchParams,
+        ).toHaveBeenCalled();
+        expect(mockCreateVoteSocialImageResponse).toHaveBeenCalledWith({
+            apiBaseUrl: 'https://api.sealed.vote',
+            pollSlug: 'budget-roadmap',
+            signal: expect.any(AbortSignal),
+            variant: 'complete',
+        });
         expect(response.status).toBe(200);
         expect(response.headers.get('content-type')).toBe('image/png');
         expect(await response.text()).toBe('');

@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,80 +7,83 @@ import { Resvg } from '@resvg/resvg-js';
 import {
     createVoteSocialImagePath,
     siteName,
-    socialImageHeight,
     socialImageWidth,
     voteSocialImagePathPrefix,
 } from './seoMetadata.mts';
 
 type FetchLike = typeof fetch;
 
-type VoteSocialImageRow = {
-    kind: 'choice' | 'summary';
-    label: string;
-    scoreLabel?: string;
+export type VoteSocialImageVariant = 'complete' | 'open';
+
+type VoteSocialImageRenderPayload = {
+    choices: string[];
+    isComplete: boolean;
+    pollTitle: string;
+    resultScores: number[];
 };
 
 type VoteSocialImagePayload = {
     choices: string[];
-    isComplete: boolean;
-    isFallback: boolean;
-    pollTitle: string | null;
+    pollTitle: string;
     resultScores: number[];
 };
+
+type VoteSocialImageFetchResult =
+    | {
+          payload: VoteSocialImagePayload;
+          status: 'found';
+      }
+    | {
+          status: 'not-found';
+      }
+    | {
+          status: 'unavailable';
+      };
 
 type VoteSocialImageResponse = {
     body: Uint8Array;
     headers: Record<string, string>;
-    isFallback: boolean;
+    status: number;
 };
 
-const voteSocialImageChoicesLimit = 3;
-const voteSocialImageTitleMaxLength = 72;
-const voteSocialImageTitleLineLength = 24;
-const voteSocialImageTitleMaxLines = 3;
-const voteSocialImageChoiceMaxLength = 44;
-const resolveVoteSocialImageFontPathFromModule = (): string | null => {
-    try {
-        return fileURLToPath(
-            new URL('../src/fonts/Roboto-Regular.ttf', import.meta.url),
-        );
-    } catch {
-        return null;
-    }
+type VoteResultEntry = {
+    label: string;
 };
-const voteSocialImageFontPathCandidates = [
-    path.resolve(process.cwd(), 'src', 'fonts', 'Roboto-Regular.ttf'),
-    path.resolve(
-        process.cwd(),
-        'apps',
-        'web',
-        'src',
-        'fonts',
-        'Roboto-Regular.ttf',
-    ),
-    resolveVoteSocialImageFontPathFromModule(),
-];
-const voteSocialImageFontPath =
-    voteSocialImageFontPathCandidates.find(
-        (candidatePath): candidatePath is string =>
-            candidatePath !== null && fs.existsSync(candidatePath),
-    ) ||
-    voteSocialImageFontPathCandidates.find(
-        (candidatePath): candidatePath is string => candidatePath !== null,
-    ) ||
-    path.resolve(process.cwd(), 'src', 'fonts', 'Roboto-Regular.ttf');
-const fallbackVoteSocialImageRows = [
-    'Confidential browser voting',
-    'Homomorphic encryption',
-    'Public verification',
-];
-const longVoteSocialImageCacheControl = 'public, max-age=31536000, immutable';
-const longVoteSocialImageCdnCacheControl =
-    'public, durable, max-age=31536000, stale-while-revalidate=604800';
-const shortVoteSocialImageCacheControl =
-    'public, max-age=3600, stale-while-revalidate=600';
-const shortVoteSocialImageCdnCacheControl =
-    'public, durable, max-age=3600, stale-while-revalidate=600';
+
+type VoteSocialImageCachePolicy = {
+    browser: string;
+    cdn: string;
+    netlifyCdn: string;
+};
+
+const maxTitleLineLength = 16;
+const maxTitleLines = 3;
+const maxVisibleChoices = 4;
+const maxVisibleResults = 4;
+const maxChoiceLineLength = 19;
+const maxResultLineLength = 18;
+const ellipsis = '...';
+const dayInSeconds = 60 * 60 * 24;
+const hourInSeconds = 60 * 60;
+const fontFileNames = ['Inter-Regular.ttf', 'Inter-Bold.ttf'] as const;
+
+const persistentImageCachePolicy: VoteSocialImageCachePolicy = {
+    browser: 'public, max-age=31536000, immutable',
+    cdn: `public, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
+    netlifyCdn: `public, durable, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
+};
+
+const notFoundImageCachePolicy: VoteSocialImageCachePolicy = {
+    browser: `public, max-age=${hourInSeconds}, stale-while-revalidate=${dayInSeconds}`,
+    cdn: `public, max-age=${hourInSeconds}, stale-while-revalidate=${dayInSeconds}`,
+    netlifyCdn: `public, durable, max-age=${hourInSeconds}, stale-while-revalidate=${dayInSeconds}`,
+};
+
+const unavailableImageCachePolicy: VoteSocialImageCachePolicy = {
+    browser: 'no-store',
+    cdn: 'no-store',
+    netlifyCdn: 'no-store',
+};
 
 const normalizeWhitespace = (value: string): string =>
     value.trim().replace(/\s+/g, ' ');
@@ -91,219 +94,245 @@ const escapeXml = (value: string): string =>
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+        .replaceAll("'", '&apos;');
 
-const truncateText = (value: string, maxLength: number): string => {
-    const normalizedValue = normalizeWhitespace(value);
-
-    if (normalizedValue.length <= maxLength) {
-        return normalizedValue;
+const fitLineWithEllipsis = (value: string, maxLength: number): string => {
+    if (maxLength <= ellipsis.length) {
+        return ellipsis.slice(0, Math.max(maxLength, 0));
     }
 
-    if (maxLength <= 3) {
-        return normalizedValue.slice(0, maxLength);
+    return `${value.slice(0, maxLength - ellipsis.length).trimEnd()}${ellipsis}`;
+};
+
+const truncateLine = (value: string, maxLength: number): string =>
+    value.length <= maxLength ? value : fitLineWithEllipsis(value, maxLength);
+
+const ellipsizeLine = (value: string, maxLength: number): string => {
+    if (value.length + ellipsis.length <= maxLength) {
+        return `${value}${ellipsis}`;
     }
 
-    return `${normalizedValue.slice(0, maxLength - 3).trimEnd()}...`;
+    return fitLineWithEllipsis(value, maxLength);
+};
+
+const wrapText = (
+    value: string,
+    maxLineLength: number,
+    maxLines: number,
+): string[] => {
+    const words = normalizeWhitespace(value).split(/\s+/).filter(Boolean);
+
+    if (!words.length) {
+        return ['Untitled vote'];
+    }
+
+    const lines: string[] = [];
+    let currentLine = '';
+    let didTruncate = false;
+
+    for (const word of words) {
+        if (word.length > maxLineLength) {
+            if (currentLine) {
+                lines.push(currentLine);
+                currentLine = '';
+
+                if (lines.length === maxLines) {
+                    didTruncate = true;
+                    break;
+                }
+            }
+
+            lines.push(truncateLine(word, maxLineLength));
+
+            if (lines.length === maxLines) {
+                didTruncate = true;
+                break;
+            }
+
+            continue;
+        }
+
+        const nextLine = currentLine ? `${currentLine} ${word}` : word;
+
+        if (nextLine.length <= maxLineLength) {
+            currentLine = nextLine;
+            continue;
+        }
+
+        if (currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+        } else {
+            lines.push(truncateLine(word, maxLineLength));
+        }
+
+        if (lines.length === maxLines) {
+            didTruncate = true;
+            break;
+        }
+    }
+
+    if (lines.length < maxLines && currentLine) {
+        lines.push(currentLine);
+    }
+
+    if (
+        lines.length === maxLines &&
+        didTruncate &&
+        !lines[maxLines - 1].endsWith(ellipsis)
+    ) {
+        lines[maxLines - 1] = ellipsizeLine(lines[maxLines - 1], maxLineLength);
+    }
+
+    return lines;
 };
 
 const hasVoteSocialImageResults = (resultScores: number[]): boolean =>
     resultScores.some((score) => Number.isFinite(score));
 
-const formatVoteSocialImageScore = (score: number): string => score.toFixed(2);
+const buildChoiceLines = (choiceNames: string[]): string[] => {
+    const visibleChoices = choiceNames
+        .slice(0, maxVisibleChoices)
+        .map((choiceName) => truncateLine(choiceName, maxChoiceLineLength));
 
-export const wrapVoteSocialImageTitle = (title: string): string[] => {
-    const normalizedTitle = truncateText(title, voteSocialImageTitleMaxLength);
-
-    if (!normalizedTitle) {
-        return [siteName];
+    if (choiceNames.length > maxVisibleChoices) {
+        visibleChoices.push(`+${choiceNames.length - maxVisibleChoices} more`);
     }
 
-    const words = normalizedTitle.split(' ');
-    const rawLines: string[] = [];
-    let currentLine = '';
-
-    for (const word of words) {
-        const candidateLine = currentLine ? `${currentLine} ${word}` : word;
-
-        if (candidateLine.length <= voteSocialImageTitleLineLength) {
-            currentLine = candidateLine;
-            continue;
-        }
-
-        if (currentLine) {
-            rawLines.push(currentLine);
-            currentLine = word;
-            continue;
-        }
-
-        rawLines.push(truncateText(word, voteSocialImageTitleLineLength));
-    }
-
-    if (currentLine) {
-        rawLines.push(currentLine);
-    }
-
-    if (rawLines.length <= voteSocialImageTitleMaxLines) {
-        return rawLines;
-    }
-
-    const visibleLines = rawLines.slice(0, voteSocialImageTitleMaxLines);
-    const finalLineText = [
-        visibleLines[voteSocialImageTitleMaxLines - 1],
-        ...rawLines.slice(voteSocialImageTitleMaxLines),
-    ].join(' ');
-
-    visibleLines[voteSocialImageTitleMaxLines - 1] = truncateText(
-        finalLineText,
-        voteSocialImageTitleLineLength,
-    );
-
-    return visibleLines;
+    return visibleChoices.length ? visibleChoices : ['No choices yet'];
 };
 
-export const createVoteSocialImageRows = (
-    choices: string[],
-    resultScores: number[] = [],
-): VoteSocialImageRow[] => {
-    const normalizedChoiceSlots = choices.map((choice) =>
-        normalizeWhitespace(choice),
-    );
-    const normalizedChoices = normalizedChoiceSlots.filter(Boolean);
+const buildResultEntries = (
+    choiceNames: string[],
+    resultScores: number[],
+): VoteResultEntry[] =>
+    choiceNames
+        .map((choiceName, index) => ({
+            index,
+            label: choiceName,
+            score: resultScores[index] ?? Number.NEGATIVE_INFINITY,
+        }))
+        .filter(
+            (entry) => entry.label.length > 0 && Number.isFinite(entry.score),
+        )
+        .sort((left, right) => {
+            if (right.score !== left.score) {
+                return right.score - left.score;
+            }
 
-    if (hasVoteSocialImageResults(resultScores)) {
-        const visibleResults = normalizedChoiceSlots
-            .map((choice, index) => ({
-                choice,
-                index,
-                score: resultScores[index] ?? Number.NEGATIVE_INFINITY,
-            }))
-            .filter((entry) => entry.choice && Number.isFinite(entry.score))
-            .sort((left, right) => {
-                if (right.score !== left.score) {
-                    return right.score - left.score;
-                }
-
-                return left.index - right.index;
-            })
-            .slice(0, voteSocialImageChoicesLimit)
-            .map((entry) => ({
-                kind: 'choice' as const,
-                label: truncateText(
-                    entry.choice,
-                    voteSocialImageChoiceMaxLength,
-                ),
-                scoreLabel: formatVoteSocialImageScore(entry.score),
-            }));
-
-        const resultRows: VoteSocialImageRow[] = visibleResults.map(
-            ({ kind, label, scoreLabel }) => ({
-                kind,
-                label,
-                scoreLabel,
-            }),
-        );
-
-        if (normalizedChoices.length > voteSocialImageChoicesLimit) {
-            resultRows.push({
-                kind: 'summary',
-                label: `+${normalizedChoices.length - voteSocialImageChoicesLimit} more choices`,
-            });
-        }
-
-        if (resultRows.length > 0) {
-            return resultRows;
-        }
-    }
-
-    const visibleChoices: VoteSocialImageRow[] = normalizedChoices
-        .slice(0, voteSocialImageChoicesLimit)
-        .map((choice) => ({
-            kind: 'choice' as const,
-            label: truncateText(choice, voteSocialImageChoiceMaxLength),
+            return left.index - right.index;
+        })
+        .slice(0, maxVisibleResults)
+        .map(({ label }) => ({
+            label: truncateLine(label, maxResultLineLength),
         }));
 
-    if (normalizedChoices.length > voteSocialImageChoicesLimit) {
-        visibleChoices.push({
-            kind: 'summary',
-            label: `+${normalizedChoices.length - voteSocialImageChoicesLimit} more`,
-        });
-    }
-
-    if (visibleChoices.length > 0) {
-        return visibleChoices;
-    }
-
-    return fallbackVoteSocialImageRows.map((choice) => ({
-        kind: 'choice' as const,
-        label: choice,
-    }));
-};
-
-const createTitleTspans = (titleLines: string[]): string =>
-    titleLines
+const buildOpenVoteMarkup = (choiceNames: string[]): string => {
+    const choiceLines = buildChoiceLines(choiceNames);
+    const choiceCountLabel =
+        choiceNames.length === 1 ? '1 choice' : `${choiceNames.length} choices`;
+    const choicesMarkup = choiceLines
         .map(
             (line, index) =>
-                `<tspan x="72" dy="${index === 0 ? 0 : 78}">${escapeXml(line)}</tspan>`,
+                `<g transform="translate(780 ${190 + index * 62})"><circle cx="12" cy="12" fill="#8f8f8f" r="6" /><text x="34" y="22" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="400">${escapeXml(line)}</text></g>`,
         )
         .join('');
 
-const createChoiceRowsSvg = (rows: VoteSocialImageRow[]): string =>
-    rows
-        .map((row, index) => {
-            const y = 304 + index * 70;
-            const badgeText = row.kind === 'choice' ? `${index + 1}` : '+';
-            const rowFill = row.kind === 'choice' ? '#1c1c1c' : '#181818';
-            const badgeFill = row.kind === 'choice' ? '#f2f2f2' : '#2d2d2d';
-            const badgeTextFill = row.kind === 'choice' ? '#111111' : '#f2f2f2';
-            const scoreText = row.scoreLabel
-                ? `<text x="1086" y="${y + 36}" text-anchor="end" font-size="24" font-weight="700" fill="#ffffff">${escapeXml(row.scoreLabel)}</text>`
-                : '';
+    return `<text x="780" y="130" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Choices</text>
+    <text x="780" y="164" fill="#a3a3a3" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="400">${escapeXml(choiceCountLabel)}</text>
+    ${choicesMarkup}`;
+};
 
-            return `
-                <rect x="72" y="${y}" width="1056" height="56" rx="8" fill="${rowFill}" stroke="#343434" />
-                <rect x="92" y="${y + 12}" width="32" height="32" rx="6" fill="${badgeFill}" />
-                <text x="108" y="${y + 34}" text-anchor="middle" font-size="18" font-weight="700" fill="${badgeTextFill}">${badgeText}</text>
-                <text x="144" y="${y + 36}" font-size="26" fill="#f5f5f5">${escapeXml(row.label)}</text>
-                ${scoreText}
-            `;
-        })
+const buildCompletedVoteMarkup = (
+    choiceNames: string[],
+    resultScores: number[],
+): string => {
+    const resultEntries = buildResultEntries(choiceNames, resultScores);
+    const scoredChoiceCount = resultScores.filter((score) =>
+        Number.isFinite(score),
+    ).length;
+    const resultCountLabel =
+        scoredChoiceCount === 1
+            ? '1 scored choice'
+            : `${scoredChoiceCount} scored choices`;
+
+    if (!resultEntries.length) {
+        return `<text x="780" y="130" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Results</text>
+    <text x="780" y="164" fill="#a3a3a3" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="400">No scores submitted</text>
+    <text x="780" y="248" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="600">No submitted scores</text>
+    <text x="780" y="292" fill="#9f9f9f" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="400">This vote ended before anyone voted.</text>
+    <text x="780" y="352" fill="#9f9f9f" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="400">${escapeXml(
+        choiceNames.length === 1
+            ? '1 choice was available.'
+            : `${choiceNames.length} choices were available.`,
+    )}</text>`;
+    }
+
+    const rowsMarkup = resultEntries
+        .map(
+            ({ label }, resultIndex) =>
+                `<g transform="translate(776 ${178 + resultIndex * 84})"><rect width="308" height="64" rx="18" fill="#202020" stroke="#2c2c2c" /><text x="24" y="41" fill="#8f8f8f" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">${resultIndex + 1}</text><text x="64" y="41" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="600">${escapeXml(label)}</text></g>`,
+        )
         .join('');
+    const hiddenChoiceCount = scoredChoiceCount - resultEntries.length;
+    const hiddenChoiceMarkup =
+        hiddenChoiceCount > 0
+            ? `<text x="780" y="534" fill="#9f9f9f" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="400">+${hiddenChoiceCount} more scored choices</text>`
+            : '';
+
+    return `<text x="780" y="130" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Results</text>
+    <text x="780" y="164" fill="#a3a3a3" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="400">${escapeXml(resultCountLabel)}</text>
+    ${rowsMarkup}
+    ${hiddenChoiceMarkup}`;
+};
 
 export const createVoteSocialImageSvg = ({
     choices,
     isComplete,
     pollTitle,
     resultScores,
-}: VoteSocialImagePayload): string => {
-    const titleLines = wrapVoteSocialImageTitle(pollTitle || siteName);
-    const choiceRows = createVoteSocialImageRows(choices, resultScores);
-    const sectionLabel = isComplete ? 'Final results' : 'Choices';
-    const statusBadge = isComplete
-        ? `
-            <rect x="956" y="40" width="172" height="40" rx="8" fill="#1f1f1f" stroke="#353535" />
-            <text x="1042" y="66" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Completed</text>
-        `
-        : '';
+}: VoteSocialImageRenderPayload): string => {
+    const titleStartY = 246;
+    const titleLines = wrapText(pollTitle, maxTitleLineLength, maxTitleLines);
+    const titleMarkup = titleLines
+        .map(
+            (line, index) =>
+                `<text x="80" y="${titleStartY + index * 84}" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="72" font-weight="700">${escapeXml(line)}</text>`,
+        )
+        .join('');
+    const panelMarkup = isComplete
+        ? buildCompletedVoteMarkup(choices, resultScores)
+        : buildOpenVoteMarkup(choices);
+    const eyebrowLabel = isComplete ? 'Final results' : '1-10 score vote';
 
-    return `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${socialImageWidth}" height="${socialImageHeight}" viewBox="0 0 ${socialImageWidth} ${socialImageHeight}">
-            <rect width="${socialImageWidth}" height="${socialImageHeight}" fill="#121212" />
-            <rect x="0" y="96" width="${socialImageWidth}" height="1" fill="#303030" />
-            <text x="72" y="72" font-size="54" font-weight="700" fill="#ffffff">${siteName}</text>
-            ${statusBadge}
-            <text x="72" y="176" font-size="72" font-weight="700" fill="#ffffff">${createTitleTspans(titleLines)}</text>
-            <text x="72" y="274" font-size="24" fill="#8f8f8f">${sectionLabel}</text>
-            ${createChoiceRowsSvg(choiceRows)}
-        </svg>
-    `;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="${escapeXml(pollTitle)}">
+    <defs>
+        <linearGradient id="background" x1="0%" x2="100%" y1="0%" y2="100%">
+            <stop offset="0%" stop-color="#101010" />
+            <stop offset="100%" stop-color="#171717" />
+        </linearGradient>
+        <radialGradient id="accent" cx="78%" cy="12%" r="62%">
+            <stop offset="0%" stop-color="#2f2f2f" stop-opacity="0.7" />
+            <stop offset="100%" stop-color="#2f2f2f" stop-opacity="0" />
+        </radialGradient>
+    </defs>
+    <rect width="1200" height="630" fill="url(#background)" />
+    <rect width="1200" height="630" fill="url(#accent)" />
+    <text x="80" y="118" fill="#d4d4d4" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="600">${siteName}</text>
+    <text x="80" y="168" fill="#9f9f9f" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="400">${eyebrowLabel}</text>
+    <rect x="740" y="70" width="380" height="490" rx="28" fill="#1a1a1a" stroke="#2e2e2e" />
+    ${titleMarkup}
+    ${panelMarkup}
+</svg>`;
 };
 
 const normalizePollChoices = (value: unknown): string[] =>
     Array.isArray(value)
-        ? value.map((choice) =>
-              typeof choice === 'string' ? normalizeWhitespace(choice) : '',
-          )
+        ? value
+              .map((choice) =>
+                  typeof choice === 'string' ? normalizeWhitespace(choice) : '',
+              )
+              .filter(Boolean)
         : [];
 
 const normalizePollScores = (value: unknown): number[] =>
@@ -322,7 +351,7 @@ const normalizePollTitle = (value: unknown): string | null => {
 
     const normalizedTitle = normalizeWhitespace(value);
 
-    return normalizedTitle ? normalizedTitle : null;
+    return normalizedTitle || null;
 };
 
 const normalizeVoteSocialImagePayload = (
@@ -335,9 +364,6 @@ const normalizeVoteSocialImagePayload = (
     const pollTitle = normalizePollTitle(
         (value as { pollName?: unknown }).pollName,
     );
-    const resultScores = normalizePollScores(
-        (value as { resultScores?: unknown }).resultScores,
-    );
 
     if (!pollTitle) {
         return null;
@@ -345,10 +371,10 @@ const normalizeVoteSocialImagePayload = (
 
     return {
         choices: normalizePollChoices((value as { choices?: unknown }).choices),
-        isComplete: hasVoteSocialImageResults(resultScores),
-        isFallback: false,
         pollTitle,
-        resultScores,
+        resultScores: normalizePollScores(
+            (value as { resultScores?: unknown }).resultScores,
+        ),
     };
 };
 
@@ -374,7 +400,12 @@ export const extractVoteSocialImageSlugFromPathname = (
     }
 };
 
-export const fetchVoteSocialImagePayload = async ({
+export const extractVoteSocialImageVariantFromSearchParams = (
+    searchParams: URLSearchParams,
+): VoteSocialImageVariant =>
+    searchParams.get('v') === 'complete' ? 'complete' : 'open';
+
+const fetchVoteSocialImagePayload = async ({
     apiBaseUrl,
     fetchImpl = fetch,
     pollSlug,
@@ -384,7 +415,7 @@ export const fetchVoteSocialImagePayload = async ({
     fetchImpl?: FetchLike;
     pollSlug: string;
     signal?: AbortSignal;
-}): Promise<VoteSocialImagePayload | null> => {
+}): Promise<VoteSocialImageFetchResult> => {
     try {
         const response = await fetchImpl(
             new URL(`/api/polls/${encodeURIComponent(pollSlug)}`, apiBaseUrl),
@@ -396,18 +427,85 @@ export const fetchVoteSocialImagePayload = async ({
             },
         );
 
-        if (!response.ok) {
-            return null;
+        if (response.status === 404) {
+            return {
+                status: 'not-found',
+            };
         }
 
-        return normalizeVoteSocialImagePayload(await response.json());
+        if (!response.ok) {
+            return {
+                status: 'unavailable',
+            };
+        }
+
+        const payload = normalizeVoteSocialImagePayload(await response.json());
+
+        if (!payload) {
+            return {
+                status: 'unavailable',
+            };
+        }
+
+        return {
+            payload,
+            status: 'found',
+        };
     } catch {
-        return null;
+        return {
+            status: 'unavailable',
+        };
     }
 };
 
+const getFontDirectoryCandidates = (): string[] => {
+    const candidates = [
+        path.resolve(process.cwd(), 'netlify', 'functions', 'assets', 'fonts'),
+        path.resolve(
+            process.cwd(),
+            '..',
+            '..',
+            'netlify',
+            'functions',
+            'assets',
+            'fonts',
+        ),
+    ];
+
+    try {
+        candidates.push(
+            fileURLToPath(
+                new URL(
+                    '../../../netlify/functions/assets/fonts',
+                    import.meta.url,
+                ),
+            ),
+        );
+    } catch {
+        return candidates;
+    }
+
+    return candidates;
+};
+
+const resolveFontFiles = (): string[] | undefined => {
+    for (const directory of getFontDirectoryCandidates()) {
+        const fontFiles = fontFileNames.map((fontFileName) =>
+            path.resolve(directory, fontFileName),
+        );
+
+        if (fontFiles.every((fontFile) => existsSync(fontFile))) {
+            return fontFiles;
+        }
+    }
+
+    return undefined;
+};
+
+const voteSocialImageFontFiles = resolveFontFiles();
+
 export const renderVoteSocialImagePng = (
-    payload: VoteSocialImagePayload,
+    payload: VoteSocialImageRenderPayload,
 ): Uint8Array => {
     const svg = createVoteSocialImageSvg(payload);
     const resvg = new Resvg(svg, {
@@ -416,32 +514,42 @@ export const renderVoteSocialImagePng = (
             value: socialImageWidth,
         },
         font: {
-            defaultFontFamily: 'Roboto',
-            fontFiles: [voteSocialImageFontPath],
-            loadSystemFonts: false,
+            defaultFontFamily: voteSocialImageFontFiles
+                ? 'Inter'
+                : 'sans-serif',
+            ...(voteSocialImageFontFiles
+                ? {
+                      fontFiles: voteSocialImageFontFiles,
+                      loadSystemFonts: false,
+                      sansSerifFamily: 'Inter',
+                  }
+                : {
+                      loadSystemFonts: true,
+                      sansSerifFamily: 'sans-serif',
+                  }),
         },
     });
 
     return resvg.render().asPng();
 };
 
-const createFallbackVoteSocialImagePayload = (): VoteSocialImagePayload => ({
-    choices: [],
-    isComplete: false,
-    isFallback: true,
-    pollTitle: null,
-    resultScores: [],
-});
+const createFallbackVoteSocialImagePayload =
+    (): VoteSocialImageRenderPayload => ({
+        choices: ['Share the link', 'Collect responses', 'Reveal results'],
+        isComplete: false,
+        pollTitle: siteName,
+        resultScores: [],
+    });
 
 export const renderVoteSocialImagePngWithFallback = ({
     payload,
     renderImpl = renderVoteSocialImagePng,
 }: {
-    payload: VoteSocialImagePayload;
-    renderImpl?: (payload: VoteSocialImagePayload) => Uint8Array;
+    payload: VoteSocialImageRenderPayload;
+    renderImpl?: (payload: VoteSocialImageRenderPayload) => Uint8Array;
 }): {
     body: Uint8Array;
-    renderedPayload: VoteSocialImagePayload;
+    renderedPayload: VoteSocialImageRenderPayload;
 } => {
     try {
         return {
@@ -472,54 +580,130 @@ export const renderVoteSocialImagePngWithFallback = ({
 
 const buildVoteSocialImageHeaders = ({
     byteLength,
-    isFallback,
+    cachePolicy,
 }: {
     byteLength: number;
-    isFallback: boolean;
+    cachePolicy: VoteSocialImageCachePolicy;
 }): Record<string, string> => ({
-    'cache-control': isFallback
-        ? shortVoteSocialImageCacheControl
-        : longVoteSocialImageCacheControl,
+    'cache-control': cachePolicy.browser,
+    'cdn-cache-control': cachePolicy.cdn,
     'content-length': byteLength.toString(),
     'content-type': 'image/png',
-    'netlify-cdn-cache-control': isFallback
-        ? shortVoteSocialImageCdnCacheControl
-        : longVoteSocialImageCdnCacheControl,
+    'netlify-cdn-cache-control': cachePolicy.netlifyCdn,
 });
+
+export const createVoteSocialImagePayloadForVariant = ({
+    payload,
+    variant,
+}: {
+    payload: VoteSocialImagePayload;
+    variant: VoteSocialImageVariant;
+}): VoteSocialImageRenderPayload => {
+    const isComplete =
+        variant === 'complete' &&
+        hasVoteSocialImageResults(payload.resultScores);
+
+    return {
+        choices: payload.choices,
+        isComplete,
+        pollTitle: payload.pollTitle,
+        resultScores: isComplete ? payload.resultScores : [],
+    };
+};
 
 export const createVoteSocialImageResponse = async ({
     apiBaseUrl,
     fetchImpl,
     pollSlug,
     signal,
+    variant,
 }: {
     apiBaseUrl: string;
     fetchImpl?: FetchLike;
     pollSlug: string;
     signal?: AbortSignal;
+    variant: VoteSocialImageVariant;
 }): Promise<VoteSocialImageResponse> => {
-    const payload =
-        (await fetchVoteSocialImagePayload({
-            apiBaseUrl,
-            fetchImpl,
-            pollSlug,
-            signal,
-        })) || createFallbackVoteSocialImagePayload();
-    const { body, renderedPayload } = renderVoteSocialImagePngWithFallback({
-        payload,
+    const voteSocialImageResult = await fetchVoteSocialImagePayload({
+        apiBaseUrl,
+        fetchImpl,
+        pollSlug,
+        signal,
+    });
+
+    if (voteSocialImageResult.status === 'not-found') {
+        const { body } = renderVoteSocialImagePngWithFallback({
+            payload: {
+                choices: [
+                    'Share the link',
+                    'Collect responses',
+                    'Reveal results',
+                ],
+                isComplete: false,
+                pollTitle: 'Vote not found',
+                resultScores: [],
+            },
+        });
+
+        return {
+            body,
+            headers: buildVoteSocialImageHeaders({
+                byteLength: body.byteLength,
+                cachePolicy: notFoundImageCachePolicy,
+            }),
+            status: 200,
+        };
+    }
+
+    if (voteSocialImageResult.status === 'unavailable') {
+        const { body } = renderVoteSocialImagePngWithFallback({
+            payload: {
+                choices: ['Try again shortly'],
+                isComplete: false,
+                pollTitle: 'Vote unavailable',
+                resultScores: [],
+            },
+        });
+
+        return {
+            body,
+            headers: buildVoteSocialImageHeaders({
+                byteLength: body.byteLength,
+                cachePolicy: unavailableImageCachePolicy,
+            }),
+            status: 503,
+        };
+    }
+
+    const { body } = renderVoteSocialImagePngWithFallback({
+        payload: createVoteSocialImagePayloadForVariant({
+            payload: voteSocialImageResult.payload,
+            variant,
+        }),
     });
 
     return {
         body,
         headers: buildVoteSocialImageHeaders({
             byteLength: body.byteLength,
-            isFallback: renderedPayload.isFallback,
+            cachePolicy: persistentImageCachePolicy,
         }),
-        isFallback: renderedPayload.isFallback,
+        status: 200,
     };
 };
 
-export const createVoteSocialImageUrl = (
-    origin: string,
-    pollSlug: string,
-): string => new URL(createVoteSocialImagePath(pollSlug), origin).toString();
+export const createVoteSocialImageUrl = ({
+    origin,
+    pollSlug,
+    variant = 'open',
+}: {
+    origin: string;
+    pollSlug: string;
+    variant?: VoteSocialImageVariant;
+}): string =>
+    new URL(
+        createVoteSocialImagePath(pollSlug, {
+            isComplete: variant === 'complete',
+        }),
+        origin,
+    ).toString();

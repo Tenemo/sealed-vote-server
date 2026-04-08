@@ -12,7 +12,10 @@
   VITE_API_BASE_URL = "https://api.sealed.vote"
 
 [functions]
-  included_files = ["apps/web/src/fonts/Roboto-Regular.ttf"]
+  included_files = [
+    "netlify/functions/assets/fonts/Inter-Bold.ttf",
+    "netlify/functions/assets/fonts/Inter-Regular.ttf",
+  ]
 
 [[edge_functions]]
   function = "vote-seo"

@@ -3,134 +3,184 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, test, vi } from 'vitest';
 
 import {
+    createVoteSocialImagePayloadForVariant,
     createVoteSocialImageResponse,
-    createVoteSocialImageRows,
     createVoteSocialImageSvg,
     extractVoteSocialImageSlugFromPathname,
+    extractVoteSocialImageVariantFromSearchParams,
     renderVoteSocialImagePngWithFallback,
-    wrapVoteSocialImageTitle,
 } from './voteSocialImage';
 
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
-describe('wrapVoteSocialImageTitle', () => {
-    test('wraps long vote titles into multiple lines', () => {
-        expect(
-            wrapVoteSocialImageTitle(
-                'Quarterly roadmap alignment for platform migration',
-            ),
-        ).toEqual(['Quarterly roadmap', 'alignment for platform', 'migration']);
-    });
-
-    test('truncates very long vote titles safely', () => {
-        const lines = wrapVoteSocialImageTitle(
-            'This is a deliberately oversized vote title that keeps going long enough to require truncation on the final visible line of the preview image',
-        );
-
-        expect(lines.length).toBeGreaterThan(1);
-        expect(lines.length).toBeLessThanOrEqual(3);
-        expect(lines.at(-1)).toContain('...');
-    });
-});
-
-describe('createVoteSocialImageRows', () => {
-    test('renders the first three choices and a summary row for the rest', () => {
-        expect(
-            createVoteSocialImageRows([
-                'Alpha',
-                'Beta',
-                'Gamma',
-                'Delta',
-                'Epsilon',
-            ]),
-        ).toEqual([
-            { kind: 'choice', label: 'Alpha' },
-            { kind: 'choice', label: 'Beta' },
-            { kind: 'choice', label: 'Gamma' },
-            { kind: 'summary', label: '+2 more' },
-        ]);
-    });
-
-    test('renders the highest-ranked completed results with score labels', () => {
-        expect(
-            createVoteSocialImageRows(
-                ['Alpha', 'Beta', 'Gamma', 'Delta'],
-                [6.5, 9.25, 7.75, 8.1],
-            ),
-        ).toEqual([
-            { kind: 'choice', label: 'Beta', scoreLabel: '9.25' },
-            { kind: 'choice', label: 'Delta', scoreLabel: '8.10' },
-            { kind: 'choice', label: 'Gamma', scoreLabel: '7.75' },
-            { kind: 'summary', label: '+1 more choices' },
-        ]);
-    });
-
-    test('preserves choice-to-score indices when invalid placeholders are present', () => {
-        expect(
-            createVoteSocialImageRows(
-                ['Alpha', '', 'Gamma', 'Delta'],
-                [6.5, 9.25, Number.NaN, 8.1],
-            ),
-        ).toEqual([
-            { kind: 'choice', label: 'Delta', scoreLabel: '8.10' },
-            { kind: 'choice', label: 'Alpha', scoreLabel: '6.50' },
-        ]);
-    });
-
-    test('falls back to generic rows when the vote has no usable choices', () => {
-        expect(createVoteSocialImageRows(['', '   '])).toEqual([
-            {
-                kind: 'choice',
-                label: 'Confidential browser voting',
-            },
-            {
-                kind: 'choice',
-                label: 'Homomorphic encryption',
-            },
-            {
-                kind: 'choice',
-                label: 'Public verification',
-            },
-        ]);
-    });
-});
-
 describe('createVoteSocialImageSvg', () => {
-    test('renders a generic branded fallback image when poll data is missing', () => {
+    test('renders the open poll title and first choices into the SVG card', () => {
         const svg = createVoteSocialImageSvg({
-            choices: [],
+            choices: ['Apples', 'Bananas', 'Pears'],
             isComplete: false,
-            isFallback: true,
-            pollTitle: null,
+            pollTitle: 'Best fruit for breakfast',
             resultScores: [],
         });
 
-        expect(svg).toContain('sealed.vote');
-        expect(svg).toContain('Public verification');
-        expect(svg).not.toContain('Vote preview');
-        expect(svg).not.toContain('Share this link to let participants join');
-        expect(svg).not.toContain('Confidential 1-10 score voting');
-        expect(svg).not.toContain(
-            'Homomorphic encryption | offline recovery | public verification',
-        );
-        expect(svg).not.toContain(
-            'width="1056" height="286" rx="10" fill="#161616" stroke="#343434"',
-        );
+        expect(svg).toContain('Best fruit for');
+        expect(svg).toContain('breakfast');
+        expect(svg).toContain('1-10 score vote');
+        expect(svg).toContain('Choices');
+        expect(svg).toContain('Apples');
+        expect(svg).toContain('Bananas');
+        expect(svg).toContain('3 choices');
     });
 
-    test('renders a completed-results layout when published scores are available', () => {
+    test('escapes XML and summarizes extra choices', () => {
         const svg = createVoteSocialImageSvg({
-            choices: ['Alpha', 'Beta', 'Gamma'],
-            isComplete: true,
-            isFallback: false,
-            pollTitle: 'Quarterly roadmap',
-            resultScores: [6.25, 9.5, 8.1],
+            choices: ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'],
+            isComplete: false,
+            pollTitle: 'Fish & Chips <Friday>',
+            resultScores: [],
         });
 
-        expect(svg).toContain('Completed');
+        expect(svg).toContain('Fish &amp; Chips');
+        expect(svg).toContain('&lt;Friday&gt;');
+        expect(svg).toContain('+2 more');
+    });
+
+    test('uses tighter truncation for long choice labels in the preview panel', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Long bong Long bong Long bong Long bong', 'Short'],
+            isComplete: false,
+            pollTitle: 'Best fruit for breakfast',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('Long bong Long b...');
+        expect(svg).not.toContain('Long bong Long bong...');
+    });
+
+    test('wraps longer vote titles before they collide with the choices panel', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Matematyka', 'Biologia', 'Chemia'],
+            isComplete: false,
+            pollTitle: 'Ulubiony przedmiot?',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('Ulubiony');
+        expect(svg).toContain('przedmiot?');
+    });
+
+    test('ellipsizes the last visible title line when more words remain', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas', 'Pears'],
+            isComplete: false,
+            pollTitle: 'favorite favorite favorite favorite favorite',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('favorite...');
+    });
+
+    test('does not ellipsize title lines when the title fits exactly', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas', 'Pears'],
+            isComplete: false,
+            pollTitle: '1234567890abcdef ghijklmnopqrstuv wxyz123456789012',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('1234567890abcdef');
+        expect(svg).toContain('ghijklmnopqrstuv');
+        expect(svg).toContain('wxyz123456789012');
+        expect(svg).not.toContain('wxyz123456789...');
+    });
+
+    test('ellipsizes a single long title token instead of letting it overflow', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas', 'Pears'],
+            isComplete: false,
+            pollTitle: 'favorite-favorite-favorite-favor--6fa446f6',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('favorite-favo...');
+    });
+
+    test('ellipsizes a long word even when it starts a later title line', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas', 'Pears'],
+            isComplete: false,
+            pollTitle:
+                'Best favorite-favorite-favorite-favor--6fa446f6 breakfast',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('favorite-favo...');
+    });
+
+    test('renders final results for completed polls in score order', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas', 'Pears'],
+            isComplete: true,
+            pollTitle: 'Best fruit for breakfast',
+            resultScores: [8.94, 9.5, 7.12],
+        });
+
         expect(svg).toContain('Final results');
-        expect(svg).toContain('9.50');
-        expect(svg).toContain('Beta');
+        expect(svg).toContain('Results');
+        expect(svg).toContain('Bananas');
+        expect(svg).not.toContain('9.50');
+        expect(svg).not.toContain('8.94');
+        expect(svg.indexOf('Bananas')).toBeLessThan(svg.indexOf('Apples'));
+        expect(svg.indexOf('Apples')).toBeLessThan(svg.indexOf('Pears'));
+    });
+
+    test('renders a clear empty state when a completed poll has no results', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas'],
+            isComplete: true,
+            pollTitle: 'Best fruit for breakfast',
+            resultScores: [],
+        });
+
+        expect(svg).toContain('No submitted scores');
+        expect(svg).toContain('2 choices were available.');
+    });
+});
+
+describe('createVoteSocialImagePayloadForVariant', () => {
+    test('keeps the open card stable even if results are available', () => {
+        expect(
+            createVoteSocialImagePayloadForVariant({
+                payload: {
+                    choices: ['Alpha', 'Beta'],
+                    pollTitle: 'Quarterly roadmap',
+                    resultScores: [4.2, 8.1],
+                },
+                variant: 'open',
+            }),
+        ).toEqual({
+            choices: ['Alpha', 'Beta'],
+            isComplete: false,
+            pollTitle: 'Quarterly roadmap',
+            resultScores: [],
+        });
+    });
+
+    test('uses the completed card only when the completed variant is requested', () => {
+        expect(
+            createVoteSocialImagePayloadForVariant({
+                payload: {
+                    choices: ['Alpha', 'Beta'],
+                    pollTitle: 'Quarterly roadmap',
+                    resultScores: [4.2, 8.1],
+                },
+                variant: 'complete',
+            }),
+        ).toEqual({
+            choices: ['Alpha', 'Beta'],
+            isComplete: true,
+            pollTitle: 'Quarterly roadmap',
+            resultScores: [4.2, 8.1],
+        });
     });
 });
 
@@ -158,6 +208,24 @@ describe('extractVoteSocialImageSlugFromPathname', () => {
     });
 });
 
+describe('extractVoteSocialImageVariantFromSearchParams', () => {
+    test('parses the completed image version from the query string', () => {
+        expect(
+            extractVoteSocialImageVariantFromSearchParams(
+                new URLSearchParams('v=complete'),
+            ),
+        ).toBe('complete');
+    });
+
+    test('falls back to the open image variant', () => {
+        expect(
+            extractVoteSocialImageVariantFromSearchParams(
+                new URLSearchParams('v=legacy'),
+            ),
+        ).toBe('open');
+    });
+});
+
 describe('createVoteSocialImageResponse', () => {
     test('returns a PNG with long-lived cache headers for a real poll image', async () => {
         const response = await createVoteSocialImageResponse({
@@ -166,36 +234,55 @@ describe('createVoteSocialImageResponse', () => {
                 Response.json({
                     choices: ['Alpha', 'Beta', 'Gamma', 'Delta'],
                     pollName: 'Quarterly roadmap',
+                    resultScores: [6.5, 9.25, 7.75, 8.1],
                 }),
             ),
             pollSlug: 'quarterly-roadmap',
+            variant: 'open',
         });
 
-        expect(response.isFallback).toBe(false);
+        expect(response.status).toBe(200);
         expect(response.headers['content-type']).toBe('image/png');
         expect(response.headers['cache-control']).toBe(
             'public, max-age=31536000, immutable',
         );
+        expect(response.headers['cdn-cache-control']).toContain('max-age=');
         expect(response.headers['netlify-cdn-cache-control']).toContain(
             'durable',
         );
         expect(Buffer.from(response.body).subarray(0, 8)).toEqual(pngSignature);
     });
 
-    test('returns a generic PNG with shorter cache headers when the poll cannot be loaded', async () => {
+    test('returns a generic PNG with shorter cache headers when the poll is not found', async () => {
         const response = await createVoteSocialImageResponse({
             apiBaseUrl: 'https://api.sealed.vote',
             fetchImpl: vi.fn(async () => new Response(null, { status: 404 })),
             pollSlug: 'missing-vote',
+            variant: 'open',
         });
 
-        expect(response.isFallback).toBe(true);
+        expect(response.status).toBe(200);
         expect(response.headers['cache-control']).toBe(
-            'public, max-age=3600, stale-while-revalidate=600',
+            'public, max-age=3600, stale-while-revalidate=86400',
         );
         expect(response.headers['netlify-cdn-cache-control']).toBe(
-            'public, durable, max-age=3600, stale-while-revalidate=600',
+            'public, durable, max-age=3600, stale-while-revalidate=86400',
         );
+        expect(Buffer.from(response.body).subarray(0, 8)).toEqual(pngSignature);
+    });
+
+    test('returns a no-store image and 503 when the poll data is unavailable', async () => {
+        const response = await createVoteSocialImageResponse({
+            apiBaseUrl: 'https://api.sealed.vote',
+            fetchImpl: vi.fn(async () => new Response(null, { status: 500 })),
+            pollSlug: 'unavailable-vote',
+            variant: 'complete',
+        });
+
+        expect(response.status).toBe(503);
+        expect(response.headers['cache-control']).toBe('no-store');
+        expect(response.headers['cdn-cache-control']).toBe('no-store');
+        expect(response.headers['netlify-cdn-cache-control']).toBe('no-store');
         expect(Buffer.from(response.body).subarray(0, 8)).toEqual(pngSignature);
     });
 });
@@ -216,7 +303,6 @@ describe('renderVoteSocialImagePngWithFallback', () => {
                 payload: {
                     choices: ['Alpha'],
                     isComplete: false,
-                    isFallback: false,
                     pollTitle: 'Quarterly roadmap',
                     resultScores: [],
                 },

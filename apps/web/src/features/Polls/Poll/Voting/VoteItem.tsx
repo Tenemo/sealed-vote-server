@@ -1,6 +1,5 @@
 import React, { useId } from 'react';
 
-import { buttonVariants } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +10,12 @@ type Props = {
 };
 
 const SCORE_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const scoreChipClassName =
+    'flex h-11 w-full cursor-pointer items-center justify-center rounded-md border px-0 text-base font-medium transition-[color,background-color,border-color,box-shadow] outline-none select-none peer-focus-visible:ring-2 peer-focus-visible:ring-foreground/55 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background';
+const selectedScoreChipClassName =
+    'border-white bg-white text-black hover:border-white hover:bg-white hover:text-black';
+const unselectedScoreChipClassName =
+    'border-border bg-background text-foreground hover:border-border hover:bg-accent hover:text-foreground';
 
 const VoteItem = ({
     choiceName,
@@ -43,15 +48,16 @@ const VoteItem = ({
                                 />
                                 <label
                                     className={cn(
-                                        buttonVariants({
-                                            size: 'default',
-                                            variant: 'outline',
-                                        }),
                                         scoreChoice === selectedScore
-                                            ? 'border-white bg-white text-black hover:border-white hover:bg-white hover:text-black'
-                                            : 'border-border bg-background text-foreground hover:border-border hover:bg-accent hover:text-foreground',
-                                        'h-11 w-full cursor-pointer px-0 text-base peer-focus-visible:ring-2 peer-focus-visible:ring-foreground/55 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
+                                            ? selectedScoreChipClassName
+                                            : unselectedScoreChipClassName,
+                                        scoreChipClassName,
                                     )}
+                                    data-selected={
+                                        scoreChoice === selectedScore
+                                            ? 'true'
+                                            : 'false'
+                                    }
                                     htmlFor={`${radioGroupName}-${scoreChoice}`}
                                 >
                                     {scoreChoice}

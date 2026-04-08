@@ -48,24 +48,28 @@ jobs:
                     - name: chromium-desktop
                       slug: chromium-desktop
                       browser_cache_key: chromium-firefox
+                      ci_workers: '1'
                       install_browsers: chromium firefox
                     - name: firefox-desktop
                       slug: firefox-desktop
                       browser_cache_key: firefox
+                      ci_workers: '4'
                       install_browsers: firefox
                     - name: webkit-desktop
                       slug: webkit-desktop
                       browser_cache_key: webkit
+                      ci_workers: '4'
                       install_browsers: webkit
                     - name: mobile-firefox-android
                       slug: mobile-firefox-android
                       browser_cache_key: firefox
+                      ci_workers: '4'
                       install_browsers: firefox
 
         env:
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_BLOB_REPORT: 'true'
-            PLAYWRIGHT_CI_WORKERS: '4'
+            PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
 
         steps:
             - uses: actions/checkout@v6
