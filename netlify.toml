@@ -16,7 +16,7 @@
 
 [[edge_functions]]
   function = "vote-seo"
-  path = "/votes/*"
+  path = "/*"
 
 [[headers]]
   for = "/*"

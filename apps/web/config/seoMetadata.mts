@@ -1,5 +1,7 @@
 export const seoMarkerStartName = 'sealed-vote-seo-start';
 export const seoMarkerEndName = 'sealed-vote-seo-end';
+export const reactHelmetAttributeName = 'data-rh';
+export const reactHelmetAttributeValue = 'true';
 
 export const siteName = 'sealed.vote';
 export const siteAuthor = 'piotr@piech.dev';
@@ -397,13 +399,13 @@ const renderMetaTag = (
     content: string,
     attribute: 'name' | 'property' = 'name',
 ): string =>
-    `<meta ${attribute}="${escapeHtml(name)}" content="${escapeHtml(content)}" />`;
+    `<meta ${reactHelmetAttributeName}="${reactHelmetAttributeValue}" ${attribute}="${escapeHtml(name)}" content="${escapeHtml(content)}" />`;
 
 const renderLinkTag = (rel: string, href: string): string =>
-    `<link rel="${escapeHtml(rel)}" href="${escapeHtml(href)}" />`;
+    `<link ${reactHelmetAttributeName}="${reactHelmetAttributeValue}" rel="${escapeHtml(rel)}" href="${escapeHtml(href)}" />`;
 
 const renderJsonLdScript = (structuredData: StructuredData): string =>
-    `<script type="application/ld+json">${serializeStructuredData(structuredData)}</script>`;
+    `<script ${reactHelmetAttributeName}="${reactHelmetAttributeValue}" type="application/ld+json">${serializeStructuredData(structuredData)}</script>`;
 
 export const renderSeoBlock = (metadata: SeoMetadata): string =>
     [
@@ -444,7 +446,7 @@ export const renderSeoBlock = (metadata: SeoMetadata): string =>
         renderMetaTag('twitter:image', metadata.imageUrl),
         renderMetaTag('twitter:image:alt', metadata.imageAlt),
         renderLinkTag('canonical', metadata.canonicalUrl),
-        `<title>${escapeHtml(metadata.title)}</title>`,
+        `<title ${reactHelmetAttributeName}="${reactHelmetAttributeValue}">${escapeHtml(metadata.title)}</title>`,
         ...metadata.structuredData.map(renderJsonLdScript),
         `<meta name="${seoMarkerEndName}" content="1" />`,
     ].join('\n');

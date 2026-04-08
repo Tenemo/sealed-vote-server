@@ -201,11 +201,14 @@ describe('renderDocumentHtml', () => {
         });
 
         expect(html).toContain(
-            '<title>Team &lt;sync&gt; &quot;Q2&quot; | sealed.vote</title>',
+            '<title data-rh="true">Team &lt;sync&gt; &quot;Q2&quot; | sealed.vote</title>',
         );
         expect(html).toContain('content="https://sealed.vote/votes/team-sync"');
         expect(html).toContain(
             'content="https://sealed.vote/social/votes/team-sync.png?v=results-',
+        );
+        expect(html).toContain(
+            '<link data-rh="true" rel="canonical" href="https://sealed.vote/votes/team-sync"',
         );
         expect(html).toContain('Team \\u003csync\\u003e \\"Q2\\"');
         expect(html).not.toContain('<title>placeholder</title>');
@@ -221,9 +224,28 @@ describe('renderDocumentHtml', () => {
             requestUrl: new URL('https://sealed.vote/votes/team-sync'),
         });
 
-        expect(html).toContain('<title>Vote | sealed.vote</title>');
+        expect(html).toContain(
+            '<title data-rh="true">Vote | sealed.vote</title>',
+        );
         expect(html).toContain(
             'content="Confidential participant vote page on sealed.vote."',
         );
+    });
+
+    test('injects request-origin homepage metadata for preview domains', async () => {
+        const html = await renderDocumentHtml({
+            baseHtml,
+            requestUrl: new URL(
+                'https://deploy-preview-11--sealed-vote.netlify.app/',
+            ),
+        });
+
+        expect(html).toContain(
+            '<link data-rh="true" rel="canonical" href="https://deploy-preview-11--sealed-vote.netlify.app/"',
+        );
+        expect(html).toContain(
+            'content="https://deploy-preview-11--sealed-vote.netlify.app/"',
+        );
+        expect(html).not.toContain('href="https://sealed.vote/"');
     });
 });
