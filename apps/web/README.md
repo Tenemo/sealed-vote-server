@@ -40,4 +40,5 @@ For deployed static serving outside Vite, the workspace also provides:
 pnpm --filter @sealed-vote/web serve:dist
 ```
 
-That command serves `dist` with SPA fallback and is used by the Railway preview web service.
+That command serves `dist` with SPA fallback, injects route-aware SEO
+metadata into vote pages, and is used by the Railway preview web service.

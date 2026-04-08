@@ -48,6 +48,12 @@ The Playwright suite covers the recovery model directly:
 - [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) also verifies that a previously visited poll can reopen from persisted local data when live poll fetches fail.
 - [`tests/e2e/voting-flow.spec.ts`](./tests/e2e/voting-flow.spec.ts) covers the normal happy path and asserts that completed polls show locally verified published results.
 
+## Social previews
+
+- The root page ships a full static SEO block with canonical, Open Graph, Twitter, and JSON-LD metadata.
+- Vote links publish route-specific HTML metadata before JavaScript runs. Share unfurls for `/votes/<slug>` use the exact vote title in the page title, Open Graph title, Twitter title, canonical URL, and structured data, while still reusing the generic sealed.vote preview image.
+- The same metadata builder is used for the static app shell, the client-side route updates, the Railway built-preview server, and the Netlify `/votes/*` edge path so previews stay consistent across environments.
+
 ## Tech stack
 
 - Frontend: TypeScript, React, Redux Toolkit, Tailwind CSS, shadcn/ui, Vite, Vitest

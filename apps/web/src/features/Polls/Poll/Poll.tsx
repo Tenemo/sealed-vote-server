@@ -1,7 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { isUuid } from '@sealed-vote/contracts';
 import React, { useEffect, useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 
 import PollHeader from './PollHeader';
@@ -11,7 +10,9 @@ import Voting from './Voting/Voting';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
+import DocumentSeo from 'app/DocumentSeo';
 import { useAppDispatch, useAppSelector } from 'app/hooks';
+import { buildVotePageSeo } from 'app/seo';
 import NotFound from 'components/NotFound/NotFound';
 import {
     findCreatorSessionByPollId,
@@ -91,6 +92,10 @@ const PollPage = (): React.JSX.Element => {
         currentVoteState.creatorToken ??
         fallbackCreatorSession?.creatorToken ??
         null;
+    const pageSeo = buildVotePageSeo({
+        pollPath: `/votes/${effectivePoll?.slug ?? pollSlug}`,
+        pollTitle: effectivePoll?.pollName,
+    });
     const onVote = (
         newVoterName: string,
         newSelectedScores: Record<string, number>,
@@ -165,18 +170,7 @@ const PollPage = (): React.JSX.Element => {
 
     return (
         <>
-            <Helmet>
-                <title>
-                    {effectivePoll
-                        ? `${effectivePoll.pollName} | sealed.vote`
-                        : 'Vote | sealed.vote'}
-                </title>
-                <meta
-                    content="Confidential participant vote page on sealed.vote."
-                    name="description"
-                />
-                <meta content="noindex, nofollow, noarchive" name="robots" />
-            </Helmet>
+            <DocumentSeo metadata={pageSeo} />
             {isLoadingPoll && !hasPollData && (
                 <div className="flex min-h-[40vh] items-center justify-center">
                     <Spinner className="size-10" />
