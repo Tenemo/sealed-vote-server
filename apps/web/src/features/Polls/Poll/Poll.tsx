@@ -34,7 +34,7 @@ const isNotFoundError = (error: unknown): boolean =>
     'status' in error &&
     error.status === 404;
 
-const defaultPollPollingIntervalMs = 3000;
+const defaultPollPollingIntervalMs = 5000;
 const minimumPollPollingIntervalMs = 250;
 
 const resolvePollPollingIntervalMs = (rawValue: string | undefined): number => {
@@ -74,6 +74,9 @@ const PollPage = (): React.JSX.Element => {
     const hasResumedVotingRef = useRef(false);
     const shouldResumeOnResolvedPollRef = useRef(false);
     const resolvedPollIdRef = useRef<string | null>(null);
+    const [activePollingIntervalMs, setActivePollingIntervalMs] = useState(
+        pollPollingIntervalMs,
+    );
     const [isBrowserOnline, setIsBrowserOnline] = useState(
         getBrowserOnlineState,
     );
@@ -82,10 +85,9 @@ const PollPage = (): React.JSX.Element => {
         isLoading: isLoadingPoll,
         error: pollError,
     } = useGetPollQuery(isLegacyPollLink ? skipToken : pollSlug, {
-        pollingInterval: pollPollingIntervalMs,
+        pollingInterval: activePollingIntervalMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
-        skipPollingIfUnfocused: true,
     });
     const pollId = poll?.id ?? null;
     const votingState = useAppSelector((state) =>
@@ -158,6 +160,13 @@ const PollPage = (): React.JSX.Element => {
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
+
+    useEffect(() => {
+        const hasResults =
+            !!poll?.results.length || !!votingState.results?.length;
+
+        setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
+    }, [poll?.results.length, votingState.results]);
 
     useEffect(() => {
         if (

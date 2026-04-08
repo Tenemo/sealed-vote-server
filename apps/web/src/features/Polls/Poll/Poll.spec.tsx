@@ -208,9 +208,31 @@ describe('Poll page', () => {
         expect(mockedUseGetPollQuery).toHaveBeenCalledWith(
             skipToken,
             expect.objectContaining({
-                pollingInterval: 3000,
+                pollingInterval: 5000,
             }),
         );
+    });
+
+    it('stops polling once results are available', async () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: {
+                ...basePoll,
+                results: [12],
+            },
+            error: undefined,
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        await waitFor(() => {
+            expect(mockedUseGetPollQuery).toHaveBeenLastCalledWith(
+                'best-fruit--1111',
+                expect.objectContaining({
+                    pollingInterval: 0,
+                }),
+            );
+        });
     });
 
     it('shows a non-blocking connection toast when polling fails after data has loaded', () => {

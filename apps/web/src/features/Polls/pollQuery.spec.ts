@@ -102,6 +102,45 @@ describe('fetchFreshPoll', () => {
         expect(result).toEqual(cachedPoll);
     });
 
+    test('prefers the freshest matching cached poll over a stale direct poll cache entry', async () => {
+        const staleDirectPoll = createPoll('freshest-cached-poll');
+        const freshSlugPoll = {
+            ...staleDirectPoll,
+            commonPublicKey: '12345',
+            isOpen: false,
+            publicKeyShareCount: 2,
+        };
+        const dispatch = vi.fn(() => ({
+            unwrap: async () => {
+                throw new Error('Network error');
+            },
+        })) as never;
+
+        mockedSelect.mockReturnValue(() => ({
+            data: staleDirectPoll,
+        }));
+        mockedGetState.mockReturnValue({
+            polls: {
+                queries: {
+                    directPollQuery: {
+                        data: staleDirectPoll,
+                        endpointName: 'getPoll',
+                        fulfilledTimeStamp: 10,
+                    },
+                    freshSlugQuery: {
+                        data: freshSlugPoll,
+                        endpointName: 'getPoll',
+                        fulfilledTimeStamp: 20,
+                    },
+                },
+            },
+        });
+
+        const result = await fetchFreshPoll(dispatch, freshSlugPoll.id);
+
+        expect(result).toEqual(freshSlugPoll);
+    });
+
     test('falls back to a matching cached poll from another query state', async () => {
         const cachedPoll = createPoll('cached-query-poll');
         const dispatch = vi.fn(() => ({

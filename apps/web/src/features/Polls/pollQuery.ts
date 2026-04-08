@@ -16,31 +16,43 @@ const isPollResponse = (value: unknown): value is PollResponse =>
     'id' in value &&
     typeof (value as { id: unknown }).id === 'string';
 
+type PollQueryState = {
+    data?: unknown;
+    endpointName?: string;
+    fulfilledTimeStamp?: number;
+    startedTimeStamp?: number;
+};
+
+const getPollQueryTimestamp = (queryState: PollQueryState): number =>
+    queryState.fulfilledTimeStamp ?? queryState.startedTimeStamp ?? 0;
+
 const selectPollResult = (
     state: RootState,
     pollId: string,
 ): PollResponse | null => {
+    const queryStates = Object.values(
+        state[pollsApi.reducerPath].queries,
+    ) as PollQueryState[];
+
+    const freshestMatchingQuery = queryStates
+        .filter(
+            (queryState) =>
+                queryState.endpointName === 'getPoll' &&
+                isPollResponse(queryState.data) &&
+                queryState.data.id === pollId,
+        )
+        .sort(
+            (leftQueryState, rightQueryState) =>
+                getPollQueryTimestamp(rightQueryState) -
+                getPollQueryTimestamp(leftQueryState),
+        )[0];
+
+    if (freshestMatchingQuery && isPollResponse(freshestMatchingQuery.data)) {
+        return freshestMatchingQuery.data;
+    }
+
     const directPoll = pollsApi.endpoints.getPoll.select(pollId)(state).data;
-    if (directPoll?.id === pollId) {
-        return directPoll;
-    }
-
-    const queryStates = Object.values(state[pollsApi.reducerPath].queries);
-    for (const queryState of queryStates) {
-        if (
-            !queryState ||
-            (queryState as { endpointName?: string }).endpointName !== 'getPoll'
-        ) {
-            continue;
-        }
-
-        const data = (queryState as { data?: unknown }).data;
-        if (isPollResponse(data) && data.id === pollId) {
-            return data;
-        }
-    }
-
-    return null;
+    return directPoll?.id === pollId ? directPoll : null;
 };
 
 export const fetchFreshPoll = async (
