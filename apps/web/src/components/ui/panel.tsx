@@ -10,7 +10,6 @@ const panelVariants = cva('border border-border/70', {
             default: 'p-5 sm:p-6',
             compact: 'p-4 sm:p-5',
             row: 'px-4 py-3',
-            none: '',
         },
         tone: {
             default: 'bg-card',
@@ -42,11 +41,11 @@ const Panel = ({
     radius,
     tone,
     ...props
-}: React.ComponentProps<'section'> &
+}: React.ComponentProps<'div'> &
     VariantProps<typeof panelVariants> & {
         asChild?: boolean;
     }): React.JSX.Element => {
-    const Comp = asChild ? Slot.Root : 'section';
+    const Comp = asChild ? Slot.Root : 'div';
 
     return (
         <Comp

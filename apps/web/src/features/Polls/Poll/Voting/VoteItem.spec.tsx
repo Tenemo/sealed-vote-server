@@ -47,6 +47,27 @@ describe('VoteItem', () => {
         expect(onVote).toHaveBeenCalledWith('Apples', 2);
     });
 
+    it('keeps the checked score keyboard reachable and lets arrow keys move the selection', async () => {
+        const user = userEvent.setup();
+        const onVote = vi.fn();
+
+        render(
+            <VoteItem choiceName="Apples" onVote={onVote} selectedScore={1} />,
+        );
+
+        const firstRadio = screen.getByRole('radio', {
+            name: 'Score 1 for Apples',
+        });
+
+        await user.tab();
+
+        expect(firstRadio).toHaveFocus();
+
+        await user.keyboard('{ArrowRight}');
+
+        expect(onVote).toHaveBeenCalledWith('Apples', 2);
+    });
+
     it('renders the selected score with an explicit white highlight', () => {
         render(
             <VoteItem choiceName="Apples" onVote={vi.fn()} selectedScore={7} />,

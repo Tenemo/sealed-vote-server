@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type TestInfo } from '@playwright/test';
 
 import {
     beginVote,
@@ -24,16 +24,40 @@ import {
     createVoterName,
 } from './support/testData';
 
+const localSyntheticDropHosts = new Set(['127.0.0.1', 'localhost']);
+
+const supportsSyntheticPostCommitDrops = (testInfo: TestInfo): boolean => {
+    const baseUrl = testInfo.project.use.baseURL;
+
+    if (typeof baseUrl !== 'string') {
+        return false;
+    }
+
+    try {
+        return localSyntheticDropHosts.has(new URL(baseUrl).hostname);
+    } catch {
+        return false;
+    }
+};
+
+const skipUnsupportedSyntheticDropScenario = (
+    browserName: string,
+    testInfo: TestInfo,
+): void => {
+    test.skip(
+        browserName === 'webkit' ||
+            testInfo.project.name === 'mobile-firefox-android' ||
+            !supportsSyntheticPostCommitDrops(testInfo),
+        'This synthetic post-commit transport drop is only covered against the local test backend on desktop Chromium and Firefox.',
+    );
+};
+
 test('retries poll creation safely after the initial response is lost', async ({
     browserName,
     page,
     request,
 }, testInfo) => {
-    test.skip(
-        browserName === 'webkit' ||
-            testInfo.project.name === 'mobile-firefox-android',
-        'This synthetic post-commit transport drop is only covered on desktop Chromium and Firefox.',
-    );
+    skipUnsupportedSyntheticDropScenario(browserName, testInfo);
 
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
@@ -91,11 +115,7 @@ test('recovers automatically when voter registration commits but the response is
     page,
     request,
 }, testInfo) => {
-    test.skip(
-        browserName === 'webkit' ||
-            testInfo.project.name === 'mobile-firefox-android',
-        'This synthetic post-commit transport drop is only covered on desktop Chromium and Firefox.',
-    );
+    skipUnsupportedSyntheticDropScenario(browserName, testInfo);
 
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
@@ -133,11 +153,7 @@ test('recovers from lost close and phase-submission responses without manual int
     page,
     request,
 }, testInfo) => {
-    test.skip(
-        browserName === 'webkit' ||
-            testInfo.project.name === 'mobile-firefox-android',
-        'This synthetic post-commit transport drop is only covered on desktop Chromium and Firefox.',
-    );
+    skipUnsupportedSyntheticDropScenario(browserName, testInfo);
 
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);

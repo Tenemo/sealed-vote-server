@@ -8,6 +8,11 @@ import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    actionButtonClassName,
+    mutedBodyClassName,
+    pageTitleClassName,
+} from '@/lib/uiClasses';
 import { cn } from '@/lib/utils';
 import DocumentSeo from 'app/DocumentSeo';
 import { buildHomePageSeo } from 'app/seo';
@@ -102,10 +107,13 @@ const PollCreationPage = (): React.JSX.Element => {
             <DocumentSeo metadata={homePageSeo} />
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
-                    <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                        Create a new vote
-                    </h1>
-                    <p className="mx-auto max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+                    <h1 className={pageTitleClassName}>Create a new vote</h1>
+                    <p
+                        className={cn(
+                            mutedBodyClassName,
+                            'mx-auto max-w-2xl text-base sm:text-lg',
+                        )}
+                    >
                         Give the vote a clear name, add a few choices, and share
                         the generated link when you are ready.
                     </p>
@@ -142,7 +150,7 @@ const PollCreationPage = (): React.JSX.Element => {
                     )}
                     <div className="flex justify-end">
                         <Button
-                            className="w-full sm:w-auto"
+                            className={actionButtonClassName}
                             disabled={!isFormValid || isLoading}
                             size="lg"
                             type="submit"

@@ -2,8 +2,8 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/ci.yml?branch=master&label=ci)](https://github.com/Tenemo/sealed-vote/actions/workflows/ci.yml)
 [![Production e2e](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/production-e2e.yml?branch=master&label=production%20e2e)](https://github.com/Tenemo/sealed-vote/actions/workflows/production-e2e.yml)
-[![Web deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed.vote%20%2F%20production?label=web%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed.vote+%2F+production)
-[![API deploy](https://img.shields.io/github/deployments/Tenemo/sealed-vote/sealed-vote-preview%20%2F%20production?label=api%20deploy&logo=railway&logoColor=white)](https://github.com/Tenemo/sealed-vote/deployments/activity_log?environments_filter=sealed-vote-preview+%2F+production)
+[![Web status](https://img.shields.io/website?url=https%3A%2F%2Fsealed.vote&label=web%20status)](https://sealed.vote)
+[![API status](https://img.shields.io/website?url=https%3A%2F%2Fapi.sealed.vote%2Fapi%2Fhealth-check&label=api%20status)](https://api.sealed.vote/api/health-check)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/coverage.json)](https://github.com/Tenemo/sealed-vote/actions/workflows/readme-badges.yml)
 [![Node version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
 
@@ -39,6 +39,12 @@ The frontend and backend both rely on [`threshold-elgamal`](https://www.npmjs.co
 
 See [docs/voting.md](./docs/voting.md) for the protocol and phase model, and [docs/endpoints.md](./docs/endpoints.md) for the current API surface.
 
+## Tech stack
+
+- Frontend: TypeScript, React, Redux Toolkit, Tailwind CSS, shadcn/ui, Vite, Vitest
+- Backend: TypeScript, Fastify, Drizzle ORM, PostgreSQL, Vitest
+- Tooling: pnpm workspaces, Turborepo, Playwright, ESLint, stylelint (web app)
+
 ## Offline and reconnect recovery
 
 Offline and reconnect recovery is a core feature of the app, not a best-effort extra.
@@ -48,28 +54,6 @@ Offline and reconnect recovery is a core feature of the app, not a best-effort e
 - In production, the custom service worker caches the app shell plus any poll payloads the browser has already fetched. That allows previously visited polls to reopen from cached data while the network is unavailable.
 - `RecoveryCoordinator` runs in the background after startup, on window focus, and when the browser comes back online. It resumes creator sessions, confirmed voter sessions, and pending voter registrations without requiring the user to restart the flow manually.
 - Recovery is safe because the backend routes are deliberately idempotent where needed. Poll creation, voter registration, poll close, public key share submission, vote submission, and decryption share submission can all be retried after a lost response without duplicating state or changing the result unexpectedly.
-
-The Playwright suite covers the recovery model directly:
-
-- [`tests/e2e/refresh-resume.spec.ts`](./tests/e2e/refresh-resume.spec.ts) verifies that a persisted voter session survives a browser refresh and still reaches completion.
-- [`tests/e2e/polling-offline.spec.ts`](./tests/e2e/polling-offline.spec.ts) verifies that the UI stays usable across disconnects before and after the vote starts, and that background polling recovers cleanly.
-- [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) verifies safe replay after post-commit response loss for create, register, close, public key share, vote, and decryption share requests.
-- [`tests/e2e/recovery-network-cuts.spec.ts`](./tests/e2e/recovery-network-cuts.spec.ts) also verifies that a previously visited poll can reopen from persisted local data when live poll fetches fail.
-- [`tests/e2e/voting-flow.spec.ts`](./tests/e2e/voting-flow.spec.ts) covers the normal happy path and asserts that completed polls show locally verified published results.
-
-## Social previews
-
-- The root page ships a full static SEO block with canonical, Open Graph, Twitter, and JSON-LD metadata.
-- Vote links publish route-specific HTML metadata before JavaScript runs. Share unfurls for `/votes/<slug>` use the exact vote title in the page title, Open Graph title, Twitter title, canonical URL, structured data, and a vote-specific PNG preview at `/social/votes/<slug>.png`.
-- Vote preview images are rendered lazily from the poll title and first choices while the vote is still open, then switch to a versioned results image after completion so newly shared links can show the final ranking without breaking CDN caching for already-shared live previews.
-- The per-vote image responses are cached aggressively through the Netlify CDN with durable caching so repeated shares of the same vote state do not keep regenerating the image.
-- The same metadata and image rendering logic is used for the static app shell, the client-side route updates, the Railway built-preview server, the Netlify `/votes/*` edge path, and the Netlify `/social/votes/:slug.png` function so previews stay consistent across environments.
-
-## Tech stack
-
-- Frontend: TypeScript, React, Redux Toolkit, Tailwind CSS, shadcn/ui, Vite, Vitest
-- Backend: TypeScript, Fastify, Drizzle ORM, PostgreSQL, Vitest
-- Tooling: pnpm workspaces, Turborepo, Playwright, ESLint, stylelint (web app)
 
 ## Local development
 
@@ -95,40 +79,6 @@ The default local setup serves:
 
 - the web app at `http://127.0.0.1:3000`
 - the API at `http://127.0.0.1:4000`
-
-## End-to-end testing
-
-Run the guarded Playwright suite from the repository root:
-
-```bash
-pnpm e2e
-```
-
-The e2e entrypoint refuses to run unless all of these are true:
-
-- `NODE_ENV=test`
-- `DATABASE_URL` points at the local or CI Postgres `sv-db`
-- `VITE_API_BASE_URL`, if set, points at a local HTTP backend
-
-The suite resets the database before starting the shared backend and web dev servers, so it must never be able to target a production or remote environment.
-
-GitHub Actions uses a separate built-artifact path for PR e2e runs:
-
-- `pnpm e2e:ci:build` builds the API and web artifacts once
-- `pnpm e2e:ci:serve:api` starts the built API server
-- `pnpm e2e:ci:serve:web` starts the built web server
-- `pnpm e2e:ci:test` runs Playwright against the built API and built web server
-
-Production e2e uses a separate remote-safe path:
-
-- `pnpm e2e:production:wait -- --commit <sha> --web https://sealed.vote --api https://api.sealed.vote` waits until the deployed frontend and API both serve the target commit SHA
-- `PLAYWRIGHT_BASE_URL=https://sealed.vote pnpm e2e:production:test` runs the same Playwright suite against the deployed site without starting local servers or touching the local database
-
-Netlify deploy previews are configured to point at the production API:
-
-- `netlify.toml` sets `VITE_API_BASE_URL=https://api.sealed.vote` for the `deploy-preview` context
-- the API CORS policy allows `https://deploy-preview-<number>--sealed-vote.netlify.app`
-- this gives PR preview frontend builds without trying to provision a matching preview backend
 
 ## Workspace documentation
 

@@ -54,7 +54,6 @@ export const extractVoteSlugFromPathname = (
 type SeoPollPayload = {
     pollName: string;
     resultScores: number[];
-    resultTallies: string[];
 };
 
 const isPollPayload = (
@@ -62,7 +61,6 @@ const isPollPayload = (
 ): value is {
     pollName: string;
     resultScores?: unknown;
-    resultTallies?: unknown;
 } =>
     typeof value === 'object' &&
     value !== null &&
@@ -74,14 +72,6 @@ const normalizeNumberArray = (value: unknown): number[] =>
         ? value.filter(
               (item): item is number =>
                   typeof item === 'number' && Number.isFinite(item),
-          )
-        : [];
-
-const normalizeStringArray = (value: unknown): string[] =>
-    Array.isArray(value)
-        ? value.filter(
-              (item): item is string =>
-                  typeof item === 'string' && item.trim().length > 0,
           )
         : [];
 
@@ -99,7 +89,6 @@ const normalizeSeoPollPayload = (value: unknown): SeoPollPayload | null => {
     return {
         pollName: pollTitle,
         resultScores: normalizeNumberArray(value.resultScores),
-        resultTallies: normalizeStringArray(value.resultTallies),
     };
 };
 
@@ -189,7 +178,6 @@ export const resolveDocumentSeoMetadata = async ({
         pollSlug,
         pollTitle: pollPayload?.pollName,
         resultScores: pollPayload?.resultScores,
-        resultTallies: pollPayload?.resultTallies,
     });
 };
 

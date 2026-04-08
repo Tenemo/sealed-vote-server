@@ -139,8 +139,9 @@ describe('resolveDocumentSeoMetadata', () => {
         });
 
         expect(metadata.title).toBe('Budget & roadmap | sealed.vote');
-        expect(metadata.description).toContain('Budget & roadmap');
-        expect(metadata.description).not.toContain('offline recovery');
+        expect(metadata.description).toBe(
+            'Budget & roadmap - score options from 1 to 10.',
+        );
         expect(metadata.canonicalUrl).toBe(
             'https://sealed.vote/votes/budget-roadmap',
         );
@@ -150,7 +151,7 @@ describe('resolveDocumentSeoMetadata', () => {
         expect(metadata.robots).toBe('noindex, nofollow, noarchive');
     });
 
-    test('uses a versioned results image url for completed votes', async () => {
+    test('uses the completed image url for completed votes', async () => {
         const metadata = await resolveDocumentSeoMetadata({
             apiBaseUrl: 'https://api.sealed.vote',
             fetchImpl: vi.fn(async () =>
@@ -163,11 +164,14 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
         });
 
-        expect(metadata.imageUrl).toContain(
-            'https://sealed.vote/social/votes/budget-roadmap.png?v=results-',
+        expect(metadata.description).toBe(
+            'Voting results for Budget & roadmap',
+        );
+        expect(metadata.imageUrl).toBe(
+            'https://sealed.vote/social/votes/budget-roadmap.png?v=complete',
         );
         expect(metadata.imageAlt).toBe(
-            'Results image for "Budget & roadmap" on sealed.vote.',
+            'Final results preview for Budget & roadmap on sealed.vote.',
         );
     });
 
@@ -176,7 +180,7 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://sealed.vote/'),
         });
 
-        expect(metadata.title).toBe('sealed.vote');
+        expect(metadata.title).toBe('sealed.vote | 1-10 score voting app');
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/og-home.png',
         );
@@ -194,7 +198,6 @@ describe('renderDocumentHtml', () => {
                 Response.json({
                     pollName: 'Team <sync> "Q2"',
                     resultScores: [9.25],
-                    resultTallies: ['37'],
                 }),
             ),
             requestUrl: new URL('https://sealed.vote/votes/team-sync'),
@@ -205,7 +208,7 @@ describe('renderDocumentHtml', () => {
         );
         expect(html).toContain('content="https://sealed.vote/votes/team-sync"');
         expect(html).toContain(
-            'content="https://sealed.vote/social/votes/team-sync.png?v=results-',
+            'content="https://sealed.vote/social/votes/team-sync.png?v=complete"',
         );
         expect(html).toContain(
             '<link data-rh="true" rel="canonical" href="https://sealed.vote/votes/team-sync"',
@@ -227,9 +230,7 @@ describe('renderDocumentHtml', () => {
         expect(html).toContain(
             '<title data-rh="true">Vote | sealed.vote</title>',
         );
-        expect(html).toContain(
-            'content="Confidential participant vote page on sealed.vote."',
-        );
+        expect(html).toContain('content="Vote - score options from 1 to 10."');
     });
 
     test('injects request-origin homepage metadata for preview domains', async () => {

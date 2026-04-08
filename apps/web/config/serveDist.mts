@@ -12,6 +12,7 @@ import {
 import {
     createVoteSocialImageResponse,
     extractVoteSocialImageSlugFromPathname,
+    extractVoteSocialImageVariantFromSearchParams,
 } from './voteSocialImage.ts';
 
 const readForwardedHeader = (
@@ -183,6 +184,10 @@ const start = async (): Promise<void> => {
         const voteSocialImageSlug = extractVoteSocialImageSlugFromPathname(
             requestUrl.pathname,
         );
+        const voteSocialImageVariant =
+            extractVoteSocialImageVariantFromSearchParams(
+                requestUrl.searchParams,
+            );
         const isDocumentRequest =
             (request.method === 'GET' || request.method === 'HEAD') &&
             path.extname(requestUrl.pathname) === '';
@@ -210,9 +215,10 @@ const start = async (): Promise<void> => {
                         apiBaseUrl: seoApiBaseUrl,
                         pollSlug: voteSocialImageSlug,
                         signal: AbortSignal.timeout(5000),
+                        variant: voteSocialImageVariant,
                     });
 
-                response.statusCode = 200;
+                response.statusCode = voteSocialImageResponse.status;
 
                 Object.entries(voteSocialImageResponse.headers).forEach(
                     ([headerName, headerValue]) => {

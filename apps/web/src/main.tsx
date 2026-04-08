@@ -20,7 +20,7 @@ export const Root = (): React.JSX.Element => {
             <Provider store={store}>
                 <PersistGate
                     loading={
-                        <div className="flex min-h-screen items-center justify-center">
+                        <div className="flex min-h-[100svh] items-center justify-center">
                             <Spinner className="size-10" />
                         </div>
                     }

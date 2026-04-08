@@ -161,6 +161,48 @@ describe('Poll page', () => {
         expect(screen.getByText('Created 2026-01-01')).toBeVisible();
     });
 
+    it('shows the sharing guidance before results are published', () => {
+        renderPoll();
+
+        expect(
+            screen.getByText(
+                'Share the link below with participants. Once everyone has voted, the results are ordered by geometric mean.',
+            ),
+        ).toBeVisible();
+    });
+
+    it('switches the header copy after results are published', () => {
+        mockedUseGetPollQuery.mockReturnValue({
+            data: {
+                ...basePoll,
+                encryptedTallies: [
+                    {
+                        c1: '1',
+                        c2: '8',
+                    },
+                ],
+                publishedDecryptionShares: [['1']],
+                resultTallies: ['8'],
+                resultScores: [8],
+            },
+            error: undefined,
+            isLoading: false,
+        });
+
+        renderPoll();
+
+        expect(
+            screen.getByText(
+                'Voting has completed. The results below are ordered by geometric mean.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.queryByText(
+                'Share the link below with participants. Once everyone has voted, the results are ordered by geometric mean.',
+            ),
+        ).not.toBeInTheDocument();
+    });
+
     it('renders participants as individual list items', () => {
         mockedUseGetPollQuery.mockReturnValue({
             data: {

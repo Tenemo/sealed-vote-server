@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import {
     createVoteSocialImageResponse,
     extractVoteSocialImageSlugFromPathname,
+    extractVoteSocialImageVariantFromSearchParams,
 } from '../../apps/web/config/voteSocialImage.ts';
 import { resolveSeoApiBaseUrl } from '../../apps/web/config/documentSeo.ts';
 
@@ -40,9 +41,13 @@ export default async (
         });
     }
 
+    const requestUrl = new URL(request.url);
     const pollSlug =
         context.params?.slug ||
-        extractVoteSocialImageSlugFromPathname(new URL(request.url).pathname);
+        extractVoteSocialImageSlugFromPathname(requestUrl.pathname);
+    const variant = extractVoteSocialImageVariantFromSearchParams(
+        requestUrl.searchParams,
+    );
 
     if (!pollSlug) {
         return new Response(null, {
@@ -55,6 +60,7 @@ export default async (
             apiBaseUrl: seoApiBaseUrl,
             pollSlug,
             signal: AbortSignal.timeout(5000),
+            variant,
         });
 
         return new Response(
@@ -63,7 +69,7 @@ export default async (
                 : Buffer.from(voteSocialImageResponse.body),
             {
                 headers: voteSocialImageResponse.headers,
-                status: 200,
+                status: voteSocialImageResponse.status,
             },
         );
     } catch (error) {
