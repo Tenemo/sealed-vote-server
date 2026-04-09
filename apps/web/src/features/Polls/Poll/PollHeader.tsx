@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { actionButtonClassName, pageTitleClassName } from '@/lib/uiClasses';
 import { useAppSelector } from 'app/hooks';
 import LoadingButton from 'components/LoadingButton';
-import { hasPublishedResults } from 'features/Polls/pollData';
+import { hasPublishedResults } from 'features/Polls/pollResults';
 import {
     useClosePollMutation,
     type PollResponse,

@@ -6,7 +6,6 @@ import { polls } from '../db/schema.js';
 type LockedPoll = {
     id: string;
     isOpen: boolean;
-    maxParticipants: number;
     commonPublicKey: string | null;
     encryptedTallies: typeof polls.$inferSelect.encryptedTallies;
     resultTallies: typeof polls.$inferSelect.resultTallies;
@@ -27,7 +26,6 @@ export const lockPollById = async (
         .select({
             id: polls.id,
             isOpen: polls.isOpen,
-            maxParticipants: polls.maxParticipants,
             commonPublicKey: polls.commonPublicKey,
             encryptedTallies: polls.encryptedTallies,
             resultTallies: polls.resultTallies,
@@ -39,6 +37,8 @@ export const lockPollById = async (
 
     return poll;
 };
+
+export type { LockedPoll };
 
 export const lockPollByIdForCreatorAction = async (
     tx: DatabaseTransaction,

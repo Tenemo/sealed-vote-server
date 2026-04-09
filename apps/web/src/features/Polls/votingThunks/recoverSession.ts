@@ -1,12 +1,13 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 
-import { fetchFreshPoll } from '../pollQuery';
 import { pollsApi } from '../pollsApi';
-import { applyRecoveredSession, upsertPollSnapshot } from '../votingSlice';
+import {
+    getResumableVotingIntent,
+    refreshPollSnapshot,
+} from '../votingSession';
+import { applyRecoveredSession } from '../votingSlice';
 import {
     getRecoveryRequestData,
-    getResumableVoterName,
-    hasPendingVotingIntent,
     selectVoteStateByPollId,
 } from '../votingState';
 
@@ -50,17 +51,11 @@ export const recoverSession = createAsyncThunk<
     );
 
     try {
-        const poll = await fetchFreshPoll({
+        await refreshPollSnapshot({
             dispatch,
             getState,
             pollId,
         });
-        dispatch(
-            upsertPollSnapshot({
-                pollId: poll.id,
-                poll,
-            }),
-        );
     } catch {
         // Keep the last persisted snapshot when the live poll refetch fails.
     }
@@ -69,14 +64,12 @@ export const recoverSession = createAsyncThunk<
         getState().voting,
         pollId,
     );
-    const resumableVoterName = getResumableVoterName(recoveredVoteState);
+    const resumableVotingIntent = getResumableVotingIntent(recoveredVoteState);
 
     if (
         recoveredVoteState.isVotingInProgress ||
         !recoveredVoteState.shouldResumeWorkflow ||
-        !hasPendingVotingIntent(recoveredVoteState) ||
-        !resumableVoterName ||
-        !recoveredVoteState.selectedScores
+        !resumableVotingIntent
     ) {
         return;
     }
@@ -84,8 +77,8 @@ export const recoverSession = createAsyncThunk<
     void dispatch(
         vote({
             pollId,
-            voterName: resumableVoterName,
-            selectedScores: recoveredVoteState.selectedScores,
+            voterName: resumableVotingIntent.voterName,
+            selectedScores: resumableVotingIntent.selectedScores,
         }),
     );
 });

@@ -1,269 +1,91 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 import type { Database, DatabaseTransaction } from '../db/client.js';
 import {
     decryptionShares,
     encryptedVotes,
     publicKeyShares,
+    voters,
 } from '../db/schema.js';
 
-type OrderedDecryptionShareRow = {
-    shares: typeof decryptionShares.$inferSelect.shares;
-};
-
-type OrderedEncryptedVoteRow = {
-    votes: typeof encryptedVotes.$inferSelect.votes;
-};
-
-type OrderedPublicKeyShareRow = {
-    publicKeyShare: string;
-};
-
-type ExistingPublicKeyShareRow = {
-    publicKeyShare: string;
-};
-
-type ExistingEncryptedVoteRow = {
-    votes: typeof encryptedVotes.$inferSelect.votes;
-};
-
-type ExistingDecryptionSharesRow = {
-    shares: typeof decryptionShares.$inferSelect.shares;
-};
+type SubmissionSpec =
+    | {
+          table: typeof publicKeyShares;
+          valueColumn: typeof publicKeyShares.publicKeyShare;
+      }
+    | {
+          table: typeof encryptedVotes;
+          valueColumn: typeof encryptedVotes.votes;
+      }
+    | {
+          table: typeof decryptionShares;
+          valueColumn: typeof decryptionShares.shares;
+      };
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 
-type OrderedRowWithVoter<T> = T & {
-    voter: {
-        voterIndex: number;
-    } | null;
-};
+type SubmissionQueryArgs<TSubmissionSpec extends SubmissionSpec> = {
+    db: ReadOnlyDatabase;
+    pollId: string;
+} & TSubmissionSpec;
 
-const findExistingPublicKeyShare = async (
-    db: ReadOnlyDatabase,
-    pollId: string,
-    voterId: string,
-    shouldLock: boolean,
-): Promise<ExistingPublicKeyShareRow | undefined> => {
-    if (shouldLock) {
-        const [row] = await db
-            .select({
-                publicKeyShare: publicKeyShares.publicKeyShare,
-            })
-            .from(publicKeyShares)
-            .where(
-                and(
-                    eq(publicKeyShares.pollId, pollId),
-                    eq(publicKeyShares.voterId, voterId),
-                ),
-            )
-            .for('update');
+type ExistingSubmissionQueryArgs<TSubmissionSpec extends SubmissionSpec> = {
+    shouldLock?: boolean;
+    voterId: string;
+} & SubmissionQueryArgs<TSubmissionSpec>;
 
-        return row;
-    }
+type LockedExistingSubmissionQueryArgs<TSubmissionSpec extends SubmissionSpec> =
+    Omit<ExistingSubmissionQueryArgs<TSubmissionSpec>, 'shouldLock'> & {
+        shouldLock: boolean;
+    };
 
-    const [row] = await db
+const loadSubmissionValue = async <
+    TValue,
+    TSubmissionSpec extends SubmissionSpec,
+>(
+    args: LockedExistingSubmissionQueryArgs<TSubmissionSpec>,
+): Promise<TValue | undefined> => {
+    const { db, pollId, shouldLock, table, valueColumn, voterId } = args;
+    const query = db
         .select({
-            publicKeyShare: publicKeyShares.publicKeyShare,
+            value: valueColumn as SubmissionSpec['valueColumn'],
         })
-        .from(publicKeyShares)
-        .where(
-            and(
-                eq(publicKeyShares.pollId, pollId),
-                eq(publicKeyShares.voterId, voterId),
-            ),
-        );
+        .from(table as SubmissionSpec['table'])
+        .where(and(eq(table.pollId, pollId), eq(table.voterId, voterId)));
+    const rows = shouldLock ? await query.for('update') : await query;
 
-    return row;
+    return (rows[0] as { value: TValue } | undefined)?.value;
 };
 
-const findExistingEncryptedVote = async (
-    db: ReadOnlyDatabase,
-    pollId: string,
-    voterId: string,
-    shouldLock: boolean,
-): Promise<ExistingEncryptedVoteRow | undefined> => {
-    if (shouldLock) {
-        const [row] = await db
-            .select({
-                votes: encryptedVotes.votes,
-            })
-            .from(encryptedVotes)
-            .where(
-                and(
-                    eq(encryptedVotes.pollId, pollId),
-                    eq(encryptedVotes.voterId, voterId),
-                ),
-            )
-            .for('update');
+export const getExistingPollSubmissionValue = async <
+    TValue,
+    TSubmissionSpec extends SubmissionSpec = SubmissionSpec,
+>(
+    args: ExistingSubmissionQueryArgs<TSubmissionSpec>,
+): Promise<TValue | undefined> => {
+    const lockedArgs: LockedExistingSubmissionQueryArgs<TSubmissionSpec> = {
+        ...args,
+        shouldLock: args.shouldLock ?? false,
+    };
 
-        return row;
-    }
+    return await loadSubmissionValue(lockedArgs);
+};
 
-    const [row] = await db
+export const getOrderedPollSubmissionValues = async <
+    TValue,
+    TSubmissionSpec extends SubmissionSpec = SubmissionSpec,
+>(
+    args: SubmissionQueryArgs<TSubmissionSpec>,
+): Promise<TValue[]> => {
+    const { db, pollId, table, valueColumn } = args;
+    const rows = await db
         .select({
-            votes: encryptedVotes.votes,
+            value: valueColumn,
         })
-        .from(encryptedVotes)
-        .where(
-            and(
-                eq(encryptedVotes.pollId, pollId),
-                eq(encryptedVotes.voterId, voterId),
-            ),
-        );
+        .from(table)
+        .innerJoin(voters, eq(table.voterId, voters.id))
+        .where(eq(table.pollId, pollId))
+        .orderBy(asc(voters.voterIndex));
 
-    return row;
+    return rows.map(({ value }) => value as TValue);
 };
-
-const findExistingDecryptionShares = async (
-    db: ReadOnlyDatabase,
-    pollId: string,
-    voterId: string,
-    shouldLock: boolean,
-): Promise<ExistingDecryptionSharesRow | undefined> => {
-    if (shouldLock) {
-        const [row] = await db
-            .select({
-                shares: decryptionShares.shares,
-            })
-            .from(decryptionShares)
-            .where(
-                and(
-                    eq(decryptionShares.pollId, pollId),
-                    eq(decryptionShares.voterId, voterId),
-                ),
-            )
-            .for('update');
-
-        return row;
-    }
-
-    const [row] = await db
-        .select({
-            shares: decryptionShares.shares,
-        })
-        .from(decryptionShares)
-        .where(
-            and(
-                eq(decryptionShares.pollId, pollId),
-                eq(decryptionShares.voterId, voterId),
-            ),
-        );
-
-    return row;
-};
-
-export const sortRowsByVoterIndex = <T extends OrderedRowWithVoter<object>>(
-    rows: T[],
-): T[] =>
-    rows.sort(
-        (left, right) =>
-            (left.voter?.voterIndex ?? 0) - (right.voter?.voterIndex ?? 0),
-    );
-
-export const getOrderedPollDecryptionShares = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-): Promise<OrderedDecryptionShareRow[]> => {
-    const rows = await tx.query.decryptionShares.findMany({
-        where: (fields, { eq: isEqual }) => isEqual(fields.pollId, pollId),
-        columns: {
-            shares: true,
-        },
-        with: {
-            voter: {
-                columns: {
-                    voterIndex: true,
-                },
-            },
-        },
-    });
-
-    return sortRowsByVoterIndex(rows).map(({ shares }) => ({ shares }));
-};
-
-export const getOrderedPollEncryptedVotes = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-): Promise<OrderedEncryptedVoteRow[]> => {
-    const rows = await tx.query.encryptedVotes.findMany({
-        where: (fields, { eq: isEqual }) => isEqual(fields.pollId, pollId),
-        columns: {
-            votes: true,
-        },
-        with: {
-            voter: {
-                columns: {
-                    voterIndex: true,
-                },
-            },
-        },
-    });
-
-    return sortRowsByVoterIndex(rows).map(({ votes }) => ({ votes }));
-};
-
-export const getOrderedPollPublicKeyShares = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-): Promise<OrderedPublicKeyShareRow[]> => {
-    const rows = await tx.query.publicKeyShares.findMany({
-        where: (fields, { eq: isEqual }) => isEqual(fields.pollId, pollId),
-        columns: {
-            publicKeyShare: true,
-        },
-        with: {
-            voter: {
-                columns: {
-                    voterIndex: true,
-                },
-            },
-        },
-    });
-
-    return sortRowsByVoterIndex(rows).map(({ publicKeyShare }) => ({
-        publicKeyShare,
-    }));
-};
-
-export const getExistingPublicKeyShare = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-    voterId: string,
-): Promise<ExistingPublicKeyShareRow | undefined> =>
-    await findExistingPublicKeyShare(tx, pollId, voterId, true);
-
-export const getExistingPublicKeyShareReadOnly = async (
-    db: ReadOnlyDatabase,
-    pollId: string,
-    voterId: string,
-): Promise<ExistingPublicKeyShareRow | undefined> =>
-    await findExistingPublicKeyShare(db, pollId, voterId, false);
-
-export const getExistingEncryptedVote = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-    voterId: string,
-): Promise<ExistingEncryptedVoteRow | undefined> =>
-    await findExistingEncryptedVote(tx, pollId, voterId, true);
-
-export const getExistingEncryptedVoteReadOnly = async (
-    db: ReadOnlyDatabase,
-    pollId: string,
-    voterId: string,
-): Promise<ExistingEncryptedVoteRow | undefined> =>
-    await findExistingEncryptedVote(db, pollId, voterId, false);
-
-export const getExistingDecryptionShares = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-    voterId: string,
-): Promise<ExistingDecryptionSharesRow | undefined> =>
-    await findExistingDecryptionShares(tx, pollId, voterId, true);
-
-export const getExistingDecryptionSharesReadOnly = async (
-    db: ReadOnlyDatabase,
-    pollId: string,
-    voterId: string,
-): Promise<ExistingDecryptionSharesRow | undefined> =>
-    await findExistingDecryptionShares(db, pollId, voterId, false);
