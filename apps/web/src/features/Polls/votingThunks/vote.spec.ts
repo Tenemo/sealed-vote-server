@@ -5,9 +5,7 @@ const mockedCanRegister = vi.fn();
 const mockedFetchFreshPoll = vi.fn();
 const mockedGenerateClientToken = vi.fn();
 const mockedRegisterVoterInitiate = vi.fn();
-const mockedRunProcessPublicPrivateKeys = vi.fn();
-const mockedRunEncryptVotesGenerateShares = vi.fn();
-const mockedRunDecryptResults = vi.fn();
+const mockedRunVotingSessionWorkflow = vi.fn();
 
 vi.mock('@sealed-vote/protocol', () => ({
     canRegister: (...args: unknown[]) => mockedCanRegister(...args),
@@ -45,12 +43,9 @@ vi.mock('features/Polls/pollsApi', () => ({
     },
 }));
 
-vi.mock('../votingWorkflow', () => ({
-    runProcessPublicPrivateKeys: (...args: unknown[]) =>
-        mockedRunProcessPublicPrivateKeys(...args),
-    runEncryptVotesGenerateShares: (...args: unknown[]) =>
-        mockedRunEncryptVotesGenerateShares(...args),
-    runDecryptResults: (...args: unknown[]) => mockedRunDecryptResults(...args),
+vi.mock('../votingSession', () => ({
+    runVotingSessionWorkflow: (...args: unknown[]) =>
+        mockedRunVotingSessionWorkflow(...args),
 }));
 
 import { initialVoteState, votingSlice } from '../votingSlice';
@@ -77,9 +72,7 @@ describe('vote thunk', () => {
         mockedFetchFreshPoll.mockReset();
         mockedGenerateClientToken.mockReset();
         mockedRegisterVoterInitiate.mockReset();
-        mockedRunProcessPublicPrivateKeys.mockReset();
-        mockedRunEncryptVotesGenerateShares.mockReset();
-        mockedRunDecryptResults.mockReset();
+        mockedRunVotingSessionWorkflow.mockReset();
         mockedGenerateClientToken.mockReturnValue('generated-voter-token');
     });
 
@@ -119,9 +112,7 @@ describe('vote thunk', () => {
                 resolve: (value: typeof registerPayload) => unknown,
             ): Promise<unknown> => Promise.resolve(resolve(registerPayload)),
         });
-        mockedRunProcessPublicPrivateKeys.mockResolvedValue(undefined);
-        mockedRunEncryptVotesGenerateShares.mockResolvedValue(undefined);
-        mockedRunDecryptResults.mockResolvedValue(undefined);
+        mockedRunVotingSessionWorkflow.mockResolvedValue(undefined);
 
         const voteResult = store.dispatch(
             vote({
@@ -149,9 +140,14 @@ describe('vote thunk', () => {
                 voterToken: 'generated-voter-token',
             },
         });
-        expect(mockedRunProcessPublicPrivateKeys).toHaveBeenCalled();
-        expect(mockedRunEncryptVotesGenerateShares).toHaveBeenCalled();
-        expect(mockedRunDecryptResults).toHaveBeenCalled();
+        expect(mockedRunVotingSessionWorkflow).toHaveBeenCalledWith(
+            expect.objectContaining({
+                dispatch: expect.any(Function),
+                getState: expect.any(Function),
+                pollId: 'poll-1',
+                signal: expect.any(AbortSignal),
+            }),
+        );
         expect(store.getState().voting['poll-1']).toEqual({
             ...initialVoteState,
             pendingVoterName: null,
@@ -201,7 +197,7 @@ describe('vote thunk', () => {
                 resolve: (value: typeof registerPayload) => unknown,
             ): Promise<unknown> => Promise.resolve(resolve(registerPayload)),
         });
-        mockedRunProcessPublicPrivateKeys.mockRejectedValue(
+        mockedRunVotingSessionWorkflow.mockRejectedValue(
             new Error('TypeError: Failed to fetch'),
         );
 

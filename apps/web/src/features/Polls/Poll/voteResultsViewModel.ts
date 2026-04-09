@@ -5,8 +5,8 @@ import {
 
 import {
     hasPublishedResults,
-    normalizePollResponse,
-} from 'features/Polls/pollData';
+    orderPublishedPollResults,
+} from 'features/Polls/pollResults';
 import { type PollResponse } from 'features/Polls/pollsApi';
 
 type VoteResultEntry = {
@@ -21,42 +21,33 @@ type VoteResultsViewModel = {
 };
 
 const buildResultEntries = (poll: PollResponse): VoteResultEntry[] =>
-    poll.choices
-        .map((choiceName, index) => ({
-            choiceName,
-            score: poll.resultScores[index] ?? 0,
-        }))
-        .sort((left, right) => right.score - left.score)
-        .map(({ choiceName, score }) => ({
-            choiceName,
-            scoreLabel: score.toFixed(2),
-        }));
+    orderPublishedPollResults(poll).map(({ choiceName, score }) => ({
+        choiceName,
+        scoreLabel: score.toFixed(2),
+    }));
 
 export const buildVoteResultsViewModel = (
     poll: PollResponse,
 ): VoteResultsViewModel | null => {
-    const normalizedPoll = normalizePollResponse(poll) ?? poll;
-
-    if (!hasPublishedResults(normalizedPoll)) {
+    if (!hasPublishedResults(poll)) {
         return null;
     }
 
     try {
         return {
-            results: buildResultEntries(normalizedPoll),
+            results: buildResultEntries(poll),
             verification: verifyPublishedResults({
-                encryptedTallies: normalizedPoll.encryptedTallies,
-                publishedDecryptionShares:
-                    normalizedPoll.publishedDecryptionShares,
-                resultTallies: normalizedPoll.resultTallies,
-                resultScores: normalizedPoll.resultScores,
-                voterCount: normalizedPoll.voters.length,
+                encryptedTallies: poll.encryptedTallies,
+                publishedDecryptionShares: poll.publishedDecryptionShares,
+                resultTallies: poll.resultTallies,
+                resultScores: poll.resultScores,
+                voterCount: poll.voters.length,
             }),
             verificationError: null,
         };
     } catch (verificationError) {
         return {
-            results: buildResultEntries(normalizedPoll),
+            results: buildResultEntries(poll),
             verification: null,
             verificationError,
         };

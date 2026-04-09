@@ -24,8 +24,6 @@ import { hashSecureToken } from '../utils/voterAuth.js';
 
 import { MessageResponseSchema, SecureTokenSchema } from './schemas.js';
 
-const defaultMaxParticipants = 20;
-
 const CreatePollRequestSchema = Type.Object(
     {
         choices: Type.Array(Type.String()),
@@ -183,7 +181,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                                 creatorTokenHash,
                                 pollName,
                                 slug,
-                                maxParticipants: defaultMaxParticipants,
                             });
 
                             await tx.insert(choicesTable).values(

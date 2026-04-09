@@ -16,7 +16,6 @@ const baseHtml = `<!doctype html>
         <meta name="sealed-vote-seo-start" content="1" />
         <title>placeholder</title>
         <meta name="sealed-vote-seo-end" content="1" />
-        <script defer src="/browser-guard.js"></script>
     </head>
     <body>
         <div id="root"></div>

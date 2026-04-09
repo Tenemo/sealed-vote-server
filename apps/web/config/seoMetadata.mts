@@ -1,3 +1,5 @@
+import { hasPublishedResultScores } from './pollResults.mts';
+
 export const seoMarkerStartName = 'sealed-vote-seo-start';
 export const seoMarkerEndName = 'sealed-vote-seo-end';
 export const reactHelmetAttributeName = 'data-rh';
@@ -47,10 +49,6 @@ export type SeoMetadata = {
     title: string;
     url: string;
 };
-
-const hasPublishedResults = (value: unknown): boolean =>
-    Array.isArray(value) &&
-    value.some((score) => typeof score === 'number' && Number.isFinite(score));
 
 export const createVoteSocialImagePath = (
     pollSlug: string,
@@ -336,7 +334,7 @@ export const buildVotePageSeo = ({
     const normalizedOrigin = normalizeOrigin(origin);
     const normalizedPollSlug = pollSlug?.trim() || null;
     const normalizedPollTitle = pollTitle?.trim() || null;
-    const isComplete = hasPublishedResults(resultScores);
+    const isComplete = hasPublishedResultScores(resultScores);
     const url = createAbsoluteUrl(normalizedOrigin, pollPath);
     const description = createVotePageDescription({
         isComplete,

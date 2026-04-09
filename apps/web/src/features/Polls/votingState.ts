@@ -1,9 +1,6 @@
 import type { PollResponse } from '@sealed-vote/contracts';
 
-import {
-    hasPublishedResults,
-    normalizePollResponse,
-} from 'features/Polls/pollData';
+import { hasPublishedResults } from 'features/Polls/pollResults';
 
 export type VoteState = {
     creatorToken: string | null;
@@ -173,7 +170,7 @@ export const sanitizeVotingStateForPersistence = (
             const normalizedVoteState: VoteState = {
                 ...initialVoteState,
                 ...voteState,
-                pollSnapshot: normalizePollResponse(voteState.pollSnapshot),
+                pollSnapshot: voteState.pollSnapshot ?? null,
             };
 
             return [

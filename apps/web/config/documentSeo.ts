@@ -1,3 +1,4 @@
+import { hasPublishedResultScores } from './pollResults.mts';
 import {
     buildCreatePageSeo,
     buildHomePageSeo,
@@ -68,9 +69,6 @@ export const extractVoteSlugFromPathname = (
     }
 };
 
-const hasPublishedResults = (payload: SeoPollPayload): boolean =>
-    payload.resultScores.some((score) => Number.isFinite(score));
-
 const createPollSeoPayloadCacheKey = (
     apiBaseUrl: string,
     pollSlug: string,
@@ -129,7 +127,7 @@ const writePollSeoPayloadCache = (
     cache.set(cacheKey, {
         expiresAt:
             nowMs +
-            (hasPublishedResults(payload)
+            (hasPublishedResultScores(payload.resultScores)
                 ? completedPollSeoCacheTtlMs
                 : openPollSeoCacheTtlMs),
         payload,

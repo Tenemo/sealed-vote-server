@@ -15,7 +15,6 @@ import {
 
 import { rootPersistStateReconciler } from './persistStateReconciler';
 import { localPersistStorage } from './persistStorage';
-import { shouldEnableReduxDevTools } from './reduxDevTools';
 
 import { pollsApi } from 'features/Polls/pollsApi';
 import {
@@ -56,7 +55,7 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
     reducer: persistedReducer,
-    devTools: shouldEnableReduxDevTools(import.meta.env.MODE),
+    devTools: import.meta.env.MODE !== 'production',
     middleware: (getDefaultMiddleware) => {
         const middleware = getDefaultMiddleware({
             serializableCheck: {

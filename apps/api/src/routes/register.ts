@@ -11,6 +11,7 @@ import type { DatabaseTransaction } from '../db/client.js';
 import { voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import { countPollVoters } from '../utils/pollCounts.js';
+import { maxPollParticipants } from '../utils/pollLimits.js';
 import { lockPollById } from '../utils/pollLocks.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
@@ -136,7 +137,7 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
 
                     const voterCount = await countPollVoters(tx, pollId);
 
-                    if (voterCount >= poll.maxParticipants) {
+                    if (voterCount >= maxPollParticipants) {
                         throw createError(
                             400,
                             ERROR_MESSAGES.maxParticipantsReached,
