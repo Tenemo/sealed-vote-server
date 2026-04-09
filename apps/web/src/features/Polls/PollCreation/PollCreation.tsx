@@ -1,3 +1,4 @@
+import { normalizeTrimmedString } from '@sealed-vote/contracts';
 import React, { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -73,7 +74,8 @@ const PollCreationPage = (): React.JSX.Element => {
         }));
     };
 
-    const isFormValid = !!pollName.trim() && choices.length > 1;
+    const normalizedPollName = normalizeTrimmedString(pollName);
+    const isFormValid = !!normalizedPollName && choices.length > 1;
 
     const onCreatePoll = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -86,7 +88,7 @@ const PollCreationPage = (): React.JSX.Element => {
         setCreatorToken(nextCreatorToken);
 
         void createPoll({
-            pollName: form.pollName.trim(),
+            pollName: normalizedPollName,
             choices: form.choices,
             creatorToken: nextCreatorToken,
         })

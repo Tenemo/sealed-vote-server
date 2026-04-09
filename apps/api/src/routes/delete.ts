@@ -7,7 +7,7 @@ import createError from 'http-errors';
 
 import { polls } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
-import { lockPollByIdForCreatorAction } from '../utils/polls.js';
+import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
 import {

@@ -12,7 +12,6 @@ import { mobileFirefoxAndroidContextOptions } from './support/profiles';
 const chromiumOnlySpecs = [
     '**/duplicate-title-polls.spec.ts',
     '**/duplicate-voter-name.spec.ts',
-    '**/legacy-route.spec.ts',
     '**/mixed-platform-poll.spec.ts',
     '**/share-link.spec.ts',
 ];

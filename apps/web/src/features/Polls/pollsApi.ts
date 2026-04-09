@@ -124,5 +124,13 @@ export const pollsApi = createApi({
 
 export type { PollResponse, RegisterVoterResponse };
 
-export const { useCreatePollMutation, useGetPollQuery, useClosePollMutation } =
-    pollsApi;
+export const {
+    useClosePollMutation,
+    useCreatePollMutation,
+    useGetPollQuery,
+    useRecoverSessionMutation,
+    useRegisterVoterMutation,
+    useSubmitDecryptionSharesMutation,
+    useSubmitPublicKeyShareMutation,
+    useVoteMutation,
+} = pollsApi;

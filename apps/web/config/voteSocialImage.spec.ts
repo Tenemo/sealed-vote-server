@@ -289,16 +289,20 @@ describe('createVoteSocialImageResponse', () => {
 
 describe('renderVoteSocialImagePngWithFallback', () => {
     test('throws a clear error when both the main and fallback renders fail', () => {
+        const mainRenderError = new Error('main render failed');
+        const fallbackRenderError = new Error('fallback render failed');
         const renderImpl = vi
             .fn()
             .mockImplementationOnce(() => {
-                throw new Error('main render failed');
+                throw mainRenderError;
             })
             .mockImplementationOnce(() => {
-                throw new Error('fallback render failed');
+                throw fallbackRenderError;
             });
 
-        expect(() =>
+        let thrownError: unknown;
+
+        try {
             renderVoteSocialImagePngWithFallback({
                 payload: {
                     choices: ['Alpha'],
@@ -307,10 +311,21 @@ describe('renderVoteSocialImagePngWithFallback', () => {
                     resultScores: [],
                 },
                 renderImpl,
-            }),
-        ).toThrow(
-            'Failed to render vote social image, including fallback image.',
-        );
+            });
+        } catch (error) {
+            thrownError = error;
+        }
+
+        expect(thrownError).toBeInstanceOf(AggregateError);
+        expect(thrownError).toMatchObject({
+            message:
+                'Failed to render vote social image, including fallback image.',
+        });
+        expect((thrownError as AggregateError).cause).toBe(fallbackRenderError);
+        expect((thrownError as AggregateError).errors).toEqual([
+            mainRenderError,
+            fallbackRenderError,
+        ]);
         expect(renderImpl).toHaveBeenCalledTimes(2);
     });
 });

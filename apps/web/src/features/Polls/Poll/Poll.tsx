@@ -1,9 +1,8 @@
-import { skipToken } from '@reduxjs/toolkit/query';
-import { isUuid } from '@sealed-vote/contracts';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
 
 import PollHeader from './PollHeader';
+import { usePollPageState } from './usePollPageState';
 import VoteResults from './VoteResults';
 import Voting from './Voting/Voting';
 
@@ -12,167 +11,35 @@ import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import { mutedBodyClassName, sectionTitleClassName } from '@/lib/uiClasses';
 import DocumentSeo from 'app/DocumentSeo';
-import { useAppDispatch, useAppSelector } from 'app/hooks';
-import { buildVotePageSeo } from 'app/seo';
 import NotFound from 'components/NotFound/NotFound';
-import {
-    findCreatorSessionByPollId,
-    findCreatorSessionByPollSlug,
-    removeCreatorSession,
-    saveCreatorSession,
-} from 'features/Polls/creatorSessionStorage';
-import {
-    hasPublishedResults,
-    normalizePollResponse,
-} from 'features/Polls/pollData';
-import { pollPollingIntervalMs } from 'features/Polls/pollQuery';
-import { useGetPollQuery } from 'features/Polls/pollsApi';
-import {
-    restoreCreatorSession,
-    selectVotingStateByPollId,
-} from 'features/Polls/votingSlice';
-import { selectVoteStateByPollSlug } from 'features/Polls/votingState';
-import { vote } from 'features/Polls/votingThunks/vote';
-import {
-    connectionLostMessage,
-    isConnectionError,
-    renderError,
-} from 'utils/networkErrors';
-
-const isNotFoundError = (error: unknown): boolean =>
-    !!error &&
-    typeof error === 'object' &&
-    'status' in error &&
-    error.status === 404;
+import { connectionLostMessage, renderError } from 'utils/networkErrors';
 
 const PollPage = (): React.JSX.Element => {
-    const dispatch = useAppDispatch();
     const { pollSlug } = useParams();
     const participantsHeadingId = React.useId();
 
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
     }
-    const isLegacyPollLink = isUuid(pollSlug);
-    const [activePollingIntervalMs, setActivePollingIntervalMs] = useState(
-        pollPollingIntervalMs,
-    );
-    // Voting can advance in another tab or window, so background polling
-    // must continue until the workflow reaches results.
     const {
-        data: poll,
-        isLoading: isLoadingPoll,
-        error: pollError,
-    } = useGetPollQuery(isLegacyPollLink ? skipToken : pollSlug, {
-        pollingInterval: activePollingIntervalMs,
-        refetchOnFocus: true,
-        refetchOnReconnect: true,
-    });
-    const votingState = useAppSelector((state) =>
-        selectVoteStateByPollSlug(state.voting, pollSlug),
-    );
-    const effectivePoll = normalizePollResponse(
-        poll ?? votingState.pollSnapshot,
-    );
-    const pollId = effectivePoll?.id ?? null;
-    const hasResults = hasPublishedResults(effectivePoll);
-    const currentVoteState = useAppSelector((state) =>
-        pollId ? selectVotingStateByPollId(state, pollId) : votingState,
-    );
-    const fallbackCreatorSession = React.useMemo(() => {
-        if (!effectivePoll || hasResults || currentVoteState.creatorToken) {
-            return null;
-        }
-
-        return (
-            findCreatorSessionByPollId(effectivePoll.id) ??
-            findCreatorSessionByPollSlug(effectivePoll.slug)
-        );
-    }, [currentVoteState.creatorToken, effectivePoll, hasResults]);
-    const effectiveCreatorToken =
-        currentVoteState.creatorToken ??
-        fallbackCreatorSession?.creatorToken ??
-        null;
-    const runtimeOrigin =
-        typeof window === 'undefined' ? undefined : window.location.origin;
-    const pageSeo = buildVotePageSeo({
-        origin: runtimeOrigin,
-        pollPath: `/votes/${effectivePoll?.slug ?? pollSlug}`,
-        pollSlug: effectivePoll?.slug ?? pollSlug,
-        pollTitle: effectivePoll?.pollName,
-        resultScores: effectivePoll?.resultScores,
-    });
-    const onVote = (
-        newVoterName: string,
-        newSelectedScores: Record<string, number>,
-    ): void => {
-        if (!pollId) {
-            return;
-        }
-
-        void dispatch(
-            vote({
-                pollId,
-                voterName: newVoterName,
-                selectedScores: newSelectedScores,
-            }),
-        );
-    };
-
-    useEffect(() => {
-        setActivePollingIntervalMs(hasResults ? 0 : pollPollingIntervalMs);
-    }, [hasResults]);
-
-    useEffect(() => {
-        if (!effectivePoll) {
-            return;
-        }
-
-        if (hasResults) {
-            removeCreatorSession(effectivePoll.id);
-            return;
-        }
-
-        if (currentVoteState.creatorToken) {
-            saveCreatorSession({
-                creatorToken: currentVoteState.creatorToken,
-                pollId: effectivePoll.id,
-                pollSlug: effectivePoll.slug,
-            });
-            return;
-        }
-
-        if (!fallbackCreatorSession) {
-            return;
-        }
-
-        dispatch(
-            restoreCreatorSession({
-                creatorToken: fallbackCreatorSession.creatorToken,
-                pollId: effectivePoll.id,
-                pollSlug: effectivePoll.slug,
-            }),
-        );
-    }, [
-        currentVoteState.creatorToken,
-        dispatch,
+        effectiveCreatorToken,
         effectivePoll,
-        effectivePoll?.id,
-        effectivePoll?.slug,
-        fallbackCreatorSession,
-        hasResults,
-    ]);
+        isLoadingPoll,
+        onVote,
+        pageSeo,
+        pollError,
+        pollId,
+        shouldShowConnectionState,
+        shouldShowConnectionToast,
+        shouldShowFatalError,
+        shouldShowNotFound,
+    } = usePollPageState(pollSlug);
 
-    if (isLegacyPollLink || isNotFoundError(pollError)) {
+    if (shouldShowNotFound) {
         return <NotFound />;
     }
 
     const hasPollData = !!pollId && !!effectivePoll;
-    const hasConnectionError = isConnectionError(pollError);
-    const shouldShowConnectionToast = hasPollData && hasConnectionError;
-    const shouldShowConnectionState =
-        !hasPollData && !isLoadingPoll && hasConnectionError;
-    const shouldShowFatalError = !!pollError && !hasConnectionError;
 
     return (
         <>

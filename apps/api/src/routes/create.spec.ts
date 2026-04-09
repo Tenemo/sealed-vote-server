@@ -203,7 +203,7 @@ describe('POST /polls/create', () => {
         ).toBe('Choice names must be unique.');
     });
 
-    test('rejects legacy maxParticipants input', async () => {
+    test('rejects unexpected extra input fields', async () => {
         const response = await fastify.inject({
             method: 'POST',
             url: '/api/polls/create',
@@ -211,7 +211,7 @@ describe('POST /polls/create', () => {
                 choices: ['Dog', 'Cat'],
                 creatorToken: generateToken(),
                 maxParticipants: 50,
-                pollName: getUniquePollName('Legacy max participants'),
+                pollName: getUniquePollName('Unexpected create field'),
             },
         });
 

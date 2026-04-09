@@ -3,6 +3,10 @@ import { pollsApi } from './pollsApi';
 import { selectVoteStateByPollId } from './votingState';
 
 import { type AppDispatch, type RootState } from 'app/store';
+import {
+    isConnectionError,
+    isConnectionErrorMessage,
+} from 'utils/networkErrors';
 
 const defaultPollPollingIntervalMs = 5000;
 const minimumPollPollingIntervalMs = 250;
@@ -41,6 +45,10 @@ const isPollResponse = (value: unknown): value is PollResponse =>
     value !== null &&
     'id' in value &&
     typeof (value as { id: unknown }).id === 'string';
+
+const isTransientPollFetchError = (error: unknown): boolean =>
+    isConnectionError(error) ||
+    (error instanceof Error && isConnectionErrorMessage(error.message));
 
 const selectCachedPoll = (
     state: RootState,
@@ -127,17 +135,14 @@ export const fetchFreshPoll = async ({
             return freshPoll;
         }
     } catch (error) {
-        const fallbackPoll = selectFallbackPoll(getState(), pollId);
+        const fallbackPoll = isTransientPollFetchError(error)
+            ? selectFallbackPoll(getState(), pollId)
+            : null;
         if (fallbackPoll) {
             return fallbackPoll;
         }
 
         throw error;
-    }
-
-    const fallbackPoll = selectFallbackPoll(getState(), pollId);
-    if (fallbackPoll) {
-        return fallbackPoll;
     }
 
     throw new Error(`Poll ${pollId} could not be fetched.`);
@@ -161,18 +166,24 @@ export const waitForPoll = async ({
             throw createAbortError();
         }
 
-        const fallbackPoll = selectFallbackPoll(getState(), pollId);
-        if (fallbackPoll && predicate(fallbackPoll)) {
-            return fallbackPoll;
-        }
+        try {
+            const poll = await fetchFreshPoll({
+                dispatch,
+                getState,
+                pollId,
+            });
+            if (predicate(poll)) {
+                return poll;
+            }
+        } catch (error) {
+            if (!isTransientPollFetchError(error)) {
+                throw error;
+            }
 
-        const poll = await fetchFreshPoll({
-            dispatch,
-            getState,
-            pollId,
-        });
-        if (predicate(poll)) {
-            return poll;
+            const fallbackPoll = selectFallbackPoll(getState(), pollId);
+            if (fallbackPoll && predicate(fallbackPoll)) {
+                return fallbackPoll;
+            }
         }
 
         await waitForDelay(pollPollingIntervalMs, signal);

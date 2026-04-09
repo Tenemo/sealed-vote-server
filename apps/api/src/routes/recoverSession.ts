@@ -12,10 +12,12 @@ import { withTransaction } from '../utils/db.js';
 import {
     countPollEncryptedVotes,
     countPollVoters,
+} from '../utils/pollCounts.js';
+import {
     getExistingDecryptionSharesReadOnly,
     getExistingEncryptedVoteReadOnly,
     getExistingPublicKeyShareReadOnly,
-} from '../utils/polls.js';
+} from '../utils/pollSubmissions.js';
 import {
     authenticateVoterReadOnly,
     hashSecureToken,

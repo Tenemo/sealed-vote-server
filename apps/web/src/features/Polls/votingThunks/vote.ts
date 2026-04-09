@@ -15,7 +15,10 @@ import {
     upsertPollSnapshot,
     type VoteThunkRejectValue,
 } from '../votingSlice';
-import { selectVoteStateByPollId } from '../votingState';
+import {
+    hasRegisteredVoterSession,
+    selectVoteStateByPollId,
+} from '../votingState';
 import {
     runDecryptResults,
     runEncryptVotesGenerateShares,
@@ -91,17 +94,12 @@ export const vote = createAsyncThunk<
                 }),
             );
 
-            const {
-                voterName: stateVoterName,
-                voterIndex: stateVoterIndex,
-                voterToken: confirmedVoterToken,
-            } = selectVoteStateByPollId(getState().voting, pollId);
+            const currentVoteState = selectVoteStateByPollId(
+                getState().voting,
+                pollId,
+            );
 
-            if (
-                stateVoterIndex === null ||
-                !confirmedVoterToken ||
-                !stateVoterName
-            ) {
+            if (!hasRegisteredVoterSession(currentVoteState)) {
                 dispatch(
                     setProgressMessage({
                         pollId,

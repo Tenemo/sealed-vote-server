@@ -12,17 +12,19 @@ import { combinePublicKeys } from 'threshold-elgamal';
 
 import { polls, publicKeyShares } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
+import { countPollVoters } from '../utils/pollCounts.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import {
-    countPollVoters,
     getExistingPublicKeyShare,
+    getExistingPublicKeyShareReadOnly,
     getOrderedPollPublicKeyShares,
-    lockPollById,
-} from '../utils/polls.js';
+} from '../utils/pollSubmissions.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import { authenticateVoter } from '../utils/voterAuth.js';
 import {
-    authenticateVoter,
-    findVoterByTokenReadOnly,
-} from '../utils/voterAuth.js';
+    recoverDuplicateVoterSubmission,
+    resolveExistingVoterSubmission,
+} from '../utils/voterSubmission.js';
 
 import {
     MessageResponseSchema,
@@ -67,6 +69,9 @@ export const publicKeyShare = async (
             try {
                 const { publicKeyShare: share, voterToken } = req.body;
                 const { pollId } = req.params;
+                const successResponse = {
+                    message: 'Public key share submitted successfully',
+                } satisfies PublicKeyShareResponse;
 
                 const response = await withTransaction(fastify, async (tx) => {
                     const poll = await lockPollById(tx, pollId);
@@ -89,18 +94,19 @@ export const publicKeyShare = async (
                         pollId,
                         voter.id,
                     );
+                    const replayedSubmission = resolveExistingVoterSubmission({
+                        existingSubmission: existingShare,
+                        incomingValue: share,
+                        isEquivalent: (
+                            { publicKeyShare: existingPublicKeyShare },
+                            nextPublicKeyShare,
+                        ) => existingPublicKeyShare === nextPublicKeyShare,
+                        conflictMessage: ERROR_MESSAGES.publicKeyConflict,
+                        successResponse,
+                    });
 
-                    if (existingShare) {
-                        if (existingShare.publicKeyShare !== share) {
-                            throw createError(
-                                409,
-                                ERROR_MESSAGES.publicKeyConflict,
-                            );
-                        }
-
-                        return {
-                            message: 'Public key share submitted successfully',
-                        };
+                    if (replayedSubmission) {
+                        return replayedSubmission;
                     }
 
                     if (
@@ -144,9 +150,7 @@ export const publicKeyShare = async (
                             .where(eq(polls.id, pollId));
                     }
 
-                    return {
-                        message: 'Public key share submitted successfully',
-                    };
+                    return successResponse;
                 });
 
                 void reply.code(201);
@@ -162,46 +166,39 @@ export const publicKeyShare = async (
                         'unique_public_key_share_per_voter',
                     )
                 ) {
-                    const voter = await findVoterByTokenReadOnly(
-                        fastify.db,
-                        req.params.pollId,
-                        req.body.voterToken,
-                    );
-
-                    if (!voter) {
-                        throw createError(
-                            409,
+                    const response = await recoverDuplicateVoterSubmission({
+                        db: fastify.db,
+                        pollId: req.params.pollId,
+                        voterToken: req.body.voterToken,
+                        incomingValue: req.body.publicKeyShare,
+                        loadExistingSubmission: async ({
+                            db,
+                            pollId,
+                            voterId,
+                        }) =>
+                            await getExistingPublicKeyShareReadOnly(
+                                db,
+                                pollId,
+                                voterId,
+                            ),
+                        isEquivalent: (
+                            { publicKeyShare: existingPublicKeyShare },
+                            nextPublicKeyShare,
+                        ) => existingPublicKeyShare === nextPublicKeyShare,
+                        conflictMessage: ERROR_MESSAGES.publicKeyConflict,
+                        missingSubmissionConflictMessage:
                             ERROR_MESSAGES.publicKeyAlreadySubmitted,
-                        );
-                    }
-
-                    const existingShare =
-                        await fastify.db.query.publicKeyShares.findFirst({
-                            where: (fields, { and, eq: isEqual }) =>
-                                and(
-                                    isEqual(fields.pollId, req.params.pollId),
-                                    isEqual(fields.voterId, voter.id),
-                                ),
-                            columns: {
-                                publicKeyShare: true,
-                            },
-                        });
-
-                    if (
-                        existingShare?.publicKeyShare ===
-                        req.body.publicKeyShare
-                    ) {
-                        void reply.code(201);
-                        void maybeDropTestResponseAfterCommit({
-                            reply,
-                            request: req,
-                        });
-                        return {
+                        successResponse: {
                             message: 'Public key share submitted successfully',
-                        };
-                    }
+                        } satisfies PublicKeyShareResponse,
+                    });
 
-                    throw createError(409, ERROR_MESSAGES.publicKeyConflict);
+                    void reply.code(201);
+                    void maybeDropTestResponseAfterCommit({
+                        reply,
+                        request: req,
+                    });
+                    return response;
                 }
 
                 throw error;

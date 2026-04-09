@@ -1,15 +1,20 @@
 # sealed.vote
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/ci.yml?branch=master&label=ci)](https://github.com/Tenemo/sealed-vote/actions/workflows/ci.yml)
-[![Production e2e](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/production-e2e.yml?branch=master&label=production%20e2e)](https://github.com/Tenemo/sealed-vote/actions/workflows/production-e2e.yml)
-[![Web status](https://img.shields.io/website?url=https%3A%2F%2Fsealed.vote&label=web%20status)](https://sealed.vote)
+[![Netlify Status](https://api.netlify.com/api/v1/badges/431089b8-8373-4038-8b80-fb3a7aa02c6e/deploy-status)](https://app.netlify.com/projects/sealed-vote/deploys)
 [![API status](https://img.shields.io/website?url=https%3A%2F%2Fapi.sealed.vote%2Fapi%2Fhealth-check&label=api%20status)](https://api.sealed.vote/api/health-check)
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/coverage.json)](https://github.com/Tenemo/sealed-vote/actions/workflows/readme-badges.yml)
-[![Node version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
 
 ---
 
+[![Production E2E tests](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/production-e2e.yml?branch=master&label=production%20e2e)](https://github.com/Tenemo/sealed-vote/actions/workflows/production-e2e.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/Tenemo/sealed-vote/ci.yml?branch=master&label=ci)](https://github.com/Tenemo/sealed-vote/actions/workflows/ci.yml)
+[![Tests coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/coverage.json)](https://github.com/Tenemo/sealed-vote/actions/workflows/readme-badges.yml)
+
+---
+
+[![Node version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Tenemo/sealed-vote/badge-data/node.json)](./.nvmrc)
 [![License](https://img.shields.io/github/license/Tenemo/sealed-vote)](./LICENSE)
+
+---
 
 [sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around homomorphic encryption. Voters score each choice from 1 to 10, and the system is designed so that individual votes remain hidden from everyone, including the server, while the final tally can still be computed.
 

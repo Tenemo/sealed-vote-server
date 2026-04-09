@@ -11,10 +11,8 @@ import createError from 'http-errors';
 
 import { polls } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
-import {
-    countPollVoters,
-    lockPollByIdForCreatorAction,
-} from '../utils/polls.js';
+import { countPollVoters } from '../utils/pollCounts.js';
+import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 

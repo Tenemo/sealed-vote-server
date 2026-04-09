@@ -152,4 +152,24 @@ describe('POST /polls/:pollId/recover-session', () => {
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);
     });
+
+    test('rejects an invalid creator token after the poll has been found', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const recoveryResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/recover-session`,
+            payload: {
+                creatorToken: wrongButValidToken,
+            },
+        });
+
+        expect(recoveryResponse.statusCode).toBe(403);
+        expect(
+            (JSON.parse(recoveryResponse.body) as { message: string }).message,
+        ).toBe(ERROR_MESSAGES.invalidCreatorToken);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
 });

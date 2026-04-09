@@ -28,6 +28,14 @@ export type VoteState = {
 
 export type VotingState = Record<string, VoteState>;
 
+export type RecoveryRequestData =
+    | {
+          creatorToken: string;
+      }
+    | {
+          voterToken: string;
+      };
+
 export const initialVoteState: VoteState = {
     creatorToken: null,
     pendingVoterName: null,
@@ -67,6 +75,30 @@ export const selectVoteStateByPollSlug = (
 export const getResumableVoterName = (voteState: VoteState): string | null =>
     voteState.voterName ?? voteState.pendingVoterName;
 
+export const hasRegisteredVoterSession = (
+    voteState: VoteState,
+): voteState is VoteState & {
+    voterIndex: number;
+    voterName: string;
+    voterToken: string;
+} =>
+    voteState.voterIndex !== null &&
+    Boolean(voteState.voterName) &&
+    Boolean(voteState.voterToken);
+
+export const hasPendingRegistrationRecovery = (
+    voteState: VoteState,
+): voteState is VoteState & {
+    pendingVoterName: string;
+    pendingVoterToken: string;
+    selectedScores: Record<string, number>;
+} =>
+    Boolean(
+        voteState.pendingVoterName &&
+        voteState.pendingVoterToken &&
+        voteState.selectedScores,
+    );
+
 export const hasPendingVotingIntent = (voteState: VoteState): boolean =>
     Boolean(
         voteState.selectedScores &&
@@ -74,6 +106,47 @@ export const hasPendingVotingIntent = (voteState: VoteState): boolean =>
         (voteState.voterToken || voteState.pendingVoterToken) &&
         !hasPublishedResults(voteState.pollSnapshot),
     );
+
+export const getRecoveryRequestData = (
+    voteState: VoteState,
+): RecoveryRequestData | null => {
+    if (voteState.voterToken) {
+        return {
+            voterToken: voteState.voterToken,
+        };
+    }
+
+    if (voteState.pendingVoterToken) {
+        return {
+            voterToken: voteState.pendingVoterToken,
+        };
+    }
+
+    if (voteState.creatorToken) {
+        return {
+            creatorToken: voteState.creatorToken,
+        };
+    }
+
+    return null;
+};
+
+export const shouldRecoverViaSessionRequest = (voteState: VoteState): boolean =>
+    Boolean(voteState.creatorToken || hasPendingVotingIntent(voteState));
+
+export const shouldAttemptRecovery = (voteState: VoteState): boolean => {
+    if (
+        hasPublishedResults(voteState.pollSnapshot) ||
+        voteState.isVotingInProgress
+    ) {
+        return false;
+    }
+
+    return (
+        hasPendingRegistrationRecovery(voteState) ||
+        shouldRecoverViaSessionRequest(voteState)
+    );
+};
 
 export const clearCompletedSensitiveFields = (
     voteState: VoteState,
