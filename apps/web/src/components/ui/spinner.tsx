@@ -17,14 +17,14 @@ const Spinner = ({
 }: SpinnerProps): JSX.Element => {
     if (label === null || isAriaHidden(props['aria-hidden'])) {
         return (
-            <span {...props} aria-hidden="true">
+            <span {...props} aria-hidden="true" data-slot="spinner">
                 <Loader2Icon className={cn('size-4 animate-spin', className)} />
             </span>
         );
     }
 
     return (
-        <span {...props} aria-label={label} role="status">
+        <span {...props} aria-label={label} data-slot="spinner" role="status">
             <Loader2Icon className={cn('size-4 animate-spin', className)} />
         </span>
     );

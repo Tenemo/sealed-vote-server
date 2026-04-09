@@ -9,6 +9,7 @@ describe('Spinner', () => {
         const spinner = screen.getByRole('status');
 
         expect(spinner).toHaveAttribute('aria-label', 'Loading vote results');
+        expect(spinner).toHaveAttribute('data-slot', 'spinner');
         expect(spinner).not.toHaveAttribute('aria-hidden', 'true');
     });
 
@@ -22,6 +23,10 @@ describe('Spinner', () => {
             'aria-hidden',
             'true',
         );
+        expect(container.firstElementChild).toHaveAttribute(
+            'data-slot',
+            'spinner',
+        );
     });
 
     it('hides the spinner when the label is explicitly null', () => {
@@ -31,6 +36,10 @@ describe('Spinner', () => {
         expect(container.firstElementChild).toHaveAttribute(
             'aria-hidden',
             'true',
+        );
+        expect(container.firstElementChild).toHaveAttribute(
+            'data-slot',
+            'spinner',
         );
     });
 });

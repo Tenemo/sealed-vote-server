@@ -4,7 +4,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const alertVariants = cva(
-    'relative grid w-full gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-left text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*="size-"])]:size-4',
+    'relative grid w-full gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-left text-sm has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-3 has-[>[data-slot="spinner"]]:grid-cols-[auto_1fr] has-[>[data-slot="spinner"]]:gap-x-3 [&>[data-slot="spinner"]]:row-span-2 [&>[data-slot="spinner"]]:translate-y-0.5 [&>[data-slot="spinner"]_svg]:text-current *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*="size-"])]:size-4',
     {
         variants: {
             variant: {
