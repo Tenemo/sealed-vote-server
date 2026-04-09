@@ -1,34 +1,32 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
+import {
+    gotoInteractablePage,
+    reloadInteractablePage,
+    type NavigationTarget,
+} from './navigation.mts';
 
 type NavigationOptions = {
-    timeout: number;
-    waitUntil: string;
+    referer?: string;
+    timeout?: number;
+    waitUntil?: 'commit' | 'domcontentloaded' | 'load' | 'networkidle';
 };
 
-const createPageDouble = (): {
-    goto: (url: string, options?: NavigationOptions) => Promise<void>;
-    reload: (options?: NavigationOptions) => Promise<void>;
-    waitForTimeout: (timeout: number) => Promise<void>;
-} => ({
+const createPageDouble = (): NavigationTarget => ({
     goto: async (_url: string, _options?: NavigationOptions) => undefined,
     reload: async (_options?: NavigationOptions) => undefined,
     waitForTimeout: async (_timeout: number) => undefined,
 });
 
 test('gotoInteractablePage uses domcontentloaded with a short timeout', async () => {
-    const calls: Array<{ timeout: number; waitUntil: string }> = [];
+    const calls: NavigationOptions[] = [];
     const page = createPageDouble();
     page.goto = async (_url: string, options?: NavigationOptions) => {
-        calls.push(options as { timeout: number; waitUntil: string });
+        calls.push(options as NavigationOptions);
     };
 
-    await gotoInteractablePage(
-        page as never,
-        'https://sealed.vote/votes/example--1234',
-    );
+    await gotoInteractablePage(page, 'https://sealed.vote/votes/example--1234');
 
     assert.deepEqual(calls, [
         {
@@ -39,13 +37,13 @@ test('gotoInteractablePage uses domcontentloaded with a short timeout', async ()
 });
 
 test('gotoInteractablePage retries transient Firefox navigation errors once', async () => {
-    const gotoCalls: Array<{ timeout: number; waitUntil: string }> = [];
+    const gotoCalls: NavigationOptions[] = [];
     const retryDelays: number[] = [];
     let callCount = 0;
     const page = createPageDouble();
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
-        gotoCalls.push(options as { timeout: number; waitUntil: string });
+        gotoCalls.push(options as NavigationOptions);
         callCount += 1;
 
         if (callCount === 1) {
@@ -56,7 +54,7 @@ test('gotoInteractablePage retries transient Firefox navigation errors once', as
         retryDelays.push(timeout);
     };
 
-    await gotoInteractablePage(page as never, '/');
+    await gotoInteractablePage(page, '/');
 
     assert.equal(callCount, 2);
     assert.deepEqual(retryDelays, [1_000]);
@@ -82,20 +80,20 @@ test('gotoInteractablePage does not retry non-transient navigation errors', asyn
     };
 
     await assert.rejects(
-        async () => await gotoInteractablePage(page as never, '/'),
+        async () => await gotoInteractablePage(page, '/'),
         /ERR_CONNECTION_REFUSED/u,
     );
     assert.equal(callCount, 1);
 });
 
 test('reloadInteractablePage uses the same navigation policy', async () => {
-    const calls: Array<{ timeout: number; waitUntil: string }> = [];
+    const calls: NavigationOptions[] = [];
     const page = createPageDouble();
     page.reload = async (options?: NavigationOptions) => {
-        calls.push(options as { timeout: number; waitUntil: string });
+        calls.push(options as NavigationOptions);
     };
 
-    await reloadInteractablePage(page as never);
+    await reloadInteractablePage(page);
 
     assert.deepEqual(calls, [
         {

@@ -1,4 +1,22 @@
-import type { Page } from '@playwright/test';
+type NavigationWaitUntil =
+    | 'commit'
+    | 'domcontentloaded'
+    | 'load'
+    | 'networkidle';
+
+type NavigationGotoOptions = {
+    referer?: string;
+    timeout?: number;
+    waitUntil?: NavigationWaitUntil;
+};
+
+type NavigationReloadOptions = Omit<NavigationGotoOptions, 'referer'>;
+
+export type NavigationTarget = {
+    goto: (url: string, options?: NavigationGotoOptions) => Promise<unknown>;
+    reload: (options?: NavigationReloadOptions) => Promise<unknown>;
+    waitForTimeout: (timeout: number) => Promise<void>;
+};
 
 const navigationReadyState = 'domcontentloaded' as const;
 const navigationTimeoutMs = 15_000;
@@ -16,7 +34,7 @@ const isTransientNavigationError = (error: unknown): boolean =>
 
 const retryTransientNavigation = async (
     navigate: () => Promise<void>,
-    page: Page,
+    page: NavigationTarget,
 ): Promise<void> => {
     try {
         await navigate();
@@ -31,7 +49,7 @@ const retryTransientNavigation = async (
 };
 
 export const gotoInteractablePage = async (
-    page: Page,
+    page: NavigationTarget,
     url: string,
 ): Promise<void> => {
     await retryTransientNavigation(async () => {
@@ -42,7 +60,9 @@ export const gotoInteractablePage = async (
     }, page);
 };
 
-export const reloadInteractablePage = async (page: Page): Promise<void> => {
+export const reloadInteractablePage = async (
+    page: NavigationTarget,
+): Promise<void> => {
     await retryTransientNavigation(async () => {
         await page.reload({
             timeout: navigationTimeoutMs,

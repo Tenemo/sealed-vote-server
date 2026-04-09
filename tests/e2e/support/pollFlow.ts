@@ -160,9 +160,7 @@ export const copyShareLink = async (page: Page): Promise<string> => {
         });
     await page.getByRole('button', { name: 'Copy vote link' }).click();
 
-    return await page.evaluate(
-        async () => await navigator.clipboard.readText(),
-    );
+    return await page.evaluate(() => navigator.clipboard.readText());
 };
 
 const deletePoll = async (
