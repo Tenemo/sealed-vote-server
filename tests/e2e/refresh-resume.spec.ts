@@ -14,6 +14,10 @@ import {
     type CreatedPoll,
 } from './support/pollFlow';
 import {
+    gotoInteractablePage,
+    reloadInteractablePage,
+} from './support/navigation';
+import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
@@ -57,7 +61,7 @@ test('resumes a persisted voting session after refresh', async ({
             voterName: participantName,
         });
 
-        await participant.page.reload();
+        await reloadInteractablePage(participant.page);
         await expect(
             participant.page.getByText('Waiting for the vote to be started...'),
         ).toBeVisible();
@@ -113,7 +117,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
         });
         const restoredPage = await restoredContext.newPage();
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
-        await restoredPage.goto(createdPoll.pollUrl);
+        await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
 
         const beginVoteButton = restoredPage.getByRole('button', {
             name: 'Begin vote',

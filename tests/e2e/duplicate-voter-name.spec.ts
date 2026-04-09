@@ -5,11 +5,8 @@ import {
     closeParticipant,
     openProjectParticipant,
 } from './support/participants';
-import {
-    createPoll,
-    deletePolls,
-    type CreatedPoll,
-} from './support/pollFlow';
+import { gotoInteractablePage } from './support/navigation';
+import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -47,7 +44,7 @@ test('blocks duplicate voter names before registration submission', async ({
     attachErrorTracking(participant.page, 'page-2', tracker);
 
     try {
-        await participant.page.goto(createdPoll.pollUrl);
+        await gotoInteractablePage(participant.page, createdPoll.pollUrl);
 
         const secondVoteButton = participant.page.getByRole('button', {
             exact: true,

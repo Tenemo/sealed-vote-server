@@ -4,6 +4,7 @@ import {
     closeParticipant,
     launchFirefoxParticipant,
 } from './support/participants';
+import { gotoInteractablePage } from './support/navigation';
 import {
     copyShareLink,
     createPoll,
@@ -45,7 +46,7 @@ test('keeps copied share links slug-based across platforms', async ({
     attachErrorTracking(participant.page, 'firefox-participant', tracker);
 
     try {
-        await participant.page.goto(copiedShareLink);
+        await gotoInteractablePage(participant.page, copiedShareLink);
         await participant.page
             .getByLabel('Voter name')
             .fill(createVoterName('bob', namespace));

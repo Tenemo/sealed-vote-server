@@ -10,6 +10,7 @@ import {
     joinPoll,
     type CreatedPoll,
 } from './support/pollFlow';
+import { gotoInteractablePage } from './support/navigation';
 import {
     dropNextPostResponseAfterServerCommit,
     failPollFetches,
@@ -63,7 +64,7 @@ test('retries poll creation safely after the initial response is lost', async ({
     const namespace = createTestNamespace(testInfo);
     const pollName = createPollName('Create retry', namespace);
 
-    await page.goto('/');
+    await gotoInteractablePage(page, '/');
     await page.getByLabel('Vote name').fill(pollName);
 
     for (const choice of ['Apples', 'Bananas']) {
@@ -128,10 +129,12 @@ test('recovers automatically when voter registration commits but the response is
         });
         createdPolls.push(createdPoll);
 
-        const droppedRegistration = await dropNextPostResponseAfterServerCommit({
-            page,
-            url: /\/api\/polls\/[^/]+\/register$/,
-        });
+        const droppedRegistration = await dropNextPostResponseAfterServerCommit(
+            {
+                page,
+                url: /\/api\/polls\/[^/]+\/register$/,
+            },
+        );
 
         await page.getByLabel('Voter name').fill(voterName);
         await page.getByRole('button', { exact: true, name: 'Vote' }).click();
@@ -244,7 +247,7 @@ test('reopens a previously visited poll from persisted local data when poll fetc
             url: /\/api\/polls\/[^/]+$/,
         });
 
-        await snapshotPage.goto(createdPoll.pollUrl);
+        await gotoInteractablePage(snapshotPage, createdPoll.pollUrl);
 
         await expect(
             snapshotPage.getByRole('heading', {
