@@ -10,7 +10,7 @@ import {
     joinPoll,
     type CreatedPoll,
 } from './support/pollFlow';
-import { gotoInteractablePage } from './support/navigation';
+import { gotoInteractablePage } from './support/navigation.mts';
 import {
     dropNextPostResponseAfterServerCommit,
     failPollFetches,

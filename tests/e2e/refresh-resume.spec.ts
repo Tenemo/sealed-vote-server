@@ -16,7 +16,7 @@ import {
 import {
     gotoInteractablePage,
     reloadInteractablePage,
-} from './support/navigation';
+} from './support/navigation.mts';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,

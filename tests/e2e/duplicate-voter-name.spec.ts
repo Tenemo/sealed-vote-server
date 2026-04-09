@@ -5,7 +5,7 @@ import {
     closeParticipant,
     openProjectParticipant,
 } from './support/participants';
-import { gotoInteractablePage } from './support/navigation';
+import { gotoInteractablePage } from './support/navigation.mts';
 import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
 import {
     attachErrorTracking,

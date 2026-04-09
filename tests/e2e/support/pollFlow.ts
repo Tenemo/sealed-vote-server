@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-import { gotoInteractablePage } from './navigation';
+import { gotoInteractablePage } from './navigation.mts';
 
 const connectionToastMessage =
     'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';

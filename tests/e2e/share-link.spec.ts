@@ -4,7 +4,7 @@ import {
     closeParticipant,
     launchFirefoxParticipant,
 } from './support/participants';
-import { gotoInteractablePage } from './support/navigation';
+import { gotoInteractablePage } from './support/navigation.mts';
 import {
     copyShareLink,
     createPoll,

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
-import { gotoInteractablePage } from './support/navigation';
+import { gotoInteractablePage } from './support/navigation.mts';
 import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
 import {
     attachErrorTracking,

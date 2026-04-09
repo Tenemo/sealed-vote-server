@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { gotoInteractablePage, reloadInteractablePage } from './navigation.ts';
+import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
 
 type NavigationOptions = {
     timeout: number;
