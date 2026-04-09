@@ -95,6 +95,27 @@ describe('Register voter endpoint', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('rejects voter names that become blank after trimming', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/register`,
+            payload: {
+                voterName: '   ',
+                voterToken: generateToken(),
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            'Voter name is required.',
+        );
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('Cannot register a voter for a closed poll', async () => {
         const { pollId, creatorToken } = await createPoll(
             fastify,
@@ -112,6 +133,42 @@ describe('Register voter endpoint', () => {
 
         expect(registrationResult.success).toBeFalsy();
         expect(registrationResult.message).toContain('Poll is closed');
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('rejects registrations after the participant cap is reached', async () => {
+        const { pollId, creatorToken } = await createPoll(
+            fastify,
+            getUniquePollName('RegisteringMaxParticipants'),
+        );
+
+        for (let index = 1; index <= 20; index += 1) {
+            const registrationResult = await registerVoter(
+                fastify,
+                pollId,
+                `Voter ${index}`,
+            );
+            expect(registrationResult.success).toBe(true);
+            if (!registrationResult.success) {
+                throw new Error(registrationResult.message);
+            }
+        }
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/register`,
+            payload: {
+                voterName: 'Voter 21',
+                voterToken: generateToken(),
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            ERROR_MESSAGES.maxParticipantsReached,
+        );
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

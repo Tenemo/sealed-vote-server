@@ -183,6 +183,40 @@ describe('POST /polls/:pollId/vote', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('rejects vote vectors whose length does not match the number of poll choices', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Vote vector mismatch'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+
+        const context = builder.getContext();
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/vote`,
+            payload: {
+                votes: [],
+                voterToken: context.voters[0].voterToken,
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            ERROR_MESSAGES.voteVectorLengthMismatch,
+        );
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('replays the same encrypted vote idempotently after the tally phase starts', async () => {
         const builder = new TestPollBuilder(fastify)
             .withPollName(getUniquePollName('Idempotent vote replay'))

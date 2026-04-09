@@ -193,6 +193,41 @@ describe('POST /polls/:pollId/decryption-shares', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('rejects decryption-share vectors whose length does not match the encrypted tally count', async () => {
+        const builder = new TestPollBuilder(fastify)
+            .withPollName(getUniquePollName('Decryption vector mismatch'))
+            .withChoices(['Option 1', 'Option 2'])
+            .withVoters(['Alice', 'Bob']);
+
+        await builder.create();
+        await builder.registerVoters();
+        await builder.close();
+        await builder.submitPublicKeyShares();
+        await builder.submitVotes();
+
+        const context = builder.getContext();
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${context.pollId}/decryption-shares`,
+            payload: {
+                decryptionShares: ['1'],
+                voterToken: context.voters[0].voterToken,
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            ERROR_MESSAGES.decryptionVectorLengthMismatch,
+        );
+
+        const deleteResult = await deletePoll(
+            fastify,
+            context.pollId,
+            context.creatorToken,
+        );
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('replays the same decryption shares idempotently after results are computed', async () => {
         const builder = new TestPollBuilder(fastify)
             .withPollName(getUniquePollName('Idempotent decryption replay'))
