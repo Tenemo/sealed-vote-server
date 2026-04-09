@@ -56,7 +56,7 @@ jobs:
                   cp -r packages/protocol/dist release/packages/protocol/dist
 
             - name: Upload API artifact
-              uses: actions/upload-artifact@v6
+              uses: actions/upload-artifact@v7
               with:
                   name: sealed-vote-api-artifact
                   path: release
