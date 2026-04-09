@@ -1,4 +1,5 @@
 import {
+    buildCreatePageSeo,
     buildHomePageSeo,
     buildVotePageSeo,
     injectSeoIntoHtml,
@@ -267,6 +268,13 @@ export const resolveDocumentSeoMetadata = async ({
     const pollSlug = extractVoteSlugFromPathname(requestUrl.pathname);
 
     if (!pollSlug) {
+        if (normalizePathname(requestUrl.pathname) === '/') {
+            return buildCreatePageSeo({
+                origin: requestUrl.origin,
+                pathname: requestUrl.pathname,
+            });
+        }
+
         return buildHomePageSeo({
             origin: requestUrl.origin,
             pathname: requestUrl.pathname,

@@ -9,6 +9,7 @@ export const siteOrigin = 'https://sealed.vote';
 export const siteThemeColor = '#121212';
 export const siteLocale = 'en_US';
 export const defaultSeoTitle = `${siteName} | 1-10 score voting app`;
+export const createVoteSeoTitle = 'Create a vote';
 export const defaultKeywords =
     'confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification';
 export const socialImagePath = '/social/og-home.png';
@@ -17,10 +18,10 @@ export const socialImageAlt =
 export const voteSocialImagePathPrefix = '/social/votes/';
 export const socialImageWidth = 1200;
 export const socialImageHeight = 630;
-export const homePageDescription =
-    'Create and share 1-10 score votes, collect responses, and reveal results when you are ready.';
-export const votePageFallbackDescription = 'Vote - score options from 1 to 10.';
-export const voteResultsFallbackDescription = 'Voting results on sealed.vote.';
+export const defaultSeoDescription =
+    'Create votes, collect responses, and reveal results.';
+export const votePageFallbackDescription = 'Score options from 1 to 10.';
+export const voteResultsFallbackDescription = 'Voting results';
 
 type StructuredData = Record<string, unknown>;
 
@@ -244,7 +245,7 @@ export const buildHomePageSeo = ({
 
     return {
         canonicalUrl: url,
-        description: homePageDescription,
+        description: defaultSeoDescription,
         imageAlt: socialImageAlt,
         imageHeight: socialImageHeight,
         imageType: 'image/png',
@@ -255,7 +256,7 @@ export const buildHomePageSeo = ({
         structuredData: buildStructuredData(
             normalizedOrigin,
             url,
-            homePageDescription,
+            defaultSeoDescription,
             {
                 alt: socialImageAlt,
                 height: socialImageHeight,
@@ -270,24 +271,53 @@ export const buildHomePageSeo = ({
     };
 };
 
+export const buildCreatePageSeo = ({
+    origin,
+    pathname = '/',
+}: {
+    origin?: string;
+    pathname?: string;
+} = {}): SeoMetadata => {
+    const normalizedOrigin = normalizeOrigin(origin);
+    const url = createAbsoluteUrl(normalizedOrigin, pathname);
+    const imageUrl = createAbsoluteUrl(normalizedOrigin, socialImagePath);
+
+    return {
+        canonicalUrl: url,
+        description: defaultSeoDescription,
+        imageAlt: socialImageAlt,
+        imageHeight: socialImageHeight,
+        imageType: 'image/png',
+        imageUrl,
+        imageWidth: socialImageWidth,
+        keywords: defaultKeywords,
+        robots: 'index, follow, max-image-preview:large',
+        structuredData: buildStructuredData(
+            normalizedOrigin,
+            url,
+            defaultSeoDescription,
+            {
+                alt: socialImageAlt,
+                height: socialImageHeight,
+                type: 'image/png',
+                url: imageUrl,
+                width: socialImageWidth,
+            },
+            createVoteSeoTitle,
+        ),
+        title: createVoteSeoTitle,
+        url,
+    };
+};
+
 const createVotePageDescription = ({
     isComplete,
-    pollTitle,
 }: {
     isComplete: boolean;
-    pollTitle: string | null;
 }): string => {
-    const normalizedPollTitle = pollTitle?.trim() || null;
-
-    if (!normalizedPollTitle) {
-        return isComplete
-            ? voteResultsFallbackDescription
-            : votePageFallbackDescription;
-    }
-
     return isComplete
-        ? `Voting results for ${normalizedPollTitle}`
-        : `${normalizedPollTitle} - score options from 1 to 10.`;
+        ? voteResultsFallbackDescription
+        : votePageFallbackDescription;
 };
 
 export const buildVotePageSeo = ({
@@ -310,7 +340,6 @@ export const buildVotePageSeo = ({
     const url = createAbsoluteUrl(normalizedOrigin, pollPath);
     const description = createVotePageDescription({
         isComplete,
-        pollTitle: normalizedPollTitle,
     });
     const imageAlt = createVoteSocialImageAlt(normalizedPollTitle, {
         isComplete,
@@ -320,11 +349,9 @@ export const buildVotePageSeo = ({
         normalizedPollSlug,
         isComplete,
     );
-    const title = normalizedPollTitle
-        ? `${normalizedPollTitle} | ${siteName}`
-        : isComplete
-          ? `Voting results | ${siteName}`
-          : `Vote | ${siteName}`;
+    const title =
+        normalizedPollTitle ||
+        (isComplete ? `Voting results | ${siteName}` : `Vote | ${siteName}`);
 
     return {
         canonicalUrl: url,

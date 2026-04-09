@@ -9,7 +9,7 @@ import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { actionButtonClassName, pageTitleClassName } from '@/lib/uiClasses';
 import DocumentSeo from 'app/DocumentSeo';
-import { buildHomePageSeo } from 'app/seo';
+import { buildCreatePageSeo } from 'app/seo';
 import LoadingButton from 'components/LoadingButton';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
@@ -36,9 +36,9 @@ const PollCreationPage = (): React.JSX.Element => {
     const { pollName, choices } = form;
     const runtimeOrigin =
         typeof window === 'undefined' ? undefined : window.location.origin;
-    const homePageSeo = React.useMemo(
+    const createPageSeo = React.useMemo(
         () =>
-            buildHomePageSeo({
+            buildCreatePageSeo({
                 origin: runtimeOrigin,
             }),
         [runtimeOrigin],
@@ -101,7 +101,7 @@ const PollCreationPage = (): React.JSX.Element => {
 
     return (
         <>
-            <DocumentSeo metadata={homePageSeo} />
+            <DocumentSeo metadata={createPageSeo} />
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
                     <h1 className={pageTitleClassName} id={pageTitleId}>

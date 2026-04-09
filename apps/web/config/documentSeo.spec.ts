@@ -139,10 +139,8 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
         });
 
-        expect(metadata.title).toBe('Budget & roadmap | sealed.vote');
-        expect(metadata.description).toBe(
-            'Budget & roadmap - score options from 1 to 10.',
-        );
+        expect(metadata.title).toBe('Budget & roadmap');
+        expect(metadata.description).toBe('Score options from 1 to 10.');
         expect(metadata.canonicalUrl).toBe(
             'https://sealed.vote/votes/budget-roadmap',
         );
@@ -167,9 +165,8 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
         });
 
-        expect(metadata.description).toBe(
-            'Voting results for Budget & roadmap',
-        );
+        expect(metadata.title).toBe('Budget & roadmap');
+        expect(metadata.description).toBe('Voting results');
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/votes/budget-roadmap.png?v=complete',
         );
@@ -178,17 +175,32 @@ describe('resolveDocumentSeoMetadata', () => {
         );
     });
 
-    test('returns homepage SEO for non-vote routes', async () => {
+    test('returns create-page SEO for the root route', async () => {
         const metadata = await resolveDocumentSeoMetadata({
             requestUrl: new URL('https://sealed.vote/'),
         });
 
-        expect(metadata.title).toBe('sealed.vote | 1-10 score voting app');
+        expect(metadata.title).toBe('Create a vote');
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/og-home.png',
         );
         expect(metadata.robots).toBe('index, follow, max-image-preview:large');
         expect(metadata.canonicalUrl).toBe('https://sealed.vote/');
+        expect(metadata.description).toBe(
+            'Create votes, collect responses, and reveal results.',
+        );
+    });
+
+    test('returns site SEO for non-root non-vote routes', async () => {
+        const metadata = await resolveDocumentSeoMetadata({
+            requestUrl: new URL('https://sealed.vote/missing'),
+        });
+
+        expect(metadata.title).toBe('sealed.vote | 1-10 score voting app');
+        expect(metadata.description).toBe(
+            'Create votes, collect responses, and reveal results.',
+        );
+        expect(metadata.canonicalUrl).toBe('https://sealed.vote/missing');
     });
 
     test('caches open vote SEO payloads for a short interval', async () => {
@@ -295,7 +307,7 @@ describe('renderDocumentHtml', () => {
         });
 
         expect(html).toContain(
-            '<title data-rh="true">Team &lt;sync&gt; &quot;Q2&quot; | sealed.vote</title>',
+            '<title data-rh="true">Team &lt;sync&gt; &quot;Q2&quot;</title>',
         );
         expect(html).toContain('content="https://sealed.vote/votes/team-sync"');
         expect(html).toContain(
@@ -321,10 +333,10 @@ describe('renderDocumentHtml', () => {
         expect(html).toContain(
             '<title data-rh="true">Vote | sealed.vote</title>',
         );
-        expect(html).toContain('content="Vote - score options from 1 to 10."');
+        expect(html).toContain('content="Score options from 1 to 10."');
     });
 
-    test('injects request-origin homepage metadata for preview domains', async () => {
+    test('injects request-origin create-page metadata for preview domains', async () => {
         const html = await renderDocumentHtml({
             baseHtml,
             requestUrl: new URL(
@@ -334,6 +346,10 @@ describe('renderDocumentHtml', () => {
 
         expect(html).toContain(
             '<link data-rh="true" rel="canonical" href="https://deploy-preview-11--sealed-vote.netlify.app/"',
+        );
+        expect(html).toContain('<title data-rh="true">Create a vote</title>');
+        expect(html).toContain(
+            'content="Create votes, collect responses, and reveal results."',
         );
         expect(html).toContain(
             'content="https://deploy-preview-11--sealed-vote.netlify.app/"',
