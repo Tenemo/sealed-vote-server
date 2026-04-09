@@ -7,12 +7,15 @@ type SpinnerProps = ComponentPropsWithoutRef<'span'> & {
     label?: string | null;
 };
 
+const isAriaHidden = (value: SpinnerProps['aria-hidden']): boolean =>
+    value === true || value === 'true';
+
 const Spinner = ({
     className,
     label = 'Loading',
     ...props
 }: SpinnerProps): JSX.Element => {
-    if (label === null || props['aria-hidden']) {
+    if (label === null || isAriaHidden(props['aria-hidden'])) {
         return (
             <span {...props} aria-hidden="true">
                 <Loader2Icon className={cn('size-4 animate-spin', className)} />
