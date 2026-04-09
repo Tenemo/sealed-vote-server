@@ -13,7 +13,7 @@ const requiredDatabaseName = 'sv-db';
 const pnpmExecPath = process.env.npm_execpath;
 
 export const repoRoot = path.resolve(currentDirectory, '../../..');
-export const apiWorkspaceRoot = path.resolve(repoRoot, 'apps', 'api');
+const apiWorkspaceRoot = path.resolve(repoRoot, 'apps', 'api');
 
 const apiTsxCliPath = path.resolve(
     apiWorkspaceRoot,

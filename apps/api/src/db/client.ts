@@ -25,7 +25,7 @@ const getDatabaseSslConfig = (databaseUrl: string): PoolConfig['ssl'] =>
           }
         : false;
 
-export const createDatabaseConnectionConfig = (
+const createDatabaseConnectionConfig = (
     databaseUrl: string = getDatabaseUrl(),
 ): PoolConfig => ({
     connectionString: databaseUrl,

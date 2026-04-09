@@ -8,7 +8,7 @@ type PersistStorage = {
 
 type PersistStorageModule = PersistStorage | { default: unknown };
 
-export const isPersistStorage = (value: unknown): value is PersistStorage =>
+const isPersistStorage = (value: unknown): value is PersistStorage =>
     typeof value === 'object' &&
     value !== null &&
     typeof (value as PersistStorage).getItem === 'function' &&

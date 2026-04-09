@@ -57,8 +57,8 @@ const schema = {
     },
 };
 
-export type DecryptionSharesRequest = DecryptionSharesRequestContract;
-export type DecryptionSharesResponse = MessageResponse;
+type DecryptionSharesRequest = DecryptionSharesRequestContract;
+type DecryptionSharesResponse = MessageResponse;
 
 export const decryptionShares = async (
     fastify: FastifyInstance,

@@ -38,7 +38,7 @@ const schema = {
     },
 };
 
-export type ClosePollBody = ClosePollRequestContract;
+type ClosePollBody = ClosePollRequestContract;
 export type ClosePollResponse = MessageResponse;
 
 export const close = async (fastify: FastifyInstance): Promise<void> => {

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { DatabaseTransaction } from '../db/client.js';
 import { polls } from '../db/schema.js';
 
-export type LockedPoll = {
+type LockedPoll = {
     id: string;
     isOpen: boolean;
     maxParticipants: number;
@@ -13,7 +13,7 @@ export type LockedPoll = {
     resultScores: typeof polls.$inferSelect.resultScores;
 };
 
-export type LockedCreatorPoll = {
+type LockedCreatorPoll = {
     id: string;
     isOpen: boolean;
     creatorTokenHash: string;

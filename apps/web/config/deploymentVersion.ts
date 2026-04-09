@@ -9,7 +9,7 @@ const deploymentCommitShaEnvKeys = [
 ] as const;
 const commitShaPattern = /^[0-9a-f]{7,40}$/i;
 
-export const versionJsonFileName = 'version.json';
+const versionJsonFileName = 'version.json';
 
 const resolveGitHeadSha = (): string | null => {
     try {

@@ -1,9 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-export const connectionToastMessage =
+const connectionToastMessage =
     'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';
-export const reconnectingWorkflowMessage =
-    'Connection lost. Reconnecting and resuming in the background...';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
@@ -164,7 +162,7 @@ export const copyShareLink = async (page: Page): Promise<string> => {
     return await page.evaluate(async () => await navigator.clipboard.readText());
 };
 
-export const deletePoll = async (
+const deletePoll = async (
     request: APIRequestContext,
     poll: CreatedPoll,
 ): Promise<void> => {

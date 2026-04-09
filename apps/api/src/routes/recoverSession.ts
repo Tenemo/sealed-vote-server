@@ -67,8 +67,8 @@ const schema = {
     },
 };
 
-export type RecoverSessionRequest = RecoverSessionRequestContract;
-export type RecoverSessionResponse = RecoverSessionResponseContract;
+type RecoverSessionRequest = RecoverSessionRequestContract;
+type RecoverSessionResponse = RecoverSessionResponseContract;
 
 const hasExactlyOneRecoveryToken = ({
     creatorToken,

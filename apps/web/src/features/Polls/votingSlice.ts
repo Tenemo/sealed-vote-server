@@ -223,17 +223,6 @@ export const votingSlice = createSlice({
             const { pollId, selectedScores } = action.payload;
             ensureVoteState(state, pollId).selectedScores = selectedScores;
         },
-        setShouldResumeWorkflow: (
-            state,
-            action: PayloadAction<{
-                pollId: string;
-                shouldResumeWorkflow: boolean;
-            }>,
-        ) => {
-            const { pollId, shouldResumeWorkflow } = action.payload;
-            ensureVoteState(state, pollId).shouldResumeWorkflow =
-                shouldResumeWorkflow;
-        },
         setSubmissionStatus: (
             state,
             action: PayloadAction<{
@@ -376,7 +365,6 @@ export const {
     setPendingVoterRegistration,
     setProgressMessage,
     setSelectedScores,
-    setShouldResumeWorkflow,
     setSubmissionStatus,
     setVoterSession,
     upsertPollSnapshot,

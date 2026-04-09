@@ -52,7 +52,7 @@ const schema = {
     },
 };
 
-export type CreatePollRequest = CreatePollRequestContract;
+type CreatePollRequest = CreatePollRequestContract;
 export type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
 

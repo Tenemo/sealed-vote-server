@@ -39,10 +39,7 @@ export const createPollSlug = (
 ): string =>
     `${toPollSlugTitleSegment(pollName)}${POLL_SLUG_DELIMITER}${toSlugIdentifier(pollId).slice(-suffixLength)}`;
 
-export const getPollSlugCandidates = (
-    pollName: string,
-    pollId: string,
-): string[] =>
+const getPollSlugCandidates = (pollName: string, pollId: string): string[] =>
     POLL_SLUG_SUFFIX_LENGTHS.map((suffixLength) =>
         createPollSlug(pollName, pollId, suffixLength),
     );

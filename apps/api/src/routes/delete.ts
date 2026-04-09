@@ -21,7 +21,7 @@ const DeletePollBody = Type.Object({
     creatorToken: SecureTokenSchema,
 });
 
-export type DeletePollBody = Static<typeof DeletePollBody>;
+type DeletePollBody = Static<typeof DeletePollBody>;
 
 const schema = {
     params: PollIdParamsSchema,

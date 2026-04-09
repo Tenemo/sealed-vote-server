@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { Resvg } from '@resvg/resvg-js';
 
 import {
-    createVoteSocialImagePath,
     siteName,
     socialImageWidth,
     voteSocialImagePathPrefix,
@@ -13,7 +12,7 @@ import {
 
 type FetchLike = typeof fetch;
 
-export type VoteSocialImageVariant = 'complete' | 'open';
+type VoteSocialImageVariant = 'complete' | 'open';
 
 type VoteSocialImageRenderPayload = {
     choices: string[];
@@ -504,7 +503,7 @@ const resolveFontFiles = (): string[] | undefined => {
 
 const voteSocialImageFontFiles = resolveFontFiles();
 
-export const renderVoteSocialImagePng = (
+const renderVoteSocialImagePng = (
     payload: VoteSocialImageRenderPayload,
 ): Uint8Array => {
     const svg = createVoteSocialImageSvg(payload);
@@ -689,19 +688,3 @@ export const createVoteSocialImageResponse = async ({
         status: 200,
     };
 };
-
-export const createVoteSocialImageUrl = ({
-    origin,
-    pollSlug,
-    variant = 'open',
-}: {
-    origin: string;
-    pollSlug: string;
-    variant?: VoteSocialImageVariant;
-}): string =>
-    new URL(
-        createVoteSocialImagePath(pollSlug, {
-            isComplete: variant === 'complete',
-        }),
-        origin,
-    ).toString();
