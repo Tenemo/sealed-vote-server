@@ -1,8 +1,13 @@
 import { Buffer } from 'node:buffer';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const requireFromWorkspaceRoot = createRequire(
+    path.resolve(process.cwd(), '..', '..', 'package.json'),
+);
 
 const {
     mockCreateVoteSocialImageResponse,
@@ -38,6 +43,12 @@ describe('vote social image Netlify function', () => {
             'open',
         );
         mockResolveSeoApiBaseUrl.mockClear();
+    });
+
+    test('can resolve the PNG renderer dependency from the workspace root', () => {
+        expect(() =>
+            requireFromWorkspaceRoot.resolve('@resvg/resvg-js'),
+        ).not.toThrow();
     });
 
     test('serves the vote PNG route with cache headers on GET', async () => {
