@@ -52,8 +52,8 @@ describe('createVoteSocialImageSvg', () => {
             resultScores: [],
         });
 
-        expect(svg).toContain('Long bong Long b...');
-        expect(svg).not.toContain('Long bong Long bong...');
+        expect(svg).toContain('Long bong Lon...');
+        expect(svg).not.toContain('Long bong Long...');
     });
 
     test('wraps longer vote titles before they collide with the choices panel', () => {
@@ -131,6 +131,18 @@ describe('createVoteSocialImageSvg', () => {
         expect(svg).not.toContain('8.94');
         expect(svg.indexOf('Bananas')).toBeLessThan(svg.indexOf('Apples'));
         expect(svg.indexOf('Apples')).toBeLessThan(svg.indexOf('Pears'));
+    });
+
+    test('uses visual-width truncation for long result labels', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Long bong Long bong Long bong Long bong', 'Short'],
+            isComplete: true,
+            pollTitle: 'Best fruit for breakfast',
+            resultScores: [9, 8],
+        });
+
+        expect(svg).toContain('Long bong Lon...');
+        expect(svg).not.toContain('Long bong Long...');
     });
 
     test('renders a clear empty state when a completed poll has no results', () => {

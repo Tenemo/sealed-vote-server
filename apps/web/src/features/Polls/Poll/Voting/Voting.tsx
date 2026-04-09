@@ -7,11 +7,7 @@ import VoteItem from './VoteItem';
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
-import {
-    actionButtonClassName,
-    mutedBodyClassName,
-    sectionTitleClassName,
-} from '@/lib/uiClasses';
+import { actionButtonClassName, sectionTitleClassName } from '@/lib/uiClasses';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from 'app/hooks';
 import { type PollResponse } from 'features/Polls/pollsApi';
@@ -100,7 +96,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                         <h2 className={sectionTitleClassName} id={headingId}>
                             Cast your vote
                         </h2>
-                        <p className={mutedBodyClassName}>
+                        <p className="field-note">
                             Rate choices from 1 to 10. The results will be
                             ordered by geometric mean of all votes per item. All
                             voters need to be present in order to complete the
@@ -108,8 +104,9 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                         </p>
                     </div>
                     <ul className="space-y-4">
-                        {poll.choices.map((choiceName) => (
+                        {poll.choices.map((choiceName, choiceIndex) => (
                             <VoteItem
+                                choiceIndex={choiceIndex}
                                 choiceName={choiceName}
                                 key={choiceName}
                                 onVote={onVoteSelect}
@@ -117,7 +114,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                             />
                         ))}
                     </ul>
-                    <div className="grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                    <div className="grid gap-4 border-t border-border pt-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                         <OutlinedInputField
                             aria-invalid={isVoterNameDuplicate}
                             errorText={
@@ -143,7 +140,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
                         <Button
                             className={cn(
                                 actionButtonClassName,
-                                'sm:mt-7 sm:min-w-32',
+                                'sm:mt-8 sm:min-w-32',
                             )}
                             disabled={!isSubmitEnabled}
                             size="lg"

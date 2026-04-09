@@ -4,34 +4,38 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-const panelVariants = cva('border border-border/70', {
-    variants: {
-        padding: {
-            default: 'p-5 sm:p-6',
-            compact: 'p-4 sm:p-5',
-            row: 'px-4 py-3',
+const panelVariants = cva(
+    'rounded-[var(--radius-lg)] border border-border/70 bg-card',
+    {
+        variants: {
+            padding: {
+                default: 'p-5 sm:p-6',
+                compact: 'p-4 sm:p-5',
+                row: 'px-4 py-3',
+                none: '',
+            },
+            tone: {
+                default: '',
+                surface: 'bg-background',
+                subtle: 'bg-accent',
+            },
+            radius: {
+                default: 'rounded-[var(--radius-lg)]',
+                compact: 'rounded-[var(--radius-md)]',
+            },
+            borderStyle: {
+                solid: '',
+                dashed: 'border-dashed',
+            },
         },
-        tone: {
-            default: 'bg-card',
-            surface: 'bg-background',
-            subtle: 'bg-accent',
-        },
-        radius: {
-            default: 'rounded-lg',
-            compact: 'rounded-md',
-        },
-        borderStyle: {
-            solid: '',
-            dashed: 'border-dashed',
+        defaultVariants: {
+            padding: 'default',
+            tone: 'default',
+            radius: 'default',
+            borderStyle: 'solid',
         },
     },
-    defaultVariants: {
-        padding: 'default',
-        tone: 'default',
-        radius: 'default',
-        borderStyle: 'solid',
-    },
-});
+);
 
 const Panel = ({
     asChild = false,

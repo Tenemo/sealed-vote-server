@@ -59,8 +59,8 @@ const maxTitleLineLength = 16;
 const maxTitleLines = 3;
 const maxVisibleChoices = 4;
 const maxVisibleResults = 4;
-const maxChoiceLineLength = 19;
-const maxResultLineLength = 18;
+const maxChoiceLineWidth = 13.8;
+const maxResultLineWidth = 13.2;
 const ellipsis = '...';
 const dayInSeconds = 60 * 60 * 24;
 const hourInSeconds = 60 * 60;
@@ -105,6 +105,56 @@ const fitLineWithEllipsis = (value: string, maxLength: number): string => {
 
 const truncateLine = (value: string, maxLength: number): string =>
     value.length <= maxLength ? value : fitLineWithEllipsis(value, maxLength);
+
+const estimateCharacterWidth = (character: string): number => {
+    if (character === ' ') {
+        return 0.4;
+    }
+
+    if (/[.,'`:;|!ilI1-]/.test(character)) {
+        return 0.52;
+    }
+
+    if (/[MWOQG@#%&0-9]/.test(character)) {
+        return 1.2;
+    }
+
+    if (/[A-Z]/.test(character)) {
+        return 1.08;
+    }
+
+    return 0.94;
+};
+
+const estimateVisualWidth = (value: string): number =>
+    [...value].reduce(
+        (totalWidth, character) =>
+            totalWidth + estimateCharacterWidth(character),
+        0,
+    );
+
+const truncateLineByVisualWidth = (value: string, maxWidth: number): string => {
+    if (estimateVisualWidth(value) <= maxWidth) {
+        return value;
+    }
+
+    const ellipsisWidth = estimateVisualWidth(ellipsis);
+    const truncatedCharacters: string[] = [];
+    let currentWidth = 0;
+
+    for (const character of value) {
+        const nextWidth = currentWidth + estimateCharacterWidth(character);
+
+        if (nextWidth + ellipsisWidth > maxWidth) {
+            break;
+        }
+
+        truncatedCharacters.push(character);
+        currentWidth = nextWidth;
+    }
+
+    return `${truncatedCharacters.join('').trimEnd()}${ellipsis}`;
+};
 
 const ellipsizeLine = (value: string, maxLength: number): string => {
     if (value.length + ellipsis.length <= maxLength) {
@@ -192,7 +242,9 @@ const hasVoteSocialImageResults = (resultScores: number[]): boolean =>
 const buildChoiceLines = (choiceNames: string[]): string[] => {
     const visibleChoices = choiceNames
         .slice(0, maxVisibleChoices)
-        .map((choiceName) => truncateLine(choiceName, maxChoiceLineLength));
+        .map((choiceName) =>
+            truncateLineByVisualWidth(choiceName, maxChoiceLineWidth),
+        );
 
     if (choiceNames.length > maxVisibleChoices) {
         visibleChoices.push(`+${choiceNames.length - maxVisibleChoices} more`);
@@ -223,7 +275,7 @@ const buildResultEntries = (
         })
         .slice(0, maxVisibleResults)
         .map(({ label }) => ({
-            label: truncateLine(label, maxResultLineLength),
+            label: truncateLineByVisualWidth(label, maxResultLineWidth),
         }));
 
 const buildOpenVoteMarkup = (choiceNames: string[]): string => {

@@ -100,4 +100,47 @@ describe('VoteResults', () => {
             screen.queryByText(/Public verification failed\./i),
         ).not.toBeInTheDocument();
     });
+
+    it('marks only the first three published results with placement icons', () => {
+        mockedVerifyPublishedResults.mockReturnValue({
+            computedScores: [8, 10, 9, 7],
+            computedTallies: ['8', '10', '9', '7'],
+            isVerified: true,
+            scoresMatch: true,
+            talliesMatch: true,
+        });
+
+        const poll = {
+            id: '11111111-1111-4111-8111-111111111111',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            choices: ['Apples', 'Bananas', 'Cherries', 'Dates'],
+            voters: ['Alice', 'Bob'],
+            isOpen: false,
+            publicKeyShareCount: 2,
+            commonPublicKey: '123',
+            encryptedVoteCount: 2,
+            encryptedTallies: [
+                { c1: '1', c2: '8' },
+                { c1: '1', c2: '10' },
+                { c1: '1', c2: '9' },
+                { c1: '1', c2: '7' },
+            ],
+            decryptionShareCount: 2,
+            publishedDecryptionShares: [
+                ['share-a-1', 'share-a-2', 'share-a-3', 'share-a-4'],
+                ['share-b-1', 'share-b-2', 'share-b-3', 'share-b-4'],
+            ],
+            resultTallies: ['8', '10', '9', '7'],
+            resultScores: [8, 10, 9, 7],
+        };
+
+        render(<VoteResults poll={poll} pollId="poll-1" />);
+
+        expect(screen.getByLabelText('Winner')).toBeInTheDocument();
+        expect(screen.getByLabelText('Runner-up')).toBeInTheDocument();
+        expect(screen.getByLabelText('Third place')).toBeInTheDocument();
+        expect(screen.getAllByRole('listitem')).toHaveLength(4);
+    });
 });

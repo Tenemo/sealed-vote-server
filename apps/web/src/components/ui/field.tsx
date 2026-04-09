@@ -47,7 +47,7 @@ const FieldDescription = ({
 }: ComponentProps<'p'>): JSX.Element => {
     return (
         <p
-            className={cn('text-sm leading-6 text-muted-foreground', className)}
+            className={cn('field-note', className)}
             data-slot="field-description"
             {...props}
         />

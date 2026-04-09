@@ -17,25 +17,29 @@ const NotFound = (): React.JSX.Element => {
     };
 
     return (
-        <div className="flex flex-1 items-center justify-center">
-            <Panel className="w-full max-w-xl space-y-4 text-center">
-                <h1 className={pageTitleClassName}>Page not found</h1>
-                <div className="space-y-2">
-                    <p className={mutedBodyClassName}>
-                        The requested path does not exist.
-                    </p>
-                    <p className="break-all rounded-md bg-accent px-4 py-3 text-sm font-medium text-foreground">
-                        {pathname}
-                    </p>
-                </div>
-                <div className="flex justify-center">
-                    <Button
-                        className={actionButtonClassName}
-                        onClick={onClick}
-                        variant="outline"
-                    >
-                        Go back to vote creation
-                    </Button>
+        <div className="flex min-h-[50vh] flex-1 items-center justify-center">
+            <Panel className="w-full max-w-xl text-center">
+                <div className="space-y-4">
+                    <h1 className={pageTitleClassName}>Page not found</h1>
+                    <div className="space-y-2">
+                        <p className={mutedBodyClassName}>
+                            The requested path does not exist.
+                        </p>
+                        <p className="field-note">
+                            Path{' '}
+                            <strong className="break-all">{pathname}</strong>{' '}
+                            not found.
+                        </p>
+                    </div>
+                    <div className="flex justify-center">
+                        <Button
+                            className={actionButtonClassName}
+                            onClick={onClick}
+                            variant="outline"
+                        >
+                            Go back to vote creation
+                        </Button>
+                    </div>
                 </div>
             </Panel>
         </div>

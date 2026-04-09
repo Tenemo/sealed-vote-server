@@ -8,7 +8,7 @@ import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
-import { actionButtonClassName, mutedBodyClassName } from '@/lib/uiClasses';
+import { actionButtonClassName } from '@/lib/uiClasses';
 import { cn } from '@/lib/utils';
 
 type ChoiceAddingProps = {
@@ -51,14 +51,12 @@ const ChoiceAdding = ({
     return (
         <div className="space-y-5">
             <div className="space-y-2 text-center">
-                <h2 className="text-xl font-semibold tracking-tight">
-                    Choices
-                </h2>
-                <p className={mutedBodyClassName}>
-                    Each participant will rank every option from 1 to 10.
+                <h2 className="text-xl font-semibold">Choices</h2>
+                <p className="field-note">
+                    Each participant will score every option from 1 to 10.
                 </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                 <OutlinedInputField
                     aria-invalid={isChoiceDuplicate}
                     autoComplete="off"
@@ -75,35 +73,27 @@ const ChoiceAdding = ({
                     onKeyDown={handleKeyDown}
                     value={choiceName}
                 />
-                <div className="sm:pt-7">
-                    <Button
-                        className={cn(actionButtonClassName, 'justify-center')}
-                        disabled={!isChoiceNameValid}
-                        onClick={handleAddChoice}
-                        size="lg"
-                        type="button"
-                        variant="secondary"
-                    >
-                        <Plus aria-hidden="true" className="mr-2 size-4" />
-                        Add new choice
-                    </Button>
-                </div>
+                <Button
+                    className={cn(actionButtonClassName, 'justify-center')}
+                    disabled={!isChoiceNameValid}
+                    onClick={handleAddChoice}
+                    size="lg"
+                    type="button"
+                    variant={isChoiceNameValid ? 'default' : 'outline'}
+                >
+                    <Plus aria-hidden="true" className="size-4" />
+                    Add new choice
+                </Button>
             </div>
             {choices.length === 0 && (
-                <Panel
-                    borderStyle="dashed"
-                    className={mutedBodyClassName}
-                    padding="row"
-                    radius="compact"
-                    tone="subtle"
-                >
+                <p className="empty-state">
                     To create a vote, add choices that each participant will be
-                    able to rank from 1 to 10.
-                </Panel>
+                    able to score from 1 to 10.
+                </p>
             )}
             {!!choices.length && (
                 <div className="space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-sm font-medium text-secondary">
                         Choices currently in the vote:
                     </p>
                     <ul className="space-y-2">
@@ -114,10 +104,9 @@ const ChoiceAdding = ({
                                 key={choice}
                                 padding="row"
                                 radius="compact"
-                                tone="subtle"
                             >
                                 <li>
-                                    <span className="min-w-0 flex-1 break-words text-base text-foreground">
+                                    <span className="block min-w-0 flex-1 text-base font-medium [overflow-wrap:anywhere]">
                                         {choice}
                                     </span>
                                     <Button
@@ -139,7 +128,7 @@ const ChoiceAdding = ({
                 </div>
             )}
             {choices.length === 1 && (
-                <p className={mutedBodyClassName}>
+                <p className="field-note">
                     There need to be at least two possible choices in a vote.
                 </p>
             )}
