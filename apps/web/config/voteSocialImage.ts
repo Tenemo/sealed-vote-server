@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { Resvg } from '@resvg/resvg-js';
 
 import {
+    hasPublishedResultScores,
+    orderPublishedPollResults,
+} from './pollResults.mts';
+import {
     siteName,
     socialImageWidth,
     voteSocialImagePathPrefix,
@@ -247,8 +251,7 @@ const wrapText = (
     return lines;
 };
 
-const hasVoteSocialImageResults = (resultScores: number[]): boolean =>
-    resultScores.some((score) => Number.isFinite(score));
+const hasVoteSocialImageResults = hasPublishedResultScores;
 
 const buildChoiceLines = (choiceNames: string[]): string[] => {
     const visibleChoices = choiceNames
@@ -268,25 +271,13 @@ const buildResultEntries = (
     choiceNames: string[],
     resultScores: number[],
 ): VoteResultEntry[] =>
-    choiceNames
-        .map((choiceName, index) => ({
-            index,
-            label: choiceName,
-            score: resultScores[index] ?? Number.NEGATIVE_INFINITY,
-        }))
-        .filter(
-            (entry) => entry.label.length > 0 && Number.isFinite(entry.score),
-        )
-        .sort((left, right) => {
-            if (right.score !== left.score) {
-                return right.score - left.score;
-            }
-
-            return left.index - right.index;
-        })
+    orderPublishedPollResults({
+        choices: choiceNames,
+        resultScores,
+    })
         .slice(0, maxVisibleResults)
-        .map(({ label }) => ({
-            label: truncateLineByVisualWidth(label, maxResultLineWidth),
+        .map(({ choiceName }) => ({
+            label: truncateLineByVisualWidth(choiceName, maxResultLineWidth),
         }));
 
 const buildGoldCupIcon =
@@ -350,9 +341,10 @@ const buildCompletedVoteMarkup = (
     resultScores: number[],
 ): string => {
     const resultEntries = buildResultEntries(choiceNames, resultScores);
-    const scoredChoiceCount = resultScores.filter((score) =>
-        Number.isFinite(score),
-    ).length;
+    const scoredChoiceCount = orderPublishedPollResults({
+        choices: choiceNames,
+        resultScores,
+    }).length;
     const resultCountLabel =
         scoredChoiceCount === 1
             ? '1 scored choice'

@@ -13,6 +13,8 @@ type AuthenticatedVoter = {
     voterIndex: number;
 };
 
+export type { AuthenticatedVoter };
+
 export const generateSecureToken = (): string =>
     crypto.randomBytes(32).toString('hex');
 

@@ -8,16 +8,14 @@ import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
+import {
+    decryptionShares,
+    encryptedVotes,
+    publicKeyShares,
+} from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
-import {
-    countPollEncryptedVotes,
-    countPollVoters,
-} from '../utils/pollCounts.js';
-import {
-    getExistingDecryptionSharesReadOnly,
-    getExistingEncryptedVoteReadOnly,
-    getExistingPublicKeyShareReadOnly,
-} from '../utils/pollSubmissions.js';
+import { getPollPhaseReadModelById } from '../utils/pollReadModel.js';
+import { getExistingPollSubmissionValue } from '../utils/pollSubmissions.js';
 import {
     authenticateVoterReadOnly,
     hashSecureToken,
@@ -103,35 +101,28 @@ export const recoverSession = async (
                     where: (fields, { eq: isEqual }) =>
                         isEqual(fields.id, pollId),
                     columns: {
-                        commonPublicKey: true,
                         creatorTokenHash: true,
-                        encryptedTallies: true,
-                        id: true,
-                        isOpen: true,
-                        resultScores: true,
-                        slug: true,
                     },
                 });
+                const phaseReadModel = await getPollPhaseReadModelById(
+                    tx,
+                    pollId,
+                );
 
-                if (!poll) {
+                if (!poll || !phaseReadModel) {
                     throw createError(
                         404,
                         `Poll with ID ${pollId} does not exist.`,
                     );
                 }
 
-                const [voterCount, encryptedVoteCount] = await Promise.all([
-                    countPollVoters(tx, pollId),
-                    countPollEncryptedVotes(tx, pollId),
-                ]);
-
                 const phase = derivePollPhase({
-                    commonPublicKey: poll.commonPublicKey,
-                    encryptedTallyCount: poll.encryptedTallies.length,
-                    encryptedVoteCount,
-                    isOpen: poll.isOpen,
-                    resultScoreCount: poll.resultScores.length,
-                    voterCount,
+                    commonPublicKey: phaseReadModel.commonPublicKey,
+                    encryptedTallyCount: phaseReadModel.encryptedTallyCount,
+                    encryptedVoteCount: phaseReadModel.encryptedVoteCount,
+                    isOpen: phaseReadModel.isOpen,
+                    resultScoreCount: phaseReadModel.resultScoreCount,
+                    voterCount: phaseReadModel.voterCount,
                 });
 
                 if (creatorToken) {
@@ -147,15 +138,15 @@ export const recoverSession = async (
                     return {
                         role: 'creator',
                         pollId,
-                        pollSlug: poll.slug,
+                        pollSlug: phaseReadModel.slug,
                         phase,
-                        isOpen: poll.isOpen,
+                        isOpen: phaseReadModel.isOpen,
                         voterName: null,
                         voterIndex: null,
                         hasSubmittedPublicKeyShare: false,
                         hasSubmittedVote: false,
                         hasSubmittedDecryptionShares: false,
-                        resultsAvailable: poll.resultScores.length > 0,
+                        resultsAvailable: phaseReadModel.resultScoreCount > 0,
                     };
                 }
 
@@ -167,21 +158,39 @@ export const recoverSession = async (
 
                 const [publicKeyShare, existingVote, existingDecryptionShares] =
                     await Promise.all([
-                        getExistingPublicKeyShareReadOnly(tx, pollId, voter.id),
-                        getExistingEncryptedVoteReadOnly(tx, pollId, voter.id),
-                        getExistingDecryptionSharesReadOnly(
-                            tx,
+                        getExistingPollSubmissionValue<string>({
+                            db: tx,
                             pollId,
-                            voter.id,
-                        ),
+                            table: publicKeyShares,
+                            valueColumn: publicKeyShares.publicKeyShare,
+                            voterId: voter.id,
+                        }),
+                        getExistingPollSubmissionValue<
+                            typeof encryptedVotes.$inferSelect.votes
+                        >({
+                            db: tx,
+                            pollId,
+                            table: encryptedVotes,
+                            valueColumn: encryptedVotes.votes,
+                            voterId: voter.id,
+                        }),
+                        getExistingPollSubmissionValue<
+                            typeof decryptionShares.$inferSelect.shares
+                        >({
+                            db: tx,
+                            pollId,
+                            table: decryptionShares,
+                            valueColumn: decryptionShares.shares,
+                            voterId: voter.id,
+                        }),
                     ]);
 
                 return {
                     role: 'voter',
                     pollId,
-                    pollSlug: poll.slug,
+                    pollSlug: phaseReadModel.slug,
                     phase,
-                    isOpen: poll.isOpen,
+                    isOpen: phaseReadModel.isOpen,
                     voterName: voter.voterName,
                     voterIndex: voter.voterIndex,
                     hasSubmittedPublicKeyShare: Boolean(publicKeyShare),
@@ -189,7 +198,7 @@ export const recoverSession = async (
                     hasSubmittedDecryptionShares: Boolean(
                         existingDecryptionShares,
                     ),
-                    resultsAvailable: poll.resultScores.length > 0,
+                    resultsAvailable: phaseReadModel.resultScoreCount > 0,
                 };
             });
         },

@@ -210,7 +210,7 @@ describe('POST /polls/create', () => {
             payload: {
                 choices: ['Dog', 'Cat'],
                 creatorToken: generateToken(),
-                maxParticipants: 50,
+                unexpectedField: 50,
                 pollName: getUniquePollName('Unexpected create field'),
             },
         });

@@ -10,12 +10,9 @@ import {
     removeCreatorSession,
     saveCreatorSession,
 } from 'features/Polls/creatorSessionStorage';
-import {
-    hasPublishedResults,
-    normalizePollResponse,
-} from 'features/Polls/pollData';
 import { pollPollingIntervalMs } from 'features/Polls/pollQuery';
-import { useGetPollQuery } from 'features/Polls/pollsApi';
+import { hasPublishedResults } from 'features/Polls/pollResults';
+import { useGetPollQuery, type PollResponse } from 'features/Polls/pollsApi';
 import {
     restoreCreatorSession,
     selectVotingStateByPollId,
@@ -34,7 +31,7 @@ export const usePollPageState = (
     pollSlug: string,
 ): {
     effectiveCreatorToken: string | null;
-    effectivePoll: ReturnType<typeof normalizePollResponse>;
+    effectivePoll: PollResponse | null;
     isLoadingPoll: boolean;
     onVote: (voterName: string, selectedScores: Record<string, number>) => void;
     pageSeo: ReturnType<typeof buildVotePageSeo>;
@@ -62,9 +59,7 @@ export const usePollPageState = (
     const votingState = useAppSelector((state) =>
         selectVoteStateByPollSlug(state.voting, pollSlug),
     );
-    const effectivePoll = normalizePollResponse(
-        poll ?? votingState.pollSnapshot,
-    );
+    const effectivePoll = poll ?? votingState.pollSnapshot ?? null;
     const pollId = effectivePoll?.id ?? null;
     const hasResults = hasPublishedResults(effectivePoll);
     const currentVoteState = useAppSelector((state) =>

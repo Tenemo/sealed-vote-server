@@ -1,15 +1,11 @@
 import type { EnhancedStore } from '@reduxjs/toolkit';
 import { configureStore } from '@reduxjs/toolkit';
 
-const mockedFetchFreshPoll = vi.fn();
 const mockedRecoverSessionInitiate = vi.fn();
+const mockedRefreshPollSnapshot = vi.fn();
 const mockedVote = vi.fn((payload: unknown) => ({
     payload,
     type: 'voting/vote',
-}));
-
-vi.mock('features/Polls/pollQuery', () => ({
-    fetchFreshPoll: (...args: unknown[]) => mockedFetchFreshPoll(...args),
 }));
 
 vi.mock('features/Polls/pollsApi', () => ({
@@ -33,6 +29,19 @@ vi.mock('features/Polls/pollsApi', () => ({
         },
     },
 }));
+
+vi.mock('../votingSession', async () => {
+    const actual =
+        await vi.importActual<typeof import('../votingSession')>(
+            '../votingSession',
+        );
+
+    return {
+        ...actual,
+        refreshPollSnapshot: (...args: unknown[]) =>
+            mockedRefreshPollSnapshot(...args),
+    };
+});
 
 vi.mock('./vote', () => ({
     vote: (payload: unknown) => mockedVote(payload),
@@ -62,8 +71,8 @@ const createTestStore = (
 
 describe('recoverSession thunk', () => {
     beforeEach(() => {
-        mockedFetchFreshPoll.mockReset();
         mockedRecoverSessionInitiate.mockReset();
+        mockedRefreshPollSnapshot.mockReset();
         mockedVote.mockClear();
     });
 
@@ -93,23 +102,33 @@ describe('recoverSession thunk', () => {
                 resultsAvailable: false,
             }),
         });
-        mockedFetchFreshPoll.mockResolvedValue({
-            id: 'poll-1',
-            slug: 'best-fruit--1111',
-            pollName: 'Best fruit',
-            createdAt: '2026-01-01T00:00:00.000Z',
-            choices: ['Apples'],
-            voters: ['Alice', 'Bob'],
-            isOpen: false,
-            publicKeyShareCount: 2,
-            encryptedVoteCount: 2,
-            decryptionShareCount: 1,
-            commonPublicKey: '33',
-            encryptedTallies: [],
-            publishedDecryptionShares: [],
-            resultTallies: [],
-            resultScores: [],
-        });
+        mockedRefreshPollSnapshot.mockImplementation(
+            async ({ dispatch }: { dispatch: typeof store.dispatch }) => {
+                dispatch({
+                    payload: {
+                        pollId: 'poll-1',
+                        poll: {
+                            id: 'poll-1',
+                            slug: 'best-fruit--1111',
+                            pollName: 'Best fruit',
+                            createdAt: '2026-01-01T00:00:00.000Z',
+                            choices: ['Apples'],
+                            voters: ['Alice', 'Bob'],
+                            isOpen: false,
+                            publicKeyShareCount: 2,
+                            encryptedVoteCount: 2,
+                            decryptionShareCount: 1,
+                            commonPublicKey: '33',
+                            encryptedTallies: [],
+                            publishedDecryptionShares: [],
+                            resultTallies: [],
+                            resultScores: [],
+                        },
+                    },
+                    type: 'voting/upsertPollSnapshot',
+                });
+            },
+        );
 
         const result = store.dispatch(
             recoverSession({
@@ -127,7 +146,7 @@ describe('recoverSession thunk', () => {
                 voterToken: 'voter-token',
             },
         });
-        expect(mockedFetchFreshPoll).toHaveBeenCalledWith(
+        expect(mockedRefreshPollSnapshot).toHaveBeenCalledWith(
             expect.objectContaining({
                 dispatch: expect.any(Function),
                 getState: expect.any(Function),
@@ -189,7 +208,7 @@ describe('recoverSession thunk', () => {
         await result.unwrap();
 
         expect(mockedRecoverSessionInitiate).not.toHaveBeenCalled();
-        expect(mockedFetchFreshPoll).not.toHaveBeenCalled();
+        expect(mockedRefreshPollSnapshot).not.toHaveBeenCalled();
     });
 
     it('promotes a pending voter token after server recovery proves the voter session exists', async () => {
@@ -218,23 +237,33 @@ describe('recoverSession thunk', () => {
                 resultsAvailable: false,
             }),
         });
-        mockedFetchFreshPoll.mockResolvedValue({
-            id: 'poll-1',
-            slug: 'best-fruit--1111',
-            pollName: 'Best fruit',
-            createdAt: '2026-01-01T00:00:00.000Z',
-            choices: ['Apples'],
-            voters: ['Alice'],
-            isOpen: false,
-            publicKeyShareCount: 0,
-            encryptedVoteCount: 0,
-            decryptionShareCount: 0,
-            commonPublicKey: null,
-            encryptedTallies: [],
-            publishedDecryptionShares: [],
-            resultTallies: [],
-            resultScores: [],
-        });
+        mockedRefreshPollSnapshot.mockImplementation(
+            async ({ dispatch }: { dispatch: typeof store.dispatch }) => {
+                dispatch({
+                    payload: {
+                        pollId: 'poll-1',
+                        poll: {
+                            id: 'poll-1',
+                            slug: 'best-fruit--1111',
+                            pollName: 'Best fruit',
+                            createdAt: '2026-01-01T00:00:00.000Z',
+                            choices: ['Apples'],
+                            voters: ['Alice'],
+                            isOpen: false,
+                            publicKeyShareCount: 0,
+                            encryptedVoteCount: 0,
+                            decryptionShareCount: 0,
+                            commonPublicKey: null,
+                            encryptedTallies: [],
+                            publishedDecryptionShares: [],
+                            resultTallies: [],
+                            resultScores: [],
+                        },
+                    },
+                    type: 'voting/upsertPollSnapshot',
+                });
+            },
+        );
 
         await (
             store.dispatch(

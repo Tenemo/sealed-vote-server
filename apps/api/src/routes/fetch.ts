@@ -1,19 +1,9 @@
-import {
-    isUuid,
-    type PollResponse as PollResponseContract,
-} from '@sealed-vote/contracts';
+import type { PollResponse as PollResponseContract } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
-import { count, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import {
-    decryptionShares,
-    encryptedVotes,
-    publicKeyShares,
-} from '../db/schema.js';
-import { normalizeDatabaseTimestamp } from '../utils/db.js';
-import { sortRowsByVoterIndex } from '../utils/pollSubmissions.js';
+import { getPollFetchReadModel } from '../utils/pollReadModel.js';
 
 import {
     EncryptedMessageSchema,
@@ -55,101 +45,19 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
         async (
             req: FastifyRequest<{ Params: PollRefParams }>,
         ): Promise<PollResponse> => {
-            const { pollRef } = req.params;
-            const isPollId = isUuid(pollRef);
-
-            const poll = await fastify.db.query.polls.findFirst({
-                where: (fields, { eq: isEqual }) =>
-                    isPollId
-                        ? isEqual(fields.id, pollRef)
-                        : isEqual(fields.slug, pollRef),
-                columns: {
-                    id: true,
-                    slug: true,
-                    pollName: true,
-                    createdAt: true,
-                    isOpen: true,
-                    commonPublicKey: true,
-                    encryptedTallies: true,
-                    resultTallies: true,
-                    resultScores: true,
-                },
-                with: {
-                    choices: {
-                        columns: {
-                            choiceName: true,
-                        },
-                        orderBy: (fields, { asc }) => asc(fields.choiceIndex),
-                    },
-                    voters: {
-                        columns: {
-                            voterName: true,
-                        },
-                        orderBy: (fields, { asc }) => asc(fields.voterIndex),
-                    },
-                },
-            });
+            const poll = await getPollFetchReadModel(
+                fastify.db,
+                req.params.pollRef,
+            );
 
             if (!poll) {
-                throw createError(404, `Poll ${pollRef} does not exist.`);
+                throw createError(
+                    404,
+                    `Poll ${req.params.pollRef} does not exist.`,
+                );
             }
 
-            const [
-                publicKeyShareCountRow,
-                encryptedVoteCountRow,
-                decryptionShareCountRow,
-            ] = await Promise.all([
-                fastify.db
-                    .select({ count: count() })
-                    .from(publicKeyShares)
-                    .where(eq(publicKeyShares.pollId, poll.id)),
-                fastify.db
-                    .select({ count: count() })
-                    .from(encryptedVotes)
-                    .where(eq(encryptedVotes.pollId, poll.id)),
-                fastify.db
-                    .select({ count: count() })
-                    .from(decryptionShares)
-                    .where(eq(decryptionShares.pollId, poll.id)),
-            ]);
-
-            const publishedDecryptionShares =
-                poll.resultScores.length > 0
-                    ? sortRowsByVoterIndex(
-                          await fastify.db.query.decryptionShares.findMany({
-                              where: (fields, { eq: isEqual }) =>
-                                  isEqual(fields.pollId, poll.id),
-                              columns: {
-                                  shares: true,
-                              },
-                              with: {
-                                  voter: {
-                                      columns: {
-                                          voterIndex: true,
-                                      },
-                                  },
-                              },
-                          }),
-                      ).map(({ shares }) => shares)
-                    : [];
-
-            return {
-                id: poll.id,
-                slug: poll.slug,
-                pollName: poll.pollName,
-                createdAt: normalizeDatabaseTimestamp(poll.createdAt),
-                choices: poll.choices.map(({ choiceName }) => choiceName),
-                voters: poll.voters.map(({ voterName }) => voterName),
-                isOpen: poll.isOpen,
-                publicKeyShareCount: publicKeyShareCountRow[0]?.count ?? 0,
-                encryptedVoteCount: encryptedVoteCountRow[0]?.count ?? 0,
-                decryptionShareCount: decryptionShareCountRow[0]?.count ?? 0,
-                commonPublicKey: poll.commonPublicKey,
-                encryptedTallies: poll.encryptedTallies,
-                publishedDecryptionShares,
-                resultTallies: poll.resultTallies,
-                resultScores: poll.resultScores,
-            };
+            return poll;
         },
     );
 };

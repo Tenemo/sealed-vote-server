@@ -4,26 +4,19 @@ import { canRegister } from '@sealed-vote/protocol';
 import { generateClientToken } from '../clientToken';
 import { fetchFreshPoll } from '../pollQuery';
 import { pollsApi } from '../pollsApi';
+import { runVotingSessionWorkflow } from '../votingSession';
 import {
     clearWorkflowError,
-    setKeys,
     setPendingVoterRegistration,
     setProgressMessage,
     setSelectedScores,
-    setSubmissionStatus,
     setVoterSession,
-    upsertPollSnapshot,
     type VoteThunkRejectValue,
 } from '../votingSlice';
 import {
     hasRegisteredVoterSession,
     selectVoteStateByPollId,
 } from '../votingState';
-import {
-    runDecryptResults,
-    runEncryptVotesGenerateShares,
-    runProcessPublicPrivateKeys,
-} from '../votingWorkflow';
 
 import { voteThunkTypePrefix } from './voteTypes';
 
@@ -38,13 +31,6 @@ type VoteThunkArg = {
     pollId: string;
     voterName: string;
     selectedScores: Record<string, number>;
-};
-
-const workflowActions = {
-    setKeys,
-    setProgressMessage,
-    setSubmissionStatus,
-    upsertPollSnapshot,
 };
 
 export const vote = createAsyncThunk<
@@ -137,28 +123,11 @@ export const vote = createAsyncThunk<
                 );
             }
 
-            await runProcessPublicPrivateKeys({
+            await runVotingSessionWorkflow({
                 pollId,
                 dispatch,
                 getState,
                 signal,
-                actions: workflowActions,
-            });
-
-            await runEncryptVotesGenerateShares({
-                pollId,
-                dispatch,
-                getState,
-                signal,
-                actions: workflowActions,
-            });
-
-            await runDecryptResults({
-                pollId,
-                dispatch,
-                getState,
-                signal,
-                actions: workflowActions,
             });
         } catch (error) {
             const message =

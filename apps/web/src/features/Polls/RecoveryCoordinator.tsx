@@ -2,10 +2,10 @@ import React, { useEffect, useEffectEvent, useRef } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/hooks';
 import {
-    hasPendingRegistrationRecovery,
-    shouldAttemptRecovery,
-    shouldRecoverViaSessionRequest,
-} from 'features/Polls/votingState';
+    getRecoveryStrategy,
+    getResumableVotingIntent,
+} from 'features/Polls/votingSession';
+import { shouldAttemptRecovery } from 'features/Polls/votingState';
 import { recoverSession } from 'features/Polls/votingThunks/recoverSession';
 import { vote } from 'features/Polls/votingThunks/vote';
 
@@ -30,20 +30,25 @@ const RecoveryCoordinator = (): React.JSX.Element => {
         for (const [pollId, voteState] of Object.entries(
             latestVotingStateRef.current,
         )) {
+            const recoveryStrategy = getRecoveryStrategy(voteState);
+
             if (
                 recoveringPollIdsRef.current.has(pollId) ||
-                !shouldAttemptRecovery(voteState)
+                !shouldAttemptRecovery(voteState) ||
+                !recoveryStrategy
             ) {
                 continue;
             }
 
             recoveringPollIdsRef.current.add(pollId);
-            if (hasPendingRegistrationRecovery(voteState)) {
+            const resumableVotingIntent = getResumableVotingIntent(voteState);
+
+            if (recoveryStrategy === 'register' && resumableVotingIntent) {
                 void dispatch(
                     vote({
                         pollId,
-                        voterName: voteState.pendingVoterName,
-                        selectedScores: voteState.selectedScores,
+                        voterName: resumableVotingIntent.voterName,
+                        selectedScores: resumableVotingIntent.selectedScores,
                     }),
                 ).finally(() => {
                     recoveringPollIdsRef.current.delete(pollId);
@@ -51,7 +56,7 @@ const RecoveryCoordinator = (): React.JSX.Element => {
                 continue;
             }
 
-            if (shouldRecoverViaSessionRequest(voteState)) {
+            if (recoveryStrategy === 'session') {
                 void dispatch(recoverSession({ pollId })).finally(() => {
                     recoveringPollIdsRef.current.delete(pollId);
                 });
