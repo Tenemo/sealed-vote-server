@@ -157,7 +157,7 @@ describe('Poll page', () => {
     it('renders the poll creation date as a YYYY-MM-DD subheading', () => {
         renderPoll();
 
-        expect(screen.getByText('Created 2026-01-01')).toBeVisible();
+        expect(screen.getByText('Created on 2026-01-01')).toBeVisible();
     });
 
     it('shows the sharing guidance before results are published', () => {
@@ -168,6 +168,12 @@ describe('Poll page', () => {
                 'Share the link below with participants. Once everyone has voted, the results are ordered by geometric mean.',
             ),
         ).toBeVisible();
+        expect(document.title).toBe('Best fruit');
+        expect(
+            document.head
+                .querySelector('meta[name="description"]')
+                ?.getAttribute('content'),
+        ).toBe('Score options from 1 to 10.');
     });
 
     it('switches the header copy after results are published', () => {
@@ -200,6 +206,12 @@ describe('Poll page', () => {
                 'Share the link below with participants. Once everyone has voted, the results are ordered by geometric mean.',
             ),
         ).not.toBeInTheDocument();
+        expect(document.title).toBe('Best fruit');
+        expect(
+            document.head
+                .querySelector('meta[name="description"]')
+                ?.getAttribute('content'),
+        ).toBe('Voting results');
     });
 
     it('renders participants as individual list items', () => {
@@ -218,8 +230,10 @@ describe('Poll page', () => {
             name: 'Participants',
         });
         const participantsList = within(participantsRegion).getByRole('list');
+        const aliceChip = within(participantsList).getByText('Alice');
 
-        expect(within(participantsList).getByText('Alice')).toBeVisible();
+        expect(aliceChip).toBeVisible();
+        expect(aliceChip).toHaveClass('rounded-[var(--radius-md)]');
         expect(within(participantsList).getByText('Bob')).toBeVisible();
     });
 

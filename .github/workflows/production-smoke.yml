@@ -1,0 +1,92 @@
+name: production smoke
+
+on:
+    push:
+        branches: [master, main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: production-smoke-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    production-seo-smoke:
+        name: production seo smoke
+        runs-on: ubuntu-latest
+        timeout-minutes: 40
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+
+            - name: wait for the deployed commit
+              run: >-
+                  node --experimental-strip-types tests/e2e/scripts/wait-for-production-deploy.mts
+                  --commit ${{ github.sha }}
+                  --web https://sealed.vote
+                  --api https://api.sealed.vote
+                  --timeout-ms 1800000
+                  --interval-ms 15000
+
+            - name: verify production seo previews
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  base_url="https://sealed.vote"
+
+                  fail() {
+                    echo "$1" >&2
+                    exit 1
+                  }
+
+                  require_text() {
+                    local haystack="$1"
+                    local needle="$2"
+                    local label="$3"
+
+                    if [[ "$haystack" != *"$needle"* ]]; then
+                      fail "missing ${label}: ${needle}"
+                    fi
+                  }
+
+                  require_header() {
+                    local headers="$1"
+                    local pattern="$2"
+                    local label="$3"
+
+                    if ! printf '%s\n' "$headers" | tr -d '\r' | grep -Eiq "$pattern"; then
+                      fail "missing ${label}: ${pattern}"
+                    fi
+                  }
+
+                  homepage_headers="$(curl --fail --silent --show-error --location --head "${base_url}/")"
+
+                  if printf '%s\n' "$homepage_headers" | tr -d '\r' | grep -Eiq '^x-robots-tag:.*noindex'; then
+                    fail "production homepage must not send x-robots-tag: noindex"
+                  fi
+
+                  homepage_html="$(curl --fail --silent --show-error --location "${base_url}/")"
+
+                  require_text "$homepage_html" '<title>sealed.vote | 1-10 score voting app</title>' 'homepage title'
+                  require_text "$homepage_html" '<meta property="og:site_name" content="sealed.vote" />' 'og site name'
+                  require_text "$homepage_html" '<meta property="og:image" content="https://sealed.vote/social/og-home.png" />' 'og image'
+                  require_text "$homepage_html" '<meta property="og:image:type" content="image/png" />' 'og image type'
+                  require_text "$homepage_html" '<meta property="og:image:width" content="1200" />' 'og image width'
+                  require_text "$homepage_html" '<meta property="og:image:height" content="630" />' 'og image height'
+                  require_text "$homepage_html" '<meta name="twitter:card" content="summary_large_image" />' 'twitter card'
+                  require_text "$homepage_html" '<meta name="twitter:image" content="https://sealed.vote/social/og-home.png" />' 'twitter image'
+
+                  static_image_headers="$(curl --fail --silent --show-error --location --head "${base_url}/social/og-home.png")"
+                  require_header "$static_image_headers" '^content-type: image/png' 'static social image content type'
+
+                  dynamic_image_headers="$(curl --fail --silent --show-error --location --head "${base_url}/social/votes/sealed-vote-seo-smoke--0000.png")"
+                  require_header "$dynamic_image_headers" '^content-type: image/png' 'dynamic social image content type'

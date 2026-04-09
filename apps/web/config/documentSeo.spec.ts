@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import {
+    createPollSeoPayloadCache,
     extractVoteSlugFromPathname,
     fetchPollTitle,
     renderDocumentHtml,
@@ -138,17 +139,17 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
         });
 
-        expect(metadata.title).toBe('Budget & roadmap | sealed.vote');
-        expect(metadata.description).toBe(
-            'Budget & roadmap - score options from 1 to 10.',
-        );
+        expect(metadata.title).toBe('Budget & roadmap');
+        expect(metadata.description).toBe('Score options from 1 to 10.');
         expect(metadata.canonicalUrl).toBe(
             'https://sealed.vote/votes/budget-roadmap',
         );
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/votes/budget-roadmap.png',
         );
-        expect(metadata.robots).toBe('noindex, nofollow, noarchive');
+        expect(metadata.robots).toBe(
+            'noindex, nofollow, noarchive, max-image-preview:large',
+        );
     });
 
     test('uses the completed image url for completed votes', async () => {
@@ -164,9 +165,8 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
         });
 
-        expect(metadata.description).toBe(
-            'Voting results for Budget & roadmap',
-        );
+        expect(metadata.title).toBe('Budget & roadmap');
+        expect(metadata.description).toBe('Voting results');
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/votes/budget-roadmap.png?v=complete',
         );
@@ -175,17 +175,120 @@ describe('resolveDocumentSeoMetadata', () => {
         );
     });
 
-    test('returns homepage SEO for non-vote routes', async () => {
+    test('returns create-page SEO for the root route', async () => {
         const metadata = await resolveDocumentSeoMetadata({
             requestUrl: new URL('https://sealed.vote/'),
         });
 
-        expect(metadata.title).toBe('sealed.vote | 1-10 score voting app');
+        expect(metadata.title).toBe('Create a vote');
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/og-home.png',
         );
-        expect(metadata.robots).toBe('index, follow');
+        expect(metadata.robots).toBe('index, follow, max-image-preview:large');
         expect(metadata.canonicalUrl).toBe('https://sealed.vote/');
+        expect(metadata.description).toBe(
+            'Create votes, collect responses, and reveal results.',
+        );
+    });
+
+    test('returns site SEO for non-root non-vote routes', async () => {
+        const metadata = await resolveDocumentSeoMetadata({
+            requestUrl: new URL('https://sealed.vote/missing'),
+        });
+
+        expect(metadata.title).toBe('sealed.vote | 1-10 score voting app');
+        expect(metadata.description).toBe(
+            'Create votes, collect responses, and reveal results.',
+        );
+        expect(metadata.canonicalUrl).toBe('https://sealed.vote/missing');
+    });
+
+    test('caches open vote SEO payloads for a short interval', async () => {
+        const pollPayloadCache = createPollSeoPayloadCache();
+        let nowMs = 1_000;
+        const fetchImpl = vi.fn(async () =>
+            Response.json({
+                pollName: 'Budget roadmap',
+                resultScores: [],
+            }),
+        );
+        const resolveMetadata = async (): Promise<void> => {
+            await resolveDocumentSeoMetadata({
+                apiBaseUrl: 'https://api.sealed.vote',
+                fetchImpl,
+                now: () => nowMs,
+                pollPayloadCache,
+                requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            });
+        };
+
+        await resolveMetadata();
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+        nowMs += 5_001;
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    test('keeps completed vote SEO payloads cached longer than open votes', async () => {
+        const pollPayloadCache = createPollSeoPayloadCache();
+        let nowMs = 10_000;
+        const fetchImpl = vi.fn(async () =>
+            Response.json({
+                pollName: 'Budget roadmap',
+                resultScores: [9.25],
+            }),
+        );
+        const resolveMetadata = async (): Promise<void> => {
+            await resolveDocumentSeoMetadata({
+                apiBaseUrl: 'https://api.sealed.vote',
+                fetchImpl,
+                now: () => nowMs,
+                pollPayloadCache,
+                requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            });
+        };
+
+        await resolveMetadata();
+        nowMs += 5_001;
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+        nowMs += 55_000;
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    test('bounds the poll SEO payload cache', async () => {
+        const pollPayloadCache = createPollSeoPayloadCache();
+        const fetchImpl = vi.fn(
+            async (requestInput: Request | URL | string) => {
+                const requestUrl =
+                    requestInput instanceof Request
+                        ? new URL(requestInput.url)
+                        : new URL(requestInput);
+
+                return Response.json({
+                    pollName: requestUrl.pathname.split('/').pop(),
+                    resultScores: [],
+                });
+            },
+        );
+
+        for (let index = 0; index < 140; index += 1) {
+            await resolveDocumentSeoMetadata({
+                apiBaseUrl: 'https://api.sealed.vote',
+                fetchImpl,
+                pollPayloadCache,
+                requestUrl: new URL(
+                    `https://sealed.vote/votes/cache-test-${index}`,
+                ),
+            });
+        }
+
+        expect(fetchImpl).toHaveBeenCalledTimes(140);
+        expect(pollPayloadCache.size).toBeLessThanOrEqual(128);
     });
 });
 
@@ -204,7 +307,7 @@ describe('renderDocumentHtml', () => {
         });
 
         expect(html).toContain(
-            '<title data-rh="true">Team &lt;sync&gt; &quot;Q2&quot; | sealed.vote</title>',
+            '<title data-rh="true">Team &lt;sync&gt; &quot;Q2&quot;</title>',
         );
         expect(html).toContain('content="https://sealed.vote/votes/team-sync"');
         expect(html).toContain(
@@ -230,10 +333,10 @@ describe('renderDocumentHtml', () => {
         expect(html).toContain(
             '<title data-rh="true">Vote | sealed.vote</title>',
         );
-        expect(html).toContain('content="Vote - score options from 1 to 10."');
+        expect(html).toContain('content="Score options from 1 to 10."');
     });
 
-    test('injects request-origin homepage metadata for preview domains', async () => {
+    test('injects request-origin create-page metadata for preview domains', async () => {
         const html = await renderDocumentHtml({
             baseHtml,
             requestUrl: new URL(
@@ -243,6 +346,10 @@ describe('renderDocumentHtml', () => {
 
         expect(html).toContain(
             '<link data-rh="true" rel="canonical" href="https://deploy-preview-11--sealed-vote.netlify.app/"',
+        );
+        expect(html).toContain('<title data-rh="true">Create a vote</title>');
+        expect(html).toContain(
+            'content="Create votes, collect responses, and reveal results."',
         );
         expect(html).toContain(
             'content="https://deploy-preview-11--sealed-vote.netlify.app/"',

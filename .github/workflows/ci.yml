@@ -67,7 +67,7 @@ jobs:
                 ports:
                     - 5432:5432
                 options: >-
-                    --health-cmd pg_isready
+                    --health-cmd "pg_isready -U postgres -d sv-db"
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5
@@ -130,7 +130,6 @@ jobs:
             (github.event_name == 'push' && contains(fromJson('["master","main"]'), github.ref_name)) ||
             (github.event_name == 'pull_request' && contains(fromJson('["master","main"]'), github.base_ref))
         timeout-minutes: 30
-
         steps:
             - uses: actions/checkout@v6
               with:
@@ -168,6 +167,9 @@ jobs:
         name: e2e (${{ matrix.engine.name }})
         needs: e2e-prepare
         runs-on: ubuntu-latest
+        container:
+            image: mcr.microsoft.com/playwright:v1.59.1-noble
+            options: --ipc=host
         if: >-
             github.event_name == 'merge_group' ||
             (github.event_name == 'push' && contains(fromJson('["master","main"]'), github.ref_name)) ||
@@ -179,18 +181,12 @@ jobs:
                 engine:
                     - name: chromium
                       slug: chromium
-                      browser_cache_key: chromium-firefox
-                      install_browsers: chromium firefox
                       projects: --project chromium-desktop
                     - name: firefox
                       slug: firefox
-                      browser_cache_key: firefox
-                      install_browsers: firefox
                       projects: --project firefox-desktop --project mobile-firefox-android
                     - name: webkit
                       slug: webkit
-                      browser_cache_key: webkit
-                      install_browsers: webkit
                       projects: --project webkit-desktop
 
         services:
@@ -203,13 +199,14 @@ jobs:
                 ports:
                     - 5432:5432
                 options: >-
-                    --health-cmd pg_isready
+                    --health-cmd "pg_isready -U postgres -d sv-db"
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5
 
         env:
-            DATABASE_URL: postgres://postgres:postgres@localhost:5432/sv-db
+            DATABASE_URL: postgres://postgres:postgres@postgres:5432/sv-db
+            HOME: /root
             NODE_ENV: test
             PLAYWRIGHT_BLOB_REPORT: 'true'
             PLAYWRIGHT_CI_WORKERS: '4'
@@ -236,15 +233,6 @@ jobs:
               with:
                   name: e2e-build-artifacts
                   path: .
-
-            - name: cache Playwright browsers
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cache/ms-playwright
-                  key: ${{ runner.os }}-playwright-${{ matrix.engine.browser_cache_key }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-            - name: install Playwright browsers
-              run: pnpm exec playwright install --with-deps ${{ matrix.engine.install_browsers }}
 
             - name: run browser e2e
               run: pnpm e2e:ci:test -- ${{ matrix.engine.projects }}

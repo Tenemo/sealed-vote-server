@@ -20,7 +20,7 @@ export type SeedManifestPoll = {
     voters: SeedManifestVoter[];
 };
 
-export type SeedManifest = {
+type SeedManifest = {
     generatedAt: string;
     polls: SeedManifestPoll[];
 };

@@ -7,14 +7,10 @@ import createError from 'http-errors';
 import type { Database, DatabaseTransaction } from '../db/client.js';
 import { voters } from '../db/schema.js';
 
-export type AuthenticatedVoter = {
+type AuthenticatedVoter = {
     id: string;
     voterName: string;
     voterIndex: number;
-};
-
-export type AuthenticatedCreator = {
-    pollId: string;
 };
 
 export const generateSecureToken = (): string =>

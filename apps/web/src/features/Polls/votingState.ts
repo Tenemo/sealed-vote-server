@@ -28,7 +28,7 @@ export type VoteState = {
 
 export type VotingState = Record<string, VoteState>;
 
-export type RecoveryRequestData =
+type RecoveryRequestData =
     | {
           creatorToken: string;
       }

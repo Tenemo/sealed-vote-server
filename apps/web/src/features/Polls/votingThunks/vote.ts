@@ -34,7 +34,7 @@ import {
     reconnectingWorkflowMessage,
 } from 'utils/networkErrors';
 
-export type VoteThunkArg = {
+type VoteThunkArg = {
     pollId: string;
     voterName: string;
     selectedScores: Record<string, number>;

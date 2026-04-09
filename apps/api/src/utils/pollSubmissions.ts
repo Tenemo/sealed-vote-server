@@ -7,27 +7,27 @@ import {
     publicKeyShares,
 } from '../db/schema.js';
 
-export type OrderedDecryptionShareRow = {
+type OrderedDecryptionShareRow = {
     shares: typeof decryptionShares.$inferSelect.shares;
 };
 
-export type OrderedEncryptedVoteRow = {
+type OrderedEncryptedVoteRow = {
     votes: typeof encryptedVotes.$inferSelect.votes;
 };
 
-export type OrderedPublicKeyShareRow = {
+type OrderedPublicKeyShareRow = {
     publicKeyShare: string;
 };
 
-export type ExistingPublicKeyShareRow = {
+type ExistingPublicKeyShareRow = {
     publicKeyShare: string;
 };
 
-export type ExistingEncryptedVoteRow = {
+type ExistingEncryptedVoteRow = {
     votes: typeof encryptedVotes.$inferSelect.votes;
 };
 
-export type ExistingDecryptionSharesRow = {
+type ExistingDecryptionSharesRow = {
     shares: typeof decryptionShares.$inferSelect.shares;
 };
 

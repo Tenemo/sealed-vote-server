@@ -19,8 +19,10 @@ const allSourceFiles = ['**/*.{js,jsx,cjs,mjs,ts,tsx}'];
 const allTestFiles = ['**/*.spec.{js,jsx,ts,tsx}', '**/*.test.{js,jsx,ts,tsx}'];
 const frontendFiles = ['apps/web/src/**/*.{js,jsx,ts,tsx}'];
 const apiFiles = ['apps/api/**/*.{js,ts}'];
+const netlifyFiles = ['netlify/**/*.{js,ts}'];
 
 const sharedProjects = [
+    './tsconfig.root.json',
     './apps/api/tsconfig.json',
     './apps/web/tsconfig.json',
     './packages/contracts/tsconfig.json',
@@ -212,6 +214,19 @@ module.exports = defineConfig(
                 ERROR,
                 {
                     allowLiteral: false,
+                },
+            ],
+        },
+    },
+    {
+        files: netlifyFiles,
+        rules: {
+            'import/extensions': [
+                ERROR,
+                'ignorePackages',
+                {
+                    js: 'never',
+                    ts: 'always',
                 },
             ],
         },

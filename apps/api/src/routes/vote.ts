@@ -38,7 +38,7 @@ import {
     type PollIdParams,
 } from './schemas.js';
 
-export const VoteRequestSchema = Type.Object({
+const VoteRequestSchema = Type.Object({
     votes: Type.Array(EncryptedMessageSchema),
     voterToken: SecureTokenSchema,
 });
@@ -57,8 +57,8 @@ const schema = {
     },
 };
 
-export type VoteRequest = VoteRequestContract;
-export type VoteResponse = VoteResponseContract;
+type VoteRequest = VoteRequestContract;
+type VoteResponse = VoteResponseContract;
 
 export const vote = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(

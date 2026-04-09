@@ -45,23 +45,24 @@ const PollPage = (): React.JSX.Element => {
         <>
             <DocumentSeo metadata={pageSeo} />
             {isLoadingPoll && !hasPollData && (
-                <div className="flex flex-1 items-center justify-center">
-                    <Spinner className="size-10" />
+                <div className="flex min-h-[40vh] items-center justify-center">
+                    <Panel className="loading-panel max-w-xl">
+                        <Spinner className="size-10" />
+                    </Panel>
                 </div>
             )}
             {shouldShowConnectionToast && (
                 <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
                     <Alert
-                        aria-live="polite"
+                        announcement="polite"
                         className="pointer-events-auto w-full max-w-xl border-border/70 bg-background/95 shadow-lg backdrop-blur"
                         data-slot="connection-toast"
-                        role="status"
                         variant="info"
                     >
                         <Spinner
                             aria-hidden="true"
                             className="size-4"
-                            role="presentation"
+                            label={null}
                         />
                         <AlertDescription>
                             {connectionLostMessage} Showing the latest available
@@ -71,7 +72,7 @@ const PollPage = (): React.JSX.Element => {
                 </div>
             )}
             {shouldShowConnectionState && (
-                <Panel className="mx-auto flex flex-1 w-full max-w-2xl flex-col items-center justify-center gap-4 text-center">
+                <Panel className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-4 text-center">
                     <Spinner className="size-10" />
                     <div className="space-y-2">
                         <h1 className={sectionTitleClassName}>
@@ -86,7 +87,11 @@ const PollPage = (): React.JSX.Element => {
                 </Panel>
             )}
             {shouldShowFatalError && (
-                <Alert className="mx-auto mt-6 max-w-3xl" variant="destructive">
+                <Alert
+                    announcement="assertive"
+                    className="mx-auto mt-6 max-w-3xl"
+                    variant="destructive"
+                >
                     <AlertDescription>
                         {renderError(pollError)}
                     </AlertDescription>
@@ -105,31 +110,26 @@ const PollPage = (): React.JSX.Element => {
                         pollId={pollId}
                     />
                     <VoteResults poll={effectivePoll} pollId={pollId} />
-                    <Panel asChild padding="compact" tone="surface">
+                    <Panel asChild padding="compact" tone="subtle">
                         <section aria-labelledby={participantsHeadingId}>
                             <h2
-                                className="text-lg font-semibold tracking-tight"
+                                className="text-lg font-semibold"
                                 id={participantsHeadingId}
                             >
                                 Participants
                             </h2>
                             {effectivePoll.voters.length ? (
-                                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                                <ul className="mt-3 flex flex-wrap gap-2">
                                     {effectivePoll.voters.map((voterName) => (
-                                        <Panel
-                                            asChild
-                                            className="min-w-0 break-words text-sm leading-6 text-foreground"
-                                            key={voterName}
-                                            padding="row"
-                                            radius="compact"
-                                            tone="subtle"
-                                        >
-                                            <li>{voterName}</li>
-                                        </Panel>
+                                        <li key={voterName}>
+                                            <span className="inline-flex max-w-full rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 text-sm leading-6 text-foreground [overflow-wrap:anywhere]">
+                                                {voterName}
+                                            </span>
+                                        </li>
                                     ))}
                                 </ul>
                             ) : (
-                                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                                <p className="field-note mt-2">
                                     No voters yet.
                                 </p>
                             )}

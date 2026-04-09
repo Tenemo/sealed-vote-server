@@ -45,13 +45,3 @@ export const maybeDropTestResponseAfterCommit = ({
 
     return true;
 };
-
-export const e2eDropResponseHeader = {
-    name: dropResponseHeaderName,
-    value: dropResponseHeaderValue,
-} as const;
-
-export const e2eDropResponseQueryParam = {
-    name: dropResponseQueryParamName,
-    value: dropResponseHeaderValue,
-} as const;

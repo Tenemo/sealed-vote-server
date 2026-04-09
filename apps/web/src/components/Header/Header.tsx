@@ -21,7 +21,7 @@ const Header = (): React.JSX.Element => {
         <header className="relative border-b border-border/70 bg-background">
             <div className="mx-auto flex w-full max-w-4xl items-center px-4 py-4 pr-14 sm:px-6 sm:pr-16">
                 <Link
-                    className="rounded-sm text-2xl font-semibold tracking-tight text-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:text-3xl"
+                    className="rounded-sm text-2xl font-semibold text-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:text-[2rem]"
                     to="/"
                 >
                     sealed.vote

@@ -10,7 +10,7 @@ type PersistStateReconcilerModule =
     | PersistStateReconciler
     | { default: unknown };
 
-export const isPersistStateReconciler = (
+const isPersistStateReconciler = (
     value: unknown,
 ): value is PersistStateReconciler => typeof value === 'function';
 

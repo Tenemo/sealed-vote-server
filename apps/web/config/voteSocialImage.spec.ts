@@ -12,6 +12,55 @@ import {
 } from './voteSocialImage';
 
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const resultRowStartMarkup = '<g transform="translate(776';
+
+const findResultRowEnd = (svg: string, rowStart: number): number => {
+    let depth = 0;
+    let position = rowStart;
+
+    while (position < svg.length) {
+        const nextOpen = svg.indexOf('<g', position);
+        const nextClose = svg.indexOf('</g>', position);
+
+        if (nextClose === -1) {
+            break;
+        }
+
+        if (nextOpen !== -1 && nextOpen < nextClose) {
+            depth += 1;
+            position = nextOpen + '<g'.length;
+            continue;
+        }
+
+        depth -= 1;
+        position = nextClose + '</g>'.length;
+
+        if (depth === 0) {
+            return position;
+        }
+    }
+
+    throw new Error('Expected to find the end of the result row.');
+};
+
+const getResultRowsMarkup = (svg: string): string[] => {
+    const rows: string[] = [];
+    let position = 0;
+
+    while (position < svg.length) {
+        const rowStart = svg.indexOf(resultRowStartMarkup, position);
+
+        if (rowStart === -1) {
+            break;
+        }
+
+        const rowEnd = findResultRowEnd(svg, rowStart);
+        rows.push(svg.slice(rowStart, rowEnd));
+        position = rowEnd;
+    }
+
+    return rows;
+};
 
 describe('createVoteSocialImageSvg', () => {
     test('renders the open poll title and first choices into the SVG card', () => {
@@ -52,8 +101,8 @@ describe('createVoteSocialImageSvg', () => {
             resultScores: [],
         });
 
-        expect(svg).toContain('Long bong Long b...');
-        expect(svg).not.toContain('Long bong Long bong...');
+        expect(svg).toContain('Long bong Lon...');
+        expect(svg).not.toContain('Long bong Long...');
     });
 
     test('wraps longer vote titles before they collide with the choices panel', () => {
@@ -131,6 +180,45 @@ describe('createVoteSocialImageSvg', () => {
         expect(svg).not.toContain('8.94');
         expect(svg.indexOf('Bananas')).toBeLessThan(svg.indexOf('Apples'));
         expect(svg.indexOf('Apples')).toBeLessThan(svg.indexOf('Pears'));
+    });
+
+    test('uses visual-width truncation for long result labels', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Long bong Long bong Long bong Long bong', 'Short'],
+            isComplete: true,
+            pollTitle: 'Best fruit for breakfast',
+            resultScores: [9, 8],
+        });
+
+        expect(svg).toContain('Long bong Lon...');
+        expect(svg).not.toContain('Long bong Long...');
+    });
+
+    test('uses podium icons and outlines only for the top three results', () => {
+        const svg = createVoteSocialImageSvg({
+            choices: ['Apples', 'Bananas', 'Pears', 'Dates'],
+            isComplete: true,
+            pollTitle: 'Best fruit for breakfast',
+            resultScores: [8.94, 9.5, 7.12, 6.4],
+        });
+
+        const resultRows = getResultRowsMarkup(svg);
+        const [firstRow, secondRow, thirdRow, fourthRow] = resultRows;
+
+        expect(resultRows).toHaveLength(4);
+
+        expect(firstRow).toContain('stroke="#d6a72c"');
+        expect(firstRow).toContain('M14 11h18v8');
+        expect(secondRow).toContain('stroke="#bfc5ca"');
+        expect(secondRow).toContain('>2</text>');
+        expect(thirdRow).toContain('stroke="#a9683d"');
+        expect(thirdRow).toContain('>3</text>');
+        expect(fourthRow).toContain('stroke="#2c2c2c"');
+        expect(fourthRow).toContain('>4</text>');
+        expect(fourthRow).not.toContain('M14 11h18v8');
+        expect(fourthRow).not.toContain('stroke="#d6a72c"');
+        expect(fourthRow).not.toContain('stroke="#bfc5ca"');
+        expect(fourthRow).not.toContain('stroke="#a9683d"');
     });
 
     test('renders a clear empty state when a completed poll has no results', () => {
@@ -227,7 +315,7 @@ describe('extractVoteSocialImageVariantFromSearchParams', () => {
 });
 
 describe('createVoteSocialImageResponse', () => {
-    test('returns a PNG with long-lived cache headers for a real poll image', async () => {
+    test('returns a PNG with revalidated browser cache headers for a real poll image', async () => {
         const response = await createVoteSocialImageResponse({
             apiBaseUrl: 'https://api.sealed.vote',
             fetchImpl: vi.fn(async () =>
@@ -244,7 +332,7 @@ describe('createVoteSocialImageResponse', () => {
         expect(response.status).toBe(200);
         expect(response.headers['content-type']).toBe('image/png');
         expect(response.headers['cache-control']).toBe(
-            'public, max-age=31536000, immutable',
+            'public, max-age=0, must-revalidate',
         );
         expect(response.headers['cdn-cache-control']).toContain('max-age=');
         expect(response.headers['netlify-cdn-cache-control']).toContain(

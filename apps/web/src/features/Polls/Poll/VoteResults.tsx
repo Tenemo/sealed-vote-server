@@ -1,10 +1,11 @@
+import { Medal, Trophy } from 'lucide-react';
 import React from 'react';
 
 import { buildVoteResultsViewModel } from './voteResultsViewModel';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Panel } from '@/components/ui/panel';
-import { mutedBodyClassName, sectionTitleClassName } from '@/lib/uiClasses';
+import { sectionTitleClassName } from '@/lib/uiClasses';
 import { type PollResponse } from 'features/Polls/pollsApi';
 
 type VoteResultsProps = {
@@ -49,11 +50,11 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
     return (
         <Panel asChild className="space-y-5">
             <section aria-labelledby={headingId}>
-                <div className="space-y-2">
+                <div className="space-y-1">
                     <h2 className={sectionTitleClassName} id={headingId}>
                         Results
                     </h2>
-                    <p className={mutedBodyClassName}>
+                    <p className="field-note">
                         Ordered by geometric mean across all submitted votes.
                     </p>
                 </div>
@@ -86,21 +87,41 @@ const VoteResults = ({ poll, pollId }: VoteResultsProps): React.JSX.Element => {
                         ({ choiceName, scoreLabel }, index) => (
                             <Panel
                                 asChild
-                                className="flex items-start gap-3"
+                                className="flex items-start gap-4"
                                 key={choiceName}
                                 padding="row"
                                 radius="compact"
-                                tone="subtle"
                             >
                                 <li>
-                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-background text-sm font-semibold text-foreground">
-                                        {index + 1}
+                                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-foreground">
+                                        {index === 0 && (
+                                            <Trophy
+                                                aria-label="Winner"
+                                                className="size-5"
+                                            />
+                                        )}
+                                        {(index === 1 || index === 2) && (
+                                            <Medal
+                                                aria-label={
+                                                    index === 1
+                                                        ? 'Runner-up'
+                                                        : 'Third place'
+                                                }
+                                                className="size-5"
+                                            />
+                                        )}
+                                        {index > 2 && (
+                                            <span
+                                                aria-hidden="true"
+                                                className="size-5"
+                                            />
+                                        )}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="break-words text-base font-medium text-foreground">
+                                        <p className="text-base font-medium [overflow-wrap:anywhere]">
                                             {choiceName}
                                         </p>
-                                        <p className="text-sm leading-6 text-muted-foreground">
+                                        <p className="text-sm leading-6 text-secondary">
                                             Score: {scoreLabel}
                                         </p>
                                     </div>

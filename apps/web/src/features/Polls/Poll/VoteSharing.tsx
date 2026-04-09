@@ -132,10 +132,10 @@ const VoteSharing = ({ pollTitle }: VoteSharingProps): React.JSX.Element => {
     return (
         <Field>
             <FieldLabel
-                className="text-sm font-medium text-muted-foreground"
+                className="text-sm font-medium text-foreground"
                 htmlFor="voteLink"
             >
-                Vote link
+                Share vote link
             </FieldLabel>
             <FieldContent>
                 <div className="relative">
@@ -145,8 +145,9 @@ const VoteSharing = ({ pollTitle }: VoteSharingProps): React.JSX.Element => {
                         id="voteLink"
                         readOnly
                         value={voteUrl}
+                        variant="filled"
                     />
-                    <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 gap-1">
+                    <div className="absolute top-1/2 right-2 flex -translate-y-1/2 gap-1">
                         {supportsNativeShare && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -160,6 +161,7 @@ const VoteSharing = ({ pollTitle }: VoteSharingProps): React.JSX.Element => {
                                             void handleShareLink();
                                         }}
                                         size="icon-sm"
+                                        title="Share link"
                                         type="button"
                                         variant="ghost"
                                     >
@@ -193,6 +195,7 @@ const VoteSharing = ({ pollTitle }: VoteSharingProps): React.JSX.Element => {
                                         void handleCopyLink();
                                     }}
                                     size="icon-sm"
+                                    title="Copy to clipboard"
                                     type="button"
                                     variant="ghost"
                                 >
@@ -216,7 +219,7 @@ const VoteSharing = ({ pollTitle }: VoteSharingProps): React.JSX.Element => {
                 <FieldDescription
                     aria-live="polite"
                     className={cn(
-                        'mt-2 text-sm leading-6',
+                        'mt-0',
                         (shareStatus === 'copy-error' ||
                             shareStatus === 'share-error') &&
                             'text-destructive',
