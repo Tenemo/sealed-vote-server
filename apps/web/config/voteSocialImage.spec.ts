@@ -239,7 +239,7 @@ describe('extractVoteSocialImageVariantFromSearchParams', () => {
 });
 
 describe('createVoteSocialImageResponse', () => {
-    test('returns a PNG with long-lived cache headers for a real poll image', async () => {
+    test('returns a PNG with revalidated browser cache headers for a real poll image', async () => {
         const response = await createVoteSocialImageResponse({
             apiBaseUrl: 'https://api.sealed.vote',
             fetchImpl: vi.fn(async () =>
@@ -256,7 +256,7 @@ describe('createVoteSocialImageResponse', () => {
         expect(response.status).toBe(200);
         expect(response.headers['content-type']).toBe('image/png');
         expect(response.headers['cache-control']).toBe(
-            'public, max-age=31536000, immutable',
+            'public, max-age=0, must-revalidate',
         );
         expect(response.headers['cdn-cache-control']).toContain('max-age=');
         expect(response.headers['netlify-cdn-cache-control']).toContain(

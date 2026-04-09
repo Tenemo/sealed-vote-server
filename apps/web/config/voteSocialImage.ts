@@ -67,7 +67,7 @@ const hourInSeconds = 60 * 60;
 const fontFileNames = ['Inter-Regular.ttf', 'Inter-Bold.ttf'] as const;
 
 const persistentImageCachePolicy: VoteSocialImageCachePolicy = {
-    browser: 'public, max-age=31536000, immutable',
+    browser: 'public, max-age=0, must-revalidate',
     cdn: `public, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
     netlifyCdn: `public, durable, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
 };

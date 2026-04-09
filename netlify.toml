@@ -12,14 +12,11 @@
   VITE_API_BASE_URL = "https://api.sealed.vote"
 
 [functions]
-  included_files = [
-    "netlify/functions/assets/fonts/Inter-Bold.ttf",
-    "netlify/functions/assets/fonts/Inter-Regular.ttf",
-  ]
+  included_files = ["netlify/functions/assets/fonts/**"]
 
 [[edge_functions]]
   function = "vote-seo"
-  path = "/*"
+  path = "/votes/*"
 
 [[headers]]
   for = "/*"

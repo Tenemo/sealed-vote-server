@@ -8,9 +8,25 @@ import {
 const defaultSeoApiBaseUrl = 'https://api.sealed.vote';
 
 type FetchLike = typeof fetch;
+type SeoPollPayload = {
+    pollName: string;
+    resultScores: number[];
+};
+type PollSeoPayloadCacheEntry = {
+    expiresAt: number;
+    payload: SeoPollPayload;
+};
+
+export type PollSeoPayloadCache = Map<string, PollSeoPayloadCacheEntry>;
 
 const normalizePathname = (pathname: string): string =>
     pathname.startsWith('/') ? pathname : `/${pathname}`;
+
+const openPollSeoCacheTtlMs = 5 * 1000;
+const completedPollSeoCacheTtlMs = 60 * 1000;
+const maxPollSeoCacheEntries = 128;
+
+export const createPollSeoPayloadCache = (): PollSeoPayloadCache => new Map();
 
 export const resolveSeoApiBaseUrl = (rawBaseUrl?: string | null): string => {
     const trimmedBaseUrl = rawBaseUrl?.trim();
@@ -51,9 +67,73 @@ export const extractVoteSlugFromPathname = (
     }
 };
 
-type SeoPollPayload = {
-    pollName: string;
-    resultScores: number[];
+const hasPublishedResults = (payload: SeoPollPayload): boolean =>
+    payload.resultScores.some((score) => Number.isFinite(score));
+
+const createPollSeoPayloadCacheKey = (
+    apiBaseUrl: string,
+    pollSlug: string,
+): string => `${apiBaseUrl}\n${pollSlug}`;
+
+const prunePollSeoPayloadCache = (
+    cache: PollSeoPayloadCache,
+    nowMs: number,
+): void => {
+    for (const [cacheKey, cachedPayload] of cache) {
+        if (cachedPayload.expiresAt <= nowMs) {
+            cache.delete(cacheKey);
+        }
+    }
+
+    while (cache.size > maxPollSeoCacheEntries) {
+        const oldestCacheKey = cache.keys().next().value;
+
+        if (!oldestCacheKey) {
+            break;
+        }
+
+        cache.delete(oldestCacheKey);
+    }
+};
+
+const readPollSeoPayloadCache = (
+    cache: PollSeoPayloadCache | undefined,
+    cacheKey: string,
+    nowMs: number,
+): SeoPollPayload | null => {
+    const cachedPayload = cache?.get(cacheKey);
+
+    if (!cachedPayload) {
+        return null;
+    }
+
+    if (cachedPayload.expiresAt > nowMs) {
+        return cachedPayload.payload;
+    }
+
+    cache?.delete(cacheKey);
+    return null;
+};
+
+const writePollSeoPayloadCache = (
+    cache: PollSeoPayloadCache | undefined,
+    cacheKey: string,
+    nowMs: number,
+    payload: SeoPollPayload,
+): void => {
+    if (!cache) {
+        return;
+    }
+
+    cache.set(cacheKey, {
+        expiresAt:
+            nowMs +
+            (hasPublishedResults(payload)
+                ? completedPollSeoCacheTtlMs
+                : openPollSeoCacheTtlMs),
+        payload,
+    });
+    prunePollSeoPayloadCache(cache, nowMs);
 };
 
 const isPollPayload = (
@@ -94,15 +174,27 @@ const normalizeSeoPollPayload = (value: unknown): SeoPollPayload | null => {
 
 const fetchPollSeoPayload = async ({
     apiBaseUrl,
+    cache,
     fetchImpl = fetch,
+    now = Date.now,
     pollSlug,
     signal,
 }: {
     apiBaseUrl: string;
+    cache?: PollSeoPayloadCache;
     fetchImpl?: FetchLike;
+    now?: () => number;
     pollSlug: string;
     signal?: AbortSignal;
 }): Promise<SeoPollPayload | null> => {
+    const cacheKey = createPollSeoPayloadCacheKey(apiBaseUrl, pollSlug);
+    const nowMs = now();
+    const cachedPayload = readPollSeoPayloadCache(cache, cacheKey, nowMs);
+
+    if (cachedPayload) {
+        return cachedPayload;
+    }
+
     try {
         const response = await fetchImpl(
             new URL(`/api/polls/${encodeURIComponent(pollSlug)}`, apiBaseUrl),
@@ -118,7 +210,13 @@ const fetchPollSeoPayload = async ({
             return null;
         }
 
-        return normalizeSeoPollPayload(await response.json());
+        const payload = normalizeSeoPollPayload(await response.json());
+
+        if (payload) {
+            writePollSeoPayloadCache(cache, cacheKey, nowMs, payload);
+        }
+
+        return payload;
     } catch {
         return null;
     }
@@ -126,18 +224,24 @@ const fetchPollSeoPayload = async ({
 
 export const fetchPollTitle = async ({
     apiBaseUrl,
+    cache,
     fetchImpl = fetch,
+    now,
     pollSlug,
     signal,
 }: {
     apiBaseUrl: string;
+    cache?: PollSeoPayloadCache;
     fetchImpl?: FetchLike;
+    now?: () => number;
     pollSlug: string;
     signal?: AbortSignal;
 }): Promise<string | null> => {
     const payload = await fetchPollSeoPayload({
         apiBaseUrl,
+        cache,
         fetchImpl,
+        now,
         pollSlug,
         signal,
     });
@@ -148,11 +252,15 @@ export const fetchPollTitle = async ({
 export const resolveDocumentSeoMetadata = async ({
     apiBaseUrl = defaultSeoApiBaseUrl,
     fetchImpl,
+    now,
+    pollPayloadCache,
     requestUrl,
     signal,
 }: {
     apiBaseUrl?: string;
     fetchImpl?: FetchLike;
+    now?: () => number;
+    pollPayloadCache?: PollSeoPayloadCache;
     requestUrl: URL;
     signal?: AbortSignal;
 }): Promise<SeoMetadata> => {
@@ -167,7 +275,9 @@ export const resolveDocumentSeoMetadata = async ({
 
     const pollPayload = await fetchPollSeoPayload({
         apiBaseUrl,
+        cache: pollPayloadCache,
         fetchImpl,
+        now,
         pollSlug,
         signal,
     });
@@ -185,18 +295,24 @@ export const renderDocumentHtml = async ({
     apiBaseUrl = defaultSeoApiBaseUrl,
     baseHtml,
     fetchImpl,
+    now,
+    pollPayloadCache,
     requestUrl,
     signal,
 }: {
     apiBaseUrl?: string;
     baseHtml: string;
     fetchImpl?: FetchLike;
+    now?: () => number;
+    pollPayloadCache?: PollSeoPayloadCache;
     requestUrl: URL;
     signal?: AbortSignal;
 }): Promise<string> => {
     const metadata = await resolveDocumentSeoMetadata({
         apiBaseUrl,
         fetchImpl,
+        now,
+        pollPayloadCache,
         requestUrl,
         signal,
     });

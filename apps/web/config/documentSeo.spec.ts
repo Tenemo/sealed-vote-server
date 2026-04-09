@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import {
+    createPollSeoPayloadCache,
     extractVoteSlugFromPathname,
     fetchPollTitle,
     renderDocumentHtml,
@@ -148,7 +149,9 @@ describe('resolveDocumentSeoMetadata', () => {
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/votes/budget-roadmap.png',
         );
-        expect(metadata.robots).toBe('noindex, nofollow, noarchive');
+        expect(metadata.robots).toBe(
+            'noindex, nofollow, noarchive, max-image-preview:large',
+        );
     });
 
     test('uses the completed image url for completed votes', async () => {
@@ -184,8 +187,96 @@ describe('resolveDocumentSeoMetadata', () => {
         expect(metadata.imageUrl).toBe(
             'https://sealed.vote/social/og-home.png',
         );
-        expect(metadata.robots).toBe('index, follow');
+        expect(metadata.robots).toBe('index, follow, max-image-preview:large');
         expect(metadata.canonicalUrl).toBe('https://sealed.vote/');
+    });
+
+    test('caches open vote SEO payloads for a short interval', async () => {
+        const pollPayloadCache = createPollSeoPayloadCache();
+        let nowMs = 1_000;
+        const fetchImpl = vi.fn(async () =>
+            Response.json({
+                pollName: 'Budget roadmap',
+                resultScores: [],
+            }),
+        );
+        const resolveMetadata = async (): Promise<void> => {
+            await resolveDocumentSeoMetadata({
+                apiBaseUrl: 'https://api.sealed.vote',
+                fetchImpl,
+                now: () => nowMs,
+                pollPayloadCache,
+                requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            });
+        };
+
+        await resolveMetadata();
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+        nowMs += 5_001;
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    test('keeps completed vote SEO payloads cached longer than open votes', async () => {
+        const pollPayloadCache = createPollSeoPayloadCache();
+        let nowMs = 10_000;
+        const fetchImpl = vi.fn(async () =>
+            Response.json({
+                pollName: 'Budget roadmap',
+                resultScores: [9.25],
+            }),
+        );
+        const resolveMetadata = async (): Promise<void> => {
+            await resolveDocumentSeoMetadata({
+                apiBaseUrl: 'https://api.sealed.vote',
+                fetchImpl,
+                now: () => nowMs,
+                pollPayloadCache,
+                requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            });
+        };
+
+        await resolveMetadata();
+        nowMs += 5_001;
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+        nowMs += 55_000;
+        await resolveMetadata();
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    test('bounds the poll SEO payload cache', async () => {
+        const pollPayloadCache = createPollSeoPayloadCache();
+        const fetchImpl = vi.fn(
+            async (requestInput: Request | URL | string) => {
+                const requestUrl =
+                    requestInput instanceof Request
+                        ? new URL(requestInput.url)
+                        : new URL(requestInput);
+
+                return Response.json({
+                    pollName: requestUrl.pathname.split('/').pop(),
+                    resultScores: [],
+                });
+            },
+        );
+
+        for (let index = 0; index < 140; index += 1) {
+            await resolveDocumentSeoMetadata({
+                apiBaseUrl: 'https://api.sealed.vote',
+                fetchImpl,
+                pollPayloadCache,
+                requestUrl: new URL(
+                    `https://sealed.vote/votes/cache-test-${index}`,
+                ),
+            });
+        }
+
+        expect(fetchImpl).toHaveBeenCalledTimes(140);
+        expect(pollPayloadCache.size).toBeLessThanOrEqual(128);
     });
 });
 

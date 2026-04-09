@@ -1,4 +1,5 @@
 import {
+    createPollSeoPayloadCache,
     renderDocumentHtml,
     resolveSeoApiBaseUrl,
 } from '../../apps/web/config/documentSeo.ts';
@@ -16,6 +17,7 @@ const edgeProcessEnv = (
 ).process?.env;
 
 const seoApiBaseUrl = resolveSeoApiBaseUrl(edgeProcessEnv?.VITE_API_BASE_URL);
+const pollPayloadCache = createPollSeoPayloadCache();
 
 const isHtmlResponse = (response: Response): boolean =>
     (response.headers.get('content-type') || '').includes('text/html');
@@ -39,6 +41,7 @@ export default async (
         const updatedHtml = await renderDocumentHtml({
             apiBaseUrl: seoApiBaseUrl,
             baseHtml: html,
+            pollPayloadCache,
             requestUrl: new URL(request.url),
             signal: AbortSignal.timeout(5000),
         });

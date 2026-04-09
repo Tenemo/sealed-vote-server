@@ -251,7 +251,7 @@ export const buildHomePageSeo = ({
         imageUrl,
         imageWidth: socialImageWidth,
         keywords: defaultKeywords,
-        robots: 'index, follow',
+        robots: 'index, follow, max-image-preview:large',
         structuredData: buildStructuredData(
             normalizedOrigin,
             url,
@@ -335,7 +335,7 @@ export const buildVotePageSeo = ({
         imageUrl,
         imageWidth: socialImageWidth,
         keywords: defaultKeywords,
-        robots: 'noindex, nofollow, noarchive',
+        robots: 'noindex, nofollow, noarchive, max-image-preview:large',
         structuredData: buildStructuredData(
             normalizedOrigin,
             url,
