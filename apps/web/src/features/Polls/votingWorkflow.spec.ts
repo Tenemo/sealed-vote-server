@@ -249,16 +249,25 @@ describe('voting workflow', () => {
         mockedFetchFreshPoll.mockResolvedValue(basePoll);
         mockedDerivePollPhase.mockReturnValueOnce('key-generation');
 
-        await expect(
-            runProcessPublicPrivateKeys({
+        try {
+            await runProcessPublicPrivateKeys({
                 actions,
                 dispatch,
                 getState: (() => ({ voting: state })) as never,
                 pollId: 'poll-1',
-            }),
-        ).rejects.toThrow(
-            'Failed during public/private key processing: Voter registration is missing.',
-        );
+            });
+            throw new Error('Expected public key processing to fail.');
+        } catch (error) {
+            expect(error).toBeInstanceOf(Error);
+            expect(error).toMatchObject({
+                message:
+                    'Failed during public/private key processing: Voter registration is missing.',
+            });
+            expect((error as Error).cause).toBeInstanceOf(Error);
+            expect(((error as Error).cause as Error).message).toBe(
+                'Voter registration is missing.',
+            );
+        }
     });
 
     it('includes the voter token in vote and decryption share submissions', async () => {
@@ -333,16 +342,30 @@ describe('voting workflow', () => {
             throw new Error('broken tally payload');
         });
 
-        await expect(
-            runEncryptVotesGenerateShares({
+        try {
+            await runEncryptVotesGenerateShares({
                 actions,
                 dispatch,
                 getState: (() => ({ voting: state })) as never,
                 pollId: 'poll-1',
-            }),
-        ).rejects.toThrow(
-            'Failed during vote encryption/decryption-share flow: Failed to generate decryption shares: broken tally payload',
-        );
+            });
+            throw new Error(
+                'Expected vote encryption/decryption-share flow to fail.',
+            );
+        } catch (error) {
+            expect(error).toBeInstanceOf(Error);
+            expect(error).toMatchObject({
+                message:
+                    'Failed during vote encryption/decryption-share flow: Failed to generate decryption shares: broken tally payload',
+            });
+            expect((error as Error).cause).toBeInstanceOf(Error);
+            expect(((error as Error).cause as Error).message).toBe(
+                'Failed to generate decryption shares: broken tally payload',
+            );
+            expect(
+                (((error as Error).cause as Error).cause as Error).message,
+            ).toBe('broken tally payload');
+        }
     });
 
     it('rethrows connection failures during vote submission without wrapping them', async () => {
@@ -403,13 +426,21 @@ describe('voting workflow', () => {
 
         mockedWaitForPoll.mockRejectedValue(new Error('timed out'));
 
-        await expect(
-            runDecryptResults({
+        try {
+            await runDecryptResults({
                 actions,
                 dispatch,
                 getState: (() => ({ voting: state })) as never,
                 pollId: 'poll-1',
-            }),
-        ).rejects.toThrow('Failed during result decryption wait: timed out');
+            });
+            throw new Error('Expected result decryption wait to fail.');
+        } catch (error) {
+            expect(error).toBeInstanceOf(Error);
+            expect(error).toMatchObject({
+                message: 'Failed during result decryption wait: timed out',
+            });
+            expect((error as Error).cause).toBeInstanceOf(Error);
+            expect(((error as Error).cause as Error).message).toBe('timed out');
+        }
     });
 });

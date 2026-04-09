@@ -208,6 +208,7 @@ export const runProcessPublicPrivateKeys = async ({
 
         throw new Error(
             `Failed during public/private key processing: ${message}`,
+            { cause: error },
         );
     }
 };
@@ -318,6 +319,7 @@ export const runEncryptVotesGenerateShares = async ({
             } catch (error) {
                 throw new Error(
                     `Failed to generate decryption shares: ${getErrorMessage(error)}`,
+                    { cause: error },
                 );
             }
 
@@ -351,6 +353,7 @@ export const runEncryptVotesGenerateShares = async ({
 
         throw new Error(
             `Failed during vote encryption/decryption-share flow: ${message}`,
+            { cause: error },
         );
     }
 };
@@ -389,6 +392,8 @@ export const runDecryptResults = async ({
             throw error;
         }
 
-        throw new Error(`Failed during result decryption wait: ${message}`);
+        throw new Error(`Failed during result decryption wait: ${message}`, {
+            cause: error,
+        });
     }
 };
