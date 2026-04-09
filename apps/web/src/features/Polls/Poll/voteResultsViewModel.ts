@@ -9,12 +9,12 @@ import {
 } from 'features/Polls/pollData';
 import { type PollResponse } from 'features/Polls/pollsApi';
 
-export type VoteResultEntry = {
+type VoteResultEntry = {
     choiceName: string;
     scoreLabel: string;
 };
 
-export type VoteResultsViewModel = {
+type VoteResultsViewModel = {
     results: VoteResultEntry[];
     verification: PublishedResultVerification | null;
     verificationError: unknown;

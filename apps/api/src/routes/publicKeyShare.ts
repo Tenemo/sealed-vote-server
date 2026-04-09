@@ -50,7 +50,7 @@ const schema = {
     },
 };
 
-export type PublicKeyShareRequest = PublicKeyShareRequestContract;
+type PublicKeyShareRequest = PublicKeyShareRequestContract;
 export type PublicKeyShareResponse = MessageResponse;
 
 export const publicKeyShare = async (

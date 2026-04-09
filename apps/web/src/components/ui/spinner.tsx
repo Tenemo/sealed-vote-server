@@ -1,19 +1,32 @@
 import { Loader2Icon } from 'lucide-react';
-import type { ComponentProps, JSX } from 'react';
+import type { ComponentPropsWithoutRef, JSX } from 'react';
 
 import { cn } from '@/lib/utils';
 
+type SpinnerProps = ComponentPropsWithoutRef<'span'> & {
+    label?: string | null;
+};
+
+const isAriaHidden = (value: SpinnerProps['aria-hidden']): boolean =>
+    value === true || value === 'true';
+
 const Spinner = ({
     className,
+    label = 'Loading',
     ...props
-}: ComponentProps<'svg'>): JSX.Element => {
+}: SpinnerProps): JSX.Element => {
+    if (label === null || isAriaHidden(props['aria-hidden'])) {
+        return (
+            <span {...props} aria-hidden="true" data-slot="spinner">
+                <Loader2Icon className={cn('size-4 animate-spin', className)} />
+            </span>
+        );
+    }
+
     return (
-        <Loader2Icon
-            aria-label="Loading"
-            className={cn('size-4 animate-spin', className)}
-            role="status"
-            {...props}
-        />
+        <span {...props} aria-label={label} data-slot="spinner" role="status">
+            <Loader2Icon className={cn('size-4 animate-spin', className)} />
+        </span>
     );
 };
 

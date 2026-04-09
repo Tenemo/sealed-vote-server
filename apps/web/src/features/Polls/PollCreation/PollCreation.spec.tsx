@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { HelmetProvider } from 'react-helmet-async';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 
 import PollCreation from './PollCreation';
@@ -42,12 +43,17 @@ describe('PollCreation', () => {
         });
 
         render(
-            <MemoryRouter initialEntries={['/']}>
-                <Routes>
-                    <Route element={<PollCreation />} path="/" />
-                    <Route element={<PollLocation />} path="/votes/:pollSlug" />
-                </Routes>
-            </MemoryRouter>,
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                        <Route
+                            element={<PollLocation />}
+                            path="/votes/:pollSlug"
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
         );
 
         await user.type(
@@ -84,11 +90,13 @@ describe('PollCreation', () => {
         });
 
         render(
-            <MemoryRouter initialEntries={['/']}>
-                <Routes>
-                    <Route element={<PollCreation />} path="/" />
-                </Routes>
-            </MemoryRouter>,
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
         );
 
         await user.type(
@@ -124,5 +132,29 @@ describe('PollCreation', () => {
             creatorToken: 'creator-token-1',
             pollName: 'Best fruit',
         });
+    });
+
+    it('renders create-page SEO metadata', () => {
+        render(
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
+        );
+
+        expect(document.title).toBe('Create a vote');
+        expect(
+            document.head
+                .querySelector('meta[name="description"]')
+                ?.getAttribute('content'),
+        ).toBe('Create votes, collect responses, and reveal results.');
+        expect(
+            document.head
+                .querySelector('meta[property="og:title"]')
+                ?.getAttribute('content'),
+        ).toBe('Create a vote');
     });
 });

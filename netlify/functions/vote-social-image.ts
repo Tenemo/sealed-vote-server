@@ -1,11 +1,11 @@
 import { Buffer } from 'node:buffer';
 
+import { resolveSeoApiBaseUrl } from '../../apps/web/config/documentSeo.ts';
 import {
     createVoteSocialImageResponse,
     extractVoteSocialImageSlugFromPathname,
     extractVoteSocialImageVariantFromSearchParams,
 } from '../../apps/web/config/voteSocialImage.ts';
-import { resolveSeoApiBaseUrl } from '../../apps/web/config/documentSeo.ts';
 
 type NetlifyFunctionContext = {
     params?: Record<string, string | undefined>;
@@ -13,9 +13,7 @@ type NetlifyFunctionContext = {
 
 const seoApiBaseUrl = resolveSeoApiBaseUrl(process.env.VITE_API_BASE_URL);
 
-const createVoteSocialImageErrorResponse = (
-    requestMethod: string,
-): Response =>
+const createVoteSocialImageErrorResponse = (requestMethod: string): Response =>
     new Response(requestMethod === 'HEAD' ? null : 'Failed to render image.', {
         headers: {
             'cache-control': 'no-store, max-age=0',

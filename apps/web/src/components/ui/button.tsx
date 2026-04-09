@@ -5,22 +5,22 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-    'inline-flex shrink-0 items-center justify-center rounded-md border border-transparent text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] outline-none select-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/25 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
+    'inline-flex shrink-0 appearance-none items-center justify-center gap-2 rounded-[var(--radius-md)] border border-transparent text-center text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow,opacity] outline-none select-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/25 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
     {
         variants: {
             variant: {
                 default:
-                    'bg-primary text-primary-foreground hover:bg-primary/85 disabled:bg-white/18 disabled:text-foreground/82',
+                    'bg-primary text-primary-foreground hover:bg-primary/85 disabled:bg-white/18 disabled:text-foreground/82 disabled:opacity-100',
                 outline:
-                    'border-border bg-background text-foreground hover:bg-accent hover:text-foreground disabled:border-border/45 disabled:bg-black/20 disabled:text-muted-foreground',
+                    'border-border bg-background text-foreground hover:bg-accent hover:text-foreground disabled:border-border/45 disabled:bg-black/20 disabled:text-muted-foreground disabled:opacity-100',
                 secondary:
-                    'border-border/70 bg-card text-foreground hover:bg-accent hover:text-foreground disabled:border-border/45 disabled:bg-black/24 disabled:text-muted-foreground',
+                    'border-border bg-card text-foreground hover:bg-accent hover:text-foreground disabled:border-border/45 disabled:bg-black/20 disabled:text-muted-foreground disabled:opacity-100',
                 ghost: 'border-transparent bg-transparent text-foreground hover:bg-accent hover:text-foreground disabled:text-muted-foreground',
             },
             size: {
-                default: 'h-10 gap-2 px-4 py-2 text-sm',
+                default: 'h-10 px-4 py-2',
                 lg: 'h-12 gap-2.5 px-5 py-2.5 text-base',
-                'icon-sm': 'size-9 rounded-md',
+                'icon-sm': 'size-9',
                 'icon-lg': 'size-10',
             },
         },
@@ -42,6 +42,12 @@ const Button = ({
         asChild?: boolean;
     }): React.JSX.Element => {
     const Comp = asChild ? Slot.Root : 'button';
+    const buttonProps = asChild
+        ? props
+        : {
+              type: 'button' as const,
+              ...props,
+          };
 
     return (
         <Comp
@@ -49,9 +55,9 @@ const Button = ({
             data-size={size}
             data-slot="button"
             data-variant={variant}
-            {...props}
+            {...buttonProps}
         />
     );
 };
 
-export { Button, buttonVariants };
+export { Button };

@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { Resvg } from '@resvg/resvg-js';
 
 import {
-    createVoteSocialImagePath,
     siteName,
     socialImageWidth,
     voteSocialImagePathPrefix,
@@ -13,7 +12,7 @@ import {
 
 type FetchLike = typeof fetch;
 
-export type VoteSocialImageVariant = 'complete' | 'open';
+type VoteSocialImageVariant = 'complete' | 'open';
 
 type VoteSocialImageRenderPayload = {
     choices: string[];
@@ -50,6 +49,17 @@ type VoteResultEntry = {
     label: string;
 };
 
+type MedalIconColors = {
+    fill: string;
+    ribbon: string;
+    stroke: string;
+};
+
+type PodiumResultStyle = {
+    iconMarkup: string;
+    strokeColor: string;
+};
+
 type VoteSocialImageCachePolicy = {
     browser: string;
     cdn: string;
@@ -60,15 +70,15 @@ const maxTitleLineLength = 16;
 const maxTitleLines = 3;
 const maxVisibleChoices = 4;
 const maxVisibleResults = 4;
-const maxChoiceLineLength = 19;
-const maxResultLineLength = 18;
+const maxChoiceLineWidth = 13.8;
+const maxResultLineWidth = 13.2;
 const ellipsis = '...';
 const dayInSeconds = 60 * 60 * 24;
 const hourInSeconds = 60 * 60;
 const fontFileNames = ['Inter-Regular.ttf', 'Inter-Bold.ttf'] as const;
 
-const persistentImageCachePolicy: VoteSocialImageCachePolicy = {
-    browser: 'public, max-age=31536000, immutable',
+const successfulImageCachePolicy: VoteSocialImageCachePolicy = {
+    browser: 'public, max-age=0, must-revalidate',
     cdn: `public, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
     netlifyCdn: `public, durable, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
 };
@@ -106,6 +116,56 @@ const fitLineWithEllipsis = (value: string, maxLength: number): string => {
 
 const truncateLine = (value: string, maxLength: number): string =>
     value.length <= maxLength ? value : fitLineWithEllipsis(value, maxLength);
+
+const estimateCharacterWidth = (character: string): number => {
+    if (character === ' ') {
+        return 0.4;
+    }
+
+    if (/[.,'`:;|!ilI1-]/.test(character)) {
+        return 0.52;
+    }
+
+    if (/[MWOQG@#%&0-9]/.test(character)) {
+        return 1.2;
+    }
+
+    if (/[A-Z]/.test(character)) {
+        return 1.08;
+    }
+
+    return 0.94;
+};
+
+const estimateVisualWidth = (value: string): number =>
+    [...value].reduce(
+        (totalWidth, character) =>
+            totalWidth + estimateCharacterWidth(character),
+        0,
+    );
+
+const truncateLineByVisualWidth = (value: string, maxWidth: number): string => {
+    if (estimateVisualWidth(value) <= maxWidth) {
+        return value;
+    }
+
+    const ellipsisWidth = estimateVisualWidth(ellipsis);
+    const truncatedCharacters: string[] = [];
+    let currentWidth = 0;
+
+    for (const character of value) {
+        const nextWidth = currentWidth + estimateCharacterWidth(character);
+
+        if (nextWidth + ellipsisWidth > maxWidth) {
+            break;
+        }
+
+        truncatedCharacters.push(character);
+        currentWidth = nextWidth;
+    }
+
+    return `${truncatedCharacters.join('').trimEnd()}${ellipsis}`;
+};
 
 const ellipsizeLine = (value: string, maxLength: number): string => {
     if (value.length + ellipsis.length <= maxLength) {
@@ -193,7 +253,9 @@ const hasVoteSocialImageResults = (resultScores: number[]): boolean =>
 const buildChoiceLines = (choiceNames: string[]): string[] => {
     const visibleChoices = choiceNames
         .slice(0, maxVisibleChoices)
-        .map((choiceName) => truncateLine(choiceName, maxChoiceLineLength));
+        .map((choiceName) =>
+            truncateLineByVisualWidth(choiceName, maxChoiceLineWidth),
+        );
 
     if (choiceNames.length > maxVisibleChoices) {
         visibleChoices.push(`+${choiceNames.length - maxVisibleChoices} more`);
@@ -224,8 +286,48 @@ const buildResultEntries = (
         })
         .slice(0, maxVisibleResults)
         .map(({ label }) => ({
-            label: truncateLine(label, maxResultLineLength),
+            label: truncateLineByVisualWidth(label, maxResultLineWidth),
         }));
+
+const buildGoldCupIcon =
+    (): string => `<g transform="translate(8 9)" fill="none" stroke="#d6a72c" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5">
+    <path d="M14 11h18v8c0 7-4 11-9 11s-9-4-9-11z" fill="#e7b83d" fill-opacity="0.22" />
+    <path d="M14 14H9c0 5.5 2.6 8.5 6.9 8.5" />
+    <path d="M32 14h5c0 5.5-2.6 8.5-6.9 8.5" />
+    <path d="M23 30v7" />
+    <path d="M16 37h14" />
+</g>`;
+
+const buildMedalIcon = (rank: 2 | 3, colors: MedalIconColors): string =>
+    `<g transform="translate(10 8)">
+    <path d="M10 3l7 13" fill="none" stroke="${colors.ribbon}" stroke-linecap="round" stroke-width="5" />
+    <path d="M26 3l-7 13" fill="none" stroke="${colors.ribbon}" stroke-linecap="round" stroke-width="5" />
+    <circle cx="18" cy="29" r="12" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2.5" />
+    <text x="18" y="34" fill="#1d1d1d" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="middle">${rank}</text>
+</g>`;
+
+const podiumResultStyles: PodiumResultStyle[] = [
+    {
+        iconMarkup: buildGoldCupIcon(),
+        strokeColor: '#d6a72c',
+    },
+    {
+        iconMarkup: buildMedalIcon(2, {
+            fill: '#c8cdd2',
+            ribbon: '#7c8790',
+            stroke: '#eef1f4',
+        }),
+        strokeColor: '#bfc5ca',
+    },
+    {
+        iconMarkup: buildMedalIcon(3, {
+            fill: '#a9683d',
+            ribbon: '#6f4930',
+            stroke: '#d3915f',
+        }),
+        strokeColor: '#a9683d',
+    },
+];
 
 const buildOpenVoteMarkup = (choiceNames: string[]): string => {
     const choiceLines = buildChoiceLines(choiceNames);
@@ -269,10 +371,14 @@ const buildCompletedVoteMarkup = (
     }
 
     const rowsMarkup = resultEntries
-        .map(
-            ({ label }, resultIndex) =>
-                `<g transform="translate(776 ${178 + resultIndex * 84})"><rect width="308" height="64" rx="18" fill="#202020" stroke="#2c2c2c" /><text x="24" y="41" fill="#8f8f8f" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">${resultIndex + 1}</text><text x="64" y="41" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="600">${escapeXml(label)}</text></g>`,
-        )
+        .map(({ label }, resultIndex) => {
+            const podiumStyle = podiumResultStyles[resultIndex];
+            const rankMarkup =
+                podiumStyle?.iconMarkup ??
+                `<text x="24" y="41" fill="#8f8f8f" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">${resultIndex + 1}</text>`;
+
+            return `<g transform="translate(776 ${178 + resultIndex * 84})"><rect width="308" height="64" rx="18" fill="#202020" stroke="${podiumStyle?.strokeColor ?? '#2c2c2c'}" />${rankMarkup}<text x="64" y="41" fill="#f5f5f5" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="600">${escapeXml(label)}</text></g>`;
+        })
         .join('');
     const hiddenChoiceCount = scoredChoiceCount - resultEntries.length;
     const hiddenChoiceMarkup =
@@ -504,7 +610,7 @@ const resolveFontFiles = (): string[] | undefined => {
 
 const voteSocialImageFontFiles = resolveFontFiles();
 
-export const renderVoteSocialImagePng = (
+const renderVoteSocialImagePng = (
     payload: VoteSocialImageRenderPayload,
 ): Uint8Array => {
     const svg = createVoteSocialImageSvg(payload);
@@ -684,24 +790,8 @@ export const createVoteSocialImageResponse = async ({
         body,
         headers: buildVoteSocialImageHeaders({
             byteLength: body.byteLength,
-            cachePolicy: persistentImageCachePolicy,
+            cachePolicy: successfulImageCachePolicy,
         }),
         status: 200,
     };
 };
-
-export const createVoteSocialImageUrl = ({
-    origin,
-    pollSlug,
-    variant = 'open',
-}: {
-    origin: string;
-    pollSlug: string;
-    variant?: VoteSocialImageVariant;
-}): string =>
-    new URL(
-        createVoteSocialImagePath(pollSlug, {
-            isComplete: variant === 'complete',
-        }),
-        origin,
-    ).toString();

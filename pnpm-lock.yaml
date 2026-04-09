@@ -37,6 +37,10 @@ catalogs:
 importers:
 
   .:
+    dependencies:
+      '@resvg/resvg-js':
+        specifier: ^2.6.2
+        version: 2.6.2
     devDependencies:
       '@axe-core/playwright':
         specifier: ^4.11.1

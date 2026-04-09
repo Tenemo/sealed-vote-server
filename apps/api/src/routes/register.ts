@@ -46,8 +46,8 @@ const schema = {
     },
 };
 
-export type RegisterRequest = RegisterVoterRequestContract;
-export type RegisterResponse = RegisterVoterResponseContract;
+type RegisterRequest = RegisterVoterRequestContract;
+type RegisterResponse = RegisterVoterResponseContract;
 
 const getExistingRegistration = async ({
     pollId,
@@ -225,5 +225,3 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
         },
     );
 };
-
-export default register;

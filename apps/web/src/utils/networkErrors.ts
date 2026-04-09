@@ -10,9 +10,7 @@ export const connectionLostMessage = 'The connection to the server was lost.';
 export const reconnectingWorkflowMessage =
     'Connection lost. Reconnecting and resuming in the background...';
 
-export const isFetchBaseQueryError = (
-    error: unknown,
-): error is FetchBaseQueryError =>
+const isFetchBaseQueryError = (error: unknown): error is FetchBaseQueryError =>
     !!error && typeof error === 'object' && 'status' in error;
 
 export const isConnectionError = (

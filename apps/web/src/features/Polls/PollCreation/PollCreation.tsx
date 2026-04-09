@@ -5,18 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import ChoiceAdding from './ChoiceAdding';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
-import { Spinner } from '@/components/ui/spinner';
-import {
-    actionButtonClassName,
-    mutedBodyClassName,
-    pageTitleClassName,
-} from '@/lib/uiClasses';
-import { cn } from '@/lib/utils';
+import { actionButtonClassName, pageTitleClassName } from '@/lib/uiClasses';
 import DocumentSeo from 'app/DocumentSeo';
-import { buildHomePageSeo } from 'app/seo';
+import { buildCreatePageSeo } from 'app/seo';
+import LoadingButton from 'components/LoadingButton';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
@@ -34,6 +28,7 @@ const initialForm: Form = {
 
 const PollCreationPage = (): React.JSX.Element => {
     const navigate = useNavigate();
+    const pageTitleId = React.useId();
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
 
     const [form, setForm] = useState<Form>(initialForm);
@@ -41,9 +36,9 @@ const PollCreationPage = (): React.JSX.Element => {
     const { pollName, choices } = form;
     const runtimeOrigin =
         typeof window === 'undefined' ? undefined : window.location.origin;
-    const homePageSeo = React.useMemo(
+    const createPageSeo = React.useMemo(
         () =>
-            buildHomePageSeo({
+            buildCreatePageSeo({
                 origin: runtimeOrigin,
             }),
         [runtimeOrigin],
@@ -106,21 +101,24 @@ const PollCreationPage = (): React.JSX.Element => {
 
     return (
         <>
-            <DocumentSeo metadata={homePageSeo} />
+            <DocumentSeo metadata={createPageSeo} />
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
-                    <h1 className={pageTitleClassName}>Create a new vote</h1>
-                    <p
-                        className={cn(
-                            mutedBodyClassName,
-                            'mx-auto max-w-2xl text-base sm:text-lg',
-                        )}
-                    >
-                        Give the vote a clear name, add a few choices, and share
-                        the generated link when you are ready.
+                    <h1 className={pageTitleClassName} id={pageTitleId}>
+                        Create a new vote
+                    </h1>
+                    <p className="page-lead mx-auto max-w-2xl">
+                        Set up a simple 1-10 score vote, add the options people
+                        can score, and share the generated link once everything
+                        looks right.
                     </p>
                 </div>
-                <form className="space-y-6" onSubmit={onCreatePoll}>
+                <form
+                    aria-labelledby={pageTitleId}
+                    className="space-y-6"
+                    noValidate
+                    onSubmit={onCreatePoll}
+                >
                     <Panel className="space-y-6">
                         <OutlinedInputField
                             autoComplete="off"
@@ -144,35 +142,23 @@ const PollCreationPage = (): React.JSX.Element => {
                         />
                     </Panel>
                     {error && (
-                        <Alert variant="destructive">
+                        <Alert announcement="assertive" variant="destructive">
                             <AlertDescription>
                                 {renderError(error)}
                             </AlertDescription>
                         </Alert>
                     )}
                     <div className="flex justify-end">
-                        <Button
+                        <LoadingButton
                             className={actionButtonClassName}
                             disabled={!isFormValid || isLoading}
+                            loading={isLoading}
+                            loadingLabel="Creating vote"
                             size="lg"
                             type="submit"
                         >
-                            <span className="grid grid-cols-[1.25rem_auto_1.25rem] items-center gap-2">
-                                <Spinner
-                                    aria-hidden="true"
-                                    className={cn(
-                                        'size-5',
-                                        !isLoading && 'invisible',
-                                    )}
-                                />
-                                <span>
-                                    {isLoading
-                                        ? 'Creating vote'
-                                        : 'Create vote'}
-                                </span>
-                                <span aria-hidden="true" className="size-5" />
-                            </span>
-                        </Button>
+                            Create vote
+                        </LoadingButton>
                     </div>
                 </form>
             </section>
