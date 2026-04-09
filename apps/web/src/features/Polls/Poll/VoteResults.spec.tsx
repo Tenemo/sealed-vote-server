@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 
 import VoteResults from './VoteResults';
 
@@ -138,9 +138,23 @@ describe('VoteResults', () => {
 
         render(<VoteResults poll={poll} pollId="poll-1" />);
 
-        expect(screen.getByLabelText('Winner')).toBeInTheDocument();
-        expect(screen.getByLabelText('Runner-up')).toBeInTheDocument();
-        expect(screen.getByLabelText('Third place')).toBeInTheDocument();
-        expect(screen.getAllByRole('listitem')).toHaveLength(4);
+        expect(screen.getAllByLabelText('Winner')).toHaveLength(1);
+        expect(screen.getAllByLabelText('Runner-up')).toHaveLength(1);
+        expect(screen.getAllByLabelText('Third place')).toHaveLength(1);
+
+        const resultItems = screen.getAllByRole('listitem');
+        const fourthResult = resultItems[3];
+
+        expect(resultItems).toHaveLength(4);
+
+        if (!fourthResult) {
+            throw new Error('Missing fourth result item.');
+        }
+
+        expect(
+            within(fourthResult).queryByLabelText(
+                /winner|runner-up|third place/i,
+            ),
+        ).not.toBeInTheDocument();
     });
 });
