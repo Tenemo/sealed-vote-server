@@ -5,12 +5,18 @@ import {
 } from './pollResults';
 
 describe('hasPublishedResultScores', () => {
-    it('returns true only for non-empty result score arrays', () => {
+    it('returns true only for result score arrays containing finite numbers', () => {
         expect(hasPublishedResultScores(null)).toBe(false);
         expect(hasPublishedResultScores(undefined)).toBe(false);
         expect(hasPublishedResultScores('not-an-array')).toBe(false);
         expect(hasPublishedResultScores([])).toBe(false);
+        expect(hasPublishedResultScores([Number.NaN])).toBe(false);
+        expect(hasPublishedResultScores([Number.POSITIVE_INFINITY])).toBe(
+            false,
+        );
+        expect(hasPublishedResultScores(['7.25'])).toBe(false);
         expect(hasPublishedResultScores([3.14])).toBe(true);
+        expect(hasPublishedResultScores([Number.NaN, 7.25])).toBe(true);
     });
 });
 

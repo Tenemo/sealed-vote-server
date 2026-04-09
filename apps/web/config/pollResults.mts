@@ -10,7 +10,8 @@ export type OrderedPublishedPollResult = {
 };
 
 export const hasPublishedResultScores = (value: unknown): boolean =>
-    Array.isArray(value) && value.length > 0;
+    Array.isArray(value) &&
+    value.some((score) => typeof score === 'number' && Number.isFinite(score));
 
 export const orderPublishedPollResults = ({
     choices,
