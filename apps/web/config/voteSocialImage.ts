@@ -77,7 +77,7 @@ const dayInSeconds = 60 * 60 * 24;
 const hourInSeconds = 60 * 60;
 const fontFileNames = ['Inter-Regular.ttf', 'Inter-Bold.ttf'] as const;
 
-const persistentImageCachePolicy: VoteSocialImageCachePolicy = {
+const successfulImageCachePolicy: VoteSocialImageCachePolicy = {
     browser: 'public, max-age=0, must-revalidate',
     cdn: `public, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
     netlifyCdn: `public, durable, max-age=${30 * dayInSeconds}, stale-while-revalidate=${30 * dayInSeconds}`,
@@ -790,7 +790,7 @@ export const createVoteSocialImageResponse = async ({
         body,
         headers: buildVoteSocialImageHeaders({
             byteLength: body.byteLength,
-            cachePolicy: persistentImageCachePolicy,
+            cachePolicy: successfulImageCachePolicy,
         }),
         status: 200,
     };
