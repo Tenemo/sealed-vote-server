@@ -16,15 +16,19 @@ import {
     countPollChoices,
     countPollEncryptedVotes,
     countPollVoters,
-    getExistingEncryptedVote,
-    getOrderedPollEncryptedVotes,
-    lockPollById,
-} from '../utils/polls.js';
-import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+} from '../utils/pollCounts.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import {
-    authenticateVoter,
-    findVoterByTokenReadOnly,
-} from '../utils/voterAuth.js';
+    getExistingEncryptedVote,
+    getExistingEncryptedVoteReadOnly,
+    getOrderedPollEncryptedVotes,
+} from '../utils/pollSubmissions.js';
+import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
+import { authenticateVoter } from '../utils/voterAuth.js';
+import {
+    recoverDuplicateVoterSubmission,
+    resolveExistingVoterSubmission,
+} from '../utils/voterSubmission.js';
 
 import {
     EncryptedMessageSchema,
@@ -67,6 +71,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
             }>,
             reply: FastifyReply,
         ): Promise<VoteResponse> => {
+            const successResponse = 'Vote submitted successfully';
             try {
                 const { votes, voterToken } = req.body;
                 const { pollId } = req.params;
@@ -99,21 +104,24 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                             pollId,
                             voter.id,
                         );
+                        const replayedSubmission =
+                            resolveExistingVoterSubmission({
+                                existingSubmission: existingVote,
+                                incomingValue: votes,
+                                isEquivalent: (
+                                    { votes: existingVotes },
+                                    nextVotes,
+                                ) =>
+                                    areEncryptedMessagesEqual(
+                                        existingVotes,
+                                        nextVotes,
+                                    ),
+                                conflictMessage: ERROR_MESSAGES.voteConflict,
+                                successResponse,
+                            });
 
-                        if (existingVote) {
-                            if (
-                                !areEncryptedMessagesEqual(
-                                    existingVote.votes,
-                                    votes,
-                                )
-                            ) {
-                                throw createError(
-                                    409,
-                                    ERROR_MESSAGES.voteConflict,
-                                );
-                            }
-
-                            return 'Vote submitted successfully';
+                        if (replayedSubmission) {
+                            return replayedSubmission;
                         }
 
                         if (
@@ -169,7 +177,7 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                                 .where(eq(polls.id, pollId));
                         }
 
-                        return 'Vote submitted successfully';
+                        return successResponse;
                     },
                 );
 
@@ -181,40 +189,32 @@ export const vote = async (fastify: FastifyInstance): Promise<void> => {
                 return response;
             } catch (error) {
                 if (isConstraintViolation(error, 'unique_vote_per_voter')) {
-                    const voter = await findVoterByTokenReadOnly(
-                        fastify.db,
-                        req.params.pollId,
-                        req.body.voterToken,
-                    );
+                    const response = await recoverDuplicateVoterSubmission({
+                        db: fastify.db,
+                        pollId: req.params.pollId,
+                        voterToken: req.body.voterToken,
+                        incomingValue: req.body.votes,
+                        loadExistingSubmission: async ({
+                            db,
+                            pollId,
+                            voterId,
+                        }) =>
+                            await getExistingEncryptedVoteReadOnly(
+                                db,
+                                pollId,
+                                voterId,
+                            ),
+                        isEquivalent: ({ votes: existingVotes }, nextVotes) =>
+                            areEncryptedMessagesEqual(existingVotes, nextVotes),
+                        conflictMessage: ERROR_MESSAGES.voteConflict,
+                        successResponse,
+                    });
 
-                    const existingVote =
-                        voter &&
-                        (await fastify.db.query.encryptedVotes.findFirst({
-                            where: (fields, { and, eq: isEqual }) =>
-                                and(
-                                    isEqual(fields.pollId, req.params.pollId),
-                                    isEqual(fields.voterId, voter.id),
-                                ),
-                            columns: {
-                                votes: true,
-                            },
-                        }));
-
-                    if (
-                        existingVote &&
-                        areEncryptedMessagesEqual(
-                            existingVote.votes,
-                            req.body.votes,
-                        )
-                    ) {
-                        void maybeDropTestResponseAfterCommit({
-                            reply,
-                            request: req,
-                        });
-                        return 'Vote submitted successfully';
-                    }
-
-                    throw createError(409, ERROR_MESSAGES.voteConflict);
+                    void maybeDropTestResponseAfterCommit({
+                        reply,
+                        request: req,
+                    });
+                    return response;
                 }
 
                 throw error;

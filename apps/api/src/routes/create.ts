@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import {
+    ERROR_MESSAGES,
+    hasBlankStrings,
+    hasDuplicateStrings,
+    normalizeTrimmedString,
+    normalizeTrimmedStrings,
+} from '@sealed-vote/contracts';
 import type {
     CreatePollRequest as CreatePollRequestContract,
     CreatePollResponse as CreatePollResponseContract,
@@ -119,8 +125,8 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
             const { choices, creatorToken } = req.body;
-            const pollName = req.body.pollName.trim();
-            const normalizedChoices = choices.map((choice) => choice.trim());
+            const pollName = normalizeTrimmedString(req.body.pollName);
+            const normalizedChoices = normalizeTrimmedStrings(choices);
 
             if (!pollName) {
                 throw createError(400, 'Poll name is required.');
@@ -130,11 +136,11 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                 throw createError(400, 'Not enough choices.');
             }
 
-            if (normalizedChoices.some((choice) => !choice)) {
+            if (hasBlankStrings(normalizedChoices)) {
                 throw createError(400, 'Choice names are required.');
             }
 
-            if (new Set(normalizedChoices).size !== normalizedChoices.length) {
+            if (hasDuplicateStrings(normalizedChoices)) {
                 throw createError(400, 'Choice names must be unique.');
             }
 

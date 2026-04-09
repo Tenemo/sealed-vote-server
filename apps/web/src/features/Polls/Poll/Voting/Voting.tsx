@@ -1,3 +1,4 @@
+import { normalizeTrimmedString } from '@sealed-vote/contracts';
 import { canRegister } from '@sealed-vote/protocol';
 import React, { useEffect, useState, type FormEvent } from 'react';
 
@@ -66,7 +67,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
         }));
     };
 
-    const normalizedVoterName = voterName.trim();
+    const normalizedVoterName = normalizeTrimmedString(voterName);
     const isVoterNameDuplicate =
         !!normalizedVoterName &&
         poll.voters.includes(normalizedVoterName) &&
@@ -84,7 +85,7 @@ const Voting = ({ onVote, poll, pollId }: VotingProps): React.JSX.Element => {
             return;
         }
 
-        void onVote(voterName.trim(), selectedScores);
+        void onVote(normalizedVoterName, selectedScores);
     };
 
     if (progressMessage || !canRegister(poll)) {

@@ -1,4 +1,4 @@
-const { fixupConfigRules } = require('@eslint/compat');
+const { fixupConfigRules, fixupPluginRules } = require('@eslint/compat');
 const eslint = require('@eslint/js');
 const { defineConfig } = require('eslint/config');
 const { flatConfigs: importConfigs } = require('eslint-plugin-import');
@@ -113,6 +113,8 @@ const frontendRules = {
     'jsx-a11y/label-has-for': [ERROR, { required: { every: ['id'] } }],
 };
 
+const reactCompatPlugin = fixupPluginRules(reactPlugin);
+
 module.exports = defineConfig(
     {
         ignores: [
@@ -169,14 +171,14 @@ module.exports = defineConfig(
         },
         rules: sharedRules,
     },
-    {
+    ...fixupConfigRules({
         ...reactPlugin.configs.flat.recommended,
         files: frontendFiles,
-    },
-    {
+    }),
+    ...fixupConfigRules({
         ...reactPlugin.configs.flat['jsx-runtime'],
         files: frontendFiles,
-    },
+    }),
     {
         ...jsxA11yPlugin.flatConfigs.strict,
         files: frontendFiles,
@@ -184,6 +186,7 @@ module.exports = defineConfig(
     {
         files: frontendFiles,
         plugins: {
+            react: reactCompatPlugin,
             'react-hooks': reactHooksPlugin,
         },
         languageOptions: {

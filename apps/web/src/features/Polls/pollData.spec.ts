@@ -1,11 +1,11 @@
 import { hasPublishedResults, normalizePollResponse } from './pollData';
 
 describe('normalizePollResponse', () => {
-    it('fills in missing published-result fields from legacy poll snapshots', () => {
+    it('returns the supported poll response unchanged', () => {
         const normalizedPoll = normalizePollResponse({
             id: '11111111-1111-4111-8111-111111111111',
-            slug: 'legacy-poll--1111',
-            pollName: 'Legacy poll',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples', 'Bananas'],
             voters: ['Alice'],
@@ -15,13 +15,15 @@ describe('normalizePollResponse', () => {
             decryptionShareCount: 1,
             commonPublicKey: '123',
             encryptedTallies: [{ c1: '1', c2: '2' }],
-            results: [7.25],
-        } as unknown as Parameters<typeof normalizePollResponse>[0]);
+            publishedDecryptionShares: [['share-1']],
+            resultTallies: ['49'],
+            resultScores: [7.25],
+        });
 
         expect(normalizedPoll).toEqual({
             id: '11111111-1111-4111-8111-111111111111',
-            slug: 'legacy-poll--1111',
-            pollName: 'Legacy poll',
+            slug: 'best-fruit--1111',
+            pollName: 'Best fruit',
             createdAt: '2026-01-01T00:00:00.000Z',
             choices: ['Apples', 'Bananas'],
             voters: ['Alice'],
@@ -31,8 +33,8 @@ describe('normalizePollResponse', () => {
             decryptionShareCount: 1,
             commonPublicKey: '123',
             encryptedTallies: [{ c1: '1', c2: '2' }],
-            publishedDecryptionShares: [],
-            resultTallies: [],
+            publishedDecryptionShares: [['share-1']],
+            resultTallies: ['49'],
             resultScores: [7.25],
         });
     });

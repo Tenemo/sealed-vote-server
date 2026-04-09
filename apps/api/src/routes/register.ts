@@ -10,7 +10,8 @@ import createError from 'http-errors';
 import type { DatabaseTransaction } from '../db/client.js';
 import { voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
-import { countPollVoters, lockPollById } from '../utils/polls.js';
+import { countPollVoters } from '../utils/pollCounts.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 

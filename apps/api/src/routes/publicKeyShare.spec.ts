@@ -122,6 +122,33 @@ describe('POST /polls/:pollId/public-key-share', () => {
         expect(deleteResult.success).toBe(true);
     });
 
+    test('should reject public key share submission while registration is still open', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        const voter = await registerVoter(fastify, pollId, 'Alice');
+        expect(voter.success).toBe(true);
+        if (!voter.success) {
+            throw new Error('Failed to register the voter.');
+        }
+
+        const { publicKey } = generateKeys(1, 1);
+        const response = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/public-key-share`,
+            payload: {
+                publicKeyShare: publicKey.toString(),
+                voterToken: voter.voterToken,
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect((JSON.parse(response.body) as { message: string }).message).toBe(
+            ERROR_MESSAGES.publicKeyPhaseClosed,
+        );
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
     test('should combine public keys when all voters have submitted in a closed poll, and verify combined public key', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         const alice = await registerVoter(fastify, pollId, 'Alice');
@@ -217,6 +244,55 @@ describe('POST /polls/:pollId/public-key-share', () => {
         expect(firstResponse.statusCode).toBe(201);
         expect(bobResponse.statusCode).toBe(201);
         expect(replayResponse.statusCode).toBe(201);
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('handles the last public key share submissions correctly when they arrive together', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        const alice = await registerVoter(fastify, pollId, 'Alice');
+        const bob = await registerVoter(fastify, pollId, 'Bob');
+        expect(alice.success).toBe(true);
+        expect(bob.success).toBe(true);
+        if (!alice.success || !bob.success) {
+            throw new Error('Failed to register voters.');
+        }
+
+        await closePoll(fastify, pollId, creatorToken);
+
+        const aliceKeys = generateKeys(1, 2);
+        const bobKeys = generateKeys(2, 2);
+
+        const [aliceResponse, bobResponse] = await Promise.all([
+            fastify.inject({
+                method: 'POST',
+                url: `/api/polls/${pollId}/public-key-share`,
+                payload: {
+                    publicKeyShare: aliceKeys.publicKey.toString(),
+                    voterToken: alice.voterToken,
+                },
+            }),
+            fastify.inject({
+                method: 'POST',
+                url: `/api/polls/${pollId}/public-key-share`,
+                payload: {
+                    publicKeyShare: bobKeys.publicKey.toString(),
+                    voterToken: bob.voterToken,
+                },
+            }),
+        ]);
+
+        expect(aliceResponse.statusCode).toBe(201);
+        expect(bobResponse.statusCode).toBe(201);
+
+        const pollData = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
+        });
+        expect(
+            (JSON.parse(pollData.body) as PollResponse).commonPublicKey,
+        ).toBeTruthy();
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

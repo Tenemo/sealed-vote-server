@@ -13,7 +13,7 @@ import {
     publicKeyShares,
 } from '../db/schema.js';
 import { normalizeDatabaseTimestamp } from '../utils/db.js';
-import { sortRowsByVoterIndex } from '../utils/polls.js';
+import { sortRowsByVoterIndex } from '../utils/pollSubmissions.js';
 
 import {
     EncryptedMessageSchema,

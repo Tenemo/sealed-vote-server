@@ -8,7 +8,10 @@ import { generateKeys } from 'threshold-elgamal';
 
 import { fetchFreshPoll, waitForPoll } from './pollQuery';
 import { pollsApi, type PollResponse } from './pollsApi';
-import { selectVoteStateByPollId } from './votingState';
+import {
+    hasRegisteredVoterSession,
+    selectVoteStateByPollId,
+} from './votingState';
 
 import { type AppDispatch, type RootState } from 'app/store';
 import {
@@ -82,7 +85,6 @@ export const runProcessPublicPrivateKeys = async ({
             publicKey: statePublicKey,
             pollSnapshot,
             hasSubmittedPublicKeyShare,
-            voterToken,
         } = getVotingState(getState, pollId);
 
         if (
@@ -117,11 +119,12 @@ export const runProcessPublicPrivateKeys = async ({
             });
         }
 
-        const { voterIndex } = getVotingState(getState, pollId);
+        const votingState = getVotingState(getState, pollId);
 
-        if (!voterIndex || !voterToken) {
+        if (!hasRegisteredVoterSession(votingState)) {
             throw new Error('Voter registration is missing.');
         }
+        const { voterIndex, voterToken } = votingState;
 
         let publicKey = statePublicKey;
         let privateKey = statePrivateKey;
@@ -205,6 +208,7 @@ export const runProcessPublicPrivateKeys = async ({
 
         throw new Error(
             `Failed during public/private key processing: ${message}`,
+            { cause: error },
         );
     }
 };
@@ -315,6 +319,7 @@ export const runEncryptVotesGenerateShares = async ({
             } catch (error) {
                 throw new Error(
                     `Failed to generate decryption shares: ${getErrorMessage(error)}`,
+                    { cause: error },
                 );
             }
 
@@ -348,6 +353,7 @@ export const runEncryptVotesGenerateShares = async ({
 
         throw new Error(
             `Failed during vote encryption/decryption-share flow: ${message}`,
+            { cause: error },
         );
     }
 };
@@ -386,6 +392,8 @@ export const runDecryptResults = async ({
             throw error;
         }
 
-        throw new Error(`Failed during result decryption wait: ${message}`);
+        throw new Error(`Failed during result decryption wait: ${message}`, {
+            cause: error,
+        });
     }
 };

@@ -565,13 +565,11 @@ export const renderVoteSocialImagePngWithFallback = ({
                 renderedPayload: fallbackPayload,
             };
         } catch (fallbackRenderError) {
-            throw new Error(
+            throw new AggregateError(
+                [renderError, fallbackRenderError],
                 'Failed to render vote social image, including fallback image.',
                 {
-                    cause: {
-                        fallbackRenderError,
-                        renderError,
-                    },
+                    cause: fallbackRenderError,
                 },
             );
         }
