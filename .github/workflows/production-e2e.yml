@@ -89,7 +89,7 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: cache Playwright browsers
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-production-${{ matrix.project.browser_cache_key }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -102,7 +102,7 @@ jobs:
 
             - name: upload Playwright blob report
               if: always()
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: production-playwright-blob-report-${{ matrix.project.slug }}
                   path: blob-report
@@ -110,7 +110,7 @@ jobs:
 
             - name: upload Playwright raw results
               if: failure()
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: production-playwright-test-results-${{ matrix.project.slug }}
                   path: test-results
@@ -150,7 +150,7 @@ jobs:
 
             - name: download Playwright blob reports
               if: needs.production-e2e-matrix.result == 'failure' || needs.production-e2e-matrix.result == 'cancelled'
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   pattern: production-playwright-blob-report-*
                   merge-multiple: true
@@ -162,7 +162,7 @@ jobs:
 
             - name: upload merged Playwright report
               if: needs.production-e2e-matrix.result == 'failure' || needs.production-e2e-matrix.result == 'cancelled'
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: production-playwright-report
                   path: playwright-report
@@ -172,7 +172,11 @@ jobs:
         name: production e2e
         if: always()
         needs:
-            [wait-for-production-deploy, production-e2e-matrix, production-e2e-report]
+            [
+                wait-for-production-deploy,
+                production-e2e-matrix,
+                production-e2e-report,
+            ]
         runs-on: ubuntu-latest
 
         steps:

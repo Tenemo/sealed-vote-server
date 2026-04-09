@@ -1,5 +1,7 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
+import { gotoInteractablePage } from './navigation.mts';
+
 const connectionToastMessage =
     'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';
 
@@ -29,7 +31,7 @@ export const createPoll = async ({
     pollName: string;
     choices?: string[];
 }): Promise<CreatedPoll> => {
-    await page.goto('/');
+    await gotoInteractablePage(page, '/');
     await page.getByLabel('Vote name').fill(pollName);
 
     for (const choice of choices) {
@@ -69,7 +71,7 @@ export const joinPoll = async ({
     voterName: string;
 }): Promise<void> => {
     if (pollUrl) {
-        await page.goto(pollUrl);
+        await gotoInteractablePage(page, pollUrl);
     }
 
     await page.getByLabel('Voter name').fill(voterName);
@@ -86,9 +88,9 @@ export const beginVote = async (page: Page): Promise<void> => {
 };
 
 export const expectResultsVisible = async (page: Page): Promise<void> => {
-    await expect(
-        page.getByRole('heading', { name: 'Results' }),
-    ).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({
+        timeout: 120_000,
+    });
     await expect(
         page.getByText(
             'Public verification passed. The published tallies and scores match the encrypted tallies and published decryption shares.',
@@ -151,15 +153,14 @@ export const getShareLinkValue = async (page: Page): Promise<string> =>
 export const copyShareLink = async (page: Page): Promise<string> => {
     const origin = new URL(page.url()).origin;
 
-    await page.context().grantPermissions(
-        ['clipboard-read', 'clipboard-write'],
-        {
+    await page
+        .context()
+        .grantPermissions(['clipboard-read', 'clipboard-write'], {
             origin,
-        },
-    );
+        });
     await page.getByRole('button', { name: 'Copy vote link' }).click();
 
-    return await page.evaluate(async () => await navigator.clipboard.readText());
+    return await page.evaluate(() => navigator.clipboard.readText());
 };
 
 const deletePoll = async (

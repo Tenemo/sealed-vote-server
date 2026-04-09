@@ -1,11 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
-import {
-    createPoll,
-    deletePolls,
-    type CreatedPoll,
-} from './support/pollFlow';
+import { gotoInteractablePage } from './support/navigation.mts';
+import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -34,7 +31,7 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     attachErrorTracking(page, 'mobile-home', tracker);
 
     await page.setViewportSize(mobileViewport);
-    await page.goto('/');
+    await gotoInteractablePage(page, '/');
 
     await expect(
         page.getByRole('heading', { name: 'Create a new vote' }),

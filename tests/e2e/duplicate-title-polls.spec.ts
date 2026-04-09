@@ -4,6 +4,7 @@ import {
     closeParticipant,
     openProjectParticipant,
 } from './support/participants';
+import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createPoll,
     deletePolls,
@@ -45,18 +46,20 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
 
     expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
 
-    await page.goto(firstPoll.pollUrl);
+    await gotoInteractablePage(page, firstPoll.pollUrl);
     await page
         .getByLabel('Voter name')
         .fill(createVoterName('alice', namespace));
     await page.getByRole('button', { exact: true, name: 'Vote' }).click();
-    await expectParticipantsVisible(page, [createVoterName('alice', namespace)]);
+    await expectParticipantsVisible(page, [
+        createVoterName('alice', namespace),
+    ]);
 
     const participant = await openProjectParticipant(browser, testInfo);
     attachErrorTracking(participant.page, 'page-2', tracker);
 
     try {
-        await participant.page.goto(secondPoll.pollUrl);
+        await gotoInteractablePage(participant.page, secondPoll.pollUrl);
         await participant.page
             .getByLabel('Voter name')
             .fill(createVoterName('bob', namespace));
@@ -67,8 +70,12 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
         await expectParticipantsVisible(participant.page, [
             createVoterName('bob', namespace),
         ]);
-        await expectParticipantsVisible(page, [createVoterName('alice', namespace)]);
-        await expectParticipantsHidden(page, [createVoterName('bob', namespace)]);
+        await expectParticipantsVisible(page, [
+            createVoterName('alice', namespace),
+        ]);
+        await expectParticipantsHidden(page, [
+            createVoterName('bob', namespace),
+        ]);
         await expectParticipantsHidden(participant.page, [
             createVoterName('alice', namespace),
         ]);
