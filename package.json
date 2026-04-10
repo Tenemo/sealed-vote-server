@@ -1,5 +1,6 @@
 {
     "name": "sealed-vote",
+    "description": "A browser-based application relying on homomorphic encryption allowing for 1-10 score voting in a way such that only the result is publicly known - the votes aren't revealed to neither the server, nor other voters. Uses the threshold-elgamal package: https://www.npmjs.com/package/threshold-elgamal",
     "version": "2.2.0",
     "private": true,
     "packageManager": "pnpm@10.33.0",
