@@ -16,6 +16,10 @@ import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
 
+const previewParticipantCount = 3;
+const defaultPreviewReconstructionThreshold = 2;
+const defaultPreviewMinimumPublishedVoterCount = 3;
+
 type Form = {
     pollName: string;
     choices: string[];
@@ -26,8 +30,10 @@ type Form = {
 const initialForm: Form = {
     pollName: '',
     choices: [],
-    reconstructionThreshold: '',
-    minimumPublishedVoterCount: '',
+    reconstructionThreshold: String(defaultPreviewReconstructionThreshold),
+    minimumPublishedVoterCount: String(
+        defaultPreviewMinimumPublishedVoterCount,
+    ),
 };
 
 const parseOptionalInteger = (value: string): number | undefined => {
@@ -46,6 +52,10 @@ const PollCreationPage = (): React.JSX.Element => {
     const pageTitleId = React.useId();
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
     const [form, setForm] = useState<Form>(initialForm);
+    const [customThresholds, setCustomThresholds] = useState({
+        reconstructionThreshold: false,
+        minimumPublishedVoterCount: false,
+    });
     const [creatorToken, setCreatorToken] = useState<string | null>(null);
     const runtimeOrigin =
         typeof window === 'undefined' ? undefined : window.location.origin;
@@ -62,6 +72,15 @@ const PollCreationPage = (): React.JSX.Element => {
     }: ChangeEvent<HTMLInputElement>): void => {
         setCreatorToken(null);
         setForm((previousForm) => ({ ...previousForm, [id]: value }));
+        if (
+            id === 'reconstructionThreshold' ||
+            id === 'minimumPublishedVoterCount'
+        ) {
+            setCustomThresholds((previousState) => ({
+                ...previousState,
+                [id]: true,
+            }));
+        }
     };
 
     const onAddChoice = (choice: string): void => {
@@ -99,12 +118,13 @@ const PollCreationPage = (): React.JSX.Element => {
             pollName: normalizedPollName,
             choices: form.choices,
             creatorToken: nextCreatorToken,
-            reconstructionThreshold: parseOptionalInteger(
-                form.reconstructionThreshold,
-            ),
-            minimumPublishedVoterCount: parseOptionalInteger(
-                form.minimumPublishedVoterCount,
-            ),
+            reconstructionThreshold: customThresholds.reconstructionThreshold
+                ? parseOptionalInteger(form.reconstructionThreshold)
+                : undefined,
+            minimumPublishedVoterCount:
+                customThresholds.minimumPublishedVoterCount
+                    ? parseOptionalInteger(form.minimumPublishedVoterCount)
+                    : undefined,
             protocolVersion: 'v1',
         })
             .unwrap()
@@ -158,25 +178,36 @@ const PollCreationPage = (): React.JSX.Element => {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <OutlinedInputField
                                 autoComplete="off"
-                                helperText="Optional. Leave blank to use the strict-majority default when the roster is closed."
+                                helperText={`How many participants must eventually publish valid decryption shares before the tally can be opened. The form starts with ${defaultPreviewReconstructionThreshold} as a preview for the smallest supported ${previewParticipantCount}-participant ceremony. If you leave it unchanged, the app still uses the automatic strict-majority value from the final roster.`}
                                 id="reconstructionThreshold"
                                 inputMode="numeric"
                                 label="Reconstruction threshold"
+                                min={2}
                                 name="reconstructionThreshold"
                                 onChange={onFormChange}
+                                type="number"
                                 value={form.reconstructionThreshold}
                             />
                             <OutlinedInputField
                                 autoComplete="off"
-                                helperText="Optional publication floor, separate from the cryptographic threshold."
+                                helperText={`A publication floor for privacy. Results stay unpublished until at least this many accepted voters exist, even if decryption would already be possible. The form starts with ${defaultPreviewMinimumPublishedVoterCount} as a preview for the smallest supported ceremony. If you leave it unchanged, the app still derives the automatic floor from the final roster.`}
                                 id="minimumPublishedVoterCount"
                                 inputMode="numeric"
                                 label="Minimum published voter count"
+                                min={2}
                                 name="minimumPublishedVoterCount"
                                 onChange={onFormChange}
+                                type="number"
                                 value={form.minimumPublishedVoterCount}
                             />
                         </div>
+                        <p className="field-note">
+                            Reconstruction threshold controls decryption
+                            availability. Minimum published voter count controls
+                            whether the app is willing to publish results at
+                            all. They are related, but they are not the same
+                            policy.
+                        </p>
                         <p className="field-note">
                             This version uses token-only enrollment. The public
                             roster is auditable, but the app does not claim

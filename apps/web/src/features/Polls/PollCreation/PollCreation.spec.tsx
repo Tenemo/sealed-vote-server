@@ -140,6 +140,101 @@ describe('PollCreation', () => {
         });
     });
 
+    it('shows pre-filled threshold previews but keeps automatic defaults until the fields are edited', async () => {
+        render(
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
+        );
+
+        expect(
+            screen.getByRole('spinbutton', {
+                name: /^Reconstruction threshold/i,
+            }),
+        ).toHaveValue(2);
+        expect(
+            screen.getByRole('spinbutton', {
+                name: /^Minimum published voter count/i,
+            }),
+        ).toHaveValue(3);
+    });
+
+    it('submits explicit threshold values once the fields are edited', async () => {
+        const user = userEvent.setup();
+
+        mockedGenerateClientToken.mockReturnValue('creator-token-1');
+        mockedCreatePoll.mockReturnValue({
+            unwrap: () => new Promise<void>(() => undefined),
+        });
+
+        render(
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
+        );
+
+        await user.type(
+            screen.getByRole('textbox', { name: /^Vote name/i }),
+            'Best fruit',
+        );
+        await user.type(
+            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
+            'Apples',
+        );
+        await user.click(
+            screen.getByRole('button', { name: 'Add new choice' }),
+        );
+        await user.type(
+            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
+            'Bananas',
+        );
+        await user.click(
+            screen.getByRole('button', { name: 'Add new choice' }),
+        );
+
+        await user.clear(
+            screen.getByRole('spinbutton', {
+                name: /^Reconstruction threshold/i,
+            }),
+        );
+        await user.type(
+            screen.getByRole('spinbutton', {
+                name: /^Reconstruction threshold/i,
+            }),
+            '4',
+        );
+        await user.clear(
+            screen.getByRole('spinbutton', {
+                name: /^Minimum published voter count/i,
+            }),
+        );
+        await user.type(
+            screen.getByRole('spinbutton', {
+                name: /^Minimum published voter count/i,
+            }),
+            '6',
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Create vote' }));
+
+        expect(mockedCreatePoll).toHaveBeenCalledWith({
+            choices: ['Apples', 'Bananas'],
+            creatorToken: 'creator-token-1',
+            minimumPublishedVoterCount: 6,
+            pollName: 'Best fruit',
+            protocolVersion: 'v1',
+            reconstructionThreshold: 4,
+        });
+    });
+
     it('renders create-page SEO metadata', () => {
         render(
             <HelmetProvider>
