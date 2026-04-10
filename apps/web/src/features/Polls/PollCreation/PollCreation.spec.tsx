@@ -125,22 +125,22 @@ describe('PollCreation', () => {
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(1, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
-            minimumPublishedVoterCount: undefined,
+            minimumPublishedVoterCount: 3,
             pollName: 'Best fruit',
             protocolVersion: 'v1',
-            reconstructionThreshold: undefined,
+            reconstructionThreshold: 2,
         });
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(2, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
-            minimumPublishedVoterCount: undefined,
+            minimumPublishedVoterCount: 3,
             pollName: 'Best fruit',
             protocolVersion: 'v1',
-            reconstructionThreshold: undefined,
+            reconstructionThreshold: 2,
         });
     });
 
-    it('shows pre-filled threshold previews but keeps automatic defaults until the fields are edited', async () => {
+    it('shows threshold defaults as placeholders while keeping the inputs empty', async () => {
         render(
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
@@ -155,12 +155,22 @@ describe('PollCreation', () => {
             screen.getByRole('spinbutton', {
                 name: /^Reconstruction threshold/i,
             }),
-        ).toHaveValue(2);
+        ).toHaveValue(null);
         expect(
             screen.getByRole('spinbutton', {
                 name: /^Minimum published voter count/i,
             }),
-        ).toHaveValue(3);
+        ).toHaveValue(null);
+        expect(
+            screen.getByRole('spinbutton', {
+                name: /^Reconstruction threshold/i,
+            }),
+        ).toHaveAttribute('placeholder', '2');
+        expect(
+            screen.getByRole('spinbutton', {
+                name: /^Minimum published voter count/i,
+            }),
+        ).toHaveAttribute('placeholder', '3');
     });
 
     it('submits explicit threshold values once the fields are edited', async () => {

@@ -30,17 +30,18 @@ type Form = {
 const initialForm: Form = {
     pollName: '',
     choices: [],
-    reconstructionThreshold: String(defaultPreviewReconstructionThreshold),
-    minimumPublishedVoterCount: String(
-        defaultPreviewMinimumPublishedVoterCount,
-    ),
+    reconstructionThreshold: '',
+    minimumPublishedVoterCount: '',
 };
 
-const parseOptionalInteger = (value: string): number | undefined => {
+const parseIntegerWithFallback = (
+    value: string,
+    fallbackValue: number,
+): number | undefined => {
     const trimmed = value.trim();
 
     if (!trimmed) {
-        return undefined;
+        return fallbackValue;
     }
 
     const parsed = Number.parseInt(trimmed, 10);
@@ -52,10 +53,6 @@ const PollCreationPage = (): React.JSX.Element => {
     const pageTitleId = React.useId();
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
     const [form, setForm] = useState<Form>(initialForm);
-    const [customThresholds, setCustomThresholds] = useState({
-        reconstructionThreshold: false,
-        minimumPublishedVoterCount: false,
-    });
     const [creatorToken, setCreatorToken] = useState<string | null>(null);
     const runtimeOrigin =
         typeof window === 'undefined' ? undefined : window.location.origin;
@@ -72,15 +69,6 @@ const PollCreationPage = (): React.JSX.Element => {
     }: ChangeEvent<HTMLInputElement>): void => {
         setCreatorToken(null);
         setForm((previousForm) => ({ ...previousForm, [id]: value }));
-        if (
-            id === 'reconstructionThreshold' ||
-            id === 'minimumPublishedVoterCount'
-        ) {
-            setCustomThresholds((previousState) => ({
-                ...previousState,
-                [id]: true,
-            }));
-        }
     };
 
     const onAddChoice = (choice: string): void => {
@@ -118,13 +106,14 @@ const PollCreationPage = (): React.JSX.Element => {
             pollName: normalizedPollName,
             choices: form.choices,
             creatorToken: nextCreatorToken,
-            reconstructionThreshold: customThresholds.reconstructionThreshold
-                ? parseOptionalInteger(form.reconstructionThreshold)
-                : undefined,
-            minimumPublishedVoterCount:
-                customThresholds.minimumPublishedVoterCount
-                    ? parseOptionalInteger(form.minimumPublishedVoterCount)
-                    : undefined,
+            reconstructionThreshold: parseIntegerWithFallback(
+                form.reconstructionThreshold,
+                defaultPreviewReconstructionThreshold,
+            ),
+            minimumPublishedVoterCount: parseIntegerWithFallback(
+                form.minimumPublishedVoterCount,
+                defaultPreviewMinimumPublishedVoterCount,
+            ),
             protocolVersion: 'v1',
         })
             .unwrap()
@@ -178,25 +167,31 @@ const PollCreationPage = (): React.JSX.Element => {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <OutlinedInputField
                                 autoComplete="off"
-                                helperText={`How many participants must eventually publish valid decryption shares before the tally can be opened. The form starts with ${defaultPreviewReconstructionThreshold} as a preview for the smallest supported ${previewParticipantCount}-participant ceremony. If you leave it unchanged, the app still uses the automatic strict-majority value from the final roster.`}
+                                helperText={`How many participants must eventually publish valid decryption shares before the tally can be opened. If you leave this empty, the app submits ${defaultPreviewReconstructionThreshold}, which matches the smallest supported ${previewParticipantCount}-participant ceremony.`}
                                 id="reconstructionThreshold"
                                 inputMode="numeric"
                                 label="Reconstruction threshold"
                                 min={2}
                                 name="reconstructionThreshold"
                                 onChange={onFormChange}
+                                placeholder={String(
+                                    defaultPreviewReconstructionThreshold,
+                                )}
                                 type="number"
                                 value={form.reconstructionThreshold}
                             />
                             <OutlinedInputField
                                 autoComplete="off"
-                                helperText={`A publication floor for privacy. Results stay unpublished until at least this many accepted voters exist, even if decryption would already be possible. The form starts with ${defaultPreviewMinimumPublishedVoterCount} as a preview for the smallest supported ceremony. If you leave it unchanged, the app still derives the automatic floor from the final roster.`}
+                                helperText={`A publication floor for privacy. Results stay unpublished until at least this many accepted voters exist, even if decryption would already be possible. If you leave this empty, the app submits ${defaultPreviewMinimumPublishedVoterCount}, which matches the smallest supported ceremony.`}
                                 id="minimumPublishedVoterCount"
                                 inputMode="numeric"
                                 label="Minimum published voter count"
                                 min={2}
                                 name="minimumPublishedVoterCount"
                                 onChange={onFormChange}
+                                placeholder={String(
+                                    defaultPreviewMinimumPublishedVoterCount,
+                                )}
                                 type="number"
                                 value={form.minimumPublishedVoterCount}
                             />
@@ -206,7 +201,8 @@ const PollCreationPage = (): React.JSX.Element => {
                             availability. Minimum published voter count controls
                             whether the app is willing to publish results at
                             all. They are related, but they are not the same
-                            policy.
+                            policy. For larger ceremonies, enter higher values
+                            instead of relying on the placeholder defaults.
                         </p>
                         <p className="field-note">
                             This version uses token-only enrollment. The public
