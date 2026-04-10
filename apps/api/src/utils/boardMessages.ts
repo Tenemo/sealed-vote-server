@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 import type { BoardMessageRecord } from '@sealed-vote/contracts';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import {
     auditSignedPayloads,
     canonicalUnsignedPayloadBytes,
@@ -78,20 +78,34 @@ export const classifyBoardMessages = async (
         rowsBySlot.set(row.slotKey, existing);
     }
 
+    const slotMetadata = new Map<
+        string,
+        {
+            distinctUnsignedHashCount: number;
+            firstRowId: string | null;
+        }
+    >();
+
+    for (const [slotKey, slotRows] of rowsBySlot) {
+        slotMetadata.set(slotKey, {
+            distinctUnsignedHashCount: new Set(
+                slotRows.map((entry) => entry.unsignedHash),
+            ).size,
+            firstRowId: slotRows[0]?.id ?? null,
+        });
+    }
+
     const records: BoardMessageRecord[] = [];
     const acceptedRows: BoardMessageRow[] = [];
     let duplicateCount = 0;
     let equivocationCount = 0;
 
     for (const row of sortedRows) {
-        const slotRows = rowsBySlot.get(row.slotKey) ?? [];
-        const distinctUnsignedHashes = new Set(
-            slotRows.map((entry) => entry.unsignedHash),
-        );
+        const slot = slotMetadata.get(row.slotKey);
         const classification =
-            distinctUnsignedHashes.size > 1
+            (slot?.distinctUnsignedHashCount ?? 0) > 1
                 ? 'equivocation'
-                : slotRows[0]?.id === row.id
+                : slot?.firstRowId === row.id
                   ? 'accepted'
                   : 'idempotent';
 
@@ -166,8 +180,16 @@ export const getLastBoardEntryHash = async (
     db: DatabaseTransaction,
     pollId: string,
 ): Promise<string | null> => {
-    const rows = await getBoardMessageRows(db, pollId);
-    return rows.length > 0 ? rows[rows.length - 1].entryHash : null;
+    const [lastRow] = await db
+        .select({
+            entryHash: boardMessages.entryHash,
+        })
+        .from(boardMessages)
+        .where(eq(boardMessages.pollId, pollId))
+        .orderBy(desc(boardMessages.createdAt), desc(boardMessages.id))
+        .limit(1);
+
+    return lastRow?.entryHash ?? null;
 };
 
 export const boardMessageSlotKey = (signedPayload: SignedPayload): string =>

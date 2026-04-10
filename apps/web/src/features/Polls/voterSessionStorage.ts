@@ -13,6 +13,28 @@ type StoredVoterSessions = Record<string, StoredVoterSession>;
 const canUseLocalStorage = (): boolean =>
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+const isStoredVoterSession = (value: unknown): value is StoredVoterSession => {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+
+    const candidate = value as Partial<StoredVoterSession>;
+
+    return (
+        typeof candidate.pollId === 'string' &&
+        candidate.pollId.length > 0 &&
+        typeof candidate.pollSlug === 'string' &&
+        candidate.pollSlug.length > 0 &&
+        typeof candidate.voterIndex === 'number' &&
+        Number.isInteger(candidate.voterIndex) &&
+        candidate.voterIndex > 0 &&
+        typeof candidate.voterName === 'string' &&
+        candidate.voterName.length > 0 &&
+        typeof candidate.voterToken === 'string' &&
+        candidate.voterToken.length > 0
+    );
+};
+
 const readVoterSessions = (): StoredVoterSessions => {
     if (!canUseLocalStorage()) {
         return {};
@@ -27,9 +49,20 @@ const readVoterSessions = (): StoredVoterSessions => {
 
         const parsedValue = JSON.parse(rawValue);
 
-        return typeof parsedValue === 'object' && parsedValue !== null
-            ? (parsedValue as StoredVoterSessions)
-            : {};
+        if (
+            typeof parsedValue !== 'object' ||
+            parsedValue === null ||
+            Array.isArray(parsedValue)
+        ) {
+            return {};
+        }
+
+        return Object.fromEntries(
+            Object.entries(parsedValue).filter(
+                ([pollId, session]) =>
+                    isStoredVoterSession(session) && session.pollId === pollId,
+            ),
+        ) as StoredVoterSessions;
     } catch {
         return {};
     }

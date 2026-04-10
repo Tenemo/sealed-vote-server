@@ -370,7 +370,11 @@ export const boardMessageRoutes = async (
             }>,
             reply: FastifyReply,
         ): Promise<BoardMessageRecord> => {
-            if (!req.body.signedPayload?.payload) {
+            if (
+                !req.body.signedPayload?.payload ||
+                typeof req.body.signedPayload.payload !== 'object' ||
+                Array.isArray(req.body.signedPayload.payload)
+            ) {
                 throw createError(
                     400,
                     ERROR_MESSAGES.boardMessageSignatureRequired,

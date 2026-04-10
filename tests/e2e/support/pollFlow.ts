@@ -5,6 +5,12 @@ import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
 
+const escapeRegExp = (value: string): string =>
+    value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const participantRowText = (participantName: string): RegExp =>
+    new RegExp(`^\\s*\\d+\\.\\s+${escapeRegExp(participantName)}\\s*$`);
+
 type CreatePollResponse = {
     creatorToken: string;
     id: string;
@@ -103,7 +109,10 @@ export const expectParticipantsVisible = async (
 
     for (const participantName of participantNames) {
         await expect(
-            page.getByRole('listitem').filter({ hasText: participantName }).first(),
+            page
+                .getByRole('listitem')
+                .filter({ hasText: participantRowText(participantName) })
+                .first(),
         ).toBeVisible();
     }
 };
@@ -114,7 +123,9 @@ export const expectParticipantsHidden = async (
 ): Promise<void> => {
     for (const participantName of participantNames) {
         await expect(
-            page.getByRole('listitem').filter({ hasText: participantName }),
+            page
+                .getByRole('listitem')
+                .filter({ hasText: participantRowText(participantName) }),
         ).toHaveCount(0);
     }
 };

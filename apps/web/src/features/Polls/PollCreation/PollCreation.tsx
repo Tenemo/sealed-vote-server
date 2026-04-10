@@ -44,8 +44,12 @@ const parseIntegerWithFallback = (
         return fallbackValue;
     }
 
-    const parsed = Number.parseInt(trimmed, 10);
-    return Number.isInteger(parsed) ? parsed : undefined;
+    if (!/^\d+$/.test(trimmed)) {
+        return undefined;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
 };
 
 const PollCreationPage = (): React.JSX.Element => {

@@ -12,7 +12,19 @@ export const PollRefParamsSchema = Type.Object({
 
 export type PollRefParams = Static<typeof PollRefParamsSchema>;
 
-export const SignedPayloadSchema = Type.Any();
+export const SignedPayloadSchema = Type.Object(
+    {
+        payload: Type.Any(),
+        signature: Type.String({
+            minLength: 2,
+            maxLength: 8192,
+            pattern: '^(?:[A-Fa-f0-9]{2})+$',
+        }),
+    },
+    {
+        additionalProperties: false,
+    },
+);
 
 export const BoardMessageRecordSchema = Type.Object({
     id: Type.String(),

@@ -245,6 +245,67 @@ describe('PollCreation', () => {
         });
     });
 
+    it('rejects decimal threshold input instead of truncating it', async () => {
+        const user = userEvent.setup();
+
+        mockedGenerateClientToken.mockReturnValue('creator-token-1');
+        mockedCreatePoll.mockReturnValue({
+            unwrap: () => new Promise<void>(() => undefined),
+        });
+
+        render(
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
+        );
+
+        await user.type(
+            screen.getByRole('textbox', { name: /^Vote name/i }),
+            'Best fruit',
+        );
+        await user.type(
+            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
+            'Apples',
+        );
+        await user.click(
+            screen.getByRole('button', { name: 'Add new choice' }),
+        );
+        await user.type(
+            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
+            'Bananas',
+        );
+        await user.click(
+            screen.getByRole('button', { name: 'Add new choice' }),
+        );
+        await user.type(
+            screen.getByRole('spinbutton', {
+                name: /^Reconstruction threshold/i,
+            }),
+            '2.5',
+        );
+        await user.type(
+            screen.getByRole('spinbutton', {
+                name: /^Minimum published voter count/i,
+            }),
+            '6',
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Create vote' }));
+
+        expect(mockedCreatePoll).toHaveBeenCalledWith({
+            choices: ['Apples', 'Bananas'],
+            creatorToken: 'creator-token-1',
+            minimumPublishedVoterCount: 6,
+            pollName: 'Best fruit',
+            protocolVersion: 'v1',
+            reconstructionThreshold: undefined,
+        });
+    });
+
     it('renders create-page SEO metadata', () => {
         render(
             <HelmetProvider>
