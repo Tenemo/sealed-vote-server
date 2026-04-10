@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { polls } from './schema.js';
 
-type SeedPhase = 'registration' | 'voting' | 'results';
+type SeedPhase = 'registration' | 'setup';
 
 type SeedManifestVoter = {
     voterName: string;
@@ -26,12 +26,12 @@ type SeedManifest = {
 };
 
 const registrationSampleName = 'Seed registration sample';
-const votingSampleName = 'Seed voting sample';
-const resultsSampleName = 'Seed results sample';
+const setupSampleName = 'Seed setup sample';
+const experimentalSampleName = 'Seed experimental sample';
 const seedPollNames = [
     registrationSampleName,
-    votingSampleName,
-    resultsSampleName,
+    setupSampleName,
+    experimentalSampleName,
 ];
 
 const toManifestPoll = (
@@ -64,48 +64,34 @@ const buildRegistrationSample = async (
     return builder.getContext();
 };
 
-const buildVotingSample = async (
+const buildSetupSample = async (
     fastify: FastifyInstance,
 ): Promise<TestPollContext> => {
     const builder = new TestPollBuilder(fastify)
-        .withPollName(votingSampleName)
+        .withPollName(setupSampleName)
         .withChoices(['Dog', 'Cat', 'Goat'])
         .withVoters(['Alice', 'Bob', 'Charlie']);
 
     await builder.create();
     await builder.registerVoters();
     await builder.close();
-    await builder.submitPublicKeyShares();
 
     return builder.getContext();
 };
 
-const buildResultsSample = async (
+const buildExperimentalSample = async (
     fastify: FastifyInstance,
 ): Promise<TestPollContext> => {
     const builder = new TestPollBuilder(fastify)
-        .withPollName(resultsSampleName)
-        .withChoices(['Red', 'Green', 'Blue'])
-        .withVoters(['Ada', 'Grace', 'Linus'])
-        .withScoreMatrix({
-            Ada: {
-                Red: 2,
-                Green: 3,
-                Blue: 5,
-            },
-            Grace: {
-                Red: 7,
-                Green: 11,
-                Blue: 13,
-            },
-            Linus: {
-                Red: 17,
-                Green: 19,
-                Blue: 23,
-            },
-        });
+        .withPollName(experimentalSampleName)
+        .withChoices(['Red', 'Green', 'Blue', 'Yellow'])
+        .withVoters(['Ada', 'Grace', 'Linus', 'Ken']);
 
-    return builder.complete();
+    await builder.create();
+    await builder.registerVoters();
+    await builder.close();
+
+    return builder.getContext();
 };
 
 export const seedDatabase = async (
@@ -116,8 +102,8 @@ export const seedDatabase = async (
         .where(inArray(polls.pollName, seedPollNames));
 
     const registrationSample = await buildRegistrationSample(fastify);
-    const votingSample = await buildVotingSample(fastify);
-    const resultsSample = await buildResultsSample(fastify);
+    const setupSample = await buildSetupSample(fastify);
+    const experimentalSample = await buildExperimentalSample(fastify);
 
     return {
         generatedAt: new Date().toISOString(),
@@ -127,8 +113,8 @@ export const seedDatabase = async (
                 'registration',
                 registrationSample,
             ),
-            toManifestPoll(votingSampleName, 'voting', votingSample),
-            toManifestPoll(resultsSampleName, 'results', resultsSample),
+            toManifestPoll(setupSampleName, 'setup', setupSample),
+            toManifestPoll(experimentalSampleName, 'setup', experimentalSample),
         ],
     };
 };

@@ -1,80 +1,125 @@
-import { combinePublicKeys, generateKeys } from 'threshold-elgamal';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-    computeEncryptedTallies,
-    createDecryptionSharesForTallies,
-    decryptTallies,
-    serializeVotes,
+    acceptedBoardMessages,
+    filterBoardMessagesByType,
 } from '../src/crypto';
 
-describe('crypto helpers', () => {
-    test('serializes votes in choice order and decrypts tallies', () => {
-        const voter1 = generateKeys(1, 2);
-        const voter2 = generateKeys(2, 2);
-        const commonPublicKey = combinePublicKeys([
-            voter1.publicKey,
-            voter2.publicKey,
-        ]);
+import type { BoardMessageRecord } from '@sealed-vote/contracts';
+import type { SignedPayload } from 'threshold-elgamal/protocol';
 
-        const votes = [
-            serializeVotes({ Dog: 9, Cat: 4 }, ['Dog', 'Cat'], commonPublicKey),
-            serializeVotes({ Dog: 3, Cat: 2 }, ['Dog', 'Cat'], commonPublicKey),
+const createSignedPayload = (
+    messageType: SignedPayload['payload']['messageType'],
+    participantIndex: number,
+): SignedPayload => ({
+    payload: {
+        sessionId: '1'.repeat(64),
+        manifestHash: '2'.repeat(64),
+        phase: 0,
+        participantIndex,
+        messageType,
+        ...(messageType === 'registration'
+            ? {
+                  rosterHash: '3'.repeat(64),
+                  authPublicKey: '4'.repeat(182),
+                  transportPublicKey: '5'.repeat(64),
+              }
+            : {
+                  checkpointPhase: 0,
+                  checkpointTranscriptHash: '6'.repeat(64),
+                  qualParticipantIndices: [1, 2, 3],
+              }),
+    } as SignedPayload['payload'],
+    signature: '7'.repeat(128),
+});
+
+const createBoardEntry = ({
+    classification,
+    messageType,
+    participantIndex,
+}: {
+    classification: BoardMessageRecord['classification'];
+    messageType: BoardMessageRecord['messageType'];
+    participantIndex: number;
+}): BoardMessageRecord => ({
+    id: `entry-${participantIndex}-${messageType}-${classification}`,
+    createdAt: '2026-04-10T00:00:00.000Z',
+    phase: 0,
+    participantIndex,
+    messageType,
+    slotKey: `slot-${participantIndex}-${messageType}`,
+    unsignedHash: `${participantIndex}`.repeat(64),
+    previousEntryHash: null,
+    entryHash: `${participantIndex + 1}`.repeat(64),
+    classification,
+    signedPayload: createSignedPayload(messageType, participantIndex),
+});
+
+describe('board message helpers', () => {
+    it('returns only accepted payloads from the full board log', () => {
+        const boardEntries = [
+            createBoardEntry({
+                classification: 'accepted',
+                messageType: 'registration',
+                participantIndex: 1,
+            }),
+            createBoardEntry({
+                classification: 'idempotent',
+                messageType: 'registration',
+                participantIndex: 1,
+            }),
+            createBoardEntry({
+                classification: 'equivocation',
+                messageType: 'phase-checkpoint',
+                participantIndex: 2,
+            }),
+            createBoardEntry({
+                classification: 'accepted',
+                messageType: 'phase-checkpoint',
+                participantIndex: 3,
+            }),
         ];
 
-        const tallies = computeEncryptedTallies(votes);
-        const shares = [
-            createDecryptionSharesForTallies(tallies, voter1.privateKey),
-            createDecryptionSharesForTallies(tallies, voter2.privateKey),
-        ];
+        const acceptedPayloads = acceptedBoardMessages(boardEntries);
 
-        expect(decryptTallies(tallies, shares)).toEqual([27n, 8n]);
+        expect(acceptedPayloads).toHaveLength(2);
+        expect(
+            acceptedPayloads.map((payload) => payload.payload.messageType),
+        ).toEqual(['registration', 'phase-checkpoint']);
     });
 
-    test('decrypts tallies above Number.MAX_SAFE_INTEGER without precision loss', () => {
-        const voter1 = generateKeys(1, 2);
-        const voter2 = generateKeys(2, 2);
-        const commonPublicKey = combinePublicKeys([
-            voter1.publicKey,
-            voter2.publicKey,
-        ]);
-
-        const votes = [
-            serializeVotes(
-                {
-                    Huge: 9007199254740991,
-                },
-                ['Huge'],
-                commonPublicKey,
-            ),
-            serializeVotes(
-                {
-                    Huge: 10,
-                },
-                ['Huge'],
-                commonPublicKey,
-            ),
+    it('filters accepted payloads by protocol message type', () => {
+        const boardEntries = [
+            createBoardEntry({
+                classification: 'accepted',
+                messageType: 'registration',
+                participantIndex: 1,
+            }),
+            createBoardEntry({
+                classification: 'accepted',
+                messageType: 'registration',
+                participantIndex: 2,
+            }),
+            createBoardEntry({
+                classification: 'accepted',
+                messageType: 'phase-checkpoint',
+                participantIndex: 3,
+            }),
+            createBoardEntry({
+                classification: 'idempotent',
+                messageType: 'registration',
+                participantIndex: 4,
+            }),
         ];
 
-        const tallies = computeEncryptedTallies(votes);
-        const shares = [
-            createDecryptionSharesForTallies(tallies, voter1.privateKey),
-            createDecryptionSharesForTallies(tallies, voter2.privateKey),
-        ];
+        const registrations = filterBoardMessagesByType(
+            boardEntries,
+            'registration',
+        );
 
-        expect(decryptTallies(tallies, shares)).toEqual([90071992547409910n]);
-    });
-
-    test('throws when a score is missing for one of the choices', () => {
-        const voter = generateKeys(1, 1);
-
-        expect(() =>
-            serializeVotes({ Dog: 9 }, ['Dog', 'Cat'], voter.publicKey),
-        ).toThrow('Missing score for choice "Cat".');
-    });
-
-    test('returns empty arrays for empty tallies or votes', () => {
-        expect(computeEncryptedTallies([])).toEqual([]);
-        expect(decryptTallies([], [])).toEqual([]);
+        expect(registrations).toHaveLength(2);
+        expect(
+            registrations.map((payload) => payload.payload.participantIndex),
+        ).toEqual([1, 2]);
     });
 });

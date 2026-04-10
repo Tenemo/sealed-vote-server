@@ -48,7 +48,7 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     expectNoUnexpectedErrors(tracker);
 });
 
-test('keeps the vote page usable and the score grid reachable at 320 pixels wide', async ({
+test('keeps the poll page usable at 320 pixels wide before the board ceremony starts', async ({
     page,
     request,
 }, testInfo) => {
@@ -56,29 +56,34 @@ test('keeps the vote page usable and the score grid reachable at 320 pixels wide
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
 
-    attachErrorTracking(page, 'mobile-vote', tracker);
+    attachErrorTracking(page, 'mobile-poll', tracker);
 
     try {
         await page.setViewportSize(mobileViewport);
+        const pollName = createPollName('Mobile layout', namespace);
 
         const createdPoll = await createPoll({
             page,
-            pollName: createPollName('Mobile layout', namespace),
+            pollName,
         });
         createdPolls.push(createdPoll);
 
         await expect(
-            page.getByRole('heading', { name: 'Cast your vote' }),
+            page.getByRole('heading', { name: pollName }),
+        ).toBeVisible();
+        await expect(page.getByText(/Phase:\s*registration\./i)).toBeVisible();
+        await expect(page.getByLabel('Your public name')).toBeVisible();
+        await expect(
+            page.getByRole('button', { exact: true, name: 'Register' }),
         ).toBeVisible();
         await expect(
-            page.getByRole('radio', { name: 'Score 10 for Apples' }),
+            page.getByRole('heading', { name: 'Thresholds' }),
         ).toBeVisible();
-        await expect(page.getByLabel('Voter name')).toBeVisible();
         await expect(
-            page.getByRole('button', { exact: true, name: 'Vote' }),
+            page.getByRole('heading', { name: 'Board audit' }),
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
-        await expectNoAxeViolations(page, 'mobile vote page');
+        await expectNoAxeViolations(page, 'mobile poll page');
         expectNoUnexpectedErrors(tracker);
     } finally {
         await deletePolls(request, createdPolls);

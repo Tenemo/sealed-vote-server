@@ -24,6 +24,7 @@ describe('POST /polls/:pollId/close', () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         await registerVoter(fastify, pollId, 'Voter1');
         await registerVoter(fastify, pollId, 'Voter2');
+        await registerVoter(fastify, pollId, 'Voter3');
 
         const closeResponse = await fastify.inject({
             method: 'POST',
@@ -127,6 +128,7 @@ describe('POST /polls/:pollId/close', () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         await registerVoter(fastify, pollId, 'Voter1');
         await registerVoter(fastify, pollId, 'Voter2');
+        await registerVoter(fastify, pollId, 'Voter3');
 
         const firstResponse = await fastify.inject({
             method: 'POST',

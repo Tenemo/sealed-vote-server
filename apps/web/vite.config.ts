@@ -47,7 +47,6 @@ const getManualChunk = (id: string): string | undefined => {
         normalizedId.includes('/node_modules/@reduxjs/') ||
         normalizedId.includes('/node_modules/react-redux/') ||
         normalizedId.includes('/node_modules/redux/') ||
-        normalizedId.includes('/node_modules/redux-persist/') ||
         normalizedId.includes('/node_modules/immer/') ||
         normalizedId.includes('/node_modules/reselect/')
     ) {

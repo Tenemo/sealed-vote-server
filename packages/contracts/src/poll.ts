@@ -1,9 +1,14 @@
-import type { EncryptedMessage } from './vote.js';
+import type { ElectionManifest } from 'threshold-elgamal/protocol';
+
+import type { BoardMessageRecord } from './vote.js';
 
 export type CreatePollRequest = {
     choices: string[];
     creatorToken: string;
     pollName: string;
+    reconstructionThreshold?: number;
+    minimumPublishedVoterCount?: number;
+    protocolVersion?: string;
 };
 
 export type CreatePollResponse = {
@@ -12,22 +17,65 @@ export type CreatePollResponse = {
     creatorToken: string;
 };
 
+export type PollRosterParticipant = {
+    voterIndex: number;
+    voterName: string;
+};
+
+export type PollBoardAudit = {
+    acceptedCount: number;
+    duplicateCount: number;
+    equivocationCount: number;
+    ceremonyDigest: string | null;
+    phaseDigests: {
+        phase: number;
+        digest: string;
+    }[];
+};
+
+export type PollVerificationSummary = {
+    status: 'not-ready' | 'verified' | 'invalid';
+    reason: string | null;
+    qualParticipantIndices: number[];
+    verifiedOptionTallies: {
+        optionIndex: number;
+        tally: string;
+        mean: number;
+        acceptedBallotCount: number;
+    }[];
+};
+
+export type PollPhase =
+    | 'registration'
+    | 'setup'
+    | 'ballot'
+    | 'decryption'
+    | 'complete'
+    | 'aborted';
+
 export type PollResponse = {
     id: string;
     slug: string;
     pollName: string;
     createdAt: string;
-    choices: string[];
-    voters: string[];
     isOpen: boolean;
-    publicKeyShareCount: number;
-    encryptedVoteCount: number;
-    decryptionShareCount: number;
-    commonPublicKey: string | null;
-    encryptedTallies: EncryptedMessage[];
-    publishedDecryptionShares: string[][];
-    resultTallies: string[];
-    resultScores: number[];
+    choices: string[];
+    voters: PollRosterParticipant[];
+    manifest: ElectionManifest | null;
+    manifestHash: string | null;
+    sessionId: string | null;
+    sessionFingerprint: string | null;
+    phase: PollPhase;
+    boardAudit: PollBoardAudit;
+    verification: PollVerificationSummary;
+    boardEntries: BoardMessageRecord[];
+    thresholds: {
+        reconstructionThreshold: number | null;
+        minimumPublishedVoterCount: number | null;
+        suggestedReconstructionThreshold: number;
+        maxParticipants: number;
+        validationTarget: number;
+    };
 };
 
 export type RegisterVoterRequest = {
@@ -61,18 +109,8 @@ export type RecoverSessionResponse = {
     role: 'creator' | 'voter';
     pollId: string;
     pollSlug: string;
-    phase:
-        | 'registration'
-        | 'key-generation'
-        | 'voting'
-        | 'tallying'
-        | 'decryption'
-        | 'complete';
+    phase: PollPhase;
     isOpen: boolean;
     voterName: string | null;
     voterIndex: number | null;
-    hasSubmittedPublicKeyShare: boolean;
-    hasSubmittedVote: boolean;
-    hasSubmittedDecryptionShares: boolean;
-    resultsAvailable: boolean;
 };

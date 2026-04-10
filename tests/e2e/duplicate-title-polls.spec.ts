@@ -10,6 +10,7 @@ import {
     deletePolls,
     expectParticipantsHidden,
     expectParticipantsVisible,
+    registerParticipant,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -19,7 +20,7 @@ import {
 } from './support/errorTracking';
 import { createTestNamespace, createVoterName } from './support/testData';
 
-test('keeps duplicate-title polls on distinct slug URLs', async ({
+test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', async ({
     browser,
     page,
     request,
@@ -28,8 +29,10 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const pollTitle = `Duplicate title vote ${namespace}`.slice(0, 64);
+    const firstPollVoterName = createVoterName('alice', namespace);
+    const secondPollVoterName = createVoterName('bob', namespace);
 
-    attachErrorTracking(page, 'page-1', tracker);
+    attachErrorTracking(page, 'first-poll', tracker);
 
     const createPollWithTitle = async (): Promise<CreatedPoll> => {
         const createdPoll = await createPoll({
@@ -47,38 +50,28 @@ test('keeps duplicate-title polls on distinct slug URLs', async ({
     expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
 
     await gotoInteractablePage(page, firstPoll.pollUrl);
-    await page
-        .getByLabel('Voter name')
-        .fill(createVoterName('alice', namespace));
-    await page.getByRole('button', { exact: true, name: 'Vote' }).click();
-    await expectParticipantsVisible(page, [
-        createVoterName('alice', namespace),
-    ]);
+    await registerParticipant({
+        page,
+        voterName: firstPollVoterName,
+    });
+    await expectParticipantsVisible(page, [firstPollVoterName]);
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'page-2', tracker);
+    attachErrorTracking(participant.page, 'second-poll', tracker);
 
     try {
-        await gotoInteractablePage(participant.page, secondPoll.pollUrl);
-        await participant.page
-            .getByLabel('Voter name')
-            .fill(createVoterName('bob', namespace));
-        await participant.page
-            .getByRole('button', { exact: true, name: 'Vote' })
-            .click();
+        await registerParticipant({
+            page: participant.page,
+            pollUrl: secondPoll.pollUrl,
+            voterName: secondPollVoterName,
+        });
 
         await expectParticipantsVisible(participant.page, [
-            createVoterName('bob', namespace),
+            secondPollVoterName,
         ]);
-        await expectParticipantsVisible(page, [
-            createVoterName('alice', namespace),
-        ]);
-        await expectParticipantsHidden(page, [
-            createVoterName('bob', namespace),
-        ]);
-        await expectParticipantsHidden(participant.page, [
-            createVoterName('alice', namespace),
-        ]);
+        await expectParticipantsVisible(page, [firstPollVoterName]);
+        await expectParticipantsHidden(page, [secondPollVoterName]);
+        await expectParticipantsHidden(participant.page, [firstPollVoterName]);
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);

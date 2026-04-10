@@ -3,11 +3,11 @@ import type {
     ClosePollRequest as ClosePollRequestContract,
     MessageResponse,
 } from '@sealed-vote/contracts';
-import { canClose } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
+import { majorityThreshold } from 'threshold-elgamal/core';
 
 import { polls } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
@@ -74,19 +74,36 @@ export const close = async (fastify: FastifyInstance): Promise<void> => {
                     return { message: 'Poll closed successfully' };
                 }
 
-                if (
-                    !canClose({
-                        isOpen: poll.isOpen,
-                        commonPublicKey: null,
-                        voterCount,
-                        encryptedVoteCount: 0,
-                        encryptedTallyCount: 0,
-                        resultScoreCount: 0,
-                    })
-                ) {
+                if (voterCount < 3) {
                     throw createError(
                         400,
                         ERROR_MESSAGES.notEnoughVotersToClose,
+                    );
+                }
+
+                const reconstructionThreshold =
+                    poll.requestedReconstructionThreshold ??
+                    majorityThreshold(voterCount);
+
+                if (
+                    reconstructionThreshold < majorityThreshold(voterCount) ||
+                    reconstructionThreshold > voterCount - 1
+                ) {
+                    throw createError(
+                        400,
+                        `Reconstruction threshold must stay within the strict-majority range for ${voterCount} participants.`,
+                    );
+                }
+
+                if (
+                    poll.requestedMinimumPublishedVoterCount !== null &&
+                    (poll.requestedMinimumPublishedVoterCount <
+                        reconstructionThreshold ||
+                        poll.requestedMinimumPublishedVoterCount > voterCount)
+                ) {
+                    throw createError(
+                        400,
+                        `Minimum published voter count must be between ${reconstructionThreshold} and ${voterCount}.`,
                     );
                 }
 

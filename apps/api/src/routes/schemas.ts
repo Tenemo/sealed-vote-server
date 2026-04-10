@@ -12,9 +12,24 @@ export const PollRefParamsSchema = Type.Object({
 
 export type PollRefParams = Static<typeof PollRefParamsSchema>;
 
-export const EncryptedMessageSchema = Type.Object({
-    c1: Type.String(),
-    c2: Type.String(),
+export const SignedPayloadSchema = Type.Any();
+
+export const BoardMessageRecordSchema = Type.Object({
+    id: Type.String(),
+    createdAt: Type.String(),
+    phase: Type.Number(),
+    participantIndex: Type.Number(),
+    messageType: Type.String(),
+    slotKey: Type.String(),
+    unsignedHash: Type.String(),
+    previousEntryHash: Type.Union([Type.String(), Type.Null()]),
+    entryHash: Type.String(),
+    classification: Type.Union([
+        Type.Literal('accepted'),
+        Type.Literal('idempotent'),
+        Type.Literal('equivocation'),
+    ]),
+    signedPayload: SignedPayloadSchema,
 });
 
 export const SecureTokenSchema = Type.String({

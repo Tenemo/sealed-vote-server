@@ -43,6 +43,13 @@
       "when": 1775775215066,
       "tag": "0005_drop_max_participants",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775848960000,
+      "tag": "0006_board_log_rewrite",
+      "breakpoints": true
     }
   ]
 }
