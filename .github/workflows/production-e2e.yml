@@ -40,6 +40,9 @@ jobs:
         name: production e2e (${{ matrix.project.name }})
         needs: wait-for-production-deploy
         runs-on: ubuntu-latest
+        container:
+            image: mcr.microsoft.com/playwright:v1.59.1-noble
+            options: --ipc=host
         timeout-minutes: 30
         strategy:
             fail-fast: false
@@ -47,26 +50,19 @@ jobs:
                 project:
                     - name: chromium-desktop
                       slug: chromium-desktop
-                      browser_cache_key: chromium-firefox
                       ci_workers: '1'
-                      install_browsers: chromium firefox
                     - name: firefox-desktop
                       slug: firefox-desktop
-                      browser_cache_key: firefox
                       ci_workers: '4'
-                      install_browsers: firefox
                     - name: webkit-desktop
                       slug: webkit-desktop
-                      browser_cache_key: webkit
                       ci_workers: '4'
-                      install_browsers: webkit
                     - name: mobile-firefox-android
                       slug: mobile-firefox-android
-                      browser_cache_key: firefox
                       ci_workers: '4'
-                      install_browsers: firefox
 
         env:
+            HOME: /root
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_BLOB_REPORT: 'true'
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
@@ -87,15 +83,6 @@ jobs:
 
             - name: install dependencies
               run: pnpm install --frozen-lockfile
-
-            - name: cache Playwright browsers
-              uses: actions/cache@v5
-              with:
-                  path: ~/.cache/ms-playwright
-                  key: ${{ runner.os }}-playwright-production-${{ matrix.project.browser_cache_key }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-            - name: install Playwright browsers
-              run: pnpm exec playwright install --with-deps ${{ matrix.project.install_browsers }}
 
             - name: run production browser e2e
               run: pnpm e2e:production:test -- --project ${{ matrix.project.name }}
