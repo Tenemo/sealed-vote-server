@@ -123,6 +123,7 @@ describe('Register voter endpoint', () => {
         );
         await registerVoter(fastify, pollId, 'Voter1');
         await registerVoter(fastify, pollId, 'Voter2');
+        await registerVoter(fastify, pollId, 'Voter3');
         await closePoll(fastify, pollId, creatorToken);
 
         const registrationResult = await registerVoter(
@@ -144,7 +145,7 @@ describe('Register voter endpoint', () => {
             getUniquePollName('RegisteringMaxParticipants'),
         );
 
-        for (let index = 1; index <= 20; index += 1) {
+        for (let index = 1; index <= 51; index += 1) {
             const registrationResult = await registerVoter(
                 fastify,
                 pollId,
@@ -160,7 +161,7 @@ describe('Register voter endpoint', () => {
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
             payload: {
-                voterName: 'Voter 21',
+                voterName: 'Voter 52',
                 voterToken: generateToken(),
             },
         });

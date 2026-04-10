@@ -8,10 +8,7 @@ export const POLL_ROUTES = {
     recoverSession: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/recover-session`,
     close: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/close`,
-    publicKeyShare: (pollId: string): string =>
-        `${API_PREFIX}/polls/${pollId}/public-key-share`,
-    vote: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/vote`,
-    decryptionShares: (pollId: string): string =>
-        `${API_PREFIX}/polls/${pollId}/decryption-shares`,
+    boardMessages: (pollId: string): string =>
+        `${API_PREFIX}/polls/${pollId}/board/messages`,
     remove: (pollId: string): string => `${API_PREFIX}/polls/${pollId}`,
 } as const;

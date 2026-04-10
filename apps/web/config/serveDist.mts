@@ -157,9 +157,7 @@ const start = async (): Promise<void> => {
 
     await assertBuiltDistExists();
     const baseHtmlPath = path.resolve(distDirectory, 'index.html');
-    const serviceWorkerPath = path.resolve(distDirectory, 'service-worker.js');
     const baseHtml = await fs.readFile(baseHtmlPath, 'utf8');
-    const serviceWorker = await fs.readFile(serviceWorkerPath);
     const seoApiBaseUrl = resolveSeoApiBaseUrl(process.env.VITE_API_BASE_URL);
 
     const serveStatic = sirv(distDirectory, {
@@ -191,19 +189,6 @@ const start = async (): Promise<void> => {
         const isDocumentRequest =
             (request.method === 'GET' || request.method === 'HEAD') &&
             path.extname(requestUrl.pathname) === '';
-
-        if (
-            requestUrl.pathname === '/service-worker.js' &&
-            (request.method === 'GET' || request.method === 'HEAD')
-        ) {
-            response.statusCode = 200;
-            response.setHeader(
-                'Content-Type',
-                'application/javascript; charset=utf-8',
-            );
-            response.end(request.method === 'HEAD' ? undefined : serviceWorker);
-            return;
-        }
 
         if (
             voteSocialImageSlug &&

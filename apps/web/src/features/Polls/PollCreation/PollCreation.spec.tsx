@@ -125,12 +125,18 @@ describe('PollCreation', () => {
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(1, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
+            minimumPublishedVoterCount: undefined,
             pollName: 'Best fruit',
+            protocolVersion: 'v1',
+            reconstructionThreshold: undefined,
         });
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(2, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
+            minimumPublishedVoterCount: undefined,
             pollName: 'Best fruit',
+            protocolVersion: 'v1',
+            reconstructionThreshold: undefined,
         });
     });
 

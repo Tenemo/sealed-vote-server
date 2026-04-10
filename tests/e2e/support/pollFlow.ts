@@ -1,9 +1,6 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-import { gotoInteractablePage } from './navigation.mts';
-
-const connectionToastMessage =
-    'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';
+import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
@@ -61,7 +58,7 @@ export const createPoll = async ({
     };
 };
 
-export const joinPoll = async ({
+export const registerParticipant = async ({
     page,
     pollUrl,
     voterName,
@@ -74,43 +71,39 @@ export const joinPoll = async ({
         await gotoInteractablePage(page, pollUrl);
     }
 
-    await page.getByLabel('Voter name').fill(voterName);
-    await page.getByRole('button', { exact: true, name: 'Vote' }).click();
+    await page.getByLabel('Your public name').fill(voterName);
+    await page.getByRole('button', { exact: true, name: 'Register' }).click();
     await expect(
-        page.getByText('Waiting for the vote to be started...'),
-    ).toBeVisible();
-};
-
-export const beginVote = async (page: Page): Promise<void> => {
-    const beginVoteButton = page.getByRole('button', { name: 'Begin vote' });
-    await expect(beginVoteButton).toBeEnabled({ timeout: 30_000 });
-    await beginVoteButton.click();
-};
-
-export const expectResultsVisible = async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({
-        timeout: 120_000,
+        page.getByText(new RegExp(`^Registered as ${voterName}\\b`)),
+    ).toBeVisible({
+        timeout: 30_000,
     });
+};
+
+export const closeRegistrations = async (page: Page): Promise<void> => {
+    const closeButton = page.getByRole('button', {
+        name: 'Close registrations',
+    });
+
+    await expect(closeButton).toBeVisible();
+    await expect(closeButton).toBeEnabled();
+    await closeButton.click();
     await expect(
-        page.getByText(
-            'Public verification passed. The published tallies and scores match the encrypted tallies and published decryption shares.',
-        ),
-    ).toBeVisible({ timeout: 120_000 });
+        page.getByText('Registrations closed. The board ceremony can begin.'),
+    ).toBeVisible({ timeout: 30_000 });
 };
 
 export const expectParticipantsVisible = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
-    const participantsRegion = page.getByRole('region', {
-        name: 'Participants',
-    });
-
-    await expect(participantsRegion).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Participants' }),
+    ).toBeVisible();
 
     for (const participantName of participantNames) {
         await expect(
-            participantsRegion.getByText(participantName, { exact: true }),
+            page.getByRole('listitem').filter({ hasText: participantName }).first(),
         ).toBeVisible();
     }
 };
@@ -119,48 +112,32 @@ export const expectParticipantsHidden = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
-    const participantsRegion = page.getByRole('region', {
-        name: 'Participants',
-    });
-
     for (const participantName of participantNames) {
         await expect(
-            participantsRegion.getByText(participantName, { exact: true }),
+            page.getByRole('listitem').filter({ hasText: participantName }),
         ).toHaveCount(0);
     }
 };
 
-export const expectConnectionToastVisible = async (
+export const expectBoardCeremonyVisible = async (
     page: Page,
 ): Promise<void> => {
-    await expect(page.locator('[data-slot="connection-toast"]')).toBeVisible({
-        timeout: 20_000,
-    });
-    await expect(page.getByText(connectionToastMessage)).toBeVisible();
+    await expect(
+        page.getByText(/Phase:\s*setup\./i),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+        page.getByText('Registrations are closed and the board log is authoritative.'),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+        page.getByRole('heading', { name: 'Verification' }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Board log' }),
+    ).toBeVisible();
 };
 
-export const expectConnectionToastHidden = async (
-    page: Page,
-): Promise<void> => {
-    await expect(page.locator('[data-slot="connection-toast"]')).toBeHidden({
-        timeout: 20_000,
-    });
-};
-
-export const getShareLinkValue = async (page: Page): Promise<string> =>
-    await page.locator('input[readonly]').inputValue();
-
-export const copyShareLink = async (page: Page): Promise<string> => {
-    const origin = new URL(page.url()).origin;
-
-    await page
-        .context()
-        .grantPermissions(['clipboard-read', 'clipboard-write'], {
-            origin,
-        });
-    await page.getByRole('button', { name: 'Copy vote link' }).click();
-
-    return await page.evaluate(() => navigator.clipboard.readText());
+export const reloadPollPage = async (page: Page): Promise<void> => {
+    await reloadInteractablePage(page);
 };
 
 const deletePoll = async (

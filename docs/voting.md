@@ -1,50 +1,47 @@
 # Voting protocol
 
-The shared protocol logic lives in `packages/protocol`. Both apps consume the same phase derivation, result computation, and crypto helpers so the frontend and backend no longer reconstruct the state machine independently.
+The shared protocol logic lives in `packages/protocol`. Both apps now treat the board log as the source of truth and derive ceremony state from ordered signed payloads instead of trusting server-owned phase tables.
 
 ## Phases
 
-The canonical phases are:
+The public read model exposes these phases:
 
 - `registration`
-- `key-generation`
-- `voting`
-- `tallying`
+- `setup`
+- `ballot`
 - `decryption`
 - `complete`
+- `aborted`
 
-They are derived from the shared `derivePollPhase` helper using the poll state returned by `GET /api/polls/:pollRef`.
+They are derived from the accepted board payloads returned by `GET /api/polls/:pollRef`.
 
 ## Flow
 
 1. A creator creates a poll and receives a `creatorToken`.
-2. Each participant registers with a unique `voterName` and receives a `voterToken` plus `voterIndex`.
-3. The creator closes the poll once at least two voters are registered.
-4. Each voter generates a keypair with `generateKeys(voterIndex, threshold)`.
-5. Each voter submits one public key share authenticated by `voterToken`.
-6. Once every share is present, the backend combines them into `commonPublicKey`.
-7. Each voter encrypts one score per choice and submits the ciphertext vector authenticated by `voterToken`.
-8. Once every voter has submitted, the backend multiplies ciphertexts into encrypted tallies.
-9. Each voter generates one decryption share per tally and submits that vector authenticated by `voterToken`.
-10. Once every voter has submitted decryption shares, the backend decrypts the tallies into plaintext tally strings, computes rounded geometric-mean scores, and publishes both along with the ordered decryption shares used to reveal them.
-11. The frontend verifies the published completed-poll data locally with `verifyPublishedResults({ encryptedTallies, publishedDecryptionShares, resultTallies, resultScores, voterCount })` before showing the final ranking.
+2. Each participant registers a unique public `voterName` and receives a `voterToken` plus `voterIndex`.
+3. The creator closes the poll once at least three participants are registered.
+4. Participants append signed protocol payloads to `POST /api/polls/:pollId/board/messages`. The current route accepts board-backed registration and later ceremony payloads signed with the participant auth key.
+5. The backend stores every board entry append-only, computes a hash chain, and classifies each slot as accepted, idempotent retransmission, or equivocation.
+6. The public read model recomputes manifest state, phase digests, verification status, and threshold summaries from the board log only.
+7. Once ballot, decryption-share, and tally-publication payloads are present, clients verify the ceremony locally and present arithmetic means derived from verified additive tallies.
 
 ## Integrity and liveness
 
-- Submissions are voter-bound. `public-key-share`, `vote`, and `decryption-shares` all require a valid `voterToken`.
-- Each voter can submit only once per phase. The database enforces uniqueness per voter for public key shares, votes, and decryption shares.
-- The current scheme is `n-of-n`. Every registered voter must participate in every cryptographic phase or the poll will stall before completion.
-- The published result model is verifiable. Anyone with the completed poll payload can recompute the plaintext tallies and confirm that the published scores match.
+- Every board submission is tied to a `voterToken`, and the payload `participantIndex` must match the authenticated voter.
+- Exact retransmissions are idempotent when the unsigned canonical payload bytes match, even if the signature bytes differ.
+- Slot conflicts are treated as equivocation. The route still records the message, but the read model marks the slot as tainted.
+- The current app uses configurable strict-majority thresholds with a hard upper bound of 51 participants. The current verified target is 15 participants.
+- Token-based enrollment makes the roster publicly auditable, but this version does not claim strong identity binding or Sybil resistance.
 
 ## Privacy model
 
-- The backend stores encrypted votes, encrypted tallies, decryption shares, published plaintext tally strings, and published rounded scores.
-- The frontend stores in-progress voting session state in browser local storage so refreshes, reconnects, and offline reopen flows do not destroy an active vote.
-- Once a poll reaches `complete`, the persisted frontend state strips `creatorToken`, `voterToken`, `selectedScores`, `privateKey`, and `publicKey`.
-- Sentry replay is configured with full text masking and media blocking.
+- The roster is public. Ballot contents are intended to remain confidential once the full board-backed threshold flow is exercised.
+- The browser stores narrow reconnect metadata locally: creator tokens, voter tokens, voter indices, and poll references.
+- The current UI does not use `redux-persist` or a voting-path service worker cache.
+- Result presentation uses arithmetic means over verified additive tallies, not geometric means.
 
 ## Shared helpers
 
-- `derivePollPhase`, `canRegister`, `canClose`, `canSubmitPublicKeyShare`, `canVote`, and `canSubmitDecryptionShares` live in `packages/protocol/src/phases.ts`
-- `computeGeometricMean`, `computePublishedResultScores`, and `verifyPublishedResults` live in `packages/protocol/src/results.ts`
-- `serializeVotes`, `computeEncryptedTallies`, `createDecryptionSharesForTallies`, `decryptTallies`, and `decryptTalliesToStrings` live in `packages/protocol/src/crypto.ts`
+- `acceptedBoardMessages` and `filterBoardMessagesByType` live in `packages/protocol/src/crypto.ts`
+- `derivePollPhase`, `suggestedReconstructionThreshold`, and `canRegister` live in `packages/protocol/src/phases.ts`
+- `computeArithmeticMean`, `computePublishedResultScores`, and `hasVerifiedTallies` live in `packages/protocol/src/results.ts`

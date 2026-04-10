@@ -19,21 +19,34 @@ import { renderError } from 'utils/networkErrors';
 type Form = {
     pollName: string;
     choices: string[];
+    reconstructionThreshold: string;
+    minimumPublishedVoterCount: string;
 };
 
 const initialForm: Form = {
     pollName: '',
     choices: [],
+    reconstructionThreshold: '',
+    minimumPublishedVoterCount: '',
+};
+
+const parseOptionalInteger = (value: string): number | undefined => {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+        return undefined;
+    }
+
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isInteger(parsed) ? parsed : undefined;
 };
 
 const PollCreationPage = (): React.JSX.Element => {
     const navigate = useNavigate();
     const pageTitleId = React.useId();
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
-
     const [form, setForm] = useState<Form>(initialForm);
     const [creatorToken, setCreatorToken] = useState<string | null>(null);
-    const { pollName, choices } = form;
     const runtimeOrigin =
         typeof window === 'undefined' ? undefined : window.location.origin;
     const createPageSeo = React.useMemo(
@@ -53,24 +66,24 @@ const PollCreationPage = (): React.JSX.Element => {
 
     const onAddChoice = (choice: string): void => {
         setCreatorToken(null);
-        setForm((prev) => ({
-            ...prev,
-            choices: [...prev.choices, choice],
+        setForm((previousForm) => ({
+            ...previousForm,
+            choices: [...previousForm.choices, choice],
         }));
     };
 
     const onRemoveChoice = (choice: string): void => {
         setCreatorToken(null);
-        setForm((prev) => ({
-            ...prev,
-            choices: prev.choices.filter(
+        setForm((previousForm) => ({
+            ...previousForm,
+            choices: previousForm.choices.filter(
                 (currentChoice) => currentChoice !== choice,
             ),
         }));
     };
 
-    const normalizedPollName = normalizeTrimmedString(pollName);
-    const isFormValid = !!normalizedPollName && choices.length > 1;
+    const normalizedPollName = normalizeTrimmedString(form.pollName);
+    const isFormValid = !!normalizedPollName && form.choices.length > 1;
 
     const onCreatePoll = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -86,6 +99,13 @@ const PollCreationPage = (): React.JSX.Element => {
             pollName: normalizedPollName,
             choices: form.choices,
             creatorToken: nextCreatorToken,
+            reconstructionThreshold: parseOptionalInteger(
+                form.reconstructionThreshold,
+            ),
+            minimumPublishedVoterCount: parseOptionalInteger(
+                form.minimumPublishedVoterCount,
+            ),
+            protocolVersion: 'v1',
         })
             .unwrap()
             .then(({ creatorToken: confirmedCreatorToken, id, slug }) => {
@@ -108,9 +128,8 @@ const PollCreationPage = (): React.JSX.Element => {
                         Create a new vote
                     </h1>
                     <p className="page-lead mx-auto max-w-2xl">
-                        Set up a simple 1-10 score vote, add the options people
-                        can score, and share the generated link once everything
-                        looks right.
+                        Create a score vote, freeze the roster, and then run the
+                        signed board ceremony on top of the published manifest.
                     </p>
                 </div>
                 <form
@@ -122,24 +141,47 @@ const PollCreationPage = (): React.JSX.Element => {
                     <Panel className="space-y-6">
                         <OutlinedInputField
                             autoComplete="off"
-                            helperText={
-                                !pollName
-                                    ? 'What would you like to vote on?'
-                                    : undefined
-                            }
+                            helperText="What would you like to vote on?"
                             id="pollName"
                             label="Vote name"
                             maxLength={64}
                             name="pollName"
                             onChange={onFormChange}
                             required
-                            value={pollName}
+                            value={form.pollName}
                         />
                         <ChoiceAdding
                             choices={form.choices}
                             onAddChoice={onAddChoice}
                             onRemoveChoice={onRemoveChoice}
                         />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <OutlinedInputField
+                                autoComplete="off"
+                                helperText="Optional. Leave blank to use the strict-majority default when the roster is closed."
+                                id="reconstructionThreshold"
+                                inputMode="numeric"
+                                label="Reconstruction threshold"
+                                name="reconstructionThreshold"
+                                onChange={onFormChange}
+                                value={form.reconstructionThreshold}
+                            />
+                            <OutlinedInputField
+                                autoComplete="off"
+                                helperText="Optional publication floor, separate from the cryptographic threshold."
+                                id="minimumPublishedVoterCount"
+                                inputMode="numeric"
+                                label="Minimum published voter count"
+                                name="minimumPublishedVoterCount"
+                                onChange={onFormChange}
+                                value={form.minimumPublishedVoterCount}
+                            />
+                        </div>
+                        <p className="field-note">
+                            This version uses token-only enrollment. The public
+                            roster is auditable, but the app does not claim
+                            strong identity binding or Sybil resistance.
+                        </p>
                     </Panel>
                     {error && (
                         <Alert announcement="assertive" variant="destructive">

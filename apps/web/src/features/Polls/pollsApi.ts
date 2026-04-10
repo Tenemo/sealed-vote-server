@@ -1,18 +1,17 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import {
     POLL_ROUTES,
+    type BoardMessageRecord,
+    type BoardMessageRequest,
+    type BoardMessagesResponse,
     type ClosePollRequest,
     type CreatePollRequest,
     type CreatePollResponse,
-    type DecryptionSharesRequest,
     type PollResponse,
-    type PublicKeyShareRequest,
     type RecoverSessionRequest,
     type RecoverSessionResponse,
     type RegisterVoterRequest,
     type RegisterVoterResponse,
-    type VoteRequest,
-    type VoteResponse,
 } from '@sealed-vote/contracts';
 
 import { apiBaseUrl } from 'app/apiConfig';
@@ -22,7 +21,7 @@ export const pollsApi = createApi({
     baseQuery: fetchBaseQuery({
         baseUrl: apiBaseUrl,
     }),
-    tagTypes: ['Poll'],
+    tagTypes: ['Poll', 'Board'],
     endpoints: (build) => ({
         createPoll: build.mutation<CreatePollResponse, CreatePollRequest>({
             query: (pollData) => ({
@@ -38,7 +37,12 @@ export const pollsApi = createApi({
                 method: 'GET',
             }),
             providesTags: (result) =>
-                result ? [{ type: 'Poll', id: result.id }] : [],
+                result
+                    ? [
+                          { type: 'Poll', id: result.id },
+                          { type: 'Board', id: result.id },
+                      ]
+                    : [],
         }),
         registerVoter: build.mutation<
             RegisterVoterResponse,
@@ -76,44 +80,31 @@ export const pollsApi = createApi({
                 { type: 'Poll', id: pollId },
             ],
         }),
-        submitPublicKeyShare: build.mutation<
-            void,
-            { pollId: string; publicKeyShareData: PublicKeyShareRequest }
+        getBoardMessages: build.query<
+            BoardMessagesResponse,
+            { pollId: string; afterEntryHash?: string }
         >({
-            query: ({ pollId, publicKeyShareData }) => ({
-                url: POLL_ROUTES.publicKeyShare(pollId),
-                method: 'POST',
-                body: publicKeyShareData,
+            query: ({ afterEntryHash, pollId }) => ({
+                url: POLL_ROUTES.boardMessages(pollId),
+                method: 'GET',
+                params: afterEntryHash ? { afterEntryHash } : undefined,
             }),
-            invalidatesTags: (_result, _error, { pollId }) => [
-                { type: 'Poll', id: pollId },
+            providesTags: (_result, _error, { pollId }) => [
+                { type: 'Board', id: pollId },
             ],
         }),
-        vote: build.mutation<
-            VoteResponse,
-            { pollId: string; voteData: VoteRequest }
+        postBoardMessage: build.mutation<
+            BoardMessageRecord,
+            { pollId: string; boardMessage: BoardMessageRequest }
         >({
-            query: ({ pollId, voteData }) => ({
-                url: POLL_ROUTES.vote(pollId),
+            query: ({ pollId, boardMessage }) => ({
+                url: POLL_ROUTES.boardMessages(pollId),
                 method: 'POST',
-                body: voteData,
-                responseHandler: 'text',
+                body: boardMessage,
             }),
             invalidatesTags: (_result, _error, { pollId }) => [
                 { type: 'Poll', id: pollId },
-            ],
-        }),
-        submitDecryptionShares: build.mutation<
-            void,
-            { pollId: string; decryptionSharesData: DecryptionSharesRequest }
-        >({
-            query: ({ pollId, decryptionSharesData }) => ({
-                url: POLL_ROUTES.decryptionShares(pollId),
-                method: 'POST',
-                body: decryptionSharesData,
-            }),
-            invalidatesTags: (_result, _error, { pollId }) => [
-                { type: 'Poll', id: pollId },
+                { type: 'Board', id: pollId },
             ],
         }),
     }),
@@ -121,5 +112,12 @@ export const pollsApi = createApi({
 
 export type { PollResponse };
 
-export const { useClosePollMutation, useCreatePollMutation, useGetPollQuery } =
-    pollsApi;
+export const {
+    useClosePollMutation,
+    useCreatePollMutation,
+    useGetBoardMessagesQuery,
+    useGetPollQuery,
+    usePostBoardMessageMutation,
+    useRecoverSessionMutation,
+    useRegisterVoterMutation,
+} = pollsApi;
