@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
@@ -11,6 +12,7 @@ import {
 } from 'threshold-elgamal';
 
 import { buildServer } from '../buildServer';
+import { publicKeyShares } from '../db/schema';
 import {
     createPoll,
     deletePoll,
@@ -211,6 +213,56 @@ describe('Register voter endpoint', () => {
         expect((JSON.parse(response.body) as { message: string }).message).toBe(
             ERROR_MESSAGES.maxParticipantsReached,
         );
+
+        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
+        expect(deleteResult.success).toBe(true);
+    });
+
+    test('repairs a malformed stored device record for an idempotent replay', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        const voterToken = generateToken();
+        const payload = await createRegistrationPayload({
+            voterName: 'Alice',
+            voterToken,
+        });
+
+        const firstResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/register`,
+            payload,
+        });
+
+        expect(firstResponse.statusCode).toBe(201);
+
+        await fastify.db
+            .update(publicKeyShares)
+            .set({
+                publicKeyShare: '{"transportSuite":"X25519"}',
+            })
+            .where(eq(publicKeyShares.pollId, pollId));
+
+        const replayResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/register`,
+            payload,
+        });
+
+        expect(replayResponse.statusCode).toBe(201);
+
+        const secondVoter = await registerVoter(fastify, pollId, 'Bob');
+        const thirdVoter = await registerVoter(fastify, pollId, 'Carol');
+        expect(secondVoter.success).toBe(true);
+        expect(thirdVoter.success).toBe(true);
+
+        const closeResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+
+        expect(closeResponse.statusCode).toBe(200);
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

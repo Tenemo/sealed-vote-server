@@ -175,6 +175,60 @@ describe('pollWorkflow', () => {
         });
     });
 
+    it('stays in securing-waiting when no automatic ceremony action is available', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    manifest: {
+                        optionList: ['Apples', 'Bananas'],
+                        rosterHash: 'a'.repeat(64),
+                    },
+                    manifestHash: 'b'.repeat(64),
+                    phase: 'securing',
+                    sessionId: 'c'.repeat(64),
+                    submittedParticipantCount: 3,
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canRetryAutomation: false,
+            currentStep: 'securing-waiting',
+        });
+    });
+
+    it('surfaces automation retries while securing after a background failure', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: true,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    manifest: {
+                        optionList: ['Apples', 'Bananas'],
+                        rosterHash: 'a'.repeat(64),
+                    },
+                    manifestHash: 'b'.repeat(64),
+                    phase: 'securing',
+                    sessionId: 'c'.repeat(64),
+                    submittedParticipantCount: 3,
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canRetryAutomation: true,
+            currentStep: 'automation-retry-required',
+        });
+    });
+
     it('flags missing local state after close when the participant session exists', () => {
         expect(
             derivePollWorkflow({
@@ -241,6 +295,73 @@ describe('pollWorkflow', () => {
         ).toMatchObject({
             canRetryAutomation: false,
             currentStep: 'revealing-auto',
+        });
+    });
+
+    it('waits for results when ready-to-reveal has no local automation work', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    manifest: {
+                        optionList: ['Apples', 'Bananas'],
+                        rosterHash: 'a'.repeat(64),
+                    },
+                    manifestHash: 'b'.repeat(64),
+                    phase: 'ready-to-reveal',
+                    sessionId: 'c'.repeat(64),
+                    submittedParticipantCount: 3,
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canRetryAutomation: false,
+            currentStep: 'waiting-for-results',
+        });
+    });
+
+    it('shows the complete state even when a stale session no longer has local device state', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: null,
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    phase: 'complete',
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            currentStep: 'complete',
+            missingLocalState: false,
+        });
+    });
+
+    it('shows the aborted state even when a stale session no longer has local device state', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: null,
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    phase: 'aborted',
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            currentStep: 'aborted',
+            missingLocalState: false,
         });
     });
 });

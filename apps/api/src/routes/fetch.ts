@@ -13,13 +13,13 @@ import {
 
 const PollRosterParticipantSchema = Type.Object({
     deviceReady: Type.Boolean(),
-    voterIndex: Type.Number(),
+    voterIndex: Type.Integer({ minimum: 1 }),
     voterName: Type.String(),
 });
 
 const PollRosterEntrySchema = Type.Object({
     authPublicKey: Type.String(),
-    participantIndex: Type.Number(),
+    participantIndex: Type.Integer({ minimum: 1 }),
     transportPublicKey: Type.String(),
     transportSuite: Type.Literal('X25519'),
     voterName: Type.String(),

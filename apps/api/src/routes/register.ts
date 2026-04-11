@@ -4,6 +4,7 @@ import type {
     RegisterVoterResponse as RegisterVoterResponseContract,
 } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
@@ -58,6 +59,15 @@ const schema = {
 
 type RegisterRequest = RegisterVoterRequestContract;
 type RegisterResponse = RegisterVoterResponseContract;
+type ExistingRegistration = {
+    id: string;
+    publicKeyShares: {
+        id: string;
+        publicKeyShare: string;
+    }[];
+    voterIndex: number;
+    voterName: string;
+};
 
 const getExistingRegistration = async ({
     pollId,
@@ -67,17 +77,7 @@ const getExistingRegistration = async ({
     pollId: string;
     tx: DatabaseTransaction;
     voterTokenHash: string;
-}): Promise<
-    | {
-          id: string;
-          publicKeyShares: {
-              publicKeyShare: string;
-          }[];
-          voterIndex: number;
-          voterName: string;
-      }
-    | undefined
-> =>
+}): Promise<ExistingRegistration | undefined> =>
     await tx.query.voters.findFirst({
         where: (fields, { and: andOperator, eq: isEqual }) =>
             andOperator(
@@ -92,11 +92,85 @@ const getExistingRegistration = async ({
         with: {
             publicKeyShares: {
                 columns: {
+                    id: true,
                     publicKeyShare: true,
                 },
             },
         },
     });
+
+const hasMatchingParticipantDeviceRecord = ({
+    authPublicKey,
+    deviceRecord,
+    transportPublicKey,
+    transportSuite,
+}: {
+    authPublicKey: string;
+    deviceRecord: {
+        authPublicKey: string;
+        transportPublicKey: string;
+        transportSuite: 'X25519';
+    };
+    transportPublicKey: string;
+    transportSuite: 'X25519';
+}): boolean =>
+    deviceRecord.authPublicKey === authPublicKey &&
+    deviceRecord.transportPublicKey === transportPublicKey &&
+    deviceRecord.transportSuite === transportSuite;
+
+const reconcileExistingParticipantDeviceRecord = async ({
+    authPublicKey,
+    existingRegistration,
+    pollId,
+    serializedDeviceRecord,
+    transportPublicKey,
+    transportSuite,
+    tx,
+}: {
+    authPublicKey: string;
+    existingRegistration: ExistingRegistration;
+    pollId: string;
+    serializedDeviceRecord: string;
+    transportPublicKey: string;
+    transportSuite: 'X25519';
+    tx: DatabaseTransaction;
+}): Promise<void> => {
+    const existingPublicKeyShare = existingRegistration.publicKeyShares[0];
+    const existingDeviceRecord = parseParticipantDeviceRecord(
+        existingPublicKeyShare?.publicKeyShare,
+    );
+
+    if (existingDeviceRecord) {
+        if (
+            !hasMatchingParticipantDeviceRecord({
+                authPublicKey,
+                deviceRecord: existingDeviceRecord,
+                transportPublicKey,
+                transportSuite,
+            })
+        ) {
+            throw createError(409, ERROR_MESSAGES.voterTokenConflict);
+        }
+
+        return;
+    }
+
+    if (!existingPublicKeyShare) {
+        await tx.insert(publicKeyShares).values({
+            pollId,
+            publicKeyShare: serializedDeviceRecord,
+            voterId: existingRegistration.id,
+        });
+        return;
+    }
+
+    await tx
+        .update(publicKeyShares)
+        .set({
+            publicKeyShare: serializedDeviceRecord,
+        })
+        .where(eq(publicKeyShares.id, existingPublicKeyShare.id));
+};
 
 export const register = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
@@ -109,20 +183,18 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
             }>,
             reply: FastifyReply,
         ): Promise<RegisterResponse> => {
-            try {
-                const { authPublicKey, transportPublicKey, transportSuite } =
-                    req.body;
-                const voterName = req.body.voterName.trim();
-                const { voterToken } = req.body;
-                const { pollId } = req.params;
-                const serializedDeviceRecord = serializeParticipantDeviceRecord(
-                    {
-                        authPublicKey,
-                        transportPublicKey,
-                        transportSuite,
-                    },
-                );
+            const { authPublicKey, transportPublicKey, transportSuite } =
+                req.body;
+            const voterName = req.body.voterName.trim();
+            const { voterToken } = req.body;
+            const { pollId } = req.params;
+            const serializedDeviceRecord = serializeParticipantDeviceRecord({
+                authPublicKey,
+                transportPublicKey,
+                transportSuite,
+            });
 
+            try {
                 if (!voterName) {
                     throw createError(400, 'Voter name is required.');
                 }
@@ -163,37 +235,15 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                             );
                         }
 
-                        const existingDeviceRecord =
-                            parseParticipantDeviceRecord(
-                                existingRegistration.publicKeyShares[0]
-                                    ?.publicKeyShare,
-                            );
-
-                        if (
-                            existingDeviceRecord &&
-                            (existingDeviceRecord.authPublicKey !==
-                                authPublicKey ||
-                                existingDeviceRecord.transportPublicKey !==
-                                    transportPublicKey ||
-                                existingDeviceRecord.transportSuite !==
-                                    transportSuite)
-                        ) {
-                            throw createError(
-                                409,
-                                ERROR_MESSAGES.voterTokenConflict,
-                            );
-                        }
-
-                        if (
-                            !existingRegistration.publicKeyShares[0] &&
-                            existingRegistration.id
-                        ) {
-                            await tx.insert(publicKeyShares).values({
-                                pollId,
-                                publicKeyShare: serializedDeviceRecord,
-                                voterId: existingRegistration.id,
-                            });
-                        }
+                        await reconcileExistingParticipantDeviceRecord({
+                            authPublicKey,
+                            existingRegistration,
+                            pollId,
+                            serializedDeviceRecord,
+                            transportPublicKey,
+                            transportSuite,
+                            tx,
+                        });
 
                         return {
                             message: 'Voter registered successfully',
@@ -273,75 +323,50 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                         'unique_voter_token_hash_per_poll',
                     )
                 ) {
-                    const voterTokenHash = hashSecureToken(req.body.voterToken);
-                    const existingRegistration =
-                        await fastify.db.query.voters.findFirst({
-                            where: (
-                                fields,
-                                { and: andOperator, eq: isEqual },
-                            ) =>
-                                andOperator(
-                                    isEqual(fields.pollId, req.params.pollId),
-                                    isEqual(
-                                        fields.voterTokenHash,
-                                        voterTokenHash,
-                                    ),
-                                ),
-                            columns: {
-                                id: true,
-                                voterIndex: true,
-                                voterName: true,
-                            },
-                            with: {
-                                publicKeyShares: {
-                                    columns: {
-                                        publicKeyShare: true,
-                                    },
-                                },
-                            },
-                        });
+                    const voterTokenHash = hashSecureToken(voterToken);
+                    const response = await withTransaction(
+                        fastify,
+                        async (tx) => {
+                            const existingRegistration =
+                                await getExistingRegistration({
+                                    pollId,
+                                    tx,
+                                    voterTokenHash,
+                                });
 
-                    if (
-                        existingRegistration?.voterName ===
-                        req.body.voterName.trim()
-                    ) {
-                        void reply.code(201);
-                        void maybeDropTestResponseAfterCommit({
-                            reply,
-                            request: req,
-                        });
+                            if (existingRegistration?.voterName !== voterName) {
+                                throw createError(
+                                    409,
+                                    ERROR_MESSAGES.voterTokenConflict,
+                                );
+                            }
 
-                        const existingDeviceRecord =
-                            parseParticipantDeviceRecord(
-                                existingRegistration.publicKeyShares[0]
-                                    ?.publicKeyShare,
-                            );
+                            await reconcileExistingParticipantDeviceRecord({
+                                authPublicKey,
+                                existingRegistration,
+                                pollId,
+                                serializedDeviceRecord,
+                                transportPublicKey,
+                                transportSuite,
+                                tx,
+                            });
 
-                        if (
-                            existingDeviceRecord &&
-                            (existingDeviceRecord.authPublicKey !==
-                                req.body.authPublicKey ||
-                                existingDeviceRecord.transportPublicKey !==
-                                    req.body.transportPublicKey ||
-                                existingDeviceRecord.transportSuite !==
-                                    req.body.transportSuite)
-                        ) {
-                            throw createError(
-                                409,
-                                ERROR_MESSAGES.voterTokenConflict,
-                            );
-                        }
+                            return {
+                                message: 'Voter registered successfully',
+                                voterIndex: existingRegistration.voterIndex,
+                                voterName: existingRegistration.voterName,
+                                pollId,
+                                voterToken,
+                            } satisfies RegisterResponse;
+                        },
+                    );
 
-                        return {
-                            message: 'Voter registered successfully',
-                            voterIndex: existingRegistration.voterIndex,
-                            voterName: existingRegistration.voterName,
-                            pollId: req.params.pollId,
-                            voterToken: req.body.voterToken,
-                        };
-                    }
-
-                    throw createError(409, ERROR_MESSAGES.voterTokenConflict);
+                    void reply.code(201);
+                    void maybeDropTestResponseAfterCommit({
+                        reply,
+                        request: req,
+                    });
+                    return response;
                 }
 
                 throw error;
