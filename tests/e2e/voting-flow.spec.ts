@@ -5,11 +5,11 @@ import {
     closeVoting,
     createPoll,
     deletePolls,
+    expectAcceptedBallotCount,
     expectParticipantsVisible,
     expectSecuringVisible,
-    revealResults,
     submitVote,
-    waitForReadyToReveal,
+    waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
 } from './support/pollFlow';
@@ -82,12 +82,20 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         await expectSecuringVisible(participantOne.page);
         await expectSecuringVisible(participantTwo.page);
 
-        await waitForReadyToReveal(page);
-        await revealResults(page);
+        await waitForAutomaticReveal(page);
 
         await waitForVerifiedResults({ page });
         await waitForVerifiedResults({ page: participantOne.page });
         await waitForVerifiedResults({ page: participantTwo.page });
+        await expectAcceptedBallotCount({ count: 3, page });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: participantOne.page,
+        });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: participantTwo.page,
+        });
 
         await expectNoAxeViolations(page, 'full vote results page');
         expectNoUnexpectedErrors(tracker);

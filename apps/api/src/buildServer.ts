@@ -12,13 +12,13 @@ import Fastify, {
 import { getConfiguredWebAppOrigin } from './config.js';
 import { databasePlugin } from './db/plugin.js';
 import { boardMessageRoutes } from './routes/boardMessages.js';
+import { closeVoting } from './routes/close.js';
 import { create } from './routes/create.js';
 import { deletePoll } from './routes/delete.js';
 import { fetch } from './routes/fetch.js';
 import { healthCheck } from './routes/health-check.js';
 import { recoverSession } from './routes/recoverSession.js';
 import { register } from './routes/register.js';
-import { start } from './routes/start.js';
 
 config();
 
@@ -178,7 +178,7 @@ export const buildServer = async (
     await fastify.register(deletePoll, { prefix: '/api' });
     await fastify.register(register, { prefix: '/api' });
     await fastify.register(recoverSession, { prefix: '/api' });
-    await fastify.register(start, { prefix: '/api' });
+    await fastify.register(closeVoting, { prefix: '/api' });
     await fastify.register(boardMessageRoutes, { prefix: '/api' });
     return fastify;
 };

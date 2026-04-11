@@ -13,6 +13,7 @@ import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
 import { countPollVoters } from '../utils/pollCounts.js';
 import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
+import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
@@ -41,8 +42,6 @@ const schema = {
 type CloseVotingBody = CloseVotingRequestContract;
 export type CloseVotingResponse = MessageResponse;
 
-const minimumParticipantCount = 3;
-
 const validateParticipantDeviceReadiness = async (
     client: DatabaseTransaction,
     pollId: string,
@@ -67,7 +66,7 @@ const validateParticipantDeviceReadiness = async (
     }
 };
 
-export const start = async (fastify: FastifyInstance): Promise<void> => {
+export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
         '/polls/:pollId/close',
         { schema },
@@ -112,7 +111,7 @@ export const start = async (fastify: FastifyInstance): Promise<void> => {
                         req.params.pollId,
                     );
 
-                    if (participantCount < minimumParticipantCount) {
+                    if (participantCount < minimumPollParticipantsToClose) {
                         throw createError(
                             400,
                             ERROR_MESSAGES.notEnoughParticipantsToClose,

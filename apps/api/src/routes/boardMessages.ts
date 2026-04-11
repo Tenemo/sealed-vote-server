@@ -34,10 +34,6 @@ import {
 import { withTransaction } from '../utils/db.js';
 import { lockPollById } from '../utils/pollLocks.js';
 import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
-import {
-    findAcceptedRegistrationPayload,
-    getAcceptedManifestPublication,
-} from '../utils/pollReadModel.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
 import {
@@ -175,6 +171,33 @@ const isManifestPublicationPayload = (
 ): signedPayload is SignedPayload<ManifestPublicationPayload> =>
     signedPayload.payload.messageType === 'manifest-publication';
 
+const getAcceptedManifestPublication = (
+    acceptedPayloads: readonly SignedPayload[],
+): SignedPayload<ManifestPublicationPayload> | null => {
+    const payload = acceptedPayloads.find(isManifestPublicationPayload);
+
+    return payload ?? null;
+};
+
+const findAcceptedRegistrationPayload = ({
+    acceptedPayloads,
+    participantIndex,
+}: {
+    acceptedPayloads: readonly SignedPayload[];
+    participantIndex: number;
+}): SignedPayload<RegistrationPayload> | null => {
+    for (const signedPayload of acceptedPayloads) {
+        if (
+            signedPayload.payload.participantIndex === participantIndex &&
+            isRegistrationPayload(signedPayload)
+        ) {
+            return signedPayload;
+        }
+    }
+
+    return null;
+};
+
 const verifyPayloadSignature = async ({
     authPublicKey,
     signedPayload,
@@ -248,19 +271,16 @@ const assertStoredRegistrationKeysMatchPayload = async ({
 };
 
 const verifyParticipantPayloadSignature = async ({
-    pollId,
+    acceptedPayloads,
     signedPayload,
-    tx,
 }: {
-    pollId: string;
+    acceptedPayloads: readonly SignedPayload[];
     signedPayload: SignedPayload;
-    tx: DatabaseTransaction;
 }): Promise<void> => {
-    const registrationPayload = await findAcceptedRegistrationPayload(
-        tx,
-        pollId,
-        signedPayload.payload.participantIndex,
-    );
+    const registrationPayload = findAcceptedRegistrationPayload({
+        acceptedPayloads,
+        participantIndex: signedPayload.payload.participantIndex,
+    });
 
     if (!registrationPayload) {
         throw createError(
@@ -276,22 +296,17 @@ const verifyParticipantPayloadSignature = async ({
 };
 
 const verifyManifestPublicationPayload = async ({
+    acceptedPayloads,
     choiceNames,
     participantCount,
-    pollId,
     signedPayload,
-    tx,
 }: {
+    acceptedPayloads: readonly SignedPayload[];
     choiceNames: readonly string[];
     participantCount: number;
-    pollId: string;
     signedPayload: SignedPayload<ManifestPublicationPayload>;
-    tx: DatabaseTransaction;
 }): Promise<void> => {
-    const classifiedBoard = await classifyBoardMessages(
-        await getBoardMessageRows(tx, pollId),
-    );
-    const acceptedRegistrations = classifiedBoard.acceptedPayloads.filter(
+    const acceptedRegistrations = acceptedPayloads.filter(
         isRegistrationPayload,
     );
 
@@ -335,18 +350,14 @@ const verifyManifestPublicationPayload = async ({
 };
 
 const ensurePayloadMatchesPublishedManifest = async ({
-    pollId,
+    acceptedPayloads,
     signedPayload,
-    tx,
 }: {
-    pollId: string;
+    acceptedPayloads: readonly SignedPayload[];
     signedPayload: SignedPayload;
-    tx: DatabaseTransaction;
 }): Promise<void> => {
-    const manifestPublication = await getAcceptedManifestPublication(
-        tx,
-        pollId,
-    );
+    const manifestPublication =
+        getAcceptedManifestPublication(acceptedPayloads);
 
     if (!manifestPublication) {
         throw createError(
@@ -377,22 +388,18 @@ const ensurePayloadMatchesPublishedManifest = async ({
 };
 
 const assertBallotClosePublisher = async ({
-    pollId,
+    acceptedPayloads,
     signedPayload,
-    tx,
 }: {
-    pollId: string;
+    acceptedPayloads: readonly SignedPayload[];
     signedPayload: SignedPayload;
-    tx: DatabaseTransaction;
 }): Promise<void> => {
     if (signedPayload.payload.messageType !== 'ballot-close') {
         return;
     }
 
-    const manifestPublication = await getAcceptedManifestPublication(
-        tx,
-        pollId,
-    );
+    const manifestPublication =
+        getAcceptedManifestPublication(acceptedPayloads);
 
     if (
         !manifestPublication ||
@@ -505,6 +512,14 @@ export const boardMessageRoutes = async (
                     );
                 }
 
+                const classifiedBoard = isRegistrationPayload(signedPayload)
+                    ? null
+                    : await classifyBoardMessages(
+                          await getBoardMessageRows(tx, poll.id),
+                      );
+                const acceptedPayloads =
+                    classifiedBoard?.acceptedPayloads ?? [];
+
                 if (isRegistrationPayload(signedPayload)) {
                     await verifyPayloadSignature({
                         authPublicKey: signedPayload.payload.authPublicKey,
@@ -518,20 +533,17 @@ export const boardMessageRoutes = async (
                     });
                 } else if (isManifestPublicationPayload(signedPayload)) {
                     await verifyParticipantPayloadSignature({
-                        pollId: poll.id,
+                        acceptedPayloads,
                         signedPayload,
-                        tx,
                     });
                 } else {
                     await ensurePayloadMatchesPublishedManifest({
-                        pollId: poll.id,
+                        acceptedPayloads,
                         signedPayload,
-                        tx,
                     });
                     await verifyParticipantPayloadSignature({
-                        pollId: poll.id,
+                        acceptedPayloads,
                         signedPayload,
-                        tx,
                     });
                 }
 
@@ -554,19 +566,17 @@ export const boardMessageRoutes = async (
                     });
 
                     await verifyManifestPublicationPayload({
+                        acceptedPayloads,
                         choiceNames: pollChoices.map(
                             ({ choiceName }) => choiceName,
                         ),
                         participantCount: submittedVoters.length,
-                        pollId: poll.id,
                         signedPayload,
-                        tx,
                     });
                 } else {
                     await assertBallotClosePublisher({
-                        pollId: poll.id,
+                        acceptedPayloads,
                         signedPayload,
-                        tx,
                     });
                 }
 

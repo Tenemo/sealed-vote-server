@@ -202,14 +202,14 @@ describe('pollWorkflow', () => {
         });
     });
 
-    it('enables reveal only for the creator participant when reveal is ready', () => {
+    it('switches to automatic reveal once the counted ballot set is ready', () => {
         expect(
             derivePollWorkflow({
                 creatorSessionPollId: 'poll-1',
                 deviceState: createDeviceState({
                     isCreatorParticipant: true,
                 }),
-                hasAutomaticCeremonyAction: false,
+                hasAutomaticCeremonyAction: true,
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
                 poll: createPoll({
@@ -239,8 +239,8 @@ describe('pollWorkflow', () => {
                 voterSession: createVoterSession(),
             }),
         ).toMatchObject({
-            canRevealResults: true,
-            currentStep: 'ready-to-reveal',
+            canRetryAutomation: false,
+            currentStep: 'revealing-auto',
         });
     });
 });

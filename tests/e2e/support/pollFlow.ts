@@ -116,23 +116,24 @@ export const closeVoting = async (page: Page): Promise<void> => {
     await expect(
         page
             .getByText('Securing the election')
-            .or(page.getByText('Ready to reveal')),
+            .or(page.getByText('Starting reveal'))
+            .or(page.getByText('Revealing results'))
+            .or(page.getByText('Verified results')),
     ).toBeVisible({ timeout: 30_000 });
 };
 
-export const waitForReadyToReveal = async (page: Page): Promise<void> => {
+export const waitForAutomaticReveal = async (page: Page): Promise<void> => {
+    await expect(
+        page
+            .getByText(
+                'Closing the counted ballot set so the results can be opened.',
+            )
+            .or(page.getByText('Revealing results'))
+            .or(page.getByText('Verified results')),
+    ).toBeVisible({ timeout: 90_000 });
     await expect(
         page.getByRole('button', { name: 'Reveal results' }),
-    ).toBeVisible({ timeout: 90_000 });
-};
-
-export const revealResults = async (page: Page): Promise<void> => {
-    const revealButton = page.getByRole('button', {
-        name: 'Reveal results',
-    });
-
-    await expect(revealButton).toBeVisible({ timeout: 90_000 });
-    await revealButton.click();
+    ).toHaveCount(0);
 };
 
 export const waitForVerifiedResults = async ({
@@ -142,7 +143,9 @@ export const waitForVerifiedResults = async ({
     page: Page;
     choices?: string[];
 }): Promise<void> => {
-    await expect(page.getByText('Verified results', { exact: true })).toBeVisible({
+    await expect(
+        page.getByText('Verified results', { exact: true }),
+    ).toBeVisible({
         timeout: 90_000,
     });
     await expect(
@@ -156,6 +159,22 @@ export const waitForVerifiedResults = async ({
             timeout: 90_000,
         });
     }
+};
+
+export const expectAcceptedBallotCount = async ({
+    choices = ['Apples', 'Bananas'],
+    count,
+    page,
+}: {
+    choices?: string[];
+    count: number;
+    page: Page;
+}): Promise<void> => {
+    const expectedText = `${count} accepted ballots`;
+
+    await expect(page.getByText(expectedText, { exact: true })).toHaveCount(
+        choices.length,
+    );
 };
 
 export const expectParticipantsVisible = async (

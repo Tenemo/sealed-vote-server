@@ -18,7 +18,6 @@ import {
 import { generateClientToken } from 'features/Polls/clientToken';
 import {
     clearCommittedPendingPayload,
-    createRevealBallotCloseAction,
     describeAutomaticCeremonyAction,
     resolveAutomaticCeremonyAction,
     type PreparedCeremonyAction,
@@ -46,13 +45,16 @@ const scoreOptions = Array.from(
     (_value, offset) => minimumScore + offset,
 );
 
+type PollData = NonNullable<ReturnType<typeof useGetPollQuery>['data']>;
+type PollBoardEntry = PollData['boardEntries'][number];
+
 const phaseLabel = (phase: string): string =>
     (
         ({
             aborted: 'Ceremony aborted',
             complete: 'Verified results',
             open: 'Voting open',
-            'ready-to-reveal': 'Ready to reveal',
+            'ready-to-reveal': 'Starting reveal',
             revealing: 'Revealing results',
             securing: 'Securing the election',
         }) satisfies Record<string, string>
@@ -67,19 +69,81 @@ const formatDateTime = (value: string): string =>
         timeStyle: 'short',
     });
 
-const countAcceptedMessages = (
-    poll: NonNullable<ReturnType<typeof useGetPollQuery>['data']>,
-    messageType: string,
-): number =>
+const countAcceptedMessages = (poll: PollData, messageType: string): number =>
     poll.boardEntries.filter(
-        (
-            entry: NonNullable<
-                ReturnType<typeof useGetPollQuery>['data']
-            >['boardEntries'][number],
-        ) =>
+        (entry: PollBoardEntry) =>
             entry.classification === 'accepted' &&
             entry.messageType === messageType,
     ).length;
+
+const humanizeBoardMessageType = (messageType: string): string =>
+    messageType.replaceAll('-', ' ');
+
+const formatBoardEntryTitle = (
+    entry: PollBoardEntry,
+    poll: PollData,
+): string => {
+    const payload = entry.signedPayload.payload as Record<string, unknown>;
+    const baseTitle = `Participant ${entry.participantIndex}. ${humanizeBoardMessageType(entry.messageType)}`;
+
+    if (
+        typeof payload.optionIndex === 'number' &&
+        Number.isInteger(payload.optionIndex)
+    ) {
+        const choiceName = poll.choices[payload.optionIndex - 1];
+
+        return choiceName
+            ? `${baseTitle} for ${choiceName}`
+            : `${baseTitle} for choice ${payload.optionIndex}`;
+    }
+
+    if (
+        typeof payload.recipientIndex === 'number' &&
+        Number.isInteger(payload.recipientIndex)
+    ) {
+        return `${baseTitle} for participant ${payload.recipientIndex}`;
+    }
+
+    if (Array.isArray(payload.includedParticipantIndices)) {
+        return `${baseTitle} counting ${payload.includedParticipantIndices.length} participants`;
+    }
+
+    return baseTitle;
+};
+
+const formatBoardEntryStatus = (entry: PollBoardEntry): string => {
+    const classification =
+        entry.classification.charAt(0).toUpperCase() +
+        entry.classification.slice(1);
+
+    return `${classification} | ${formatDateTime(entry.createdAt)}`;
+};
+
+const formatRevealStatus = (poll: PollData): string => {
+    if (poll.phase === 'aborted') {
+        return 'Aborted';
+    }
+
+    if (poll.phase === 'complete') {
+        return 'Complete';
+    }
+
+    if (poll.phase === 'revealing') {
+        return 'Started';
+    }
+
+    if (poll.phase === 'ready-to-reveal') {
+        return 'Starting';
+    }
+
+    if (poll.ceremony.revealReady) {
+        return 'Ready';
+    }
+
+    return poll.phase === 'open'
+        ? 'Pending close'
+        : 'Waiting for complete ballots';
+};
 
 const isPollParticipantLocal = ({
     devicePollId,
@@ -125,7 +189,6 @@ const PollPage = (): React.JSX.Element => {
     const [activeActionSlotKey, setActiveActionSlotKey] = React.useState<
         string | null
     >(null);
-    const [isRevealSubmitting, setIsRevealSubmitting] = React.useState(false);
     const [copyNotice, setCopyNotice] = React.useState<string | null>(null);
 
     if (!pollSlug) {
@@ -305,7 +368,9 @@ const PollPage = (): React.JSX.Element => {
     React.useEffect(() => {
         if (
             !poll ||
-            (poll.phase !== 'securing' && poll.phase !== 'revealing') ||
+            (poll.phase !== 'securing' &&
+                poll.phase !== 'ready-to-reveal' &&
+                poll.phase !== 'revealing') ||
             !automaticAction ||
             !!activeActionSlotKey ||
             !!automationError
@@ -498,46 +563,13 @@ const PollPage = (): React.JSX.Element => {
         }
     };
 
-    const onRevealResults = async (): Promise<void> => {
-        if (!workflow.canRevealResults) {
-            return;
-        }
-
-        setLocalError(null);
-        setLocalNotice(null);
-        setAutomationError(null);
-        setIsRevealSubmitting(true);
-
-        try {
-            const revealAction = await createRevealBallotCloseAction({
-                creatorSession,
-                deviceState,
-                poll,
-                voterSession,
-            });
-
-            if (!revealAction) {
-                throw new Error(
-                    'Results are not ready to reveal from this device yet.',
-                );
-            }
-
-            await submitPreparedAction(revealAction);
-            setLocalNotice('Reveal started. Decryption shares are arriving.');
-        } catch (revealError) {
-            setLocalError(renderError(revealError));
-        } finally {
-            setIsRevealSubmitting(false);
-        }
-    };
-
     const primaryExplanation =
         workflow.currentStep === 'anonymous-ready-to-vote'
             ? 'Score every option from 1 to 10, submit once, and come back after the organizer closes voting.'
             : workflow.currentStep === 'submitting-vote'
               ? 'Saving your final local vote and registering this device for the later ceremony.'
               : workflow.currentStep === 'creator-must-submit-first'
-                ? 'You still need to submit your own vote from this browser before you can close voting or reveal results.'
+                ? 'You still need to submit your own vote from this browser before you can close voting.'
                 : workflow.currentStep === 'vote-stored-waiting-for-close'
                   ? 'Your plaintext scores are stored only on this device until the organizer closes voting.'
                   : workflow.currentStep === 'creator-can-close'
@@ -545,26 +577,23 @@ const PollPage = (): React.JSX.Element => {
                     : workflow.currentStep === 'securing-auto'
                       ? (automaticActionDescription ??
                         'Securing the election in the background.')
-                      : workflow.currentStep === 'securing-retry-required'
+                      : workflow.currentStep === 'automation-retry-required'
                         ? (automationError ??
-                          'Automatic setup needs a manual retry from this browser.')
+                          'Automatic ceremony progress needs a retry from this browser.')
                         : workflow.currentStep === 'securing-waiting'
                           ? 'Waiting for the rest of the group to finish the secure setup and encrypted ballot publication.'
-                          : workflow.currentStep === 'ready-to-reveal'
-                            ? 'Enough complete encrypted ballots are ready. Reveal results to freeze the counted set and start decryption.'
-                            : workflow.currentStep === 'revealing-auto'
-                              ? (automaticActionDescription ??
-                                'Publishing decryption material in the background.')
-                              : workflow.currentStep === 'revealing-waiting'
-                                ? 'Waiting for threshold decryption shares and final tally publication.'
-                                : workflow.currentStep === 'waiting-for-results'
-                                  ? 'The ceremony is moving without any action needed from this browser.'
-                                  : workflow.currentStep ===
-                                      'local-vote-missing'
-                                    ? 'This browser no longer has the local vote and device state required to continue after close.'
-                                    : workflow.currentStep === 'complete'
-                                      ? 'Every result shown below was replayed and verified from the public board log.'
-                                      : 'The ceremony could not be verified from the public board log.';
+                          : workflow.currentStep === 'revealing-auto'
+                            ? (automaticActionDescription ??
+                              'Starting the reveal and publishing decryption material in the background.')
+                            : workflow.currentStep === 'revealing-waiting'
+                              ? 'Waiting for threshold decryption shares and final tally publication.'
+                              : workflow.currentStep === 'waiting-for-results'
+                                ? 'The ceremony is moving without any action needed from this browser.'
+                                : workflow.currentStep === 'local-vote-missing'
+                                  ? 'This browser no longer has the local vote and device state required to continue after close.'
+                                  : workflow.currentStep === 'complete'
+                                    ? 'Every result shown below was replayed and verified from the public board log.'
+                                    : 'The ceremony could not be verified from the public board log.';
 
     return (
         <section className="mx-auto w-full max-w-[96rem] space-y-6">
@@ -787,8 +816,8 @@ const PollPage = (): React.JSX.Element => {
                                     <Alert announcement="polite" variant="info">
                                         <AlertDescription>
                                             The creator must submit a vote from
-                                            this browser before close or reveal
-                                            will be available.
+                                            this browser before close becomes
+                                            available.
                                         </AlertDescription>
                                     </Alert>
                                 ) : null}
@@ -817,36 +846,7 @@ const PollPage = (): React.JSX.Element => {
                                     </p>
                                 ) : null}
                             </div>
-                        ) : poll.phase === 'ready-to-reveal' &&
-                          workflow.canRevealResults ? (
-                            <div className="space-y-4">
-                                <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4">
-                                    <div className="text-base font-semibold">
-                                        Results are ready to open
-                                    </div>
-                                    <p className={`${mutedBodyClassName} mt-2`}>
-                                        Revealing results publishes one
-                                        organizer-signed ballot cutoff and
-                                        starts the threshold decryption phase.
-                                    </p>
-                                </div>
-                                <div className="flex flex-wrap justify-end gap-3">
-                                    <LoadingButton
-                                        className="w-full sm:w-auto"
-                                        disabled={!workflow.canRevealResults}
-                                        loading={isRevealSubmitting}
-                                        loadingLabel="Revealing results"
-                                        onClick={() => {
-                                            void onRevealResults();
-                                        }}
-                                        size="lg"
-                                    >
-                                        Reveal results
-                                    </LoadingButton>
-                                </div>
-                            </div>
-                        ) : workflow.currentStep ===
-                          'securing-retry-required' ? (
+                        ) : workflow.canRetryAutomation ? (
                             <div className="flex flex-wrap justify-end gap-3">
                                 <Button
                                     className="w-full sm:w-auto"
@@ -860,7 +860,7 @@ const PollPage = (): React.JSX.Element => {
                                     size="lg"
                                     variant="outline"
                                 >
-                                    Retry setup
+                                    Retry ceremony
                                 </Button>
                             </div>
                         ) : (
@@ -1052,11 +1052,7 @@ const PollPage = (): React.JSX.Element => {
                                 <span className="text-secondary">
                                     Reveal status
                                 </span>
-                                <span>
-                                    {poll.ceremony.revealReady
-                                        ? 'Ready'
-                                        : 'Pending'}
-                                </span>
+                                <span>{formatRevealStatus(poll)}</span>
                             </div>
                         </div>
                     </Panel>
@@ -1171,12 +1167,15 @@ const PollPage = (): React.JSX.Element => {
                                                     key={entry.id}
                                                 >
                                                     <div className="font-medium text-foreground">
-                                                        Participant{' '}
-                                                        {entry.participantIndex}
-                                                        . {entry.messageType}
+                                                        {formatBoardEntryTitle(
+                                                            entry,
+                                                            poll,
+                                                        )}
                                                     </div>
                                                     <div className="text-secondary">
-                                                        {entry.classification}
+                                                        {formatBoardEntryStatus(
+                                                            entry,
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}

@@ -26,7 +26,10 @@ import { polls } from '../db/schema.js';
 import { classifyBoardMessages, getBoardMessageRows } from './boardMessages.js';
 import { normalizeDatabaseTimestamp } from './db.js';
 import { parseParticipantDeviceRecord } from './participantDevices.js';
-import { maxPollParticipants } from './pollLimits.js';
+import {
+    maxPollParticipants,
+    minimumPollParticipantsToClose,
+} from './pollLimits.js';
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 type PollRow = Pick<
@@ -34,7 +37,6 @@ type PollRow = Pick<
     'createdAt' | 'id' | 'isOpen' | 'pollName' | 'slug'
 >;
 
-const minimumSupportedParticipantCount = 3;
 const validationTarget = 15;
 
 const formatSessionFingerprint = (value: string): string =>
@@ -98,7 +100,7 @@ const buildThresholdSummary = ({
     participantCount: number;
 }): PollResponse['thresholds'] => {
     const reconstructionThreshold =
-        !isOpen && participantCount >= minimumSupportedParticipantCount
+        !isOpen && participantCount >= minimumPollParticipantsToClose
             ? majorityThreshold(participantCount)
             : null;
 
@@ -164,10 +166,12 @@ const buildVerificationSummary = async ({
     acceptedPayloads,
     manifest,
     sessionId,
+    submittedParticipantCount,
 }: {
     acceptedPayloads: readonly SignedPayload[];
     manifest: ElectionManifest | null;
     sessionId: string | null;
+    submittedParticipantCount: number;
 }): Promise<{
     dkgCompleted: boolean;
     qualParticipantIndices: readonly number[];
@@ -263,12 +267,21 @@ const buildVerificationSummary = async ({
     ) as SignedPayload<BallotClosePayload> | undefined;
 
     if (!ballotClosePayload) {
+        const completeEncryptedBallotParticipantCount =
+            countCompleteBallotParticipants({
+                acceptedPayloads,
+                optionCount: manifest.optionList.length,
+            });
+
         return {
             dkgCompleted: true,
             qualParticipantIndices: verifiedDkg.qual,
             verification: buildNotReadyVerification(
                 verifiedDkg.qual,
-                'Encrypted ballots are still accumulating. Results can be revealed once the organizer closes the counted ballot set.',
+                completeEncryptedBallotParticipantCount ===
+                    submittedParticipantCount
+                    ? 'All encrypted ballots are accepted. Waiting for the automatic reveal to start.'
+                    : 'Encrypted ballots are still accumulating.',
             ),
         };
     }
@@ -537,24 +550,21 @@ export const getPollFetchReadModel = async (
             acceptedPayloads,
             optionCount: poll.choices.length,
         });
-    const reconstructionThreshold =
-        thresholds.reconstructionThreshold ??
-        (participantCount >= minimumSupportedParticipantCount
-            ? majorityThreshold(participantCount)
-            : null);
+    const reconstructionThreshold = thresholds.reconstructionThreshold;
     const hasBallotClose = acceptedPayloads.some((payload) =>
         isSignedPayloadOfType(payload, 'ballot-close'),
     );
     const revealReady =
         !poll.isOpen &&
         reconstructionThreshold !== null &&
-        completeEncryptedBallotParticipantCount >= reconstructionThreshold &&
+        completeEncryptedBallotParticipantCount === participantCount &&
         !hasBallotClose;
 
     const verificationSummary = await buildVerificationSummary({
         acceptedPayloads,
         manifest,
         sessionId,
+        submittedParticipantCount: participantCount,
     });
     const sessionFingerprint = classifiedBoard.boardAudit.ceremonyDigest
         ? formatSessionFingerprint(classifiedBoard.boardAudit.ceremonyDigest)
@@ -589,7 +599,7 @@ export const getPollFetchReadModel = async (
             verification: verificationSummary.verification,
         }),
         submittedParticipantCount: participantCount,
-        minimumCloseParticipantCount: minimumSupportedParticipantCount,
+        minimumCloseParticipantCount: minimumPollParticipantsToClose,
         ceremony: {
             acceptedDecryptionShareCount,
             acceptedEncryptedBallotCount,

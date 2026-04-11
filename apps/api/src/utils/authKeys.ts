@@ -14,9 +14,7 @@ const hexToBytes = (hexValue: string): Uint8Array => {
 
 const toArrayBuffer = (hexValue: string): ArrayBuffer => {
     const bytes = hexToBytes(hexValue);
-    const buffer = new ArrayBuffer(bytes.byteLength);
-    new Uint8Array(buffer).set(bytes);
-    return buffer;
+    return bytes.buffer as ArrayBuffer;
 };
 
 const copyBytesToArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {

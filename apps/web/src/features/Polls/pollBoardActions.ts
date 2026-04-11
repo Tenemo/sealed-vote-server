@@ -39,7 +39,9 @@ import {
     verifyFeldmanShare,
     verifyPedersenShare,
     type DLEQStatement,
+    type EncodedAuthPublicKey,
     type EncodedPoint,
+    type EncodedTransportPublicKey,
     type FeldmanCommitments,
     type PedersenCommitments,
     type PedersenShare,
@@ -180,15 +182,17 @@ const sha256Hex = async (value: string): Promise<string> => {
 
 const deriveCoefficient = async ({
     coefficientIndex,
+    domain,
     participantIndex,
     seedHex,
 }: {
     coefficientIndex: number;
+    domain: string;
     participantIndex: number;
     seedHex: string;
 }): Promise<bigint> => {
     const material = await sha256Hex(
-        `${seedHex}:${participantIndex}:${coefficientIndex}`,
+        `${seedHex}:${domain}:${participantIndex}:${coefficientIndex}`,
     );
 
     return modQ(BigInt(`0x${material}`), RISTRETTO_GROUP.q - 1n) + 1n;
@@ -209,11 +213,19 @@ const derivePolynomial = async ({
             async (_value, offset) =>
                 await deriveCoefficient({
                     coefficientIndex: offset + 1,
+                    domain: 'polynomial',
                     participantIndex,
                     seedHex,
                 }),
         ),
     );
+
+const asEncodedAuthPublicKey = (value: string): EncodedAuthPublicKey =>
+    value as EncodedAuthPublicKey;
+
+const asEncodedTransportPublicKey = (
+    value: string,
+): EncodedTransportPublicKey => value as EncodedTransportPublicKey;
 
 const deriveLocalDealerState = async ({
     deviceState,
@@ -723,6 +735,66 @@ const parseCompactProof = (proof: {
     response: decodeLittleEndianScalar(proof.response),
 });
 
+const createRevealBallotCloseActionInternal = async ({
+    creatorSession,
+    deviceState,
+    poll,
+    voterSession,
+}: {
+    creatorSession: StoredCreatorSession | null;
+    deviceState: StoredPollDeviceState | null;
+    poll: PollResponse;
+    voterSession: StoredVoterSession | null;
+}): Promise<PreparedCeremonyAction | null> => {
+    const manifestHash = poll.manifestHash;
+    const sessionId = poll.sessionId;
+
+    if (
+        !creatorSession ||
+        !deviceState ||
+        !deviceState.isCreatorParticipant ||
+        !voterSession ||
+        !poll.ceremony.revealReady ||
+        !manifestHash ||
+        !sessionId ||
+        creatorSession.pollId !== poll.id
+    ) {
+        return null;
+    }
+
+    const participantIndices = deriveBallotParticipantSet({
+        ballotPayloads: getAcceptedBallotPayloads(poll),
+        optionCount: poll.choices.length,
+    });
+
+    if (participantIndices.length !== poll.submittedParticipantCount) {
+        return null;
+    }
+
+    const slotKey = getLocalPayloadSlotKey({
+        kind: 'publish-ballot-close',
+        participantIndex: voterSession.voterIndex,
+        sessionId,
+    });
+    const authPrivateKey = await importStoredAuthPrivateKey(
+        deviceState.authPrivateKeyPkcs8,
+    );
+
+    return await getOrCreatePreparedAction({
+        buildSignedPayload: async () =>
+            await createBallotClosePayload(authPrivateKey, {
+                sessionId,
+                manifestHash,
+                participantIndex: voterSession.voterIndex,
+                includedParticipantIndices: participantIndices,
+            }),
+        deviceState,
+        kind: 'publish-ballot-close',
+        poll,
+        slotKey,
+    });
+};
+
 export const resolveAutomaticCeremonyAction = async ({
     creatorSession,
     deviceState,
@@ -753,12 +825,17 @@ export const resolveAutomaticCeremonyAction = async ({
         deviceState.authPrivateKeyPkcs8,
     );
     const threshold = majorityThreshold(poll.submittedParticipantCount);
-    const localDealerState = await deriveLocalDealerState({
-        deviceState,
-        participantCount: poll.submittedParticipantCount,
-        participantIndex,
-        threshold,
-    });
+    let localDealerStatePromise: Promise<LocalDealerState> | null = null;
+    const getLocalDealerState = async (): Promise<LocalDealerState> => {
+        localDealerStatePromise ??= deriveLocalDealerState({
+            deviceState,
+            participantCount: poll.submittedParticipantCount,
+            participantIndex,
+            threshold,
+        });
+
+        return await localDealerStatePromise;
+    };
     const acceptedPayloads = acceptedBoardPayloads(poll);
 
     const registrationSlotKey = getLocalPayloadSlotKey({
@@ -771,12 +848,16 @@ export const resolveAutomaticCeremonyAction = async ({
         return await getOrCreatePreparedAction({
             buildSignedPayload: async () =>
                 await createRegistrationPayload(authPrivateKey, {
-                    authPublicKey: deviceState.authPublicKey as never,
+                    authPublicKey: asEncodedAuthPublicKey(
+                        deviceState.authPublicKey,
+                    ),
                     manifestHash,
                     participantIndex,
                     rosterHash: manifest.rosterHash,
                     sessionId,
-                    transportPublicKey: deviceState.transportPublicKey as never,
+                    transportPublicKey: asEncodedTransportPublicKey(
+                        deviceState.transportPublicKey,
+                    ),
                 }),
             deviceState,
             kind: 'publish-registration',
@@ -858,14 +939,17 @@ export const resolveAutomaticCeremonyAction = async ({
 
     if (!getAcceptedPayloadBySlotKey(poll, pedersenSlotKey)) {
         return await getOrCreatePreparedAction({
-            buildSignedPayload: async () =>
-                await createPedersenCommitmentPayload(authPrivateKey, {
+            buildSignedPayload: async () => {
+                const localDealerState = await getLocalDealerState();
+
+                return await createPedersenCommitmentPayload(authPrivateKey, {
                     sessionId,
                     manifestHash,
                     participantIndex,
                     commitments:
                         localDealerState.pedersenCommitments.commitments,
-                }),
+                });
+            },
             deviceState,
             kind: 'publish-pedersen-commitment',
             poll,
@@ -891,6 +975,7 @@ export const resolveAutomaticCeremonyAction = async ({
 
         return await getOrCreatePreparedAction({
             buildSignedPayload: async () => {
+                const localDealerState = await getLocalDealerState();
                 const envelopeId = buildEncryptedShareEnvelopeId(
                     participantIndex,
                     recipient.participantIndex,
@@ -903,7 +988,7 @@ export const resolveAutomaticCeremonyAction = async ({
                 );
                 const { envelope } = await encryptEnvelope(
                     plaintext,
-                    recipient.transportPublicKey as never,
+                    asEncodedTransportPublicKey(recipient.transportPublicKey),
                     {
                         sessionId,
                         rosterHash: manifest.rosterHash,
@@ -954,8 +1039,10 @@ export const resolveAutomaticCeremonyAction = async ({
 
     if (!getAcceptedPayloadBySlotKey(poll, feldmanSlotKey)) {
         return await getOrCreatePreparedAction({
-            buildSignedPayload: async () =>
-                await createFeldmanCommitmentPayload(authPrivateKey, {
+            buildSignedPayload: async () => {
+                const localDealerState = await getLocalDealerState();
+
+                return await createFeldmanCommitmentPayload(authPrivateKey, {
                     sessionId,
                     manifestHash,
                     participantIndex,
@@ -969,7 +1056,8 @@ export const resolveAutomaticCeremonyAction = async ({
                         secretPolynomial: localDealerState.secretPolynomial,
                         sessionId,
                     }),
-                }),
+                });
+            },
             deviceState,
             kind: 'publish-feldman-commitment',
             poll,
@@ -1062,8 +1150,9 @@ export const resolveAutomaticCeremonyAction = async ({
                     const vote = BigInt(ballotScores[offset]);
                     const randomness = await deriveCoefficient({
                         coefficientIndex: optionIndex,
+                        domain: 'ballot',
                         participantIndex,
-                        seedHex: deviceState.dkgSecretSeed,
+                        seedHex: deviceState.dkgBlindingSeed,
                     });
                     const ciphertext = encryptAdditiveWithRandomness(
                         vote,
@@ -1107,6 +1196,19 @@ export const resolveAutomaticCeremonyAction = async ({
         }
 
         clearStoredBallot(poll.id);
+    }
+
+    if (!getAcceptedBallotClose(poll) && creatorIsLocalParticipant) {
+        const revealAction = await createRevealBallotCloseActionInternal({
+            creatorSession,
+            deviceState,
+            poll,
+            voterSession,
+        });
+
+        if (revealAction) {
+            return revealAction;
+        }
     }
 
     const ballotClosePayload = getAcceptedBallotClose(poll);
@@ -1278,10 +1380,12 @@ export const resolveAutomaticCeremonyAction = async ({
                 (share): share is { index: number; value: EncodedPoint } =>
                     share !== null,
             )
-            .sort((left, right) => left.index - right.index)
-            .slice(0, threshold);
+            .sort((left, right) => left.index - right.index);
 
-        if (selectedShares.length < threshold) {
+        if (
+            selectedShares.length !==
+            ballotClosePayload.payload.includedParticipantIndices.length
+        ) {
             return null;
         }
 
@@ -1313,67 +1417,8 @@ export const resolveAutomaticCeremonyAction = async ({
     return null;
 };
 
-export const createRevealBallotCloseAction = async ({
-    creatorSession,
-    deviceState,
-    poll,
-    voterSession,
-}: {
-    creatorSession: StoredCreatorSession | null;
-    deviceState: StoredPollDeviceState | null;
-    poll: PollResponse;
-    voterSession: StoredVoterSession | null;
-}): Promise<PreparedCeremonyAction | null> => {
-    const manifestHash = poll.manifestHash;
-    const sessionId = poll.sessionId;
-
-    if (
-        !creatorSession ||
-        !deviceState ||
-        !deviceState.isCreatorParticipant ||
-        !voterSession ||
-        !manifestHash ||
-        !sessionId ||
-        creatorSession.pollId !== poll.id
-    ) {
-        return null;
-    }
-
-    const participantIndices = deriveBallotParticipantSet({
-        ballotPayloads: getAcceptedBallotPayloads(poll),
-        optionCount: poll.choices.length,
-    });
-
-    if (
-        participantIndices.length <
-        majorityThreshold(poll.submittedParticipantCount)
-    ) {
-        return null;
-    }
-
-    const slotKey = getLocalPayloadSlotKey({
-        kind: 'publish-ballot-close',
-        participantIndex: voterSession.voterIndex,
-        sessionId,
-    });
-    const authPrivateKey = await importStoredAuthPrivateKey(
-        deviceState.authPrivateKeyPkcs8,
-    );
-
-    return await getOrCreatePreparedAction({
-        buildSignedPayload: async () =>
-            await createBallotClosePayload(authPrivateKey, {
-                sessionId,
-                manifestHash,
-                participantIndex: voterSession.voterIndex,
-                includedParticipantIndices: participantIndices,
-            }),
-        deviceState,
-        kind: 'publish-ballot-close',
-        poll,
-        slotKey,
-    });
-};
+export const createRevealBallotCloseAction =
+    createRevealBallotCloseActionInternal;
 
 export const describeAutomaticCeremonyAction = (
     action: PreparedCeremonyAction | null,

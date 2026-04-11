@@ -17,6 +17,7 @@ const chromiumOnlySpecs = [
 ];
 
 const webkitUnsupportedCeremonySpecs = [
+    '**/multi-participant-counting.spec.ts',
     '**/refresh-resume.spec.ts',
     '**/setup-phase.spec.ts',
     '**/voting-flow.spec.ts',
@@ -201,7 +202,8 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
           ]
         : [
               {
-                  command: 'pnpm exec node --experimental-strip-types tests/e2e/scripts/run-e2e-backend.mts',
+                  command:
+                      'pnpm exec node --experimental-strip-types tests/e2e/scripts/run-e2e-backend.mts',
                   timeout: 120_000,
                   url: `${localApiBaseUrl}/api/health-check`,
                   reuseExistingServer: false,

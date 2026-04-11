@@ -6,7 +6,11 @@ import {
     resolveAutomaticCeremonyAction,
 } from './pollBoardActions';
 
-import type { StoredPollDeviceState } from 'features/Polls/pollDeviceStorage';
+import {
+    createPendingPollDeviceState,
+    createPollDeviceState,
+    type StoredPollDeviceState,
+} from 'features/Polls/pollDeviceStorage';
 import type {
     StoredCreatorSession,
     StoredVoterSession,
@@ -120,6 +124,26 @@ const createDeviceState = (
     ...overrides,
 });
 
+const createValidDeviceState = async (
+    overrides: Omit<Partial<StoredPollDeviceState>, 'storedBallotScores'> & {
+        storedBallotScores?: number[];
+    } = {},
+): Promise<StoredPollDeviceState> => {
+    const pendingState = await createPendingPollDeviceState();
+
+    return await createPollDeviceState({
+        pendingState,
+        pollId: 'poll-1',
+        pollSlug: 'best-fruit--1111',
+        storedBallotScores: [8, 6],
+        voterIndex: 1,
+        voterName: 'Alice',
+        voterToken: 'token-1',
+        isCreatorParticipant: true,
+        ...overrides,
+    });
+};
+
 const createVoterSession = (
     overrides: Partial<StoredVoterSession> = {},
 ): StoredVoterSession => ({
@@ -138,6 +162,43 @@ const createCreatorSession = (
     pollId: 'poll-1',
     pollSlug: 'best-fruit--1111',
     ...overrides,
+});
+
+const createAcceptedBallotEntry = ({
+    entryId,
+    optionIndex,
+    participantIndex,
+}: {
+    entryId: string;
+    optionIndex: number;
+    participantIndex: number;
+}): PollResponse['boardEntries'][number] => ({
+    id: entryId,
+    createdAt: '2026-04-11T10:10:00.000Z',
+    phase: 5,
+    participantIndex,
+    messageType: 'ballot-submission',
+    slotKey: `c${participantIndex}:${optionIndex}`,
+    unsignedHash: `hash-${entryId}`,
+    previousEntryHash: null,
+    entryHash: `entry-${entryId}`,
+    classification: 'accepted',
+    signedPayload: {
+        payload: {
+            ciphertext: {
+                c1: `c1-${entryId}` as never,
+                c2: `c2-${entryId}` as never,
+            },
+            manifestHash: 'b'.repeat(64),
+            messageType: 'ballot-submission',
+            optionIndex,
+            participantIndex,
+            phase: 5,
+            proof: [] as never,
+            sessionId: 'c'.repeat(64),
+        },
+        signature: 'd'.repeat(128),
+    },
 });
 
 describe('pollBoardActions', () => {
@@ -199,5 +260,66 @@ describe('pollBoardActions', () => {
                 voterSession: createVoterSession(),
             }),
         ).resolves.toBeNull();
+    });
+
+    it('creates a reveal action only after every submitted participant has a complete ballot', async () => {
+        const deviceState = await createValidDeviceState();
+        const action = await createRevealBallotCloseAction({
+            creatorSession: createCreatorSession(),
+            deviceState,
+            poll: createPoll({
+                boardEntries: [
+                    createAcceptedBallotEntry({
+                        entryId: 'a1',
+                        optionIndex: 1,
+                        participantIndex: 1,
+                    }),
+                    createAcceptedBallotEntry({
+                        entryId: 'a2',
+                        optionIndex: 2,
+                        participantIndex: 1,
+                    }),
+                    createAcceptedBallotEntry({
+                        entryId: 'b1',
+                        optionIndex: 1,
+                        participantIndex: 2,
+                    }),
+                    createAcceptedBallotEntry({
+                        entryId: 'b2',
+                        optionIndex: 2,
+                        participantIndex: 2,
+                    }),
+                    createAcceptedBallotEntry({
+                        entryId: 'c1',
+                        optionIndex: 1,
+                        participantIndex: 3,
+                    }),
+                    createAcceptedBallotEntry({
+                        entryId: 'c2',
+                        optionIndex: 2,
+                        participantIndex: 3,
+                    }),
+                ],
+                ceremony: {
+                    acceptedDecryptionShareCount: 0,
+                    acceptedEncryptedBallotCount: 6,
+                    acceptedRegistrationCount: 3,
+                    completeEncryptedBallotParticipantCount: 3,
+                    revealReady: true,
+                },
+            }),
+            voterSession: createVoterSession({
+                voterIndex: 1,
+                voterToken: deviceState.voterToken,
+                voterName: deviceState.voterName,
+            }),
+        });
+
+        expect(action?.kind).toBe('publish-ballot-close');
+        expect(
+            action?.signedPayload.payload.messageType === 'ballot-close'
+                ? action.signedPayload.payload.includedParticipantIndices
+                : null,
+        ).toEqual([1, 2, 3]);
     });
 });

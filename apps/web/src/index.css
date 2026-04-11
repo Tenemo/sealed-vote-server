@@ -41,6 +41,7 @@
         -moz-osx-font-smoothing: grayscale;
         background-color: var(--color-background);
         min-height: 100%;
+        scrollbar-gutter: stable;
     }
 
     *,

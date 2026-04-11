@@ -4,11 +4,11 @@ import {
     closeVoting,
     createPoll,
     deletePolls,
+    expectAcceptedBallotCount,
     expectParticipantsVisible,
     expectSecuringVisible,
-    revealResults,
     submitVote,
-    waitForReadyToReveal,
+    waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
 } from './support/pollFlow';
@@ -86,12 +86,20 @@ test('completes one real ceremony across chromium, desktop firefox, and mobile f
         await expectSecuringVisible(firefoxDesktop.page);
         await expectSecuringVisible(firefoxMobile.page);
 
-        await waitForReadyToReveal(page);
-        await revealResults(page);
+        await waitForAutomaticReveal(page);
 
         await waitForVerifiedResults({ page });
         await waitForVerifiedResults({ page: firefoxDesktop.page });
         await waitForVerifiedResults({ page: firefoxMobile.page });
+        await expectAcceptedBallotCount({ count: 3, page });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: firefoxDesktop.page,
+        });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: firefoxMobile.page,
+        });
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(firefoxDesktop);

@@ -61,7 +61,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
         ).toBeVisible();
         await expect(
             nextStepPanel.getByText(
-                'You still need to submit your own vote from this browser before you can close voting or reveal results.',
+                'You still need to submit your own vote from this browser before you can close voting.',
                 {
                     exact: true,
                 },

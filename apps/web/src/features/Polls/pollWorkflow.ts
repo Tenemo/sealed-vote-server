@@ -10,9 +10,8 @@ export type ViewerWorkflowState =
     | 'creator-must-submit-first'
     | 'creator-can-close'
     | 'securing-auto'
-    | 'securing-retry-required'
+    | 'automation-retry-required'
     | 'securing-waiting'
-    | 'ready-to-reveal'
     | 'revealing-auto'
     | 'revealing-waiting'
     | 'waiting-for-results'
@@ -22,7 +21,6 @@ export type ViewerWorkflowState =
 
 export type DerivedPollWorkflow = {
     canCloseVoting: boolean;
-    canRevealResults: boolean;
     canRetryAutomation: boolean;
     canSubmitVote: boolean;
     currentStep: ViewerWorkflowState;
@@ -75,7 +73,6 @@ export const derivePollWorkflow = ({
     if (poll.phase === 'aborted') {
         return {
             canCloseVoting: false,
-            canRevealResults: false,
             canRetryAutomation: false,
             canSubmitVote: false,
             currentStep: 'aborted',
@@ -89,7 +86,6 @@ export const derivePollWorkflow = ({
     if (poll.phase === 'complete') {
         return {
             canCloseVoting: false,
-            canRevealResults: false,
             canRetryAutomation: false,
             canSubmitVote: false,
             currentStep: 'complete',
@@ -104,7 +100,6 @@ export const derivePollWorkflow = ({
         if (!localParticipant) {
             return {
                 canCloseVoting: false,
-                canRevealResults: false,
                 canRetryAutomation: false,
                 canSubmitVote: !isSubmittingVote,
                 currentStep: isSubmittingVote
@@ -124,7 +119,6 @@ export const derivePollWorkflow = ({
                 creatorHasLocalParticipant &&
                 poll.submittedParticipantCount >=
                     poll.minimumCloseParticipantCount,
-            canRevealResults: false,
             canRetryAutomation: false,
             canSubmitVote: false,
             currentStep:
@@ -143,7 +137,6 @@ export const derivePollWorkflow = ({
     if (missingLocalState) {
         return {
             canCloseVoting: false,
-            canRevealResults: false,
             canRetryAutomation: false,
             canSubmitVote: false,
             currentStep: 'local-vote-missing',
@@ -155,17 +148,15 @@ export const derivePollWorkflow = ({
     }
 
     if (poll.phase === 'securing') {
-        const currentStep = hasAutomaticCeremonyAction
-            ? hasAutomationFailure
-                ? 'securing-retry-required'
-                : 'securing-auto'
-            : 'securing-waiting';
+        const currentStep = hasAutomationFailure
+            ? 'automation-retry-required'
+            : hasAutomaticCeremonyAction
+              ? 'securing-auto'
+              : 'securing-waiting';
 
         return {
             canCloseVoting: false,
-            canRevealResults: false,
-            canRetryAutomation:
-                hasAutomaticCeremonyAction && hasAutomationFailure,
+            canRetryAutomation: hasAutomationFailure,
             canSubmitVote: false,
             currentStep,
             hasLocalVote,
@@ -178,14 +169,13 @@ export const derivePollWorkflow = ({
     if (poll.phase === 'ready-to-reveal') {
         return {
             canCloseVoting: false,
-            canRevealResults:
-                creatorHasLocalParticipant && poll.ceremony.revealReady,
-            canRetryAutomation: false,
+            canRetryAutomation: hasAutomationFailure,
             canSubmitVote: false,
-            currentStep:
-                creatorHasLocalParticipant && poll.ceremony.revealReady
-                    ? 'ready-to-reveal'
-                    : 'waiting-for-results',
+            currentStep: hasAutomationFailure
+                ? 'automation-retry-required'
+                : hasAutomaticCeremonyAction
+                  ? 'revealing-auto'
+                  : 'waiting-for-results',
             hasLocalVote,
             hasSubmittedVote,
             isCreator,
@@ -193,14 +183,15 @@ export const derivePollWorkflow = ({
         };
     }
 
-    const currentStep = hasAutomaticCeremonyAction
-        ? 'revealing-auto'
-        : 'revealing-waiting';
+    const currentStep = hasAutomationFailure
+        ? 'automation-retry-required'
+        : hasAutomaticCeremonyAction
+          ? 'revealing-auto'
+          : 'revealing-waiting';
 
     return {
         canCloseVoting: false,
-        canRevealResults: false,
-        canRetryAutomation: false,
+        canRetryAutomation: hasAutomationFailure,
         canSubmitVote: false,
         currentStep,
         hasLocalVote,
