@@ -310,6 +310,32 @@ export const updatePollDeviceState = (
     return nextState;
 };
 
+export const savePendingPayloadIfAbsent = ({
+    pollId,
+    signedPayload,
+    slotKey,
+}: {
+    pollId: string;
+    signedPayload: SignedPayload;
+    slotKey: string;
+}): SignedPayload | null => {
+    const nextState = updatePollDeviceState(pollId, (currentState) => {
+        if (currentState.pendingPayloads[slotKey]) {
+            return currentState;
+        }
+
+        return {
+            ...currentState,
+            pendingPayloads: {
+                ...currentState.pendingPayloads,
+                [slotKey]: signedPayload,
+            },
+        };
+    });
+
+    return nextState?.pendingPayloads[slotKey] ?? null;
+};
+
 export const findPollDeviceStateByPollId = (
     pollId: string,
 ): StoredPollDeviceState | null => readStoredStates()[pollId] ?? null;

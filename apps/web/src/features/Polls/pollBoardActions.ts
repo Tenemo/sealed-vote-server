@@ -52,6 +52,7 @@ import {
 import {
     importStoredAuthPrivateKey,
     restoreStoredTransportPrivateKey,
+    savePendingPayloadIfAbsent,
     updatePollDeviceState,
     type StoredPollDeviceState,
 } from './pollDeviceStorage';
@@ -99,6 +100,8 @@ type PreparedCeremonyAction = {
     signedPayload: SignedPayload;
     slotKey: string;
 };
+
+type ShouldAbortResolution = () => boolean;
 
 type LocalDealerState = {
     blindingPolynomial: readonly bigint[];
@@ -290,19 +293,9 @@ const pruneAcceptedPendingPayloads = (
     }));
 };
 
-const persistPendingPayload = (
-    pollId: string,
-    slotKey: string,
-    signedPayload: SignedPayload,
-): void => {
-    updatePollDeviceState(pollId, (currentState) => ({
-        ...currentState,
-        pendingPayloads: {
-            ...currentState.pendingPayloads,
-            [slotKey]: signedPayload,
-        },
-    }));
-};
+const wasResolutionAborted = (
+    shouldAbort: ShouldAbortResolution | undefined,
+): boolean => shouldAbort?.() ?? false;
 
 const clearPendingPayload = (pollId: string, slotKey: string): void => {
     updatePollDeviceState(pollId, (currentState) => ({
@@ -327,14 +320,16 @@ const getOrCreatePreparedAction = async ({
     deviceState,
     kind,
     poll,
+    shouldAbort,
     slotKey,
 }: {
     buildSignedPayload: () => Promise<SignedPayload>;
     deviceState: StoredPollDeviceState;
     kind: PreparedCeremonyAction['kind'];
     poll: PollResponse;
+    shouldAbort?: ShouldAbortResolution;
     slotKey: string;
-}): Promise<PreparedCeremonyAction> => {
+}): Promise<PreparedCeremonyAction | null> => {
     const existingPayload = getStoredOrAcceptedPayload({
         deviceState,
         poll,
@@ -349,12 +344,26 @@ const getOrCreatePreparedAction = async ({
         };
     }
 
+    if (wasResolutionAborted(shouldAbort)) {
+        return null;
+    }
+
     const signedPayload = await buildSignedPayload();
-    persistPendingPayload(poll.id, slotKey, signedPayload);
+
+    if (wasResolutionAborted(shouldAbort)) {
+        return null;
+    }
+
+    const persistedPayload =
+        savePendingPayloadIfAbsent({
+            pollId: poll.id,
+            signedPayload,
+            slotKey,
+        }) ?? signedPayload;
 
     return {
         kind,
-        signedPayload,
+        signedPayload: persistedPayload,
         slotKey,
     };
 };
@@ -735,15 +744,52 @@ const parseCompactProof = (proof: {
     response: decodeLittleEndianScalar(proof.response),
 });
 
+const selectCanonicalDecryptionShares = ({
+    threshold,
+    validShares,
+}: {
+    threshold: number;
+    validShares: readonly {
+        index: number;
+        value: EncodedPoint;
+    }[];
+}):
+    | readonly {
+          index: number;
+          value: EncodedPoint;
+      }[]
+    | null => {
+    if (validShares.length < threshold) {
+        return null;
+    }
+
+    return [...validShares]
+        .sort((left, right) => left.index - right.index)
+        .slice(0, threshold);
+};
+
+const selectCanonicalParticipantIndices = ({
+    participantIndices,
+    threshold,
+}: {
+    participantIndices: readonly number[];
+    threshold: number;
+}): readonly number[] =>
+    [...participantIndices]
+        .sort((left, right) => left - right)
+        .slice(0, threshold);
+
 const createRevealBallotCloseActionInternal = async ({
     creatorSession,
     deviceState,
     poll,
+    shouldAbort,
     voterSession,
 }: {
     creatorSession: StoredCreatorSession | null;
     deviceState: StoredPollDeviceState | null;
     poll: PollResponse;
+    shouldAbort?: ShouldAbortResolution;
     voterSession: StoredVoterSession | null;
 }): Promise<PreparedCeremonyAction | null> => {
     const manifestHash = poll.manifestHash;
@@ -791,6 +837,7 @@ const createRevealBallotCloseActionInternal = async ({
         deviceState,
         kind: 'publish-ballot-close',
         poll,
+        shouldAbort,
         slotKey,
     });
 };
@@ -799,11 +846,13 @@ export const resolveAutomaticCeremonyAction = async ({
     creatorSession,
     deviceState,
     poll,
+    shouldAbort,
     voterSession,
 }: {
     creatorSession: StoredCreatorSession | null;
     deviceState: StoredPollDeviceState | null;
     poll: PollResponse;
+    shouldAbort?: ShouldAbortResolution;
     voterSession: StoredVoterSession | null;
 }): Promise<PreparedCeremonyAction | null> => {
     if (!deviceState || !voterSession) {
@@ -815,6 +864,10 @@ export const resolveAutomaticCeremonyAction = async ({
     const sessionId = poll.sessionId;
 
     if (!manifest || !manifestHash || !sessionId) {
+        return null;
+    }
+
+    if (wasResolutionAborted(shouldAbort)) {
         return null;
     }
 
@@ -862,6 +915,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-registration',
             poll,
+            shouldAbort,
             slotKey: registrationSlotKey,
         });
     }
@@ -893,6 +947,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-manifest',
             poll,
+            shouldAbort,
             slotKey,
         });
     }
@@ -917,6 +972,7 @@ export const resolveAutomaticCeremonyAction = async ({
                 deviceState,
                 kind: 'accept-manifest',
                 poll,
+                shouldAbort,
                 slotKey: manifestAcceptanceSlotKey,
             });
         }
@@ -953,6 +1009,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-pedersen-commitment',
             poll,
+            shouldAbort,
             slotKey: pedersenSlotKey,
         });
     }
@@ -1017,6 +1074,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-encrypted-share',
             poll,
+            shouldAbort,
             slotKey,
         });
     }
@@ -1061,6 +1119,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-feldman-commitment',
             poll,
+            shouldAbort,
             slotKey: feldmanSlotKey,
         });
     }
@@ -1121,6 +1180,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-key-confirmation',
             poll,
+            shouldAbort,
             slotKey: keyConfirmationSlotKey,
         });
     }
@@ -1191,8 +1251,13 @@ export const resolveAutomaticCeremonyAction = async ({
                 deviceState,
                 kind: 'publish-ballot',
                 poll,
+                shouldAbort,
                 slotKey,
             });
+        }
+
+        if (wasResolutionAborted(shouldAbort)) {
+            return null;
         }
 
         clearStoredBallot(poll.id);
@@ -1203,6 +1268,7 @@ export const resolveAutomaticCeremonyAction = async ({
             creatorSession,
             deviceState,
             poll,
+            shouldAbort,
             voterSession,
         });
 
@@ -1233,75 +1299,90 @@ export const resolveAutomaticCeremonyAction = async ({
         return null;
     }
 
-    const localContributions = await deriveLocalAcceptedShareContributions({
-        deviceState,
-        poll,
-        verifiedDkg,
-    });
-    const finalShare = deriveFinalShare({
-        contributions: localContributions,
-        participantIndex,
-    });
-
-    for (const optionBallots of verifiedBallotsByOption) {
-        const slotKey = getLocalPayloadSlotKey({
-            kind: 'publish-decryption-share',
-            optionIndex: optionBallots.optionIndex,
-            participantIndex,
-            sessionId,
+    const selectedDecryptionParticipantIndices =
+        selectCanonicalParticipantIndices({
+            participantIndices:
+                ballotClosePayload.payload.includedParticipantIndices,
+            threshold:
+                poll.thresholds.minimumPublishedVoterCount ??
+                majorityThreshold(poll.submittedParticipantCount),
         });
+    const selectedDecryptionParticipantSet = new Set(
+        selectedDecryptionParticipantIndices,
+    );
 
-        if (getAcceptedPayloadBySlotKey(poll, slotKey)) {
-            continue;
-        }
-
-        return await getOrCreatePreparedAction({
-            buildSignedPayload: async () => {
-                const verifiedShare = createVerifiedDecryptionShare(
-                    optionBallots.aggregate,
-                    finalShare,
-                );
-                const statement: DLEQStatement = {
-                    publicKey: deriveTranscriptVerificationKey(
-                        verifiedDkg.feldmanCommitments,
-                        participantIndex,
-                        RISTRETTO_GROUP,
-                    ),
-                    ciphertext: optionBallots.aggregate.ciphertext,
-                    decryptionShare: verifiedShare.value,
-                };
-                const context: ProofContext = {
-                    protocolVersion: SHIPPED_PROTOCOL_VERSION,
-                    suiteId: RISTRETTO_GROUP.name,
-                    manifestHash,
-                    sessionId,
-                    label: 'decryption-share-dleq',
-                    participantIndex,
-                    optionIndex: optionBallots.optionIndex,
-                };
-                const proof = await createDLEQProof(
-                    finalShare.value,
-                    statement,
-                    RISTRETTO_GROUP,
-                    context,
-                );
-
-                return await createDecryptionSharePayload(authPrivateKey, {
-                    sessionId,
-                    manifestHash,
-                    participantIndex,
-                    optionIndex: optionBallots.optionIndex,
-                    transcriptHash: optionBallots.aggregate.transcriptHash,
-                    ballotCount: optionBallots.aggregate.ballotCount,
-                    decryptionShare: verifiedShare.value,
-                    proof,
-                });
-            },
+    if (selectedDecryptionParticipantSet.has(participantIndex)) {
+        const localContributions = await deriveLocalAcceptedShareContributions({
             deviceState,
-            kind: 'publish-decryption-share',
             poll,
-            slotKey,
+            verifiedDkg,
         });
+        const finalShare = deriveFinalShare({
+            contributions: localContributions,
+            participantIndex,
+        });
+
+        for (const optionBallots of verifiedBallotsByOption) {
+            const slotKey = getLocalPayloadSlotKey({
+                kind: 'publish-decryption-share',
+                optionIndex: optionBallots.optionIndex,
+                participantIndex,
+                sessionId,
+            });
+
+            if (getAcceptedPayloadBySlotKey(poll, slotKey)) {
+                continue;
+            }
+
+            return await getOrCreatePreparedAction({
+                buildSignedPayload: async () => {
+                    const verifiedShare = createVerifiedDecryptionShare(
+                        optionBallots.aggregate,
+                        finalShare,
+                    );
+                    const statement: DLEQStatement = {
+                        publicKey: deriveTranscriptVerificationKey(
+                            verifiedDkg.feldmanCommitments,
+                            participantIndex,
+                            RISTRETTO_GROUP,
+                        ),
+                        ciphertext: optionBallots.aggregate.ciphertext,
+                        decryptionShare: verifiedShare.value,
+                    };
+                    const context: ProofContext = {
+                        protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                        suiteId: RISTRETTO_GROUP.name,
+                        manifestHash,
+                        sessionId,
+                        label: 'decryption-share-dleq',
+                        participantIndex,
+                        optionIndex: optionBallots.optionIndex,
+                    };
+                    const proof = await createDLEQProof(
+                        finalShare.value,
+                        statement,
+                        RISTRETTO_GROUP,
+                        context,
+                    );
+
+                    return await createDecryptionSharePayload(authPrivateKey, {
+                        sessionId,
+                        manifestHash,
+                        participantIndex,
+                        optionIndex: optionBallots.optionIndex,
+                        transcriptHash: optionBallots.aggregate.transcriptHash,
+                        ballotCount: optionBallots.aggregate.ballotCount,
+                        decryptionShare: verifiedShare.value,
+                        proof,
+                    });
+                },
+                deviceState,
+                kind: 'publish-decryption-share',
+                poll,
+                shouldAbort,
+                slotKey,
+            });
+        }
     }
 
     if (!creatorIsLocalParticipant) {
@@ -1337,8 +1418,11 @@ export const resolveAutomaticCeremonyAction = async ({
             acceptedDecryptionSharePayloads
                 .filter(
                     (payload) =>
+                        selectedDecryptionParticipantSet.has(
+                            payload.payload.participantIndex,
+                        ) &&
                         payload.payload.optionIndex ===
-                        optionBallots.optionIndex,
+                            optionBallots.optionIndex,
                 )
                 .map(async (payload) => {
                     const statement: DLEQStatement = {
@@ -1375,16 +1459,20 @@ export const resolveAutomaticCeremonyAction = async ({
                 }),
         );
 
-        const selectedShares = validShares
-            .filter(
+        const selectedShares = selectCanonicalDecryptionShares({
+            threshold: selectedDecryptionParticipantIndices.length,
+            validShares: validShares.filter(
                 (share): share is { index: number; value: EncodedPoint } =>
                     share !== null,
-            )
-            .sort((left, right) => left.index - right.index);
+            ),
+        });
 
         if (
-            selectedShares.length !==
-            ballotClosePayload.payload.includedParticipantIndices.length
+            !selectedShares ||
+            selectedShares.some(
+                (share, index) =>
+                    share.index !== selectedDecryptionParticipantIndices[index],
+            )
         ) {
             return null;
         }
@@ -1410,6 +1498,7 @@ export const resolveAutomaticCeremonyAction = async ({
             deviceState,
             kind: 'publish-tally',
             poll,
+            shouldAbort,
             slotKey,
         });
     }
@@ -1419,6 +1508,7 @@ export const resolveAutomaticCeremonyAction = async ({
 
 export const createRevealBallotCloseAction =
     createRevealBallotCloseActionInternal;
+export { selectCanonicalDecryptionShares };
 
 export const describeAutomaticCeremonyAction = (
     action: PreparedCeremonyAction | null,

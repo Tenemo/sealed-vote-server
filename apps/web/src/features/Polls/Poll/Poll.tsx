@@ -282,6 +282,10 @@ const PollPage = (): React.JSX.Element => {
                 return;
             }
 
+            if (activeActionSlotKey) {
+                return;
+            }
+
             setIsResolvingAutomaticAction(true);
 
             try {
@@ -289,6 +293,7 @@ const PollPage = (): React.JSX.Element => {
                     creatorSession,
                     deviceState,
                     poll,
+                    shouldAbort: () => cancelled,
                     voterSession,
                 });
 
@@ -322,6 +327,7 @@ const PollPage = (): React.JSX.Element => {
             cancelled = true;
         };
     }, [
+        activeActionSlotKey,
         automaticResolutionAttempt,
         creatorSession,
         deviceState,

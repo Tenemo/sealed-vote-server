@@ -4,6 +4,7 @@ import {
     createRevealBallotCloseAction,
     describeAutomaticCeremonyAction,
     resolveAutomaticCeremonyAction,
+    selectCanonicalDecryptionShares,
 } from './pollBoardActions';
 
 import {
@@ -321,5 +322,54 @@ describe('pollBoardActions', () => {
                 ? action.signedPayload.payload.includedParticipantIndices
                 : null,
         ).toEqual([1, 2, 3]);
+    });
+
+    it('uses a stable threshold subset of decryption shares for tally publication', () => {
+        expect(
+            selectCanonicalDecryptionShares({
+                threshold: 2,
+                validShares: [
+                    {
+                        index: 4,
+                        value: 'share-4' as never,
+                    },
+                    {
+                        index: 2,
+                        value: 'share-2' as never,
+                    },
+                    {
+                        index: 3,
+                        value: 'share-3' as never,
+                    },
+                ],
+            }),
+        ).toEqual([
+            {
+                index: 2,
+                value: 'share-2',
+            },
+            {
+                index: 3,
+                value: 'share-3',
+            },
+        ]);
+    });
+
+    it('waits for the threshold share count before publishing a tally', () => {
+        expect(
+            selectCanonicalDecryptionShares({
+                threshold: 3,
+                validShares: [
+                    {
+                        index: 1,
+                        value: 'share-1' as never,
+                    },
+                    {
+                        index: 2,
+                        value: 'share-2' as never,
+                    },
+                ],
+            }),
+        ).toBeNull();
     });
 });
