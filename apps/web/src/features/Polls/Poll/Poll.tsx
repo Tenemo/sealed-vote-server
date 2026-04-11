@@ -351,6 +351,11 @@ const PollPage = (): React.JSX.Element => {
         poll.joinedParticipantCount,
         effectiveThresholdPercent,
     );
+    const previewParticipantCount = Math.max(
+        poll.joinedParticipantCount,
+        poll.minimumStartParticipantCount,
+    );
+    const maximumSupportedThreshold = previewParticipantCount - 1;
     const autoBoardSetupDescription =
         describeAutoBoardSetupAction(autoBoardSetupAction);
     const shareableUrl =
@@ -425,8 +430,8 @@ const PollPage = (): React.JSX.Element => {
 
     return (
         <section className="mx-auto flex w-full max-w-[88rem] flex-col gap-6">
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.95fr)]">
-                <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.95fr)]">
+                <div className="min-w-0 space-y-6">
                     <Panel className="space-y-5">
                         <div className="space-y-3">
                             <div className="flex flex-wrap items-center gap-3">
@@ -472,7 +477,7 @@ const PollPage = (): React.JSX.Element => {
                                 </p>
                                 <p className={mutedBodyClassName}>
                                     {poll.isOpen
-                                        ? `${effectiveThresholdPercent}% would currently resolve to ${thresholdPreview} of ${Math.max(poll.joinedParticipantCount, poll.minimumStartParticipantCount)} participants.`
+                                        ? `${effectiveThresholdPercent}% would currently resolve to ${thresholdPreview} of ${previewParticipantCount} participants.`
                                         : 'The frozen count needed to help open the result.'}
                                 </p>
                             </Panel>
@@ -771,10 +776,7 @@ const PollPage = (): React.JSX.Element => {
                                         <span className="text-sm font-medium">
                                             {effectiveThresholdPercent}% maps to{' '}
                                             {thresholdPreview} of{' '}
-                                            {Math.max(
-                                                poll.joinedParticipantCount,
-                                                poll.minimumStartParticipantCount,
-                                            )}{' '}
+                                            {previewParticipantCount}{' '}
                                             participants
                                         </span>
                                         <input
@@ -792,6 +794,14 @@ const PollPage = (): React.JSX.Element => {
                                             value={effectiveThresholdPercent}
                                         />
                                     </label>
+                                    <p className={mutedBodyClassName}>
+                                        The current beta protocol supports
+                                        threshold counts from{' '}
+                                        {poll.thresholds.strictMajorityFloor} to{' '}
+                                        {maximumSupportedThreshold} for the
+                                        current roster size. Full n-of-n is not
+                                        supported by the published protocol yet.
+                                    </p>
                                     <Button
                                         disabled={
                                             startState.isLoading ||
@@ -849,8 +859,12 @@ const PollPage = (): React.JSX.Element => {
                         </Panel>
                     )}
                 </div>
-                <aside className="space-y-6">
-                    <Panel className="space-y-4 lg:sticky lg:top-6">
+                <aside className="min-w-0 space-y-6">
+                    <Panel
+                        aria-label="Audit and verification details"
+                        className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto"
+                        tabIndex={0}
+                    >
                         <div className="space-y-1">
                             <h2 className={sectionTitleClassName}>
                                 Audit and verification
@@ -915,10 +929,15 @@ const PollPage = (): React.JSX.Element => {
                                 Accepted decryption shares:{' '}
                                 {acceptedDecryptionShares}
                             </p>
-                            <p className={mutedBodyClassName}>
-                                Ceremony digest:{' '}
-                                {poll.boardAudit.ceremonyDigest ?? 'Pending'}
-                            </p>
+                            <div className="space-y-1">
+                                <p className={mutedBodyClassName}>
+                                    Ceremony digest
+                                </p>
+                                <p className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
+                                    {poll.boardAudit.ceremonyDigest ??
+                                        'Pending'}
+                                </p>
+                            </div>
                         </div>
 
                         {poll.boardAudit.phaseDigests.length > 0 && (
