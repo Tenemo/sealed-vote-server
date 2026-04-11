@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { polls } from './schema.js';
 
-type SeedPhase = 'registration' | 'setup';
+type SeedPhase = 'open' | 'preparing';
 
 type SeedManifestVoter = {
     voterName: string;
@@ -25,12 +25,12 @@ type SeedManifest = {
     polls: SeedManifestPoll[];
 };
 
-const registrationSampleName = 'Seed registration sample';
-const setupSampleName = 'Seed setup sample';
+const openSampleName = 'Seed open sample';
+const preparingSampleName = 'Seed preparing sample';
 const experimentalSampleName = 'Seed experimental sample';
 const seedPollNames = [
-    registrationSampleName,
-    setupSampleName,
+    openSampleName,
+    preparingSampleName,
     experimentalSampleName,
 ];
 
@@ -50,11 +50,11 @@ const toManifestPoll = (
     })),
 });
 
-const buildRegistrationSample = async (
+const buildOpenSample = async (
     fastify: FastifyInstance,
 ): Promise<TestPollContext> => {
     const builder = new TestPollBuilder(fastify)
-        .withPollName(registrationSampleName)
+        .withPollName(openSampleName)
         .withChoices(['Pizza', 'Sushi', 'Pasta'])
         .withVoters(['Alice', 'Bob']);
 
@@ -64,11 +64,11 @@ const buildRegistrationSample = async (
     return builder.getContext();
 };
 
-const buildSetupSample = async (
+const buildPreparingSample = async (
     fastify: FastifyInstance,
 ): Promise<TestPollContext> => {
     const builder = new TestPollBuilder(fastify)
-        .withPollName(setupSampleName)
+        .withPollName(preparingSampleName)
         .withChoices(['Dog', 'Cat', 'Goat'])
         .withVoters(['Alice', 'Bob', 'Charlie']);
 
@@ -101,20 +101,20 @@ export const seedDatabase = async (
         .delete(polls)
         .where(inArray(polls.pollName, seedPollNames));
 
-    const registrationSample = await buildRegistrationSample(fastify);
-    const setupSample = await buildSetupSample(fastify);
+    const openSample = await buildOpenSample(fastify);
+    const preparingSample = await buildPreparingSample(fastify);
     const experimentalSample = await buildExperimentalSample(fastify);
 
     return {
         generatedAt: new Date().toISOString(),
         polls: [
+            toManifestPoll(openSampleName, 'open', openSample),
+            toManifestPoll(preparingSampleName, 'preparing', preparingSample),
             toManifestPoll(
-                registrationSampleName,
-                'registration',
-                registrationSample,
+                experimentalSampleName,
+                'preparing',
+                experimentalSample,
             ),
-            toManifestPoll(setupSampleName, 'setup', setupSample),
-            toManifestPoll(experimentalSampleName, 'setup', experimentalSample),
         ],
     };
 };

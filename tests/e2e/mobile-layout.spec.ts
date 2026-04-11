@@ -48,7 +48,7 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     expectNoUnexpectedErrors(tracker);
 });
 
-test('keeps the poll page usable at 320 pixels wide before the board ceremony starts', async ({
+test('keeps the poll page usable at 320 pixels wide before voting starts', async ({
     page,
     request,
 }, testInfo) => {
@@ -71,16 +71,16 @@ test('keeps the poll page usable at 320 pixels wide before the board ceremony st
         await expect(
             page.getByRole('heading', { name: pollName }),
         ).toBeVisible();
-        await expect(page.getByText(/Phase:\s*registration\./i)).toBeVisible();
+        await expect(page.getByText('Waiting room open')).toBeVisible();
         await expect(page.getByLabel('Your public name')).toBeVisible();
         await expect(
-            page.getByRole('button', { exact: true, name: 'Register' }),
+            page.getByRole('button', { exact: true, name: 'Join vote' }),
         ).toBeVisible();
         await expect(
-            page.getByRole('heading', { name: 'Thresholds' }),
+            page.getByRole('heading', { name: 'Your next step' }),
         ).toBeVisible();
         await expect(
-            page.getByRole('heading', { name: 'Board audit' }),
+            page.getByRole('heading', { name: 'Audit and verification' }),
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
         await expectNoAxeViolations(page, 'mobile poll page');

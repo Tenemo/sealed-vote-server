@@ -16,40 +16,14 @@ import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
 
-const previewParticipantCount = 3;
-const defaultPreviewReconstructionThreshold = 2;
-const defaultPreviewMinimumPublishedVoterCount = 3;
-
 type Form = {
     pollName: string;
     choices: string[];
-    reconstructionThreshold: string;
-    minimumPublishedVoterCount: string;
 };
 
 const initialForm: Form = {
     pollName: '',
     choices: [],
-    reconstructionThreshold: '',
-    minimumPublishedVoterCount: '',
-};
-
-const parseIntegerWithFallback = (
-    value: string,
-    fallbackValue: number,
-): number | undefined => {
-    const trimmed = value.trim();
-
-    if (!trimmed) {
-        return fallbackValue;
-    }
-
-    if (!/^\d+$/.test(trimmed)) {
-        return undefined;
-    }
-
-    const parsed = Number(trimmed);
-    return Number.isSafeInteger(parsed) ? parsed : undefined;
 };
 
 const PollCreationPage = (): React.JSX.Element => {
@@ -110,14 +84,6 @@ const PollCreationPage = (): React.JSX.Element => {
             pollName: normalizedPollName,
             choices: form.choices,
             creatorToken: nextCreatorToken,
-            reconstructionThreshold: parseIntegerWithFallback(
-                form.reconstructionThreshold,
-                defaultPreviewReconstructionThreshold,
-            ),
-            minimumPublishedVoterCount: parseIntegerWithFallback(
-                form.minimumPublishedVoterCount,
-                defaultPreviewMinimumPublishedVoterCount,
-            ),
             protocolVersion: 'v1',
         })
             .unwrap()
@@ -141,8 +107,8 @@ const PollCreationPage = (): React.JSX.Element => {
                         Create a new vote
                     </h1>
                     <p className="page-lead mx-auto max-w-2xl">
-                        Create a score vote, freeze the roster, and then run the
-                        signed board ceremony on top of the published manifest.
+                        Create a score vote, share the link, let people join,
+                        and start voting once the roster looks right.
                     </p>
                 </div>
                 <form
@@ -168,45 +134,10 @@ const PollCreationPage = (): React.JSX.Element => {
                             onAddChoice={onAddChoice}
                             onRemoveChoice={onRemoveChoice}
                         />
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <OutlinedInputField
-                                autoComplete="off"
-                                helperText={`How many participants must eventually publish valid decryption shares before the tally can be opened. If you leave this empty, the app submits ${defaultPreviewReconstructionThreshold}, which matches the smallest supported ${previewParticipantCount}-participant ceremony.`}
-                                id="reconstructionThreshold"
-                                inputMode="numeric"
-                                label="Reconstruction threshold"
-                                min={2}
-                                name="reconstructionThreshold"
-                                onChange={onFormChange}
-                                placeholder={String(
-                                    defaultPreviewReconstructionThreshold,
-                                )}
-                                type="number"
-                                value={form.reconstructionThreshold}
-                            />
-                            <OutlinedInputField
-                                autoComplete="off"
-                                helperText={`A publication floor for privacy. Results stay unpublished until at least this many accepted voters exist, even if decryption would already be possible. If you leave this empty, the app submits ${defaultPreviewMinimumPublishedVoterCount}, which matches the smallest supported ceremony.`}
-                                id="minimumPublishedVoterCount"
-                                inputMode="numeric"
-                                label="Minimum published voter count"
-                                min={2}
-                                name="minimumPublishedVoterCount"
-                                onChange={onFormChange}
-                                placeholder={String(
-                                    defaultPreviewMinimumPublishedVoterCount,
-                                )}
-                                type="number"
-                                value={form.minimumPublishedVoterCount}
-                            />
-                        </div>
                         <p className="field-note">
-                            Reconstruction threshold controls decryption
-                            availability. Minimum published voter count controls
-                            whether the app is willing to publish results at
-                            all. They are related, but they are not the same
-                            policy. For larger ceremonies, enter higher values
-                            instead of relying on the placeholder defaults.
+                            The decryption threshold is chosen on the live poll
+                            page right before voting starts, so it can follow
+                            the actual participant count.
                         </p>
                         <p className="field-note">
                             This version uses token-only enrollment. The public

@@ -3,7 +3,7 @@ import { majorityThreshold } from 'threshold-elgamal/core';
 
 export const derivePollPhase = (
     poll: Pick<PollResponse, 'phase'> | null | undefined,
-): PollPhase => poll?.phase ?? 'registration';
+): PollPhase => poll?.phase ?? 'open';
 
 export const suggestedReconstructionThreshold = (
     participantCount: number,
@@ -11,4 +11,4 @@ export const suggestedReconstructionThreshold = (
 
 export const canRegister = (
     poll: Pick<PollResponse, 'isOpen' | 'phase'> | null | undefined,
-): boolean => !!poll?.isOpen && derivePollPhase(poll) === 'registration';
+): boolean => !!poll?.isOpen && derivePollPhase(poll) === 'open';

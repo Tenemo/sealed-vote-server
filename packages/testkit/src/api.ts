@@ -11,6 +11,12 @@ import type {
     RegisterVoterResponse,
 } from '@sealed-vote/contracts';
 import type { FastifyInstance } from 'fastify';
+import {
+    exportAuthPublicKey,
+    exportTransportPublicKey,
+    generateAuthKeyPair,
+    generateTransportKeyPair,
+} from 'threshold-elgamal/transport';
 
 export const getUniquePollName = (baseName?: string): string =>
     `${baseName ?? 'Test poll'}-${randomBytes(8).toString('hex')}`;
@@ -129,14 +135,27 @@ export const registerVoter = async (
     pollId: string,
     voterName: string,
 ): Promise<
-    | ({ success: true } & RegisterVoterResponse)
+    | ({
+          success: true;
+          authKeyPair: CryptoKeyPair;
+          transportKeyPair: Awaited<
+              ReturnType<typeof generateTransportKeyPair>
+          >;
+      } & RegisterVoterResponse)
     | { success: false; message?: string }
 > => {
     const voterToken = generateClientToken();
+    const authKeyPair = await generateAuthKeyPair();
+    const transportKeyPair = await generateTransportKeyPair();
     const response = await fastify.inject({
         method: 'POST',
         url: POLL_ROUTES.register(pollId),
         payload: {
+            authPublicKey: await exportAuthPublicKey(authKeyPair.publicKey),
+            transportPublicKey: await exportTransportPublicKey(
+                transportKeyPair.publicKey,
+            ),
+            transportSuite: transportKeyPair.suite,
             voterName,
             voterToken,
         },
@@ -144,7 +163,12 @@ export const registerVoter = async (
 
     if (response.statusCode === 201) {
         const responseBody = JSON.parse(response.body) as RegisterVoterResponse;
-        return { success: true, ...responseBody };
+        return {
+            success: true,
+            authKeyPair,
+            transportKeyPair,
+            ...responseBody,
+        };
     }
 
     const responseBody = JSON.parse(response.body) as MessageResponse;
@@ -158,9 +182,10 @@ export const closePoll = async (
 ): Promise<{ success: boolean; message?: string }> => {
     const response = await fastify.inject({
         method: 'POST',
-        url: POLL_ROUTES.close(pollId),
+        url: POLL_ROUTES.start(pollId),
         payload: {
             creatorToken,
+            thresholdPercent: 51,
         },
     });
 

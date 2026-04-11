@@ -3,6 +3,12 @@ import { randomBytes } from 'node:crypto';
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import {
+    exportAuthPublicKey,
+    exportTransportPublicKey,
+    generateAuthKeyPair,
+    generateTransportKeyPair,
+} from 'threshold-elgamal/transport';
 
 import { buildServer } from '../buildServer';
 import {
@@ -14,6 +20,33 @@ import {
 } from '../testUtils';
 
 const generateToken = (): string => randomBytes(32).toString('hex');
+
+const createRegistrationPayload = async ({
+    voterName,
+    voterToken,
+}: {
+    voterName: string;
+    voterToken: string;
+}): Promise<{
+    authPublicKey: string;
+    transportPublicKey: string;
+    transportSuite: 'X25519' | 'P-256';
+    voterName: string;
+    voterToken: string;
+}> => {
+    const authKeyPair = await generateAuthKeyPair();
+    const transportKeyPair = await generateTransportKeyPair();
+
+    return {
+        authPublicKey: await exportAuthPublicKey(authKeyPair.publicKey),
+        transportPublicKey: await exportTransportPublicKey(
+            transportKeyPair.publicKey,
+        ),
+        transportSuite: transportKeyPair.suite,
+        voterName,
+        voterToken,
+    };
+};
 
 describe('Register voter endpoint', () => {
     let fastify: FastifyInstance;
@@ -83,10 +116,10 @@ describe('Register voter endpoint', () => {
         const response = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
+            payload: await createRegistrationPayload({
                 voterName: 'Alice',
                 voterToken: 'short-token',
-            },
+            }),
         });
 
         expect(response.statusCode).toBe(400);
@@ -98,13 +131,14 @@ describe('Register voter endpoint', () => {
     test('rejects voter names that become blank after trimming', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
 
+        const payload = await createRegistrationPayload({
+            voterName: '   ',
+            voterToken: generateToken(),
+        });
         const response = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
-                voterName: '   ',
-                voterToken: generateToken(),
-            },
+            payload,
         });
 
         expect(response.statusCode).toBe(400);
@@ -157,13 +191,14 @@ describe('Register voter endpoint', () => {
             }
         }
 
+        const payload = await createRegistrationPayload({
+            voterName: 'Voter 52',
+            voterToken: generateToken(),
+        });
         const response = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
-                voterName: 'Voter 52',
-                voterToken: generateToken(),
-            },
+            payload,
         });
 
         expect(response.statusCode).toBe(400);
@@ -178,10 +213,10 @@ describe('Register voter endpoint', () => {
     test('replays voter registration idempotently for the same token and name', async () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         const voterToken = generateToken();
-        const payload = {
+        const payload = await createRegistrationPayload({
             voterName: 'Alice',
             voterToken,
-        };
+        });
 
         const firstResponse = await fastify.inject({
             method: 'POST',
@@ -223,13 +258,14 @@ describe('Register voter endpoint', () => {
         }
 
         const voterToken = generateToken();
+        const firstPayload = await createRegistrationPayload({
+            voterName: 'Alice',
+            voterToken,
+        });
         const firstResponse = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
-                voterName: 'Alice',
-                voterToken,
-            },
+            payload: firstPayload,
         });
         expect(firstResponse.statusCode).toBe(201);
 
@@ -238,10 +274,7 @@ describe('Register voter endpoint', () => {
         const replayResponse = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
-                voterName: 'Alice',
-                voterToken,
-            },
+            payload: firstPayload,
         });
 
         expect(replayResponse.statusCode).toBe(201);
@@ -258,21 +291,23 @@ describe('Register voter endpoint', () => {
         const { pollId, creatorToken } = await createPoll(fastify);
         const voterToken = generateToken();
 
+        const firstPayload = await createRegistrationPayload({
+            voterName: 'Alice',
+            voterToken,
+        });
+        const conflictingPayload = {
+            ...firstPayload,
+            voterName: 'Alicia',
+        };
         const firstResponse = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
-                voterName: 'Alice',
-                voterToken,
-            },
+            payload: firstPayload,
         });
         const conflictingResponse = await fastify.inject({
             method: 'POST',
             url: `/api/polls/${pollId}/register`,
-            payload: {
-                voterName: 'Alicia',
-                voterToken,
-            },
+            payload: conflictingPayload,
         });
 
         expect(firstResponse.statusCode).toBe(201);

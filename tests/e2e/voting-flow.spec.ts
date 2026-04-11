@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
 import {
-    closeRegistrations,
     deletePolls,
     expectBoardCeremonyVisible,
     expectParticipantsVisible,
     registerParticipant,
     reloadPollPage,
+    startVoting,
     createPoll,
     type CreatedPoll,
 } from './support/pollFlow';
@@ -26,7 +26,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('completes the registration and close flow on every required browser project', async ({
+test('completes the open waiting-room and start flow on every required browser project', async ({
     browser,
     page,
     request,
@@ -67,7 +67,7 @@ test('completes the registration and close flow on every required browser projec
             voterName: participantTwoName,
         });
 
-        await closeRegistrations(page);
+        await startVoting(page);
         await reloadPollPage(page);
         await reloadPollPage(participantOne.page);
         await reloadPollPage(participantTwo.page);
@@ -80,20 +80,7 @@ test('completes the registration and close flow on every required browser projec
             participantOneName,
             participantTwoName,
         ]);
-        await expect(
-            page.getByRole('heading', { name: 'Post a signed board message' }),
-        ).toBeVisible();
-        await expect(
-            participantOne.page.getByRole('heading', {
-                name: 'Post a signed board message',
-            }),
-        ).toBeVisible();
-        await expect(
-            participantTwo.page.getByRole('heading', {
-                name: 'Post a signed board message',
-            }),
-        ).toBeVisible();
-        await expectNoAxeViolations(page, 'closed board ceremony page');
+        await expectNoAxeViolations(page, 'started poll page');
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);

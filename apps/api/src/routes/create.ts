@@ -19,7 +19,6 @@ import { choices as choicesTable, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
 import { areStringArraysEqual } from '../utils/idempotency.js';
 import { getCreatePollSlugAttempts } from '../utils/pollSlug.js';
-import { maxPollParticipants } from '../utils/pollLimits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
@@ -30,12 +29,6 @@ const CreatePollRequestSchema = Type.Object(
         choices: Type.Array(Type.String()),
         creatorToken: SecureTokenSchema,
         pollName: Type.String(),
-        reconstructionThreshold: Type.Optional(
-            Type.Integer({ minimum: 2, maximum: maxPollParticipants - 1 }),
-        ),
-        minimumPublishedVoterCount: Type.Optional(
-            Type.Integer({ minimum: 2, maximum: maxPollParticipants }),
-        ),
         protocolVersion: Type.Optional(Type.String({ minLength: 1 })),
     },
     {
@@ -69,10 +62,8 @@ const getExistingPollByCreatorTokenHash = async (
     | {
           choices: string[];
           id: string;
-          minimumPublishedVoterCount: number | null;
           pollName: string;
           protocolVersion: string;
-          reconstructionThreshold: number | null;
           slug: string;
       }
     | undefined
@@ -84,8 +75,6 @@ const getExistingPollByCreatorTokenHash = async (
             id: true,
             pollName: true,
             protocolVersion: true,
-            requestedMinimumPublishedVoterCount: true,
-            requestedReconstructionThreshold: true,
             slug: true,
         },
         with: {
@@ -102,11 +91,8 @@ const getExistingPollByCreatorTokenHash = async (
         ? {
               choices: poll.choices.map(({ choiceName }) => choiceName),
               id: poll.id,
-              minimumPublishedVoterCount:
-                  poll.requestedMinimumPublishedVoterCount,
               pollName: poll.pollName,
               protocolVersion: poll.protocolVersion,
-              reconstructionThreshold: poll.requestedReconstructionThreshold,
               slug: poll.slug,
           }
         : undefined;
@@ -114,32 +100,22 @@ const getExistingPollByCreatorTokenHash = async (
 
 const assertMatchingCreateRequest = ({
     existingPoll,
-    minimumPublishedVoterCount,
     normalizedChoices,
     pollName,
     protocolVersion,
-    reconstructionThreshold,
 }: {
     existingPoll: {
         choices: string[];
-        minimumPublishedVoterCount: number | null;
         pollName: string;
         protocolVersion: string;
-        reconstructionThreshold: number | null;
     };
-    minimumPublishedVoterCount: number | undefined;
     normalizedChoices: string[];
     pollName: string;
     protocolVersion: string;
-    reconstructionThreshold: number | undefined;
 }): void => {
     if (
         existingPoll.pollName !== pollName ||
         existingPoll.protocolVersion !== protocolVersion ||
-        existingPoll.reconstructionThreshold !==
-            (reconstructionThreshold ?? null) ||
-        existingPoll.minimumPublishedVoterCount !==
-            (minimumPublishedVoterCount ?? null) ||
         !areStringArraysEqual(existingPoll.choices, normalizedChoices)
     ) {
         throw createError(409, ERROR_MESSAGES.creatorTokenConflict);
@@ -154,12 +130,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             req: FastifyRequest<{ Body: CreatePollRequest }>,
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
-            const {
-                choices,
-                creatorToken,
-                minimumPublishedVoterCount,
-                reconstructionThreshold,
-            } = req.body;
+            const { choices, creatorToken } = req.body;
             const pollName = normalizeTrimmedString(req.body.pollName);
             const normalizedChoices = normalizeTrimmedStrings(choices);
             const protocolVersion = normalizeTrimmedString(
@@ -189,17 +160,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                 );
             }
 
-            if (
-                reconstructionThreshold !== undefined &&
-                minimumPublishedVoterCount !== undefined &&
-                minimumPublishedVoterCount < reconstructionThreshold
-            ) {
-                throw createError(
-                    400,
-                    'Minimum published voter count must be greater than or equal to the reconstruction threshold.',
-                );
-            }
-
             const creatorTokenHash = hashSecureToken(creatorToken);
             const existingPoll = await getExistingPollByCreatorTokenHash(
                 fastify,
@@ -209,11 +169,9 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             if (existingPoll) {
                 assertMatchingCreateRequest({
                     existingPoll,
-                    minimumPublishedVoterCount,
                     normalizedChoices,
                     pollName,
                     protocolVersion,
-                    reconstructionThreshold,
                 });
 
                 void reply.code(201);
@@ -240,10 +198,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                             await tx.insert(polls).values({
                                 id: pollId,
                                 creatorTokenHash,
-                                requestedMinimumPublishedVoterCount:
-                                    minimumPublishedVoterCount ?? null,
-                                requestedReconstructionThreshold:
-                                    reconstructionThreshold ?? null,
                                 pollName,
                                 protocolVersion,
                                 slug,
@@ -287,11 +241,9 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                         if (conflictingPoll) {
                             assertMatchingCreateRequest({
                                 existingPoll: conflictingPoll,
-                                minimumPublishedVoterCount,
                                 normalizedChoices,
                                 pollName,
                                 protocolVersion,
-                                reconstructionThreshold,
                             });
 
                             void reply.code(201);

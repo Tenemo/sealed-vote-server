@@ -12,14 +12,11 @@ The backend routes live under `/api`. The request and response payloads below ma
     "pollName": "Lunch vote",
     "creatorToken": "creator-token",
     "choices": ["Pizza", "Sushi", "Pasta"],
-    "reconstructionThreshold": 2,
-    "minimumPublishedVoterCount": 3,
     "protocolVersion": "v1"
 }
 ```
 
 - notes:
-  - `reconstructionThreshold` and `minimumPublishedVoterCount` are optional
   - the hard participant cap is `51`
   - the current validated target is `15`
   - `protocolVersion` currently accepts only `v1`
@@ -47,21 +44,23 @@ Example response:
     "pollName": "Lunch vote",
     "choices": ["Pizza", "Sushi", "Pasta"],
     "voters": [
-        { "voterIndex": 1, "voterName": "Alice" },
-        { "voterIndex": 2, "voterName": "Bob" }
+        { "voterIndex": 1, "voterName": "Alice", "deviceReady": true },
+        { "voterIndex": 2, "voterName": "Bob", "deviceReady": true }
     ],
-    "isOpen": false,
-    "phase": "setup",
+    "isOpen": true,
+    "phase": "open",
     "manifest": null,
     "manifestHash": null,
     "sessionId": null,
     "sessionFingerprint": null,
+    "joinedParticipantCount": 2,
+    "minimumStartParticipantCount": 3,
     "boardAudit": {
-        "acceptedCount": 1,
+        "acceptedCount": 0,
         "duplicateCount": 0,
         "equivocationCount": 0,
-        "ceremonyDigest": "digest",
-        "phaseDigests": [{ "phase": 0, "digest": "phase-digest" }]
+        "ceremonyDigest": null,
+        "phaseDigests": []
     },
     "verification": {
         "status": "not-ready",
@@ -69,10 +68,12 @@ Example response:
         "qualParticipantIndices": [],
         "verifiedOptionTallies": []
     },
+    "rosterEntries": [],
     "thresholds": {
-        "reconstructionThreshold": 2,
-        "minimumPublishedVoterCount": 3,
+        "reconstructionThreshold": null,
+        "minimumPublishedVoterCount": null,
         "suggestedReconstructionThreshold": 2,
+        "strictMajorityFloor": 2,
         "maxParticipants": 51,
         "validationTarget": 15
     }
@@ -86,6 +87,9 @@ Example response:
 
 ```json
 {
+    "authPublicKey": "spki-hex",
+    "transportPublicKey": "raw-public-key-hex",
+    "transportSuite": "X25519",
     "voterName": "Alice",
     "voterToken": "voter-token"
 }
@@ -94,22 +98,26 @@ Example response:
 - notes:
   - voter names are unique within a poll
   - registration is token-only in this version; there is no strong identity binding
-  - registration closes permanently once the creator closes the poll
+  - registration closes permanently once the creator starts voting
+  - the app stores the participant auth and transport public keys during join so the later board-backed ceremony can verify that roster
 
-## Close poll
+## Start voting
 
-- `POST /api/polls/:pollId/close`
+- `POST /api/polls/:pollId/start`
 - request body:
 
 ```json
 {
-    "creatorToken": "creator-token"
+    "creatorToken": "creator-token",
+    "thresholdPercent": 60
 }
 ```
 
 - notes:
-  - the poll requires at least three registered participants before it can be closed
-  - once closed, the roster is frozen and board messages are allowed
+  - the poll requires at least three registered participants before it can be started
+  - starting voting freezes the roster and resolves the exact integer reconstruction threshold from the current joined participant count
+  - `minimumPublishedVoterCount` is derived automatically from the frozen threshold
+  - `POST /api/polls/:pollId/close` remains as a compatibility alias, but the normal UI and tests use `/start`
 
 ## List board messages
 
@@ -123,6 +131,7 @@ afterEntryHash=<entry-hash>
 - response:
   - ordered board message records for the poll
   - if `afterEntryHash` is provided, only entries after that hash are returned
+  - if `afterEntryHash` does not exist in the current board log, the route returns `400`
 
 ## Post board message
 
@@ -149,8 +158,10 @@ afterEntryHash=<entry-hash>
 ```
 
 - notes:
-  - board messages are accepted only after the poll is closed
+  - board messages are accepted only after voting has started
+  - the normal product UI posts these payloads in the background; it does not expose a raw signed-payload form
   - the authenticated voter token must match `signedPayload.payload.participantIndex`
+  - the payload must include a valid base protocol shape before signature checks or participant checks run
   - registration payloads are verified against the embedded auth public key
   - later payloads are verified against the accepted registration auth key
   - exact retransmissions are stored and classified as idempotent

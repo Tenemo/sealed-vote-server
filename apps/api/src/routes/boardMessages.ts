@@ -13,6 +13,7 @@ import {
     hashRosterEntries,
     validateElectionManifest,
     type ManifestPublicationPayload,
+    type ProtocolMessageType,
     type RegistrationPayload,
     type SignedPayload,
 } from 'threshold-elgamal/protocol';
@@ -25,14 +26,17 @@ import type { DatabaseTransaction } from '../db/client.js';
 import { boardMessages } from '../db/schema.js';
 import {
     boardMessageSlotKey,
+    classifyBoardMessageRow,
     classifyBoardMessages,
-    getBoardMessageRows,
     getLastBoardEntryHash,
+    getBoardMessageRows,
+    getBoardMessageSlotRows,
     nextEntryHash,
     unsignedPayloadHash,
 } from '../utils/boardMessages.js';
 import { withTransaction } from '../utils/db.js';
 import { lockPollById } from '../utils/pollLocks.js';
+import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
 import {
     findAcceptedRegistrationPayload,
     getAcceptedManifestPublication,
@@ -80,6 +84,7 @@ const fetchSchema = {
     querystring: BoardMessagesQuerySchema,
     response: {
         200: BoardMessagesResponseSchema,
+        400: MessageResponseSchema,
         404: MessageResponseSchema,
     },
 };
@@ -89,6 +94,77 @@ type BoardMessageRecord = BoardMessageRecordContract;
 type BoardMessagesResponse = BoardMessagesResponseContract;
 type BoardMessagesQuery = {
     afterEntryHash?: string;
+};
+
+const HEX_64_PATTERN = /^[A-Fa-f0-9]{64}$/;
+const protocolMessageTypes: readonly ProtocolMessageType[] = [
+    'manifest-publication',
+    'registration',
+    'manifest-acceptance',
+    'phase-checkpoint',
+    'pedersen-commitment',
+    'encrypted-dual-share',
+    'complaint',
+    'complaint-resolution',
+    'feldman-commitment',
+    'feldman-share-reveal',
+    'key-derivation-confirmation',
+    'ballot-submission',
+    'decryption-share',
+    'tally-publication',
+    'ceremony-restart',
+];
+const protocolMessageTypeSet = new Set<string>(protocolMessageTypes);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isHex64 = (value: unknown): value is string =>
+    typeof value === 'string' && HEX_64_PATTERN.test(value);
+
+const isProtocolMessageType = (value: unknown): value is ProtocolMessageType =>
+    typeof value === 'string' && protocolMessageTypeSet.has(value);
+
+const validateBoardPayloadShape = (
+    signedPayload: BoardMessageRequest['signedPayload'],
+): SignedPayload => {
+    if (!isRecord(signedPayload) || !isRecord(signedPayload.payload)) {
+        throw createError(400, ERROR_MESSAGES.boardMessagePayloadInvalid);
+    }
+
+    const { payload } = signedPayload;
+
+    if (
+        !isHex64(payload.sessionId) ||
+        !isHex64(payload.manifestHash) ||
+        !Number.isInteger(payload.phase) ||
+        payload.phase < 0 ||
+        !Number.isInteger(payload.participantIndex) ||
+        payload.participantIndex < 1 ||
+        !isProtocolMessageType(payload.messageType)
+    ) {
+        throw createError(400, ERROR_MESSAGES.boardMessagePayloadInvalid);
+    }
+
+    if (
+        payload.messageType === 'registration' &&
+        (!isHex64(payload.rosterHash) ||
+            typeof payload.authPublicKey !== 'string' ||
+            payload.authPublicKey.length === 0 ||
+            typeof payload.transportPublicKey !== 'string' ||
+            payload.transportPublicKey.length === 0)
+    ) {
+        throw createError(400, ERROR_MESSAGES.boardMessagePayloadInvalid);
+    }
+
+    if (
+        payload.messageType === 'manifest-publication' &&
+        !isRecord(payload.manifest)
+    ) {
+        throw createError(400, ERROR_MESSAGES.boardMessagePayloadInvalid);
+    }
+
+    return signedPayload as SignedPayload;
 };
 
 const isRegistrationPayload = (
@@ -115,6 +191,58 @@ const verifyRegistrationPayloadSignature = async (
 
     if (!verified) {
         throw createError(400, 'Registration payload signature is invalid.');
+    }
+};
+
+const assertStoredRegistrationKeysMatchPayload = async ({
+    pollId,
+    signedPayload,
+    tx,
+    voterId,
+}: {
+    pollId: string;
+    signedPayload: SignedPayload<RegistrationPayload>;
+    tx: DatabaseTransaction;
+    voterId: string;
+}): Promise<void> => {
+    const voterRecord = await tx.query.voters.findFirst({
+        where: (fields, { and: andOperator, eq: isEqual }) =>
+            andOperator(
+                isEqual(fields.id, voterId),
+                isEqual(fields.pollId, pollId),
+            ),
+        columns: {
+            id: true,
+        },
+        with: {
+            publicKeyShares: {
+                columns: {
+                    publicKeyShare: true,
+                },
+            },
+        },
+    });
+
+    const deviceRecord = parseParticipantDeviceRecord(
+        voterRecord?.publicKeyShares[0]?.publicKeyShare,
+    );
+
+    if (!deviceRecord) {
+        throw createError(
+            400,
+            'The participant must complete device setup before publishing a board registration payload.',
+        );
+    }
+
+    if (
+        deviceRecord.authPublicKey !== signedPayload.payload.authPublicKey ||
+        deviceRecord.transportPublicKey !==
+            signedPayload.payload.transportPublicKey
+    ) {
+        throw createError(
+            400,
+            'The published registration payload does not match the participant device keys registered with the poll.',
+        );
     }
 };
 
@@ -295,26 +423,6 @@ const ensurePayloadMatchesPublishedManifest = async ({
     }
 };
 
-const toBoardMessageRecord = async ({
-    pollId,
-    recordId,
-    tx,
-}: {
-    pollId: string;
-    recordId: string;
-    tx: DatabaseTransaction;
-}): Promise<BoardMessageRecord> => {
-    const rows = await getBoardMessageRows(tx, pollId);
-    const classified = await classifyBoardMessages(rows);
-    const record = classified.records.find((item) => item.id === recordId);
-
-    if (!record) {
-        throw createError(500, 'Stored board message could not be reloaded.');
-    }
-
-    return record;
-};
-
 export const boardMessageRoutes = async (
     fastify: FastifyInstance,
 ): Promise<void> => {
@@ -344,18 +452,27 @@ export const boardMessageRoutes = async (
 
             const rows = await getBoardMessageRows(fastify.db, poll.id);
             const classified = await classifyBoardMessages(rows);
-            const startIndex = req.query.afterEntryHash
-                ? classified.records.findIndex(
-                      (record) => record.entryHash === req.query.afterEntryHash,
-                  )
-                : -1;
+            if (req.query.afterEntryHash) {
+                const startIndex = classified.records.findIndex(
+                    (record) => record.entryHash === req.query.afterEntryHash,
+                );
+
+                if (startIndex < 0) {
+                    throw createError(
+                        400,
+                        ERROR_MESSAGES.boardMessageCursorInvalid,
+                    );
+                }
+
+                return {
+                    pollId: poll.id,
+                    messages: classified.records.slice(startIndex + 1),
+                };
+            }
 
             return {
                 pollId: poll.id,
-                messages:
-                    startIndex >= 0
-                        ? classified.records.slice(startIndex + 1)
-                        : classified.records,
+                messages: classified.records,
             };
         },
     );
@@ -370,16 +487,9 @@ export const boardMessageRoutes = async (
             }>,
             reply: FastifyReply,
         ): Promise<BoardMessageRecord> => {
-            if (
-                !req.body.signedPayload?.payload ||
-                typeof req.body.signedPayload.payload !== 'object' ||
-                Array.isArray(req.body.signedPayload.payload)
-            ) {
-                throw createError(
-                    400,
-                    ERROR_MESSAGES.boardMessageSignatureRequired,
-                );
-            }
+            const signedPayload = validateBoardPayloadShape(
+                req.body.signedPayload,
+            );
 
             const response = await withTransaction(fastify, async (tx) => {
                 const poll = await lockPollById(tx, req.params.pollId);
@@ -403,7 +513,6 @@ export const boardMessageRoutes = async (
                     poll.id,
                     req.body.voterToken,
                 );
-                const signedPayload = req.body.signedPayload;
 
                 if (
                     signedPayload.payload.participantIndex !==
@@ -417,6 +526,12 @@ export const boardMessageRoutes = async (
 
                 if (isRegistrationPayload(signedPayload)) {
                     await verifyRegistrationPayloadSignature(signedPayload);
+                    await assertStoredRegistrationKeysMatchPayload({
+                        pollId: poll.id,
+                        signedPayload,
+                        tx,
+                        voterId: authenticatedVoter.id,
+                    });
                 } else if (isManifestPublicationPayload(signedPayload)) {
                     await verifyParticipantPayloadSignature({
                         pollId: poll.id,
@@ -489,18 +604,30 @@ export const boardMessageRoutes = async (
                     })
                     .returning({
                         id: boardMessages.id,
+                        pollId: boardMessages.pollId,
+                        participantIndex: boardMessages.participantIndex,
+                        phase: boardMessages.phase,
+                        messageType: boardMessages.messageType,
+                        slotKey: boardMessages.slotKey,
+                        unsignedHash: boardMessages.unsignedHash,
+                        previousEntryHash: boardMessages.previousEntryHash,
+                        entryHash: boardMessages.entryHash,
+                        signedPayload: boardMessages.signedPayload,
+                        createdAt: boardMessages.createdAt,
                     });
 
-                const recordId = inserted[0]?.id;
-                if (!recordId) {
+                const insertedRow = inserted[0];
+                if (!insertedRow) {
                     throw createError(500, 'Board message was not stored.');
                 }
 
-                return await toBoardMessageRecord({
-                    pollId: poll.id,
-                    recordId,
+                const slotRows = await getBoardMessageSlotRows(
                     tx,
-                });
+                    poll.id,
+                    slotKey,
+                );
+
+                return classifyBoardMessageRow(insertedRow, slotRows);
             });
 
             void reply.code(201);

@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import type { PollResponse } from '@sealed-vote/contracts';
+import {
+    ERROR_MESSAGES,
+    POLL_ROUTES,
+    type PollResponse,
+} from '@sealed-vote/contracts';
 import type {
     RegistrationPayload,
     SignedPayload,
@@ -9,7 +13,6 @@ import { canonicalUnsignedPayloadBytes } from 'threshold-elgamal/protocol';
 import {
     exportAuthPublicKey,
     exportTransportPublicKey,
-    generateAuthKeyPair,
     generateTransportKeyPair,
     signPayloadBytes,
 } from 'threshold-elgamal/transport';
@@ -27,6 +30,8 @@ import {
 } from '../testUtils';
 
 type RegisteredParticipant = {
+    authKeyPair: CryptoKeyPair;
+    transportKeyPair: Awaited<ReturnType<typeof generateTransportKeyPair>>;
     voterIndex: number;
     voterName: string;
     voterToken: string;
@@ -60,6 +65,8 @@ const createClosedPollWithParticipants = async (
             }
 
             return {
+                authKeyPair: registrationResult.authKeyPair,
+                transportKeyPair: registrationResult.transportKeyPair,
                 voterIndex: registrationResult.voterIndex,
                 voterName: registrationResult.voterName,
                 voterToken: registrationResult.voterToken,
@@ -81,14 +88,16 @@ const createClosedPollWithParticipants = async (
 };
 
 const createSignedRegistrationPayload = async ({
+    authKeyPair,
     participantIndex,
     rosterHash = fixedRosterHash,
+    transportKeyPair,
 }: {
+    authKeyPair: CryptoKeyPair;
     participantIndex: number;
     rosterHash?: string;
+    transportKeyPair: Awaited<ReturnType<typeof generateTransportKeyPair>>;
 }): Promise<SignedPayload<RegistrationPayload>> => {
-    const authKeyPair = await generateAuthKeyPair();
-    const transportKeyPair = await generateTransportKeyPair();
     const payload: RegistrationPayload = {
         sessionId: fixedSessionId,
         manifestHash: fixedManifestHash,
@@ -136,7 +145,9 @@ describe('Board messages endpoint', () => {
             }
 
             const signedPayload = await createSignedRegistrationPayload({
+                authKeyPair: participant.authKeyPair,
                 participantIndex: participant.voterIndex,
+                transportKeyPair: participant.transportKeyPair,
             });
             const firstPost = await postBoardMessage(fastify, pollId, {
                 voterToken: participant.voterToken,
@@ -166,7 +177,7 @@ describe('Board messages endpoint', () => {
             assertionCount += 2;
 
             const poll = await fetchPoll(fastify, pollId);
-            expect(poll.phase).toBe('setup');
+            expect(poll.phase).toBe('preparing');
             expect(poll.boardAudit.acceptedCount).toBe(1);
             expect(poll.boardAudit.duplicateCount).toBe(1);
             expect(poll.boardAudit.equivocationCount).toBe(0);
@@ -199,12 +210,16 @@ describe('Board messages endpoint', () => {
             }
 
             const firstPayload = await createSignedRegistrationPayload({
+                authKeyPair: participant.authKeyPair,
                 participantIndex: participant.voterIndex,
                 rosterHash: fixedRosterHash,
+                transportKeyPair: participant.transportKeyPair,
             });
             const conflictingPayload = await createSignedRegistrationPayload({
+                authKeyPair: participant.authKeyPair,
                 participantIndex: participant.voterIndex,
                 rosterHash: '4'.repeat(64),
+                transportKeyPair: participant.transportKeyPair,
             });
 
             const firstPost = await postBoardMessage(fastify, pollId, {
@@ -237,6 +252,84 @@ describe('Board messages endpoint', () => {
                 poll.boardEntries.map((entry) => entry.classification),
             ).toEqual(['equivocation', 'equivocation']);
             assertionCount += 6;
+        } finally {
+            const deleteResult = await deletePoll(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(deleteResult.success).toBe(true);
+            assertionCount += 1;
+            expect(assertionCount).toBeGreaterThan(0);
+        }
+    });
+
+    test('rejects board message fetches with an unknown incremental cursor', async () => {
+        const { pollId, creatorToken } =
+            await createClosedPollWithParticipants(fastify);
+        let assertionCount = 0;
+
+        try {
+            const response = await fastify.inject({
+                method: 'GET',
+                url: `${POLL_ROUTES.boardMessages(pollId)}?afterEntryHash=${'9'.repeat(64)}`,
+            });
+
+            expect(response.statusCode).toBe(400);
+            expect(JSON.parse(response.body)).toEqual({
+                message: ERROR_MESSAGES.boardMessageCursorInvalid,
+            });
+            assertionCount += 2;
+        } finally {
+            const deleteResult = await deletePoll(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(deleteResult.success).toBe(true);
+            assertionCount += 1;
+            expect(assertionCount).toBeGreaterThan(0);
+        }
+    });
+
+    test('rejects malformed protocol payloads before participant validation', async () => {
+        const { pollId, creatorToken, participants } =
+            await createClosedPollWithParticipants(fastify);
+        const participant = participants[0];
+        let assertionCount = 0;
+
+        try {
+            if (!participant) {
+                throw new Error(
+                    'Expected at least one registered participant.',
+                );
+            }
+
+            const response = await fastify.inject({
+                method: 'POST',
+                url: POLL_ROUTES.boardMessages(pollId),
+                payload: {
+                    voterToken: participant.voterToken,
+                    signedPayload: {
+                        payload: {
+                            sessionId: fixedSessionId,
+                            manifestHash: fixedManifestHash,
+                            phase: 0,
+                            participantIndex: participant.voterIndex,
+                            messageType: 'registration',
+                            rosterHash: fixedRosterHash,
+                            transportPublicKey: 'deadbeef',
+                        },
+                        signature: '00',
+                    },
+                },
+            });
+
+            expect(response.statusCode).toBe(400);
+            expect(JSON.parse(response.body)).toEqual({
+                message: ERROR_MESSAGES.boardMessagePayloadInvalid,
+            });
+            assertionCount += 2;
         } finally {
             const deleteResult = await deletePoll(
                 fastify,

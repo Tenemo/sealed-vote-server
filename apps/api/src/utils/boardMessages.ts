@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 import type { BoardMessageRecord } from '@sealed-vote/contracts';
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import {
     auditSignedPayloads,
     canonicalUnsignedPayloadBytes,
@@ -15,7 +15,7 @@ import { boardMessages } from '../db/schema.js';
 import { normalizeDatabaseTimestamp } from './db.js';
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
-type BoardMessageRow = typeof boardMessages.$inferSelect;
+export type BoardMessageRow = typeof boardMessages.$inferSelect;
 
 const hashBytes = (value: Uint8Array | string): string =>
     crypto.createHash('sha256').update(value).digest('hex');
@@ -166,6 +166,47 @@ export const classifyBoardMessages = async (
     };
 };
 
+const classifySlotRows = (
+    slotRows: readonly BoardMessageRow[],
+    rowId: string,
+): BoardMessageRecord['classification'] => {
+    const distinctUnsignedHashCount = new Set(
+        slotRows.map((entry) => entry.unsignedHash),
+    ).size;
+
+    if (distinctUnsignedHashCount > 1) {
+        return 'equivocation';
+    }
+
+    return slotRows[0]?.id === rowId ? 'accepted' : 'idempotent';
+};
+
+const toBoardMessageRecord = (
+    row: BoardMessageRow,
+    classification: BoardMessageRecord['classification'],
+): BoardMessageRecord => ({
+    id: row.id,
+    createdAt: normalizeDatabaseTimestamp(row.createdAt),
+    phase: row.phase,
+    participantIndex: row.participantIndex,
+    messageType: row.messageType as BoardMessageRecord['messageType'],
+    slotKey: row.slotKey,
+    unsignedHash: row.unsignedHash,
+    previousEntryHash: row.previousEntryHash,
+    entryHash: row.entryHash,
+    classification,
+    signedPayload: row.signedPayload,
+});
+
+export const classifyBoardMessageRow = (
+    row: BoardMessageRow,
+    slotRows: readonly BoardMessageRow[],
+): BoardMessageRecord => {
+    const sortedSlotRows = sortBoardRows(slotRows);
+
+    return toBoardMessageRecord(row, classifySlotRows(sortedSlotRows, row.id));
+};
+
 export const getBoardMessageRows = async (
     db: ReadOnlyDatabase,
     pollId: string,
@@ -174,6 +215,22 @@ export const getBoardMessageRows = async (
         .select()
         .from(boardMessages)
         .where(eq(boardMessages.pollId, pollId))
+        .orderBy(asc(boardMessages.createdAt), asc(boardMessages.id));
+
+export const getBoardMessageSlotRows = async (
+    db: ReadOnlyDatabase,
+    pollId: string,
+    slotKey: string,
+): Promise<BoardMessageRow[]> =>
+    await db
+        .select()
+        .from(boardMessages)
+        .where(
+            and(
+                eq(boardMessages.pollId, pollId),
+                eq(boardMessages.slotKey, slotKey),
+            ),
+        )
         .orderBy(asc(boardMessages.createdAt), asc(boardMessages.id));
 
 export const getLastBoardEntryHash = async (

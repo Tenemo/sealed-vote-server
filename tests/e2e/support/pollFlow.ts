@@ -78,24 +78,24 @@ export const registerParticipant = async ({
     }
 
     await page.getByLabel('Your public name').fill(voterName);
-    await page.getByRole('button', { exact: true, name: 'Register' }).click();
+    await page.getByRole('button', { exact: true, name: 'Join vote' }).click();
     await expect(
-        page.getByText(new RegExp(`^Registered as ${voterName}\\b`)),
+        page.getByText(new RegExp(`^Joined as ${voterName}\\.`)),
     ).toBeVisible({
         timeout: 30_000,
     });
 };
 
-export const closeRegistrations = async (page: Page): Promise<void> => {
-    const closeButton = page.getByRole('button', {
-        name: 'Close registrations',
+export const startVoting = async (page: Page): Promise<void> => {
+    const startButton = page.getByRole('button', {
+        name: 'Start voting',
     });
 
-    await expect(closeButton).toBeVisible();
-    await expect(closeButton).toBeEnabled();
-    await closeButton.click();
+    await expect(startButton).toBeVisible();
+    await expect(startButton).toBeEnabled();
+    await startButton.click();
     await expect(
-        page.getByText('Registrations closed. The board ceremony can begin.'),
+        page.getByText('Voting started. The roster is now frozen.'),
     ).toBeVisible({ timeout: 30_000 });
 };
 
@@ -106,13 +106,13 @@ export const expectParticipantsVisible = async (
     await expect(
         page.getByRole('heading', { name: 'Participants' }),
     ).toBeVisible();
+    const participantsList = page.getByRole('list', {
+        name: 'Participants roster',
+    });
 
     for (const participantName of participantNames) {
         await expect(
-            page
-                .getByRole('listitem')
-                .filter({ hasText: participantRowText(participantName) })
-                .first(),
+            participantsList.getByText(participantRowText(participantName)),
         ).toBeVisible();
     }
 };
@@ -121,11 +121,13 @@ export const expectParticipantsHidden = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
+    const participantsList = page.getByRole('list', {
+        name: 'Participants roster',
+    });
+
     for (const participantName of participantNames) {
         await expect(
-            page
-                .getByRole('listitem')
-                .filter({ hasText: participantRowText(participantName) }),
+            participantsList.getByText(participantRowText(participantName)),
         ).toHaveCount(0);
     }
 };
@@ -134,16 +136,16 @@ export const expectBoardCeremonyVisible = async (
     page: Page,
 ): Promise<void> => {
     await expect(
-        page.getByText(/Phase:\s*setup\./i),
+        page.getByText('Preparing devices'),
     ).toBeVisible({ timeout: 30_000 });
     await expect(
-        page.getByText('Registrations are closed and the board log is authoritative.'),
+        page.getByText('Audit and verification'),
     ).toBeVisible({ timeout: 30_000 });
     await expect(
-        page.getByRole('heading', { name: 'Verification' }),
+        page.getByRole('heading', { name: 'Your next step' }),
     ).toBeVisible();
     await expect(
-        page.getByRole('heading', { name: 'Board log' }),
+        page.getByRole('heading', { name: 'Board activity' }),
     ).toBeVisible();
 };
 

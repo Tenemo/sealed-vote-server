@@ -12,7 +12,16 @@ import {
 } from './schemas.js';
 
 const PollRosterParticipantSchema = Type.Object({
+    deviceReady: Type.Boolean(),
     voterIndex: Type.Number(),
+    voterName: Type.String(),
+});
+
+const PollRosterEntrySchema = Type.Object({
+    authPublicKey: Type.String(),
+    participantIndex: Type.Number(),
+    transportPublicKey: Type.String(),
+    transportSuite: Type.Union([Type.Literal('X25519'), Type.Literal('P-256')]),
     voterName: Type.String(),
 });
 
@@ -29,13 +38,15 @@ const PollResponseSchema = Type.Object({
     sessionId: Type.Union([Type.String(), Type.Null()]),
     sessionFingerprint: Type.Union([Type.String(), Type.Null()]),
     phase: Type.Union([
-        Type.Literal('registration'),
-        Type.Literal('setup'),
-        Type.Literal('ballot'),
-        Type.Literal('decryption'),
+        Type.Literal('open'),
+        Type.Literal('preparing'),
+        Type.Literal('voting'),
+        Type.Literal('opening-results'),
         Type.Literal('complete'),
         Type.Literal('aborted'),
     ]),
+    joinedParticipantCount: Type.Number(),
+    minimumStartParticipantCount: Type.Number(),
     boardAudit: Type.Object({
         acceptedCount: Type.Number(),
         duplicateCount: Type.Number(),
@@ -66,10 +77,12 @@ const PollResponseSchema = Type.Object({
         ),
     }),
     boardEntries: Type.Array(BoardMessageRecordSchema),
+    rosterEntries: Type.Array(PollRosterEntrySchema),
     thresholds: Type.Object({
         reconstructionThreshold: Type.Union([Type.Number(), Type.Null()]),
         minimumPublishedVoterCount: Type.Union([Type.Number(), Type.Null()]),
         suggestedReconstructionThreshold: Type.Number(),
+        strictMajorityFloor: Type.Number(),
         maxParticipants: Type.Number(),
         validationTarget: Type.Number(),
     }),

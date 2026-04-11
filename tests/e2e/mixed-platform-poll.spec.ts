@@ -1,13 +1,13 @@
 import { test } from '@playwright/test';
 
 import {
-    closeRegistrations,
     createPoll,
     deletePolls,
     expectBoardCeremonyVisible,
     expectParticipantsVisible,
     registerParticipant,
     reloadPollPage,
+    startVoting,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -25,7 +25,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('closes one real ceremony across chromium, desktop firefox, and mobile firefox', async ({
+test('starts one real ceremony across chromium, desktop firefox, and mobile firefox', async ({
     page,
     playwright,
     request,
@@ -70,7 +70,7 @@ test('closes one real ceremony across chromium, desktop firefox, and mobile fire
             voterName: firefoxMobileName,
         });
 
-        await closeRegistrations(page);
+        await startVoting(page);
         await reloadPollPage(page);
         await reloadPollPage(firefoxDesktop.page);
         await reloadPollPage(firefoxMobile.page);

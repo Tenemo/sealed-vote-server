@@ -59,7 +59,7 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
             .getByLabel('Your public name')
             .fill(firstVoterName);
         await participant.page
-            .getByRole('button', { exact: true, name: 'Register' })
+            .getByRole('button', { exact: true, name: 'Join vote' })
             .click();
 
         await expect(
@@ -76,12 +76,12 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
             .getByLabel('Your public name')
             .fill(secondVoterName);
         await participant.page
-            .getByRole('button', { exact: true, name: 'Register' })
+            .getByRole('button', { exact: true, name: 'Join vote' })
             .click();
 
         await expect(
             participant.page.getByText(
-                new RegExp(`^Registered as ${secondVoterName}\\b`),
+                new RegExp(`^Joined as ${secondVoterName}\\.`),
             ),
         ).toBeVisible({ timeout: 30_000 });
     } finally {

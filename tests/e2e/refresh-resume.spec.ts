@@ -1,11 +1,11 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
 
 import {
-    closeRegistrations,
     createPoll,
     deletePolls,
     expectBoardCeremonyVisible,
     registerParticipant,
+    startVoting,
     type CreatedPoll,
 } from './support/pollFlow';
 import { gotoInteractablePage } from './support/navigation.mts';
@@ -55,7 +55,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
 
         await expect(
             restoredPage.getByRole('button', {
-                name: 'Close registrations',
+                name: 'Start voting',
             }),
         ).toBeVisible();
         expectNoUnexpectedErrors(tracker);
@@ -110,7 +110,7 @@ test('restores the voter board-message panel after refresh once the roster is cl
             voterName: participantTwoName,
         });
 
-        await closeRegistrations(page);
+        await startVoting(page);
 
         restoredContext = await browser.newContext({
             ...(getProjectContextOptions(testInfo) ?? {}),
@@ -122,9 +122,7 @@ test('restores the voter board-message panel after refresh once the roster is cl
 
         await expectBoardCeremonyVisible(restoredPage);
         await expect(
-            restoredPage.getByRole('heading', {
-                name: 'Post a signed board message',
-            }),
+            restoredPage.getByText('Preparing your device'),
         ).toBeVisible();
         expectNoUnexpectedErrors(tracker);
     } finally {

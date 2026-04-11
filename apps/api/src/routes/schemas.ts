@@ -1,5 +1,44 @@
 import { Type, type Static } from '@sinclair/typebox';
 
+const ProtocolMessageTypeSchema = Type.Union([
+    Type.Literal('manifest-publication'),
+    Type.Literal('registration'),
+    Type.Literal('manifest-acceptance'),
+    Type.Literal('phase-checkpoint'),
+    Type.Literal('pedersen-commitment'),
+    Type.Literal('encrypted-dual-share'),
+    Type.Literal('complaint'),
+    Type.Literal('complaint-resolution'),
+    Type.Literal('feldman-commitment'),
+    Type.Literal('feldman-share-reveal'),
+    Type.Literal('key-derivation-confirmation'),
+    Type.Literal('ballot-submission'),
+    Type.Literal('decryption-share'),
+    Type.Literal('tally-publication'),
+    Type.Literal('ceremony-restart'),
+]);
+
+const ProtocolPayloadSchema = Type.Object(
+    {
+        sessionId: Type.String({
+            minLength: 64,
+            maxLength: 64,
+            pattern: '^[A-Fa-f0-9]{64}$',
+        }),
+        manifestHash: Type.String({
+            minLength: 64,
+            maxLength: 64,
+            pattern: '^[A-Fa-f0-9]{64}$',
+        }),
+        phase: Type.Integer({ minimum: 0 }),
+        participantIndex: Type.Integer({ minimum: 1 }),
+        messageType: ProtocolMessageTypeSchema,
+    },
+    {
+        additionalProperties: true,
+    },
+);
+
 export const PollIdParamsSchema = Type.Object({
     pollId: Type.String({ format: 'uuid' }),
 });
@@ -14,7 +53,7 @@ export type PollRefParams = Static<typeof PollRefParamsSchema>;
 
 export const SignedPayloadSchema = Type.Object(
     {
-        payload: Type.Any(),
+        payload: ProtocolPayloadSchema,
         signature: Type.String({
             minLength: 2,
             maxLength: 8192,

@@ -125,22 +125,18 @@ describe('PollCreation', () => {
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(1, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
-            minimumPublishedVoterCount: 3,
             pollName: 'Best fruit',
             protocolVersion: 'v1',
-            reconstructionThreshold: 2,
         });
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(2, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
-            minimumPublishedVoterCount: 3,
             pollName: 'Best fruit',
             protocolVersion: 'v1',
-            reconstructionThreshold: 2,
         });
     });
 
-    it('shows threshold defaults as placeholders while keeping the inputs empty', async () => {
+    it('explains that the threshold is chosen on the live poll page', () => {
         render(
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
@@ -152,158 +148,10 @@ describe('PollCreation', () => {
         );
 
         expect(
-            screen.getByRole('spinbutton', {
-                name: /^Reconstruction threshold/i,
-            }),
-        ).toHaveValue(null);
-        expect(
-            screen.getByRole('spinbutton', {
-                name: /^Minimum published voter count/i,
-            }),
-        ).toHaveValue(null);
-        expect(
-            screen.getByRole('spinbutton', {
-                name: /^Reconstruction threshold/i,
-            }),
-        ).toHaveAttribute('placeholder', '2');
-        expect(
-            screen.getByRole('spinbutton', {
-                name: /^Minimum published voter count/i,
-            }),
-        ).toHaveAttribute('placeholder', '3');
-    });
-
-    it('submits explicit threshold values once the fields are edited', async () => {
-        const user = userEvent.setup();
-
-        mockedGenerateClientToken.mockReturnValue('creator-token-1');
-        mockedCreatePoll.mockReturnValue({
-            unwrap: () => new Promise<void>(() => undefined),
-        });
-
-        render(
-            <HelmetProvider>
-                <MemoryRouter initialEntries={['/']}>
-                    <Routes>
-                        <Route element={<PollCreation />} path="/" />
-                    </Routes>
-                </MemoryRouter>
-            </HelmetProvider>,
-        );
-
-        await user.type(
-            screen.getByRole('textbox', { name: /^Vote name/i }),
-            'Best fruit',
-        );
-        await user.type(
-            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
-            'Apples',
-        );
-        await user.click(
-            screen.getByRole('button', { name: 'Add new choice' }),
-        );
-        await user.type(
-            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
-            'Bananas',
-        );
-        await user.click(
-            screen.getByRole('button', { name: 'Add new choice' }),
-        );
-
-        await user.clear(
-            screen.getByRole('spinbutton', {
-                name: /^Reconstruction threshold/i,
-            }),
-        );
-        await user.type(
-            screen.getByRole('spinbutton', {
-                name: /^Reconstruction threshold/i,
-            }),
-            '4',
-        );
-        await user.clear(
-            screen.getByRole('spinbutton', {
-                name: /^Minimum published voter count/i,
-            }),
-        );
-        await user.type(
-            screen.getByRole('spinbutton', {
-                name: /^Minimum published voter count/i,
-            }),
-            '6',
-        );
-
-        await user.click(screen.getByRole('button', { name: 'Create vote' }));
-
-        expect(mockedCreatePoll).toHaveBeenCalledWith({
-            choices: ['Apples', 'Bananas'],
-            creatorToken: 'creator-token-1',
-            minimumPublishedVoterCount: 6,
-            pollName: 'Best fruit',
-            protocolVersion: 'v1',
-            reconstructionThreshold: 4,
-        });
-    });
-
-    it('rejects decimal threshold input instead of truncating it', async () => {
-        const user = userEvent.setup();
-
-        mockedGenerateClientToken.mockReturnValue('creator-token-1');
-        mockedCreatePoll.mockReturnValue({
-            unwrap: () => new Promise<void>(() => undefined),
-        });
-
-        render(
-            <HelmetProvider>
-                <MemoryRouter initialEntries={['/']}>
-                    <Routes>
-                        <Route element={<PollCreation />} path="/" />
-                    </Routes>
-                </MemoryRouter>
-            </HelmetProvider>,
-        );
-
-        await user.type(
-            screen.getByRole('textbox', { name: /^Vote name/i }),
-            'Best fruit',
-        );
-        await user.type(
-            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
-            'Apples',
-        );
-        await user.click(
-            screen.getByRole('button', { name: 'Add new choice' }),
-        );
-        await user.type(
-            screen.getByRole('textbox', { name: /^Choice to vote for/i }),
-            'Bananas',
-        );
-        await user.click(
-            screen.getByRole('button', { name: 'Add new choice' }),
-        );
-        await user.type(
-            screen.getByRole('spinbutton', {
-                name: /^Reconstruction threshold/i,
-            }),
-            '2.5',
-        );
-        await user.type(
-            screen.getByRole('spinbutton', {
-                name: /^Minimum published voter count/i,
-            }),
-            '6',
-        );
-
-        await user.click(screen.getByRole('button', { name: 'Create vote' }));
-
-        expect(mockedCreatePoll).toHaveBeenCalledWith({
-            choices: ['Apples', 'Bananas'],
-            creatorToken: 'creator-token-1',
-            minimumPublishedVoterCount: 6,
-            pollName: 'Best fruit',
-            protocolVersion: 'v1',
-            reconstructionThreshold: undefined,
-        });
+            screen.getByText(
+                /The decryption threshold is chosen on the live poll page/i,
+            ),
+        ).toBeInTheDocument();
     });
 
     it('renders create-page SEO metadata', () => {
