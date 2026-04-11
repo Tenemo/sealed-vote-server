@@ -4,7 +4,7 @@ import type {
     MessageResponse,
 } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
@@ -53,7 +53,13 @@ const validateParticipantDeviceReadiness = async (
             voterId: voters.id,
         })
         .from(voters)
-        .leftJoin(publicKeyShares, eq(publicKeyShares.voterId, voters.id))
+        .leftJoin(
+            publicKeyShares,
+            and(
+                eq(publicKeyShares.voterId, voters.id),
+                eq(publicKeyShares.pollId, voters.pollId),
+            ),
+        )
         .where(eq(voters.pollId, pollId));
 
     const everyParticipantHasDeviceKeys = submittedParticipants.every(
