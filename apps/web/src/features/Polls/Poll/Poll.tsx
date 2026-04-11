@@ -442,7 +442,10 @@ const PollPage = (): React.JSX.Element => {
                             </h1>
                             <p className={mutedBodyClassName}>
                                 Share this link so people can join from their
-                                own devices: {shareableUrl}
+                                own devices:
+                                <span className="mt-2 block break-all font-mono text-xs text-foreground/80 sm:text-sm">
+                                    {shareableUrl}
+                                </span>
                             </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-3">
