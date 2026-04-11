@@ -16,6 +16,12 @@ const chromiumOnlySpecs = [
     '**/share-link.spec.ts',
 ];
 
+const webkitUnsupportedCeremonySpecs = [
+    '**/refresh-resume.spec.ts',
+    '**/setup-phase.spec.ts',
+    '**/voting-flow.spec.ts',
+];
+
 const isCi = Boolean(process.env.CI);
 const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
 const shouldUseBuiltServers =
@@ -134,7 +140,7 @@ const projects: Project[] = [
     },
     {
         name: 'webkit-desktop',
-        testIgnore: chromiumOnlySpecs,
+        testIgnore: [...chromiumOnlySpecs, ...webkitUnsupportedCeremonySpecs],
         use: {
             ...devices['Desktop Safari'],
             browserName: 'webkit' as const,

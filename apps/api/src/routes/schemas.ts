@@ -13,6 +13,7 @@ const ProtocolMessageTypeSchema = Type.Union([
     Type.Literal('feldman-share-reveal'),
     Type.Literal('key-derivation-confirmation'),
     Type.Literal('ballot-submission'),
+    Type.Literal('ballot-close'),
     Type.Literal('decryption-share'),
     Type.Literal('tally-publication'),
     Type.Literal('ceremony-restart'),

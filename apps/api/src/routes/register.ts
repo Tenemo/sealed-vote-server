@@ -29,8 +29,9 @@ import {
 
 const RegisterRequestSchema = Type.Object({
     authPublicKey: Type.String({ minLength: 1 }),
+    creatorToken: Type.Optional(SecureTokenSchema),
     transportPublicKey: Type.String({ minLength: 1 }),
-    transportSuite: Type.Union([Type.Literal('X25519'), Type.Literal('P-256')]),
+    transportSuite: Type.Literal('X25519'),
     voterName: Type.String({ minLength: 1, maxLength: 32 }),
     voterToken: SecureTokenSchema,
 });
@@ -49,6 +50,7 @@ const schema = {
     response: {
         201: RegisterResponseSchema,
         400: MessageResponseSchema,
+        403: MessageResponseSchema,
         404: MessageResponseSchema,
         409: MessageResponseSchema,
     },
@@ -133,6 +135,17 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                         throw createError(
                             404,
                             `Poll with ID ${pollId} does not exist.`,
+                        );
+                    }
+
+                    if (
+                        req.body.creatorToken &&
+                        poll.creatorTokenHash !==
+                            hashSecureToken(req.body.creatorToken)
+                    ) {
+                        throw createError(
+                            403,
+                            ERROR_MESSAGES.invalidCreatorToken,
                         );
                     }
 

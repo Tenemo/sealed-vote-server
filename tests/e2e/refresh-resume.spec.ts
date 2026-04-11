@@ -1,11 +1,11 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
 
 import {
+    closeVoting,
     createPoll,
     deletePolls,
-    expectBoardCeremonyVisible,
-    registerParticipant,
-    startVoting,
+    expectSecuringVisible,
+    submitVote,
     type CreatedPoll,
 } from './support/pollFlow';
 import { gotoInteractablePage } from './support/navigation.mts';
@@ -52,11 +52,20 @@ test('keeps creator controls after reopening the shared link in a new browser se
         const restoredPage = await restoredContext.newPage();
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
         await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
+        const nextStepPanel = restoredPage
+            .getByRole('heading', { name: /your next step/i })
+            .locator('xpath=..');
 
         await expect(
-            restoredPage.getByRole('button', {
-                name: 'Start voting',
-            }),
+            restoredPage.getByRole('heading', { name: /your next step/i }),
+        ).toBeVisible();
+        await expect(
+            nextStepPanel.getByText(
+                'You still need to submit your own vote from this browser before you can close voting or reveal results.',
+                {
+                    exact: true,
+                },
+            ),
         ).toBeVisible();
         expectNoUnexpectedErrors(tracker);
     } finally {
@@ -67,7 +76,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
     }
 });
 
-test('restores the voter board-message panel after refresh once the roster is closed', async ({
+test('restores the securing state after refresh once voting is closed', async ({
     browser,
     page,
     request,
@@ -95,22 +104,25 @@ test('restores the voter board-message panel after refresh once the roster is cl
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await registerParticipant({
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await registerParticipant({
+        await submitVote({
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [6, 8],
             voterName: participantOneName,
         });
-        await registerParticipant({
+        await submitVote({
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
             voterName: participantTwoName,
         });
 
-        await startVoting(page);
+        await closeVoting(page);
 
         restoredContext = await browser.newContext({
             ...(getProjectContextOptions(testInfo) ?? {}),
@@ -120,10 +132,7 @@ test('restores the voter board-message panel after refresh once the roster is cl
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
         await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
 
-        await expectBoardCeremonyVisible(restoredPage);
-        await expect(
-            restoredPage.getByText('Preparing your device'),
-        ).toBeVisible();
+        await expectSecuringVisible(restoredPage);
         expectNoUnexpectedErrors(tracker);
     } finally {
         if (restoredContext) {

@@ -1,6 +1,6 @@
 const creatorSessionsStorageKey = 'sealed-vote.creator-sessions.v1';
 
-type StoredCreatorSession = {
+export type StoredCreatorSession = {
     creatorToken: string;
     pollId: string;
     pollSlug: string;
@@ -10,6 +10,25 @@ type StoredCreatorSessions = Record<string, StoredCreatorSession>;
 
 const canUseLocalStorage = (): boolean =>
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
+const isStoredCreatorSession = (
+    value: unknown,
+): value is StoredCreatorSession => {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+
+    const candidate = value as Partial<StoredCreatorSession>;
+
+    return (
+        typeof candidate.creatorToken === 'string' &&
+        candidate.creatorToken.length > 0 &&
+        typeof candidate.pollId === 'string' &&
+        candidate.pollId.length > 0 &&
+        typeof candidate.pollSlug === 'string' &&
+        candidate.pollSlug.length > 0
+    );
+};
 
 const readCreatorSessions = (): StoredCreatorSessions => {
     if (!canUseLocalStorage()) {
@@ -25,9 +44,21 @@ const readCreatorSessions = (): StoredCreatorSessions => {
 
         const parsedValue = JSON.parse(rawValue);
 
-        return typeof parsedValue === 'object' && parsedValue !== null
-            ? (parsedValue as StoredCreatorSessions)
-            : {};
+        if (
+            typeof parsedValue !== 'object' ||
+            parsedValue === null ||
+            Array.isArray(parsedValue)
+        ) {
+            return {};
+        }
+
+        return Object.fromEntries(
+            Object.entries(parsedValue).filter(
+                ([pollId, session]) =>
+                    isStoredCreatorSession(session) &&
+                    session.pollId === pollId,
+            ),
+        ) as StoredCreatorSessions;
     } catch {
         return {};
     }

@@ -4,31 +4,30 @@ import {
     type BoardMessageRequest as BoardMessageRequestContract,
     type BoardMessagesResponse as BoardMessagesResponseContract,
 } from '@sealed-vote/contracts';
+import { canonicalUnsignedPayloadBytes } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 import {
-    canonicalUnsignedPayloadBytes,
     hashElectionManifest,
     hashRosterEntries,
-    importAuthPublicKey,
     validateElectionManifest,
     type ManifestPublicationPayload,
     type ProtocolMessageType,
     type RegistrationPayload,
     type SignedPayload,
-    verifyPayloadSignature,
 } from 'threshold-elgamal';
 
 import type { DatabaseTransaction } from '../db/client.js';
 import { boardMessages } from '../db/schema.js';
+import { importAuthPublicKey, verifyAuthSignature } from '../utils/authKeys.js';
 import {
     boardMessageSlotKey,
     classifyBoardMessageRow,
     classifyBoardMessages,
-    getLastBoardEntryHash,
     getBoardMessageRows,
     getBoardMessageSlotRows,
+    getLastBoardEntryHash,
     nextEntryHash,
     unsignedPayloadHash,
 } from '../utils/boardMessages.js';
@@ -108,6 +107,7 @@ const protocolMessageTypes: readonly ProtocolMessageType[] = [
     'feldman-share-reveal',
     'key-derivation-confirmation',
     'ballot-submission',
+    'ballot-close',
     'decryption-share',
     'tally-publication',
     'ceremony-restart',
@@ -175,20 +175,22 @@ const isManifestPublicationPayload = (
 ): signedPayload is SignedPayload<ManifestPublicationPayload> =>
     signedPayload.payload.messageType === 'manifest-publication';
 
-const verifyRegistrationPayloadSignature = async (
-    signedPayload: SignedPayload<RegistrationPayload>,
-): Promise<void> => {
-    const publicKey = await importAuthPublicKey(
-        signedPayload.payload.authPublicKey,
-    );
-    const verified = await verifyPayloadSignature(
+const verifyPayloadSignature = async ({
+    authPublicKey,
+    signedPayload,
+}: {
+    authPublicKey: string;
+    signedPayload: SignedPayload;
+}): Promise<void> => {
+    const publicKey = await importAuthPublicKey(authPublicKey);
+    const verified = await verifyAuthSignature({
+        payloadBytes: canonicalUnsignedPayloadBytes(signedPayload.payload),
         publicKey,
-        canonicalUnsignedPayloadBytes(signedPayload.payload),
-        signedPayload.signature,
-    );
+        signature: signedPayload.signature,
+    });
 
     if (!verified) {
-        throw createError(400, 'Registration payload signature is invalid.');
+        throw createError(400, 'Protocol payload signature is invalid.');
     }
 };
 
@@ -235,7 +237,8 @@ const assertStoredRegistrationKeysMatchPayload = async ({
     if (
         deviceRecord.authPublicKey !== signedPayload.payload.authPublicKey ||
         deviceRecord.transportPublicKey !==
-            signedPayload.payload.transportPublicKey
+            signedPayload.payload.transportPublicKey ||
+        deviceRecord.transportSuite !== 'X25519'
     ) {
         throw createError(
             400,
@@ -266,39 +269,27 @@ const verifyParticipantPayloadSignature = async ({
         );
     }
 
-    const publicKey = await importAuthPublicKey(
-        registrationPayload.payload.authPublicKey,
-    );
-    const verified = await verifyPayloadSignature(
-        publicKey,
-        canonicalUnsignedPayloadBytes(signedPayload.payload),
-        signedPayload.signature,
-    );
-
-    if (!verified) {
-        throw createError(400, 'Protocol payload signature is invalid.');
-    }
+    await verifyPayloadSignature({
+        authPublicKey: registrationPayload.payload.authPublicKey,
+        signedPayload,
+    });
 };
 
 const verifyManifestPublicationPayload = async ({
     choiceNames,
     participantCount,
-    poll,
+    pollId,
     signedPayload,
     tx,
 }: {
     choiceNames: readonly string[];
     participantCount: number;
-    poll: Awaited<ReturnType<typeof lockPollById>>;
+    pollId: string;
     signedPayload: SignedPayload<ManifestPublicationPayload>;
     tx: DatabaseTransaction;
 }): Promise<void> => {
-    if (!poll) {
-        throw createError(404, 'Poll does not exist.');
-    }
-
     const classifiedBoard = await classifyBoardMessages(
-        await getBoardMessageRows(tx, poll.id),
+        await getBoardMessageRows(tx, pollId),
     );
     const acceptedRegistrations = classifiedBoard.acceptedPayloads.filter(
         isRegistrationPayload,
@@ -320,11 +311,6 @@ const verifyManifestPublicationPayload = async ({
     );
     const manifest = validateElectionManifest(signedPayload.payload.manifest);
     const manifestHash = await hashElectionManifest(manifest);
-    const expectedThreshold =
-        poll.requestedReconstructionThreshold ??
-        Math.floor(participantCount / 2) + 1;
-    const expectedMinimumPublishedVoterCount =
-        poll.requestedMinimumPublishedVoterCount ?? expectedThreshold + 1;
 
     if (signedPayload.payload.manifestHash !== manifestHash) {
         throw createError(
@@ -337,37 +323,6 @@ const verifyManifestPublicationPayload = async ({
         throw createError(
             400,
             'Manifest roster hash does not match the accepted registration roster.',
-        );
-    }
-
-    if (manifest.protocolVersion !== poll.protocolVersion) {
-        throw createError(
-            400,
-            'Manifest protocol version does not match the poll configuration.',
-        );
-    }
-
-    if (manifest.participantCount !== participantCount) {
-        throw createError(
-            400,
-            'Manifest participant count does not match the frozen roster.',
-        );
-    }
-
-    if (manifest.reconstructionThreshold !== expectedThreshold) {
-        throw createError(
-            400,
-            'Manifest reconstruction threshold does not match the poll configuration.',
-        );
-    }
-
-    if (
-        manifest.minimumPublishedVoterCount !==
-        expectedMinimumPublishedVoterCount
-    ) {
-        throw createError(
-            400,
-            'Manifest minimum published voter count does not match the poll configuration.',
         );
     }
 
@@ -421,6 +376,33 @@ const ensurePayloadMatchesPublishedManifest = async ({
     }
 };
 
+const assertBallotClosePublisher = async ({
+    pollId,
+    signedPayload,
+    tx,
+}: {
+    pollId: string;
+    signedPayload: SignedPayload;
+    tx: DatabaseTransaction;
+}): Promise<void> => {
+    if (signedPayload.payload.messageType !== 'ballot-close') {
+        return;
+    }
+
+    const manifestPublication = await getAcceptedManifestPublication(
+        tx,
+        pollId,
+    );
+
+    if (
+        !manifestPublication ||
+        manifestPublication.payload.participantIndex !==
+            signedPayload.payload.participantIndex
+    ) {
+        throw createError(403, ERROR_MESSAGES.boardMessageCreatorOnly);
+    }
+};
+
 export const boardMessageRoutes = async (
     fastify: FastifyInstance,
 ): Promise<void> => {
@@ -450,6 +432,7 @@ export const boardMessageRoutes = async (
 
             const rows = await getBoardMessageRows(fastify.db, poll.id);
             const classified = await classifyBoardMessages(rows);
+
             if (req.query.afterEntryHash) {
                 const startIndex = classified.records.findIndex(
                     (record) => record.entryHash === req.query.afterEntryHash,
@@ -523,7 +506,10 @@ export const boardMessageRoutes = async (
                 }
 
                 if (isRegistrationPayload(signedPayload)) {
-                    await verifyRegistrationPayloadSignature(signedPayload);
+                    await verifyPayloadSignature({
+                        authPublicKey: signedPayload.payload.authPublicKey,
+                        signedPayload,
+                    });
                     await assertStoredRegistrationKeysMatchPayload({
                         pollId: poll.id,
                         signedPayload,
@@ -559,7 +545,7 @@ export const boardMessageRoutes = async (
                         orderBy: (fields, { asc: ascending }) =>
                             ascending(fields.choiceIndex),
                     });
-                    const voterCount = await tx.query.voters.findMany({
+                    const submittedVoters = await tx.query.voters.findMany({
                         where: (fields, { eq: isEqual }) =>
                             isEqual(fields.pollId, poll.id),
                         columns: {
@@ -571,8 +557,14 @@ export const boardMessageRoutes = async (
                         choiceNames: pollChoices.map(
                             ({ choiceName }) => choiceName,
                         ),
-                        participantCount: voterCount.length,
-                        poll,
+                        participantCount: submittedVoters.length,
+                        pollId: poll.id,
+                        signedPayload,
+                        tx,
+                    });
+                } else {
+                    await assertBallotClosePublisher({
+                        pollId: poll.id,
                         signedPayload,
                         tx,
                     });

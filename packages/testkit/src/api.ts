@@ -182,10 +182,9 @@ export const closePoll = async (
 ): Promise<{ success: boolean; message?: string }> => {
     const response = await fastify.inject({
         method: 'POST',
-        url: POLL_ROUTES.start(pollId),
+        url: POLL_ROUTES.close(pollId),
         payload: {
             creatorToken,
-            thresholdPercent: 51,
         },
     });
 

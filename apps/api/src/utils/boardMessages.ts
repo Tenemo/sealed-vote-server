@@ -1,13 +1,13 @@
 import crypto from 'node:crypto';
 
 import type { BoardMessageRecord } from '@sealed-vote/contracts';
-import { and, asc, desc, eq } from 'drizzle-orm';
 import {
-    auditSignedPayloads,
     canonicalUnsignedPayloadBytes,
-    payloadSlotKey,
-    type SignedPayload,
-} from 'threshold-elgamal';
+    protocolPayloadSlotKey,
+    sortProtocolPayloads,
+} from '@sealed-vote/protocol';
+import { and, asc, desc, eq } from 'drizzle-orm';
+import { hashProtocolTranscript, type SignedPayload } from 'threshold-elgamal';
 
 import type { Database, DatabaseTransaction } from '../db/client.js';
 import { boardMessages } from '../db/schema.js';
@@ -66,121 +66,6 @@ type ClassifiedBoardMessages = {
     records: BoardMessageRecord[];
 };
 
-export const classifyBoardMessages = async (
-    rows: readonly BoardMessageRow[],
-): Promise<ClassifiedBoardMessages> => {
-    const sortedRows = sortBoardRows(rows);
-    const rowsBySlot = new Map<string, BoardMessageRow[]>();
-
-    for (const row of sortedRows) {
-        const existing = rowsBySlot.get(row.slotKey) ?? [];
-        existing.push(row);
-        rowsBySlot.set(row.slotKey, existing);
-    }
-
-    const slotMetadata = new Map<
-        string,
-        {
-            distinctUnsignedHashCount: number;
-            firstRowId: string | null;
-        }
-    >();
-
-    for (const [slotKey, slotRows] of rowsBySlot) {
-        slotMetadata.set(slotKey, {
-            distinctUnsignedHashCount: new Set(
-                slotRows.map((entry) => entry.unsignedHash),
-            ).size,
-            firstRowId: slotRows[0]?.id ?? null,
-        });
-    }
-
-    const records: BoardMessageRecord[] = [];
-    const acceptedRows: BoardMessageRow[] = [];
-    let duplicateCount = 0;
-    let equivocationCount = 0;
-
-    for (const row of sortedRows) {
-        const slot = slotMetadata.get(row.slotKey);
-        const classification =
-            (slot?.distinctUnsignedHashCount ?? 0) > 1
-                ? 'equivocation'
-                : slot?.firstRowId === row.id
-                  ? 'accepted'
-                  : 'idempotent';
-
-        if (classification === 'accepted') {
-            acceptedRows.push(row);
-        } else if (classification === 'idempotent') {
-            duplicateCount += 1;
-        } else {
-            equivocationCount += 1;
-        }
-
-        records.push({
-            id: row.id,
-            createdAt: normalizeDatabaseTimestamp(row.createdAt),
-            phase: row.phase,
-            participantIndex: row.participantIndex,
-            messageType: row.messageType as BoardMessageRecord['messageType'],
-            slotKey: row.slotKey,
-            unsignedHash: row.unsignedHash,
-            previousEntryHash: row.previousEntryHash,
-            entryHash: row.entryHash,
-            classification,
-            signedPayload: row.signedPayload,
-        });
-    }
-
-    if (acceptedRows.length === 0 || equivocationCount > 0) {
-        return {
-            acceptedPayloads: acceptedRows.map((row) => row.signedPayload),
-            boardAudit: {
-                acceptedCount: acceptedRows.length,
-                duplicateCount,
-                equivocationCount,
-                ceremonyDigest: null,
-                phaseDigests: [],
-            },
-            records,
-        };
-    }
-
-    const audited = await auditSignedPayloads(
-        acceptedRows.map((row) => row.signedPayload),
-    );
-
-    return {
-        acceptedPayloads: audited.acceptedPayloads as SignedPayload[],
-        boardAudit: {
-            acceptedCount: audited.acceptedPayloads.length,
-            duplicateCount,
-            equivocationCount,
-            ceremonyDigest: audited.ceremonyDigest,
-            phaseDigests: audited.phaseDigests.map((phaseDigest) => ({
-                phase: phaseDigest.phase,
-                digest: phaseDigest.digest,
-            })),
-        },
-        records,
-    };
-};
-
-const classifySlotRows = (
-    slotRows: readonly BoardMessageRow[],
-    rowId: string,
-): BoardMessageRecord['classification'] => {
-    const distinctUnsignedHashCount = new Set(
-        slotRows.map((entry) => entry.unsignedHash),
-    ).size;
-
-    if (distinctUnsignedHashCount > 1) {
-        return 'equivocation';
-    }
-
-    return slotRows[0]?.id === rowId ? 'accepted' : 'idempotent';
-};
-
 const toBoardMessageRecord = (
     row: BoardMessageRow,
     classification: BoardMessageRecord['classification'],
@@ -198,14 +83,127 @@ const toBoardMessageRecord = (
     signedPayload: row.signedPayload,
 });
 
+const classifySlotRows = (
+    slotRows: readonly BoardMessageRow[],
+    rowId: string,
+): BoardMessageRecord['classification'] => {
+    const distinctUnsignedHashCount = new Set(
+        slotRows.map((entry) => entry.unsignedHash),
+    ).size;
+
+    if (distinctUnsignedHashCount > 1) {
+        return 'equivocation';
+    }
+
+    return slotRows[0]?.id === rowId ? 'accepted' : 'idempotent';
+};
+
+const computePhaseDigests = async (
+    acceptedPayloads: readonly SignedPayload[],
+): Promise<
+    {
+        phase: number;
+        digest: string;
+    }[]
+> => {
+    const payloadsByPhase = new Map<number, SignedPayload['payload'][]>();
+
+    for (const payload of acceptedPayloads) {
+        const entries = payloadsByPhase.get(payload.payload.phase) ?? [];
+        entries.push(payload.payload);
+        payloadsByPhase.set(payload.payload.phase, entries);
+    }
+
+    const phaseDigests = await Promise.all(
+        [...payloadsByPhase.entries()]
+            .sort(([leftPhase], [rightPhase]) => leftPhase - rightPhase)
+            .map(async ([phase, payloads]) => ({
+                phase,
+                digest: await hashProtocolTranscript(
+                    sortProtocolPayloads(payloads),
+                ),
+            })),
+    );
+
+    return phaseDigests;
+};
+
+export const classifyBoardMessages = async (
+    rows: readonly BoardMessageRow[],
+): Promise<ClassifiedBoardMessages> => {
+    const sortedRows = sortBoardRows(rows);
+    const rowsBySlot = new Map<string, BoardMessageRow[]>();
+
+    for (const row of sortedRows) {
+        const existing = rowsBySlot.get(row.slotKey) ?? [];
+        existing.push(row);
+        rowsBySlot.set(row.slotKey, existing);
+    }
+
+    const records: BoardMessageRecord[] = [];
+    const acceptedRows: BoardMessageRow[] = [];
+    let duplicateCount = 0;
+    let equivocationCount = 0;
+
+    for (const row of sortedRows) {
+        const slotRows = rowsBySlot.get(row.slotKey) ?? [];
+        const classification = classifySlotRows(slotRows, row.id);
+
+        if (classification === 'accepted') {
+            acceptedRows.push(row);
+        } else if (classification === 'idempotent') {
+            duplicateCount += 1;
+        } else {
+            equivocationCount += 1;
+        }
+
+        records.push(toBoardMessageRecord(row, classification));
+    }
+
+    if (acceptedRows.length === 0) {
+        return {
+            acceptedPayloads: [],
+            boardAudit: {
+                acceptedCount: 0,
+                duplicateCount,
+                equivocationCount,
+                ceremonyDigest: null,
+                phaseDigests: [],
+            },
+            records,
+        };
+    }
+
+    const acceptedPayloads = acceptedRows.map((row) => row.signedPayload);
+    const orderedPayloads = sortProtocolPayloads(
+        acceptedPayloads.map((payload) => payload.payload),
+    );
+    const phaseDigests = await computePhaseDigests(acceptedPayloads);
+
+    return {
+        acceptedPayloads,
+        boardAudit: {
+            acceptedCount: acceptedRows.length,
+            duplicateCount,
+            equivocationCount,
+            ceremonyDigest:
+                equivocationCount > 0
+                    ? null
+                    : await hashProtocolTranscript(orderedPayloads),
+            phaseDigests: equivocationCount > 0 ? [] : phaseDigests,
+        },
+        records,
+    };
+};
+
 export const classifyBoardMessageRow = (
     row: BoardMessageRow,
     slotRows: readonly BoardMessageRow[],
-): BoardMessageRecord => {
-    const sortedSlotRows = sortBoardRows(slotRows);
-
-    return toBoardMessageRecord(row, classifySlotRows(sortedSlotRows, row.id));
-};
+): BoardMessageRecord =>
+    toBoardMessageRecord(
+        row,
+        classifySlotRows(sortBoardRows(slotRows), row.id),
+    );
 
 export const getBoardMessageRows = async (
     db: ReadOnlyDatabase,
@@ -250,4 +248,4 @@ export const getLastBoardEntryHash = async (
 };
 
 export const boardMessageSlotKey = (signedPayload: SignedPayload): string =>
-    payloadSlotKey(signedPayload.payload);
+    protocolPayloadSlotKey(signedPayload.payload);

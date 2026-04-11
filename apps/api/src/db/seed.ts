@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { polls } from './schema.js';
 
-type SeedPhase = 'open' | 'preparing';
+type SeedPhase = 'open' | 'securing';
 
 type SeedManifestVoter = {
     voterName: string;
@@ -26,11 +26,11 @@ type SeedManifest = {
 };
 
 const openSampleName = 'Seed open sample';
-const preparingSampleName = 'Seed preparing sample';
+const securingSampleName = 'Seed securing sample';
 const experimentalSampleName = 'Seed experimental sample';
 const seedPollNames = [
     openSampleName,
-    preparingSampleName,
+    securingSampleName,
     experimentalSampleName,
 ];
 
@@ -64,11 +64,11 @@ const buildOpenSample = async (
     return builder.getContext();
 };
 
-const buildPreparingSample = async (
+const buildSecuringSample = async (
     fastify: FastifyInstance,
 ): Promise<TestPollContext> => {
     const builder = new TestPollBuilder(fastify)
-        .withPollName(preparingSampleName)
+        .withPollName(securingSampleName)
         .withChoices(['Dog', 'Cat', 'Goat'])
         .withVoters(['Alice', 'Bob', 'Charlie']);
 
@@ -102,17 +102,17 @@ export const seedDatabase = async (
         .where(inArray(polls.pollName, seedPollNames));
 
     const openSample = await buildOpenSample(fastify);
-    const preparingSample = await buildPreparingSample(fastify);
+    const securingSample = await buildSecuringSample(fastify);
     const experimentalSample = await buildExperimentalSample(fastify);
 
     return {
         generatedAt: new Date().toISOString(),
         polls: [
             toManifestPoll(openSampleName, 'open', openSample),
-            toManifestPoll(preparingSampleName, 'preparing', preparingSample),
+            toManifestPoll(securingSampleName, 'securing', securingSample),
             toManifestPoll(
                 experimentalSampleName,
-                'preparing',
+                'securing',
                 experimentalSample,
             ),
         ],

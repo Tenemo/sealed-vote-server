@@ -9,7 +9,7 @@ import {
 import {
     createPoll,
     deletePolls,
-    registerParticipant,
+    submitVote,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -42,8 +42,9 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     });
     createdPolls.push(createdPoll);
 
-    await registerParticipant({
+    await submitVote({
         page,
+        scores: [9, 4],
         voterName: firstVoterName,
     });
 
@@ -59,7 +60,13 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
             .getByLabel('Your public name')
             .fill(firstVoterName);
         await participant.page
-            .getByRole('button', { exact: true, name: 'Join vote' })
+            .getByRole('button', { name: 'Score Apples as 8' })
+            .click();
+        await participant.page
+            .getByRole('button', { name: 'Score Bananas as 6' })
+            .click();
+        await participant.page
+            .getByRole('button', { exact: true, name: 'Submit vote' })
             .click();
 
         await expect(
@@ -76,13 +83,13 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
             .getByLabel('Your public name')
             .fill(secondVoterName);
         await participant.page
-            .getByRole('button', { exact: true, name: 'Join vote' })
+            .getByRole('button', { exact: true, name: 'Submit vote' })
             .click();
 
         await expect(
-            participant.page.getByText(
-                new RegExp(`^Joined as ${secondVoterName}\\.`),
-            ),
+            participant.page.getByText('Vote stored on this device', {
+                exact: true,
+            }),
         ).toBeVisible({ timeout: 30_000 });
     } finally {
         await closeParticipant(participant);

@@ -1,68 +1,86 @@
 import type { PollResponse } from '@sealed-vote/contracts';
 
 import type { StoredPollDeviceState } from './pollDeviceStorage';
+import type { StoredVoterSession } from './voterSessionStorage';
 
-import type { StoredVoterSession } from 'features/Polls/voterSessionStorage';
-
-type ViewerWorkflowState =
-    | 'anonymous-joinable'
-    | 'creator-configuring-threshold'
-    | 'joined-and-waiting-for-start'
-    | 'preparing-auto'
-    | 'preparing-action-required'
-    | 'preparing-waiting'
-    | 'local-state-missing'
-    | 'ready-to-vote'
-    | 'vote-submitted-and-waiting'
-    | 'ready-to-help-open-results'
+export type ViewerWorkflowState =
+    | 'anonymous-ready-to-vote'
+    | 'submitting-vote'
+    | 'vote-stored-waiting-for-close'
+    | 'creator-must-submit-first'
+    | 'creator-can-close'
+    | 'securing-auto'
+    | 'securing-retry-required'
+    | 'securing-waiting'
+    | 'ready-to-reveal'
+    | 'revealing-auto'
+    | 'revealing-waiting'
     | 'waiting-for-results'
+    | 'local-vote-missing'
     | 'complete'
     | 'aborted';
 
-type DerivedPollWorkflow = {
-    canAct: boolean;
+export type DerivedPollWorkflow = {
+    canCloseVoting: boolean;
+    canRevealResults: boolean;
+    canRetryAutomation: boolean;
+    canSubmitVote: boolean;
     currentStep: ViewerWorkflowState;
-    hasSubmittedBallot: boolean;
-    hasSubmittedDecryptionShare: boolean;
+    hasLocalVote: boolean;
+    hasSubmittedVote: boolean;
     isCreator: boolean;
     missingLocalState: boolean;
 };
 
-const hasAcceptedMessage = (
-    poll: PollResponse,
-    participantIndex: number,
-    messageType: PollResponse['boardEntries'][number]['messageType'],
+const isLocalParticipant = (
+    deviceState: StoredPollDeviceState | null,
+    voterSession: StoredVoterSession | null,
 ): boolean =>
-    poll.boardEntries.some(
-        (entry) =>
-            entry.classification === 'accepted' &&
-            entry.participantIndex === participantIndex &&
-            entry.messageType === messageType,
-    );
+    !!deviceState &&
+    !!voterSession &&
+    deviceState.pollId === voterSession.pollId &&
+    deviceState.voterIndex === voterSession.voterIndex;
 
 export const derivePollWorkflow = ({
     creatorSessionPollId,
     deviceState,
-    hasAutoSetupAction,
-    hasSetupFailure,
+    hasAutomaticCeremonyAction,
+    hasAutomationFailure,
+    isSubmittingVote,
     poll,
     voterSession,
 }: {
     creatorSessionPollId: string | null;
     deviceState: StoredPollDeviceState | null;
-    hasAutoSetupAction: boolean;
-    hasSetupFailure: boolean;
+    hasAutomaticCeremonyAction: boolean;
+    hasAutomationFailure: boolean;
+    isSubmittingVote: boolean;
     poll: PollResponse;
     voterSession: StoredVoterSession | null;
 }): DerivedPollWorkflow => {
     const isCreator = creatorSessionPollId === poll.id;
+    const localParticipant = isLocalParticipant(deviceState, voterSession);
+    const storedBallotScores = deviceState?.storedBallotScores ?? null;
+    const hasSubmittedVote = localParticipant;
+    const hasLocalVote =
+        localParticipant &&
+        Array.isArray(storedBallotScores) &&
+        storedBallotScores.length === poll.choices.length;
+    const missingLocalState = !!voterSession && !localParticipant;
+    const creatorHasLocalParticipant =
+        isCreator &&
+        localParticipant &&
+        deviceState?.isCreatorParticipant === true;
 
     if (poll.phase === 'aborted') {
         return {
-            canAct: false,
+            canCloseVoting: false,
+            canRevealResults: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
             currentStep: 'aborted',
-            hasSubmittedBallot: false,
-            hasSubmittedDecryptionShare: false,
+            hasLocalVote,
+            hasSubmittedVote,
             isCreator,
             missingLocalState: false,
         };
@@ -70,93 +88,124 @@ export const derivePollWorkflow = ({
 
     if (poll.phase === 'complete') {
         return {
-            canAct: false,
+            canCloseVoting: false,
+            canRevealResults: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
             currentStep: 'complete',
-            hasSubmittedBallot: false,
-            hasSubmittedDecryptionShare: false,
+            hasLocalVote,
+            hasSubmittedVote,
             isCreator,
             missingLocalState: false,
         };
     }
-
-    if (!voterSession) {
-        return {
-            canAct: isCreator && poll.phase === 'open',
-            currentStep:
-                isCreator && poll.phase === 'open'
-                    ? 'creator-configuring-threshold'
-                    : 'anonymous-joinable',
-            hasSubmittedBallot: false,
-            hasSubmittedDecryptionShare: false,
-            isCreator,
-            missingLocalState: false,
-        };
-    }
-
-    const participantIndex = voterSession.voterIndex;
-    const hasSubmittedBallot = hasAcceptedMessage(
-        poll,
-        participantIndex,
-        'ballot-submission',
-    );
-    const hasSubmittedDecryptionShare = hasAcceptedMessage(
-        poll,
-        participantIndex,
-        'decryption-share',
-    );
-    const missingLocalState = deviceState === null;
 
     if (poll.phase === 'open') {
+        if (!localParticipant) {
+            return {
+                canCloseVoting: false,
+                canRevealResults: false,
+                canRetryAutomation: false,
+                canSubmitVote: !isSubmittingVote,
+                currentStep: isSubmittingVote
+                    ? 'submitting-vote'
+                    : isCreator
+                      ? 'creator-must-submit-first'
+                      : 'anonymous-ready-to-vote',
+                hasLocalVote: false,
+                hasSubmittedVote: false,
+                isCreator,
+                missingLocalState: false,
+            };
+        }
+
         return {
-            canAct: false,
-            currentStep: 'joined-and-waiting-for-start',
-            hasSubmittedBallot,
-            hasSubmittedDecryptionShare,
+            canCloseVoting:
+                creatorHasLocalParticipant &&
+                poll.submittedParticipantCount >=
+                    poll.minimumCloseParticipantCount,
+            canRevealResults: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
+            currentStep:
+                creatorHasLocalParticipant &&
+                poll.submittedParticipantCount >=
+                    poll.minimumCloseParticipantCount
+                    ? 'creator-can-close'
+                    : 'vote-stored-waiting-for-close',
+            hasLocalVote,
+            hasSubmittedVote,
             isCreator,
-            missingLocalState,
+            missingLocalState: false,
         };
     }
 
-    if (poll.phase === 'preparing') {
+    if (missingLocalState) {
         return {
-            canAct: !missingLocalState && hasSetupFailure && hasAutoSetupAction,
-            currentStep: missingLocalState
-                ? 'local-state-missing'
-                : hasAutoSetupAction
-                  ? hasSetupFailure
-                      ? 'preparing-action-required'
-                      : 'preparing-auto'
-                  : 'preparing-waiting',
-            hasSubmittedBallot,
-            hasSubmittedDecryptionShare,
+            canCloseVoting: false,
+            canRevealResults: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
+            currentStep: 'local-vote-missing',
+            hasLocalVote: false,
+            hasSubmittedVote,
             isCreator,
-            missingLocalState,
+            missingLocalState: true,
         };
     }
 
-    if (poll.phase === 'voting') {
+    if (poll.phase === 'securing') {
+        const currentStep = hasAutomaticCeremonyAction
+            ? hasAutomationFailure
+                ? 'securing-retry-required'
+                : 'securing-auto'
+            : 'securing-waiting';
+
         return {
-            canAct: !missingLocalState && !hasSubmittedBallot,
-            currentStep: hasSubmittedBallot
-                ? 'vote-submitted-and-waiting'
-                : 'ready-to-vote',
-            hasSubmittedBallot,
-            hasSubmittedDecryptionShare,
+            canCloseVoting: false,
+            canRevealResults: false,
+            canRetryAutomation:
+                hasAutomaticCeremonyAction && hasAutomationFailure,
+            canSubmitVote: false,
+            currentStep,
+            hasLocalVote,
+            hasSubmittedVote,
             isCreator,
-            missingLocalState,
+            missingLocalState: false,
         };
     }
+
+    if (poll.phase === 'ready-to-reveal') {
+        return {
+            canCloseVoting: false,
+            canRevealResults:
+                creatorHasLocalParticipant && poll.ceremony.revealReady,
+            canRetryAutomation: false,
+            canSubmitVote: false,
+            currentStep:
+                creatorHasLocalParticipant && poll.ceremony.revealReady
+                    ? 'ready-to-reveal'
+                    : 'waiting-for-results',
+            hasLocalVote,
+            hasSubmittedVote,
+            isCreator,
+            missingLocalState: false,
+        };
+    }
+
+    const currentStep = hasAutomaticCeremonyAction
+        ? 'revealing-auto'
+        : 'revealing-waiting';
 
     return {
-        canAct: !missingLocalState && !hasSubmittedDecryptionShare,
-        currentStep: hasSubmittedDecryptionShare
-            ? 'waiting-for-results'
-            : 'ready-to-help-open-results',
-        hasSubmittedBallot,
-        hasSubmittedDecryptionShare,
+        canCloseVoting: false,
+        canRevealResults: false,
+        canRetryAutomation: false,
+        canSubmitVote: false,
+        currentStep,
+        hasLocalVote,
+        hasSubmittedVote,
         isCreator,
-        missingLocalState,
+        missingLocalState: false,
     };
 };
-
-export type { DerivedPollWorkflow, ViewerWorkflowState };

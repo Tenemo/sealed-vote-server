@@ -1,24 +1,23 @@
 import { isUuid, type PollResponse } from '@sealed-vote/contracts';
 import { eq } from 'drizzle-orm';
 import {
-    assertThreshold,
-    majorityThreshold,
-    replayGjkrTranscript,
-    verifyDKGTranscript,
-    defaultMinimumPublishedVoterCount,
+    createElectionManifest,
     deriveSessionId,
-    formatSessionFingerprint,
     hashElectionManifest,
     hashRosterEntries,
-    verifyElectionCeremonyDetailedResult,
+    majorityThreshold,
+    type BallotClosePayload,
     type BallotSubmissionPayload,
     type DecryptionSharePayload,
     type EncodedAuthPublicKey,
     type EncodedTransportPublicKey,
     type ElectionManifest,
     type ManifestPublicationPayload,
+    type RegistrationPayload,
     type SignedPayload,
     type TallyPublicationPayload,
+    verifyDKGTranscript,
+    verifyElectionCeremonyDetailedResult,
 } from 'threshold-elgamal';
 
 import type { Database, DatabaseTransaction } from '../db/client.js';
@@ -42,81 +41,15 @@ type PollRow = Pick<
 >;
 
 const minimumSupportedParticipantCount = 3;
+const validationTarget = 15;
+const maximumParticipantCount = 51;
 
-const getSuggestedThreshold = (participantCount: number): number =>
-    participantCount >= minimumSupportedParticipantCount
-        ? majorityThreshold(participantCount)
-        : 2;
-
-const getRequestedThresholdError = (
-    requestedReconstructionThreshold: number | null,
-    requestedMinimumPublishedVoterCount: number | null,
-    participantCount: number,
-): string | null => {
-    if (participantCount < minimumSupportedParticipantCount) {
-        return 'Distributed ceremonies require at least 3 participants.';
-    }
-
-    const effectiveThreshold =
-        requestedReconstructionThreshold ?? majorityThreshold(participantCount);
-
-    if (effectiveThreshold < majorityThreshold(participantCount)) {
-        return `Reconstruction threshold must stay at or above the strict-majority floor for ${participantCount} participants.`;
-    }
-
-    try {
-        assertThreshold(effectiveThreshold, participantCount);
-    } catch {
-        return `Reconstruction threshold must stay within the supported range for ${participantCount} participants.`;
-    }
-
-    if (
-        requestedMinimumPublishedVoterCount !== null &&
-        (requestedMinimumPublishedVoterCount < effectiveThreshold ||
-            requestedMinimumPublishedVoterCount > participantCount)
-    ) {
-        return `Minimum published voter count must be between ${effectiveThreshold} and ${participantCount}.`;
-    }
-
-    return null;
-};
-
-const resolveThresholdSummary = (
-    poll: PollRow,
-    participantCount: number,
-): PollResponse['thresholds'] => {
-    const suggestedReconstructionThreshold =
-        getSuggestedThreshold(participantCount);
-    const strictMajorityFloor =
-        participantCount >= minimumSupportedParticipantCount
-            ? majorityThreshold(participantCount)
-            : 2;
-    const reconstructionThreshold = poll.isOpen
-        ? null
-        : (poll.requestedReconstructionThreshold ??
-          (participantCount >= minimumSupportedParticipantCount
-              ? suggestedReconstructionThreshold
-              : null));
-    const minimumPublishedVoterCount = poll.isOpen
-        ? null
-        : (poll.requestedMinimumPublishedVoterCount ??
-          (participantCount >= minimumSupportedParticipantCount &&
-          reconstructionThreshold !== null
-              ? defaultMinimumPublishedVoterCount(
-                    reconstructionThreshold,
-                    participantCount,
-                )
-              : null));
-
-    return {
-        reconstructionThreshold,
-        minimumPublishedVoterCount,
-        suggestedReconstructionThreshold,
-        strictMajorityFloor,
-        maxParticipants: 51,
-        validationTarget: 15,
-    };
-};
+const formatSessionFingerprint = (value: string): string =>
+    value
+        .slice(0, 32)
+        .toUpperCase()
+        .match(/.{1,4}/g)
+        ?.join('-') ?? value.slice(0, 32).toUpperCase();
 
 const isSignedPayloadOfType = <
     TPayload extends SignedPayload['payload']['messageType'],
@@ -127,72 +60,61 @@ const isSignedPayloadOfType = <
     Extract<SignedPayload['payload'], { messageType: TPayload }>
 > => signedPayload.payload.messageType === messageType;
 
-const findManifestPublication = (
+const countAcceptedMessages = (
     acceptedPayloads: readonly SignedPayload[],
-): SignedPayload<ManifestPublicationPayload> | null => {
-    const manifestPayloads = acceptedPayloads.filter((signedPayload) =>
-        isSignedPayloadOfType(signedPayload, 'manifest-publication'),
-    );
+    messageType: SignedPayload['payload']['messageType'],
+): number =>
+    acceptedPayloads.filter((payload) =>
+        isSignedPayloadOfType(payload, messageType),
+    ).length;
 
-    if (manifestPayloads.length !== 1) {
-        return null;
-    }
-
-    return manifestPayloads[0];
-};
-
-const findPhaseDigest = (
-    phaseDigests: PollResponse['boardAudit']['phaseDigests'],
-    phase: number,
-): string | null =>
-    phaseDigests.find((phaseDigest) => phaseDigest.phase === phase)?.digest ??
-    null;
-
-const derivePollPhase = ({
+const countCompleteBallotParticipants = ({
     acceptedPayloads,
-    dkgAborted,
-    dkgCompleted,
-    isOpen,
-    verificationStatus,
+    optionCount,
 }: {
     acceptedPayloads: readonly SignedPayload[];
-    dkgAborted: boolean;
-    dkgCompleted: boolean;
+    optionCount: number;
+}): number => {
+    const ballotsByParticipant = new Map<number, Set<number>>();
+
+    for (const payload of acceptedPayloads) {
+        if (!isSignedPayloadOfType(payload, 'ballot-submission')) {
+            continue;
+        }
+
+        const optionIndices =
+            ballotsByParticipant.get(payload.payload.participantIndex) ??
+            new Set<number>();
+        optionIndices.add(payload.payload.optionIndex);
+        ballotsByParticipant.set(
+            payload.payload.participantIndex,
+            optionIndices,
+        );
+    }
+
+    return [...ballotsByParticipant.values()].filter(
+        (optionIndices) => optionIndices.size === optionCount,
+    ).length;
+};
+
+const buildThresholdSummary = ({
+    isOpen,
+    participantCount,
+}: {
     isOpen: boolean;
-    verificationStatus: PollResponse['verification']['status'];
-}): PollResponse['phase'] => {
-    if (isOpen) {
-        return 'open';
-    }
+    participantCount: number;
+}): PollResponse['thresholds'] => {
+    const reconstructionThreshold =
+        !isOpen && participantCount >= minimumSupportedParticipantCount
+            ? majorityThreshold(participantCount)
+            : null;
 
-    if (
-        dkgAborted ||
-        acceptedPayloads.some((payload) =>
-            isSignedPayloadOfType(payload, 'ceremony-restart'),
-        )
-    ) {
-        return 'aborted';
-    }
-
-    if (verificationStatus === 'verified') {
-        return 'complete';
-    }
-
-    if (
-        acceptedPayloads.some(
-            (payload) =>
-                isSignedPayloadOfType(payload, 'decryption-share') ||
-                isSignedPayloadOfType(payload, 'tally-publication'),
-        )
-    ) {
-        return 'opening-results';
-    }
-
-    if (dkgCompleted) {
-        return 'voting';
-    }
-
-    return 'preparing';
+    return {
+        reconstructionThreshold,
+        minimumPublishedVoterCount: reconstructionThreshold,
+        maxParticipants: maximumParticipantCount,
+        validationTarget,
+    };
 };
 
 const buildNotReadyVerification = (
@@ -248,38 +170,23 @@ const buildVerifiedVerification = ({
 const buildVerificationSummary = async ({
     acceptedPayloads,
     manifest,
-    manifestHash,
-    requestedThresholdError,
     sessionId,
 }: {
     acceptedPayloads: readonly SignedPayload[];
     manifest: ElectionManifest | null;
-    manifestHash: string | null;
-    requestedThresholdError: string | null;
     sessionId: string | null;
 }): Promise<{
-    dkgAborted: boolean;
     dkgCompleted: boolean;
     qualParticipantIndices: readonly number[];
     verification: PollResponse['verification'];
 }> => {
-    if (requestedThresholdError) {
+    if (!manifest || !sessionId) {
         return {
-            dkgAborted: false,
-            dkgCompleted: false,
-            qualParticipantIndices: [],
-            verification: buildInvalidVerification([], requestedThresholdError),
-        };
-    }
-
-    if (!manifest || !manifestHash || !sessionId) {
-        return {
-            dkgAborted: false,
             dkgCompleted: false,
             qualParticipantIndices: [],
             verification: buildNotReadyVerification(
                 [],
-                'Manifest publication has not been accepted yet.',
+                'Voting is still open. The ceremony transcript will begin after the organizer closes the vote.',
             ),
         };
     }
@@ -287,13 +194,10 @@ const buildVerificationSummary = async ({
     const dkgTranscript = acceptedPayloads.filter(
         (payload) =>
             !isSignedPayloadOfType(payload, 'ballot-submission') &&
+            !isSignedPayloadOfType(payload, 'ballot-close') &&
             !isSignedPayloadOfType(payload, 'decryption-share') &&
             !isSignedPayloadOfType(payload, 'tally-publication'),
     );
-
-    let qualParticipantIndices: readonly number[] = [];
-    let dkgAborted = false;
-    let dkgCompleted = false;
 
     if (
         !dkgTranscript.some((payload) =>
@@ -301,68 +205,59 @@ const buildVerificationSummary = async ({
         )
     ) {
         return {
-            dkgAborted,
-            dkgCompleted,
-            qualParticipantIndices,
+            dkgCompleted: false,
+            qualParticipantIndices: [],
             verification: buildNotReadyVerification(
-                qualParticipantIndices,
-                'The frozen manifest has not been published to the board yet.',
+                [],
+                'The frozen manifest has not been published yet.',
             ),
         };
     }
 
+    const acceptedRegistrations = countAcceptedMessages(
+        acceptedPayloads,
+        'registration',
+    );
+    if (acceptedRegistrations === 0) {
+        return {
+            dkgCompleted: false,
+            qualParticipantIndices: [],
+            verification: buildNotReadyVerification(
+                [],
+                'Participant registrations are still being published to the board.',
+            ),
+        };
+    }
+
+    const keyConfirmations = countAcceptedMessages(
+        acceptedPayloads,
+        'key-derivation-confirmation',
+    );
+
+    if (keyConfirmations < acceptedRegistrations) {
+        return {
+            dkgCompleted: false,
+            qualParticipantIndices: [],
+            verification: buildNotReadyVerification(
+                [],
+                'The distributed key generation transcript is still incomplete.',
+            ),
+        };
+    }
+
+    let verifiedDkg: Awaited<ReturnType<typeof verifyDKGTranscript>>;
     try {
-        const dkgState = replayGjkrTranscript(
-            {
-                sessionId,
-                manifestHash,
-                participantCount: manifest.participantCount,
-                threshold: manifest.reconstructionThreshold,
-            },
-            dkgTranscript,
-        );
-
-        qualParticipantIndices = dkgState.qual;
-
-        if (dkgState.phase === 'aborted') {
-            dkgAborted = true;
-            return {
-                dkgAborted,
-                dkgCompleted,
-                qualParticipantIndices,
-                verification: buildInvalidVerification(
-                    qualParticipantIndices,
-                    dkgState.abortReason ?? 'The DKG ceremony aborted.',
-                ),
-            };
-        }
-
-        if (dkgState.phase !== 'completed') {
-            return {
-                dkgAborted,
-                dkgCompleted,
-                qualParticipantIndices,
-                verification: buildNotReadyVerification(
-                    qualParticipantIndices,
-                    'The DKG transcript is still incomplete.',
-                ),
-            };
-        }
-
-        const verifiedDKG = await verifyDKGTranscript({
+        verifiedDkg = await verifyDKGTranscript({
             transcript: dkgTranscript,
             manifest,
             sessionId,
         });
-        qualParticipantIndices = verifiedDKG.qual;
-        dkgCompleted = true;
     } catch (error) {
         return {
-            dkgAborted,
-            dkgCompleted,
-            qualParticipantIndices,
+            dkgCompleted: false,
+            qualParticipantIndices: [],
             verification: buildInvalidVerification(
-                qualParticipantIndices,
+                [],
                 error instanceof Error
                     ? error.message
                     : 'The DKG transcript could not be verified.',
@@ -370,56 +265,82 @@ const buildVerificationSummary = async ({
         };
     }
 
-    const ballotPayloads = acceptedPayloads.filter((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-submission'),
-    ) as readonly SignedPayload<BallotSubmissionPayload>[];
+    const ballotClosePayload = acceptedPayloads.find((payload) =>
+        isSignedPayloadOfType(payload, 'ballot-close'),
+    ) as SignedPayload<BallotClosePayload> | undefined;
+
+    if (!ballotClosePayload) {
+        return {
+            dkgCompleted: true,
+            qualParticipantIndices: verifiedDkg.qual,
+            verification: buildNotReadyVerification(
+                verifiedDkg.qual,
+                'Encrypted ballots are still accumulating. Results can be revealed once the organizer closes the counted ballot set.',
+            ),
+        };
+    }
+
     const decryptionSharePayloads = acceptedPayloads.filter((payload) =>
         isSignedPayloadOfType(payload, 'decryption-share'),
     ) as readonly SignedPayload<DecryptionSharePayload>[];
+
+    if (decryptionSharePayloads.length === 0) {
+        return {
+            dkgCompleted: true,
+            qualParticipantIndices: verifiedDkg.qual,
+            verification: buildNotReadyVerification(
+                verifiedDkg.qual,
+                'Reveal has started. Waiting for threshold decryption shares.',
+            ),
+        };
+    }
+
     const tallyPublications = acceptedPayloads.filter((payload) =>
         isSignedPayloadOfType(payload, 'tally-publication'),
     ) as readonly SignedPayload<TallyPublicationPayload>[];
 
-    if (ballotPayloads.length === 0) {
+    if (tallyPublications.length === 0) {
         return {
-            dkgAborted,
-            dkgCompleted,
-            qualParticipantIndices,
+            dkgCompleted: true,
+            qualParticipantIndices: verifiedDkg.qual,
             verification: buildNotReadyVerification(
-                qualParticipantIndices,
-                'No accepted ballot submissions have been published yet.',
+                verifiedDkg.qual,
+                'Decryption shares are arriving. Waiting for final tally publication.',
             ),
         };
     }
 
-    if (decryptionSharePayloads.length === 0) {
+    if (tallyPublications.length < manifest.optionList.length) {
         return {
-            dkgAborted,
-            dkgCompleted,
-            qualParticipantIndices,
+            dkgCompleted: true,
+            qualParticipantIndices: verifiedDkg.qual,
             verification: buildNotReadyVerification(
-                qualParticipantIndices,
-                'No accepted decryption shares have been published yet.',
+                verifiedDkg.qual,
+                'Final tally publication is still in progress.',
             ),
         };
     }
+
+    const ballotPayloads = acceptedPayloads.filter((payload) =>
+        isSignedPayloadOfType(payload, 'ballot-submission'),
+    ) as readonly SignedPayload<BallotSubmissionPayload>[];
 
     const verificationResult = await verifyElectionCeremonyDetailedResult({
         manifest,
         sessionId,
         dkgTranscript,
         ballotPayloads,
+        ballotClosePayload,
         decryptionSharePayloads,
         tallyPublications,
     });
 
     if (!verificationResult.ok) {
         return {
-            dkgAborted,
-            dkgCompleted,
-            qualParticipantIndices,
+            dkgCompleted: true,
+            qualParticipantIndices: verifiedDkg.qual,
             verification: buildInvalidVerification(
-                qualParticipantIndices,
+                verifiedDkg.qual,
                 verificationResult.error.reason,
             ),
         };
@@ -432,15 +353,48 @@ const buildVerificationSummary = async ({
     );
 
     return {
-        dkgAborted,
-        dkgCompleted,
-        qualParticipantIndices,
+        dkgCompleted: true,
+        qualParticipantIndices: verificationResult.verified.qual,
         verification: buildVerifiedVerification({
             acceptedCounts,
             tallies: verificationResult.verified.perOptionTallies,
             qualParticipantIndices: verificationResult.verified.qual,
         }),
     };
+};
+
+const derivePollPhase = ({
+    isOpen,
+    verification,
+    revealReady,
+    hasBallotClose,
+}: {
+    hasBallotClose: boolean;
+    isOpen: boolean;
+    revealReady: boolean;
+    verification: PollResponse['verification'];
+}): PollResponse['phase'] => {
+    if (isOpen) {
+        return 'open';
+    }
+
+    if (verification.status === 'invalid') {
+        return 'aborted';
+    }
+
+    if (verification.status === 'verified') {
+        return 'complete';
+    }
+
+    if (hasBallotClose) {
+        return 'revealing';
+    }
+
+    if (revealReady) {
+        return 'ready-to-reveal';
+    }
+
+    return 'securing';
 };
 
 const getPollRow = async (
@@ -517,7 +471,10 @@ export const getPollFetchReadModel = async (
     const rows = await getBoardMessageRows(db, poll.id);
     const classifiedBoard = await classifyBoardMessages(rows);
     const participantCount = poll.voters.length;
-    const thresholds = resolveThresholdSummary(poll, participantCount);
+    const thresholds = buildThresholdSummary({
+        isOpen: poll.isOpen,
+        participantCount,
+    });
     const rosterEntries = poll.voters
         .map((participant) => {
             const deviceRecord = parseParticipantDeviceRecord(
@@ -540,66 +497,80 @@ export const getPollFetchReadModel = async (
             (entry): entry is PollResponse['rosterEntries'][number] =>
                 entry !== null,
         );
+
+    const rosterHash =
+        !poll.isOpen && rosterEntries.length === participantCount
+            ? await hashRosterEntries(
+                  rosterEntries.map((entry) => ({
+                      authPublicKey:
+                          entry.authPublicKey as EncodedAuthPublicKey,
+                      participantIndex: entry.participantIndex,
+                      transportPublicKey:
+                          entry.transportPublicKey as EncodedTransportPublicKey,
+                  })),
+              )
+            : null;
+
     const manifest =
-        !poll.isOpen &&
-        thresholds.reconstructionThreshold !== null &&
-        thresholds.minimumPublishedVoterCount !== null &&
-        rosterEntries.length === participantCount
-            ? ({
-                  protocolVersion: poll.protocolVersion,
-                  reconstructionThreshold: thresholds.reconstructionThreshold,
-                  participantCount,
-                  minimumPublishedVoterCount:
-                      thresholds.minimumPublishedVoterCount,
-                  ballotCompletenessPolicy: 'ALL_OPTIONS_REQUIRED',
-                  ballotFinality: 'first-valid',
-                  scoreDomain: '1..10',
-                  rosterHash: await hashRosterEntries(
-                      rosterEntries.map((entry) => ({
-                          authPublicKey:
-                              entry.authPublicKey as EncodedAuthPublicKey,
-                          participantIndex: entry.participantIndex,
-                          transportPublicKey:
-                              entry.transportPublicKey as EncodedTransportPublicKey,
-                      })),
-                  ),
+        rosterHash && !poll.isOpen
+            ? createElectionManifest({
+                  rosterHash,
                   optionList: poll.choices.map(({ choiceName }) => choiceName),
-                  epochDeadlines: [normalizeDatabaseTimestamp(poll.createdAt)],
-              } satisfies ElectionManifest)
+              })
             : null;
     const manifestHash = manifest ? await hashElectionManifest(manifest) : null;
     const sessionId =
-        manifest && manifestHash
+        manifest && manifestHash && rosterHash
             ? await deriveSessionId(
                   manifestHash,
-                  manifest.rosterHash,
+                  rosterHash,
                   poll.id,
                   normalizeDatabaseTimestamp(poll.createdAt),
               )
             : null;
-    const requestedThresholdError = poll.isOpen
-        ? null
-        : getRequestedThresholdError(
-              thresholds.reconstructionThreshold,
-              poll.requestedMinimumPublishedVoterCount,
-              participantCount,
-          );
-    const setupDigest = findPhaseDigest(
-        classifiedBoard.boardAudit.phaseDigests,
-        0,
+
+    const acceptedPayloads = classifiedBoard.acceptedPayloads;
+    const acceptedRegistrationCount = countAcceptedMessages(
+        acceptedPayloads,
+        'registration',
     );
-    const sessionFingerprint = setupDigest
-        ? formatSessionFingerprint(setupDigest)
+    const acceptedEncryptedBallotCount = countAcceptedMessages(
+        acceptedPayloads,
+        'ballot-submission',
+    );
+    const acceptedDecryptionShareCount = countAcceptedMessages(
+        acceptedPayloads,
+        'decryption-share',
+    );
+    const completeEncryptedBallotParticipantCount =
+        countCompleteBallotParticipants({
+            acceptedPayloads,
+            optionCount: poll.choices.length,
+        });
+    const reconstructionThreshold =
+        thresholds.reconstructionThreshold ??
+        (participantCount >= minimumSupportedParticipantCount
+            ? majorityThreshold(participantCount)
+            : null);
+    const hasBallotClose = acceptedPayloads.some((payload) =>
+        isSignedPayloadOfType(payload, 'ballot-close'),
+    );
+    const revealReady =
+        !poll.isOpen &&
+        reconstructionThreshold !== null &&
+        completeEncryptedBallotParticipantCount >= reconstructionThreshold &&
+        !hasBallotClose;
+
+    const verificationSummary = await buildVerificationSummary({
+        acceptedPayloads,
+        manifest,
+        sessionId,
+    });
+    const sessionFingerprint = classifiedBoard.boardAudit.ceremonyDigest
+        ? formatSessionFingerprint(classifiedBoard.boardAudit.ceremonyDigest)
         : sessionId
           ? formatSessionFingerprint(sessionId)
           : null;
-    const verificationSummary = await buildVerificationSummary({
-        acceptedPayloads: classifiedBoard.acceptedPayloads,
-        manifest,
-        manifestHash,
-        requestedThresholdError,
-        sessionId,
-    });
 
     return {
         id: poll.id,
@@ -621,15 +592,21 @@ export const getPollFetchReadModel = async (
         manifestHash,
         sessionId,
         sessionFingerprint,
-        joinedParticipantCount: participantCount,
-        minimumStartParticipantCount: minimumSupportedParticipantCount,
         phase: derivePollPhase({
-            acceptedPayloads: classifiedBoard.acceptedPayloads,
-            dkgAborted: verificationSummary.dkgAborted,
-            dkgCompleted: verificationSummary.dkgCompleted,
+            hasBallotClose,
             isOpen: poll.isOpen,
-            verificationStatus: verificationSummary.verification.status,
+            revealReady,
+            verification: verificationSummary.verification,
         }),
+        submittedParticipantCount: participantCount,
+        minimumCloseParticipantCount: minimumSupportedParticipantCount,
+        ceremony: {
+            acceptedDecryptionShareCount,
+            acceptedEncryptedBallotCount,
+            acceptedRegistrationCount,
+            completeEncryptedBallotParticipantCount,
+            revealReady,
+        },
         boardAudit: classifiedBoard.boardAudit,
         verification: verificationSummary.verification,
         boardEntries: classifiedBoard.records,
@@ -660,9 +637,7 @@ export const findAcceptedRegistrationPayload = async (
     db: ReadOnlyDatabase,
     pollId: string,
     participantIndex: number,
-): Promise<SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'registration' }>
-> | null> => {
+): Promise<SignedPayload<RegistrationPayload> | null> => {
     const rows = await getBoardMessageRows(db, pollId);
     const classifiedBoard = await classifyBoardMessages(rows);
 
@@ -683,5 +658,11 @@ export const getAcceptedManifestPublication = async (
 ): Promise<SignedPayload<ManifestPublicationPayload> | null> => {
     const rows = await getBoardMessageRows(db, pollId);
     const classifiedBoard = await classifyBoardMessages(rows);
-    return findManifestPublication(classifiedBoard.acceptedPayloads);
+    const payload = classifiedBoard.acceptedPayloads.find((signedPayload) =>
+        isSignedPayloadOfType(signedPayload, 'manifest-publication'),
+    );
+
+    return payload && isSignedPayloadOfType(payload, 'manifest-publication')
+        ? payload
+        : null;
 };

@@ -2,13 +2,15 @@ import { expect, test } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
 import {
-    deletePolls,
-    expectBoardCeremonyVisible,
-    expectParticipantsVisible,
-    registerParticipant,
-    reloadPollPage,
-    startVoting,
+    closeVoting,
     createPoll,
+    deletePolls,
+    expectParticipantsVisible,
+    expectSecuringVisible,
+    revealResults,
+    submitVote,
+    waitForReadyToReveal,
+    waitForVerifiedResults,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -26,7 +28,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('completes the open waiting-room and start flow on every required browser project', async ({
+test('completes the full vote-to-results ceremony across three live sessions', async ({
     browser,
     page,
     request,
@@ -42,7 +44,7 @@ test('completes the open waiting-room and start flow on every required browser p
 
     const createdPoll = await createPoll({
         page,
-        pollName: createPollName('Board ceremony flow', namespace),
+        pollName: createPollName('Full ceremony', namespace),
     });
     createdPolls.push(createdPoll);
 
@@ -52,35 +54,42 @@ test('completes the open waiting-room and start flow on every required browser p
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await registerParticipant({
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await registerParticipant({
+        await submitVote({
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [6, 8],
             voterName: participantOneName,
         });
-        await registerParticipant({
+        await submitVote({
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
             voterName: participantTwoName,
         });
 
-        await startVoting(page);
-        await reloadPollPage(page);
-        await reloadPollPage(participantOne.page);
-        await reloadPollPage(participantTwo.page);
-
-        await expectBoardCeremonyVisible(page);
-        await expectBoardCeremonyVisible(participantOne.page);
-        await expectBoardCeremonyVisible(participantTwo.page);
         await expectParticipantsVisible(page, [
             creatorName,
             participantOneName,
             participantTwoName,
         ]);
-        await expectNoAxeViolations(page, 'started poll page');
+        await closeVoting(page);
+        await expectSecuringVisible(page);
+        await expectSecuringVisible(participantOne.page);
+        await expectSecuringVisible(participantTwo.page);
+
+        await waitForReadyToReveal(page);
+        await revealResults(page);
+
+        await waitForVerifiedResults({ page });
+        await waitForVerifiedResults({ page: participantOne.page });
+        await waitForVerifiedResults({ page: participantTwo.page });
+
+        await expectNoAxeViolations(page, 'full vote results page');
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);

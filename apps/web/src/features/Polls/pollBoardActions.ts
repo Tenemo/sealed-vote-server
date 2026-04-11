@@ -1,155 +1,1380 @@
 import type { PollResponse } from '@sealed-vote/contracts';
+import { sortProtocolPayloads } from '@sealed-vote/protocol';
 import {
-    canonicalUnsignedPayloadBytes,
-    type ManifestAcceptancePayload,
-    type ManifestPublicationPayload,
-    type ProtocolPayload,
-    type RegistrationPayload,
+    combineDecryptionShares,
+    createBallotClosePayload,
+    createBallotSubmissionPayload,
+    createDLEQProof,
+    createDecryptionSharePayload,
+    createDisjunctiveProof,
+    createEncryptedDualSharePayload,
+    createFeldmanCommitmentPayload,
+    createKeyDerivationConfirmationPayload,
+    createManifestAcceptancePayload,
+    createManifestPublicationPayload,
+    createPedersenCommitmentPayload,
+    createRegistrationPayload,
+    createSchnorrProof,
+    createTallyPublicationPayload,
+    createVerifiedDecryptionShare,
+    decodePedersenShareEnvelope,
+    decryptEnvelope,
+    deriveJointPublicKey,
+    derivePedersenShares,
+    deriveTranscriptVerificationKey,
+    encodePedersenShareEnvelope,
+    encryptAdditiveWithRandomness,
+    encryptEnvelope,
+    generateFeldmanCommitments,
+    generatePedersenCommitments,
+    hashProtocolTranscript,
+    majorityThreshold,
+    modQ,
+    RISTRETTO_GROUP,
+    scoreVotingDomain,
+    SHIPPED_PROTOCOL_VERSION,
+    verifyBallotSubmissionPayloadsByOption,
+    verifyDKGTranscript,
+    verifyDLEQProof,
+    verifyFeldmanShare,
+    verifyPedersenShare,
+    type DLEQStatement,
+    type EncodedPoint,
+    type FeldmanCommitments,
+    type PedersenCommitments,
+    type PedersenShare,
+    type ProofContext,
     type SignedPayload,
-    signPayloadBytes,
-    type EncodedAuthPublicKey,
-    type EncodedTransportPublicKey,
 } from 'threshold-elgamal';
 
-import type { StoredPollDeviceState } from './pollDeviceStorage';
+import type { StoredCreatorSession } from './creatorSessionStorage';
+import {
+    importStoredAuthPrivateKey,
+    restoreStoredTransportPrivateKey,
+    updatePollDeviceState,
+    type StoredPollDeviceState,
+} from './pollDeviceStorage';
 import type { StoredVoterSession } from './voterSessionStorage';
 
-type AutoBoardSetupAction =
-    | {
-          kind: 'publish-registration';
-          payload: RegistrationPayload;
-      }
-    | {
-          kind: 'publish-manifest';
-          payload: ManifestPublicationPayload;
-      }
-    | {
-          kind: 'accept-manifest';
-          payload: ManifestAcceptancePayload;
-      };
+const deriveFinalShare = ({
+    contributions,
+    participantIndex,
+}: {
+    contributions: readonly {
+        dealerIndex: number;
+        share: {
+            blindingValue: bigint;
+            index: number;
+            secretValue: bigint;
+        };
+    }[];
+    participantIndex: number;
+}): { index: number; value: bigint } => ({
+    index: participantIndex,
+    value: contributions.reduce(
+        (total, contribution) =>
+            modQ(total + contribution.share.secretValue, RISTRETTO_GROUP.q),
+        0n,
+    ),
+});
 
-const hasAcceptedMessage = (
-    poll: PollResponse,
-    participantIndex: number,
-    messageType: PollResponse['boardEntries'][number]['messageType'],
-): boolean =>
-    poll.boardEntries.some(
-        (entry) =>
-            entry.classification === 'accepted' &&
-            entry.participantIndex === participantIndex &&
-            entry.messageType === messageType,
-    );
+type AutomaticCeremonyActionKind =
+    | 'publish-registration'
+    | 'publish-manifest'
+    | 'accept-manifest'
+    | 'publish-pedersen-commitment'
+    | 'publish-encrypted-share'
+    | 'publish-feldman-commitment'
+    | 'publish-key-confirmation'
+    | 'publish-ballot'
+    | 'publish-decryption-share'
+    | 'publish-tally';
+
+type PreparedCeremonyAction = {
+    kind: AutomaticCeremonyActionKind | 'publish-ballot-close';
+    signedPayload: SignedPayload;
+    slotKey: string;
+};
+
+type LocalDealerState = {
+    blindingPolynomial: readonly bigint[];
+    feldmanCommitments: FeldmanCommitments;
+    pedersenCommitments: PedersenCommitments;
+    secretPolynomial: readonly bigint[];
+    shares: readonly PedersenShare[];
+};
+
+type AcceptedShareContribution = {
+    dealerIndex: number;
+    share: PedersenShare;
+};
+
+const acceptedBoardPayloads = (poll: PollResponse): readonly SignedPayload[] =>
+    poll.boardEntries
+        .filter((entry) => entry.classification === 'accepted')
+        .map((entry) => entry.signedPayload);
+
+const isSignedPayloadOfType = <
+    TPayload extends SignedPayload['payload']['messageType'],
+>(
+    signedPayload: SignedPayload,
+    messageType: TPayload,
+): signedPayload is SignedPayload<
+    Extract<SignedPayload['payload'], { messageType: TPayload }>
+> => signedPayload.payload.messageType === messageType;
 
 const countAcceptedMessages = (
     poll: PollResponse,
-    messageType: PollResponse['boardEntries'][number]['messageType'],
+    messageType: SignedPayload['payload']['messageType'],
 ): number =>
-    poll.boardEntries.filter(
-        (entry) =>
-            entry.classification === 'accepted' &&
-            entry.messageType === messageType,
+    acceptedBoardPayloads(poll).filter((payload) =>
+        isSignedPayloadOfType(payload, messageType),
     ).length;
 
-export const resolveAutoBoardSetupAction = ({
+const getAcceptedPayloadBySlotKey = (
+    poll: PollResponse,
+    slotKey: string,
+): SignedPayload | null =>
+    poll.boardEntries.find(
+        (entry) =>
+            entry.classification === 'accepted' && entry.slotKey === slotKey,
+    )?.signedPayload ?? null;
+
+const getStoredOrAcceptedPayload = ({
     deviceState,
     poll,
-    voterSession,
+    slotKey,
 }: {
-    deviceState: StoredPollDeviceState | null;
+    deviceState: StoredPollDeviceState;
     poll: PollResponse;
-    voterSession: StoredVoterSession | null;
-}): AutoBoardSetupAction | null => {
+    slotKey: string;
+}): SignedPayload | null =>
+    getAcceptedPayloadBySlotKey(poll, slotKey) ??
+    deviceState.pendingPayloads[slotKey] ??
+    null;
+
+const bytesToHex = (bytes: Uint8Array): string =>
+    Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+const decodeLittleEndianScalar = (value: string): bigint => {
+    const bytes = Uint8Array.from(
+        value.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [],
+    );
+
+    return bytes.reduce(
+        (total, byte, index) => total + (BigInt(byte) << (8n * BigInt(index))),
+        0n,
+    );
+};
+
+const sha256Hex = async (value: string): Promise<string> => {
+    const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(value),
+    );
+
+    return bytesToHex(new Uint8Array(digest));
+};
+
+const deriveCoefficient = async ({
+    coefficientIndex,
+    participantIndex,
+    seedHex,
+}: {
+    coefficientIndex: number;
+    participantIndex: number;
+    seedHex: string;
+}): Promise<bigint> => {
+    const material = await sha256Hex(
+        `${seedHex}:${participantIndex}:${coefficientIndex}`,
+    );
+
+    return modQ(BigInt(`0x${material}`), RISTRETTO_GROUP.q - 1n) + 1n;
+};
+
+const derivePolynomial = async ({
+    participantIndex,
+    seedHex,
+    threshold,
+}: {
+    participantIndex: number;
+    seedHex: string;
+    threshold: number;
+}): Promise<readonly bigint[]> =>
+    await Promise.all(
+        Array.from(
+            { length: threshold },
+            async (_value, offset) =>
+                await deriveCoefficient({
+                    coefficientIndex: offset + 1,
+                    participantIndex,
+                    seedHex,
+                }),
+        ),
+    );
+
+const deriveLocalDealerState = async ({
+    deviceState,
+    participantCount,
+    participantIndex,
+    threshold,
+}: {
+    deviceState: StoredPollDeviceState;
+    participantCount: number;
+    participantIndex: number;
+    threshold: number;
+}): Promise<LocalDealerState> => {
+    const secretPolynomial = await derivePolynomial({
+        participantIndex,
+        seedHex: deviceState.dkgSecretSeed,
+        threshold,
+    });
+    const blindingPolynomial = await derivePolynomial({
+        participantIndex,
+        seedHex: deviceState.dkgBlindingSeed,
+        threshold,
+    });
+
+    return {
+        blindingPolynomial,
+        feldmanCommitments: generateFeldmanCommitments(
+            secretPolynomial,
+            RISTRETTO_GROUP,
+        ),
+        pedersenCommitments: generatePedersenCommitments(
+            secretPolynomial,
+            blindingPolynomial,
+            RISTRETTO_GROUP,
+        ),
+        secretPolynomial,
+        shares: derivePedersenShares(
+            secretPolynomial,
+            blindingPolynomial,
+            participantCount,
+            RISTRETTO_GROUP.q,
+        ),
+    };
+};
+
+const pruneAcceptedPendingPayloads = (
+    pollId: string,
+    poll: PollResponse,
+): StoredPollDeviceState | null => {
+    const acceptedSlotKeys = new Set(
+        poll.boardEntries
+            .filter((entry) => entry.classification === 'accepted')
+            .map((entry) => entry.slotKey),
+    );
+
+    return updatePollDeviceState(pollId, (currentState) => ({
+        ...currentState,
+        pendingPayloads: Object.fromEntries(
+            Object.entries(currentState.pendingPayloads).filter(
+                ([slotKey]) => !acceptedSlotKeys.has(slotKey),
+            ),
+        ),
+    }));
+};
+
+const persistPendingPayload = (
+    pollId: string,
+    slotKey: string,
+    signedPayload: SignedPayload,
+): void => {
+    updatePollDeviceState(pollId, (currentState) => ({
+        ...currentState,
+        pendingPayloads: {
+            ...currentState.pendingPayloads,
+            [slotKey]: signedPayload,
+        },
+    }));
+};
+
+const clearPendingPayload = (pollId: string, slotKey: string): void => {
+    updatePollDeviceState(pollId, (currentState) => ({
+        ...currentState,
+        pendingPayloads: Object.fromEntries(
+            Object.entries(currentState.pendingPayloads).filter(
+                ([currentSlotKey]) => currentSlotKey !== slotKey,
+            ),
+        ),
+    }));
+};
+
+const clearStoredBallot = (pollId: string): void => {
+    updatePollDeviceState(pollId, (currentState) => ({
+        ...currentState,
+        storedBallotScores: null,
+    }));
+};
+
+const getOrCreatePreparedAction = async ({
+    buildSignedPayload,
+    deviceState,
+    kind,
+    poll,
+    slotKey,
+}: {
+    buildSignedPayload: () => Promise<SignedPayload>;
+    deviceState: StoredPollDeviceState;
+    kind: PreparedCeremonyAction['kind'];
+    poll: PollResponse;
+    slotKey: string;
+}): Promise<PreparedCeremonyAction> => {
+    const existingPayload = getStoredOrAcceptedPayload({
+        deviceState,
+        poll,
+        slotKey,
+    });
+
+    if (existingPayload) {
+        return {
+            kind,
+            signedPayload: existingPayload,
+            slotKey,
+        };
+    }
+
+    const signedPayload = await buildSignedPayload();
+    persistPendingPayload(poll.id, slotKey, signedPayload);
+
+    return {
+        kind,
+        signedPayload,
+        slotKey,
+    };
+};
+
+const getAcceptedBallotPayloads = (
+    poll: PollResponse,
+): readonly SignedPayload<
+    Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
+>[] =>
+    acceptedBoardPayloads(poll).filter((payload) =>
+        isSignedPayloadOfType(payload, 'ballot-submission'),
+    ) as readonly SignedPayload<
+        Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
+    >[];
+
+const getAcceptedDecryptionSharePayloads = (
+    poll: PollResponse,
+): readonly SignedPayload<
+    Extract<SignedPayload['payload'], { messageType: 'decryption-share' }>
+>[] =>
+    acceptedBoardPayloads(poll).filter((payload) =>
+        isSignedPayloadOfType(payload, 'decryption-share'),
+    ) as readonly SignedPayload<
+        Extract<SignedPayload['payload'], { messageType: 'decryption-share' }>
+    >[];
+
+const getAcceptedTallyPayloads = (
+    poll: PollResponse,
+): readonly SignedPayload<
+    Extract<SignedPayload['payload'], { messageType: 'tally-publication' }>
+>[] =>
+    acceptedBoardPayloads(poll).filter((payload) =>
+        isSignedPayloadOfType(payload, 'tally-publication'),
+    ) as readonly SignedPayload<
+        Extract<SignedPayload['payload'], { messageType: 'tally-publication' }>
+    >[];
+
+const getAcceptedManifestPublication = (
+    poll: PollResponse,
+): SignedPayload<
+    Extract<SignedPayload['payload'], { messageType: 'manifest-publication' }>
+> | null =>
+    acceptedBoardPayloads(poll).find((payload) =>
+        isSignedPayloadOfType(payload, 'manifest-publication'),
+    ) as SignedPayload<
+        Extract<
+            SignedPayload['payload'],
+            { messageType: 'manifest-publication' }
+        >
+    > | null;
+
+const getAcceptedBallotClose = (
+    poll: PollResponse,
+): SignedPayload<
+    Extract<SignedPayload['payload'], { messageType: 'ballot-close' }>
+> | null =>
+    acceptedBoardPayloads(poll).find((payload) =>
+        isSignedPayloadOfType(payload, 'ballot-close'),
+    ) as SignedPayload<
+        Extract<SignedPayload['payload'], { messageType: 'ballot-close' }>
+    > | null;
+
+const buildEncryptedShareEnvelopeId = (
+    dealerIndex: number,
+    recipientIndex: number,
+): string => `env-${dealerIndex}-${recipientIndex}`;
+
+const getLocalPayloadSlotKey = ({
+    kind,
+    optionIndex,
+    participantIndex,
+    recipientIndex,
+    sessionId,
+}: {
+    kind: PreparedCeremonyAction['kind'];
+    optionIndex?: number;
+    participantIndex: number;
+    recipientIndex?: number;
+    sessionId: string;
+}): string => {
+    switch (kind) {
+        case 'publish-registration':
+            return `${sessionId}:0:${participantIndex}:registration`;
+        case 'publish-manifest':
+            return `${sessionId}:0:${participantIndex}:manifest-publication`;
+        case 'accept-manifest':
+            return `${sessionId}:0:${participantIndex}:manifest-acceptance`;
+        case 'publish-pedersen-commitment':
+            return `${sessionId}:1:${participantIndex}:pedersen-commitment`;
+        case 'publish-encrypted-share':
+            return `${sessionId}:1:${participantIndex}:encrypted-dual-share:${recipientIndex}`;
+        case 'publish-feldman-commitment':
+            return `${sessionId}:3:${participantIndex}:feldman-commitment`;
+        case 'publish-key-confirmation':
+            return `${sessionId}:4:${participantIndex}:key-derivation-confirmation`;
+        case 'publish-ballot':
+            return `${sessionId}:5:${participantIndex}:ballot-submission:${optionIndex}`;
+        case 'publish-ballot-close':
+            return `${sessionId}:6:ballot-close`;
+        case 'publish-decryption-share':
+            return `${sessionId}:7:${participantIndex}:decryption-share:${optionIndex}`;
+        case 'publish-tally':
+            return `${sessionId}:8:${participantIndex}:tally-publication:${optionIndex}`;
+        default:
+            return `${sessionId}:${participantIndex}:${kind}`;
+    }
+};
+
+const deriveBallotParticipantSet = ({
+    ballotPayloads,
+    optionCount,
+}: {
+    ballotPayloads: readonly SignedPayload<
+        Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
+    >[];
+    optionCount: number;
+}): readonly number[] => {
+    const optionsByParticipant = new Map<number, Set<number>>();
+
+    for (const payload of ballotPayloads) {
+        const optionIndices =
+            optionsByParticipant.get(payload.payload.participantIndex) ??
+            new Set<number>();
+        optionIndices.add(payload.payload.optionIndex);
+        optionsByParticipant.set(
+            payload.payload.participantIndex,
+            optionIndices,
+        );
+    }
+
+    return [...optionsByParticipant.entries()]
+        .filter(([, optionIndices]) => optionIndices.size === optionCount)
+        .map(([participantIndex]) => participantIndex)
+        .sort((left, right) => left - right);
+};
+
+const buildDkgTranscript = (poll: PollResponse): readonly SignedPayload[] =>
+    acceptedBoardPayloads(poll).filter(
+        (payload) =>
+            !isSignedPayloadOfType(payload, 'ballot-submission') &&
+            !isSignedPayloadOfType(payload, 'ballot-close') &&
+            !isSignedPayloadOfType(payload, 'decryption-share') &&
+            !isSignedPayloadOfType(payload, 'tally-publication'),
+    );
+
+const getVerifiedDkg = async (
+    poll: PollResponse,
+): Promise<Awaited<ReturnType<typeof verifyDKGTranscript>> | null> => {
+    if (!poll.manifest || !poll.sessionId) {
+        return null;
+    }
+
     if (
-        poll.isOpen ||
-        !deviceState ||
-        !voterSession ||
-        !poll.manifest ||
-        !poll.manifestHash ||
-        !poll.sessionId
+        countAcceptedMessages(poll, 'key-derivation-confirmation') <
+        poll.submittedParticipantCount
     ) {
         return null;
     }
 
-    const participantIndex = voterSession.voterIndex;
-    const acceptedRegistrationCount = countAcceptedMessages(
-        poll,
-        'registration',
-    );
-    const hasAcceptedRegistration = hasAcceptedMessage(
-        poll,
-        participantIndex,
-        'registration',
+    return await verifyDKGTranscript({
+        transcript: buildDkgTranscript(poll),
+        manifest: poll.manifest,
+        sessionId: poll.sessionId,
+    });
+};
+
+const buildFeldmanProofs = async ({
+    commitments,
+    manifestHash,
+    participantIndex,
+    secretPolynomial,
+    sessionId,
+}: {
+    commitments: readonly EncodedPoint[];
+    manifestHash: string;
+    participantIndex: number;
+    secretPolynomial: readonly bigint[];
+    sessionId: string;
+}): Promise<
+    readonly {
+        coefficientIndex: number;
+        challenge: bigint;
+        response: bigint;
+    }[]
+> =>
+    await Promise.all(
+        secretPolynomial.map(async (coefficient, offset) => {
+            const coefficientIndex = offset + 1;
+            const context: ProofContext = {
+                protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                suiteId: RISTRETTO_GROUP.name,
+                manifestHash,
+                sessionId,
+                label: 'feldman-coefficient-proof',
+                participantIndex,
+                coefficientIndex,
+            };
+            const proof = await createSchnorrProof(
+                coefficient,
+                commitments[offset],
+                RISTRETTO_GROUP,
+                context,
+            );
+
+            return {
+                coefficientIndex,
+                challenge: proof.challenge,
+                response: proof.response,
+            };
+        }),
     );
 
-    if (!hasAcceptedRegistration) {
-        return {
-            kind: 'publish-registration',
-            payload: {
-                sessionId: poll.sessionId,
-                manifestHash: poll.manifestHash,
-                phase: 0,
-                participantIndex,
-                messageType: 'registration',
-                rosterHash: poll.manifest.rosterHash,
-                authPublicKey:
-                    deviceState.authPublicKey as EncodedAuthPublicKey,
-                transportPublicKey:
-                    deviceState.transportPublicKey as EncodedTransportPublicKey,
+const deriveLocalAcceptedShareContributions = async ({
+    deviceState,
+    poll,
+    verifiedDkg,
+}: {
+    deviceState: StoredPollDeviceState;
+    poll: PollResponse;
+    verifiedDkg: Awaited<ReturnType<typeof verifyDKGTranscript>>;
+}): Promise<AcceptedShareContribution[]> => {
+    const participantIndex = deviceState.voterIndex;
+    const threshold = majorityThreshold(poll.submittedParticipantCount);
+    const localDealerState = await deriveLocalDealerState({
+        deviceState,
+        participantCount: poll.submittedParticipantCount,
+        participantIndex,
+        threshold,
+    });
+    const transportPrivateKey =
+        await restoreStoredTransportPrivateKey(deviceState);
+    const encryptedShares = acceptedBoardPayloads(poll).filter((payload) =>
+        isSignedPayloadOfType(payload, 'encrypted-dual-share'),
+    );
+    const pedersenCommitmentsByDealer = new Map(
+        acceptedBoardPayloads(poll)
+            .filter((payload) =>
+                isSignedPayloadOfType(payload, 'pedersen-commitment'),
+            )
+            .map((payload) => [
+                payload.payload.participantIndex,
+                payload.payload.commitments as readonly EncodedPoint[],
+            ]),
+    );
+    const feldmanCommitmentsByDealer = new Map(
+        verifiedDkg.feldmanCommitments.map((entry) => [
+            entry.dealerIndex,
+            entry.commitments,
+        ]),
+    );
+
+    const contributions: AcceptedShareContribution[] = [
+        {
+            dealerIndex: participantIndex,
+            share: localDealerState.shares[participantIndex - 1],
+        },
+    ];
+
+    for (const dealerIndex of verifiedDkg.qual) {
+        if (dealerIndex === participantIndex) {
+            continue;
+        }
+
+        const envelopePayload = encryptedShares.find(
+            (payload) =>
+                payload.payload.participantIndex === dealerIndex &&
+                payload.payload.recipientIndex === participantIndex,
+        );
+
+        if (!envelopePayload) {
+            throw new Error(
+                `Missing encrypted share payload from dealer ${dealerIndex} for participant ${participantIndex}.`,
+            );
+        }
+
+        const plaintext = await decryptEnvelope(
+            {
+                sessionId: envelopePayload.payload.sessionId,
+                rosterHash: poll.manifest!.rosterHash,
+                phase: envelopePayload.payload.phase,
+                dealerIndex,
+                recipientIndex: participantIndex,
+                envelopeId: envelopePayload.payload.envelopeId,
+                payloadType: 'encrypted-dual-share',
+                protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                suite: envelopePayload.payload.suite,
+                ephemeralPublicKey: envelopePayload.payload.ephemeralPublicKey,
+                iv: envelopePayload.payload.iv,
+                ciphertext: envelopePayload.payload.ciphertext,
             },
-        };
+            transportPrivateKey,
+        );
+        const share = decodePedersenShareEnvelope(
+            plaintext,
+            participantIndex,
+            `dealer-${dealerIndex}`,
+        );
+        const pedersenCommitments =
+            pedersenCommitmentsByDealer.get(dealerIndex);
+        const feldmanCommitments = feldmanCommitmentsByDealer.get(dealerIndex);
+
+        if (
+            !pedersenCommitments ||
+            !verifyPedersenShare(
+                share,
+                { commitments: pedersenCommitments },
+                RISTRETTO_GROUP,
+            )
+        ) {
+            throw new Error(
+                `Pedersen verification failed for dealer ${dealerIndex}.`,
+            );
+        }
+
+        if (
+            !feldmanCommitments ||
+            !verifyFeldmanShare(
+                {
+                    index: participantIndex,
+                    value: share.secretValue,
+                },
+                { commitments: feldmanCommitments },
+                RISTRETTO_GROUP,
+            )
+        ) {
+            throw new Error(
+                `Feldman verification failed for dealer ${dealerIndex}.`,
+            );
+        }
+
+        contributions.push({
+            dealerIndex,
+            share,
+        });
     }
 
-    const manifestPublisherIndex = poll.rosterEntries[0]?.participantIndex ?? 1;
-    const hasAcceptedManifestPublication = poll.boardEntries.some(
-        (entry) =>
-            entry.classification === 'accepted' &&
-            entry.messageType === 'manifest-publication',
+    return contributions;
+};
+
+const buildVerifiedBallotsForReveal = async ({
+    poll,
+    verifiedDkg,
+}: {
+    poll: PollResponse;
+    verifiedDkg: Awaited<ReturnType<typeof verifyDKGTranscript>>;
+}): Promise<Awaited<
+    ReturnType<typeof verifyBallotSubmissionPayloadsByOption>
+> | null> => {
+    const ballotClosePayload = getAcceptedBallotClose(poll);
+
+    const manifest = poll.manifest;
+    const sessionId = poll.sessionId;
+
+    if (!ballotClosePayload || !manifest || !sessionId) {
+        return null;
+    }
+
+    const countedSet = new Set(
+        ballotClosePayload.payload.includedParticipantIndices,
     );
+    const countedBallotPayloads = getAcceptedBallotPayloads(poll).filter(
+        (payload) => countedSet.has(payload.payload.participantIndex),
+    );
+
+    return await verifyBallotSubmissionPayloadsByOption({
+        ballotPayloads: countedBallotPayloads,
+        publicKey: verifiedDkg.derivedPublicKey,
+        manifest,
+        sessionId,
+    });
+};
+
+const parseCompactProof = (proof: {
+    challenge: string;
+    response: string;
+}): { challenge: bigint; response: bigint } => ({
+    challenge: decodeLittleEndianScalar(proof.challenge),
+    response: decodeLittleEndianScalar(proof.response),
+});
+
+export const resolveAutomaticCeremonyAction = async ({
+    creatorSession,
+    deviceState,
+    poll,
+    voterSession,
+}: {
+    creatorSession: StoredCreatorSession | null;
+    deviceState: StoredPollDeviceState | null;
+    poll: PollResponse;
+    voterSession: StoredVoterSession | null;
+}): Promise<PreparedCeremonyAction | null> => {
+    if (!deviceState || !voterSession) {
+        return null;
+    }
+
+    const manifest = poll.manifest;
+    const manifestHash = poll.manifestHash;
+    const sessionId = poll.sessionId;
+
+    if (!manifest || !manifestHash || !sessionId) {
+        return null;
+    }
+
+    pruneAcceptedPendingPayloads(poll.id, poll);
+
+    const participantIndex = voterSession.voterIndex;
+    const authPrivateKey = await importStoredAuthPrivateKey(
+        deviceState.authPrivateKeyPkcs8,
+    );
+    const threshold = majorityThreshold(poll.submittedParticipantCount);
+    const localDealerState = await deriveLocalDealerState({
+        deviceState,
+        participantCount: poll.submittedParticipantCount,
+        participantIndex,
+        threshold,
+    });
+    const acceptedPayloads = acceptedBoardPayloads(poll);
+
+    const registrationSlotKey = getLocalPayloadSlotKey({
+        kind: 'publish-registration',
+        participantIndex,
+        sessionId,
+    });
+
+    if (!getAcceptedPayloadBySlotKey(poll, registrationSlotKey)) {
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () =>
+                await createRegistrationPayload(authPrivateKey, {
+                    authPublicKey: deviceState.authPublicKey as never,
+                    manifestHash,
+                    participantIndex,
+                    rosterHash: manifest.rosterHash,
+                    sessionId,
+                    transportPublicKey: deviceState.transportPublicKey as never,
+                }),
+            deviceState,
+            kind: 'publish-registration',
+            poll,
+            slotKey: registrationSlotKey,
+        });
+    }
+
+    const manifestPublication = getAcceptedManifestPublication(poll);
+    const creatorIsLocalParticipant =
+        creatorSession?.pollId === poll.id && deviceState.isCreatorParticipant;
 
     if (
-        participantIndex === manifestPublisherIndex &&
-        acceptedRegistrationCount === poll.joinedParticipantCount &&
-        !hasAcceptedManifestPublication
+        creatorIsLocalParticipant &&
+        countAcceptedMessages(poll, 'registration') ===
+            poll.submittedParticipantCount &&
+        !manifestPublication
     ) {
-        return {
+        const slotKey = getLocalPayloadSlotKey({
             kind: 'publish-manifest',
-            payload: {
-                sessionId: poll.sessionId,
-                manifestHash: poll.manifestHash,
-                phase: 0,
-                participantIndex,
-                messageType: 'manifest-publication',
-                manifest: poll.manifest,
-            },
-        };
+            participantIndex,
+            sessionId,
+        });
+
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () =>
+                await createManifestPublicationPayload(authPrivateKey, {
+                    manifest,
+                    manifestHash,
+                    participantIndex,
+                    sessionId,
+                }),
+            deviceState,
+            kind: 'publish-manifest',
+            poll,
+            slotKey,
+        });
     }
 
-    const hasAcceptedManifestAcceptance = hasAcceptedMessage(
-        poll,
-        participantIndex,
-        'manifest-acceptance',
-    );
-
-    if (hasAcceptedManifestPublication && !hasAcceptedManifestAcceptance) {
-        return {
+    if (manifestPublication) {
+        const manifestAcceptanceSlotKey = getLocalPayloadSlotKey({
             kind: 'accept-manifest',
-            payload: {
-                sessionId: poll.sessionId,
-                manifestHash: poll.manifestHash,
-                phase: 0,
-                participantIndex,
-                messageType: 'manifest-acceptance',
-                rosterHash: poll.manifest.rosterHash,
-                assignedParticipantIndex: participantIndex,
+            participantIndex,
+            sessionId,
+        });
+
+        if (!getAcceptedPayloadBySlotKey(poll, manifestAcceptanceSlotKey)) {
+            return await getOrCreatePreparedAction({
+                buildSignedPayload: async () =>
+                    await createManifestAcceptancePayload(authPrivateKey, {
+                        assignedParticipantIndex: participantIndex,
+                        manifestHash,
+                        participantIndex,
+                        rosterHash: manifest.rosterHash,
+                        sessionId,
+                    }),
+                deviceState,
+                kind: 'accept-manifest',
+                poll,
+                slotKey: manifestAcceptanceSlotKey,
+            });
+        }
+    } else {
+        return null;
+    }
+
+    if (
+        countAcceptedMessages(poll, 'manifest-acceptance') <
+        poll.submittedParticipantCount
+    ) {
+        return null;
+    }
+
+    const pedersenSlotKey = getLocalPayloadSlotKey({
+        kind: 'publish-pedersen-commitment',
+        participantIndex,
+        sessionId,
+    });
+
+    if (!getAcceptedPayloadBySlotKey(poll, pedersenSlotKey)) {
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () =>
+                await createPedersenCommitmentPayload(authPrivateKey, {
+                    sessionId,
+                    manifestHash,
+                    participantIndex,
+                    commitments:
+                        localDealerState.pedersenCommitments.commitments,
+                }),
+            deviceState,
+            kind: 'publish-pedersen-commitment',
+            poll,
+            slotKey: pedersenSlotKey,
+        });
+    }
+
+    for (const recipient of poll.rosterEntries) {
+        if (recipient.participantIndex === participantIndex) {
+            continue;
+        }
+
+        const slotKey = getLocalPayloadSlotKey({
+            kind: 'publish-encrypted-share',
+            participantIndex,
+            recipientIndex: recipient.participantIndex,
+            sessionId,
+        });
+
+        if (getAcceptedPayloadBySlotKey(poll, slotKey)) {
+            continue;
+        }
+
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () => {
+                const envelopeId = buildEncryptedShareEnvelopeId(
+                    participantIndex,
+                    recipient.participantIndex,
+                );
+                const plaintext = new TextEncoder().encode(
+                    encodePedersenShareEnvelope(
+                        localDealerState.shares[recipient.participantIndex - 1],
+                        RISTRETTO_GROUP.byteLength,
+                    ),
+                );
+                const { envelope } = await encryptEnvelope(
+                    plaintext,
+                    recipient.transportPublicKey as never,
+                    {
+                        sessionId,
+                        rosterHash: manifest.rosterHash,
+                        phase: 1,
+                        dealerIndex: participantIndex,
+                        recipientIndex: recipient.participantIndex,
+                        envelopeId,
+                        payloadType: 'encrypted-dual-share',
+                        protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                        suite: 'X25519',
+                    },
+                );
+
+                return await createEncryptedDualSharePayload(authPrivateKey, {
+                    sessionId,
+                    manifestHash,
+                    participantIndex,
+                    recipientIndex: recipient.participantIndex,
+                    envelopeId: envelope.envelopeId,
+                    suite: envelope.suite,
+                    ephemeralPublicKey: envelope.ephemeralPublicKey,
+                    iv: envelope.iv,
+                    ciphertext: envelope.ciphertext,
+                });
             },
-        };
+            deviceState,
+            kind: 'publish-encrypted-share',
+            poll,
+            slotKey,
+        });
+    }
+
+    if (
+        countAcceptedMessages(poll, 'pedersen-commitment') <
+            poll.submittedParticipantCount ||
+        countAcceptedMessages(poll, 'encrypted-dual-share') <
+            poll.submittedParticipantCount *
+                (poll.submittedParticipantCount - 1)
+    ) {
+        return null;
+    }
+
+    const feldmanSlotKey = getLocalPayloadSlotKey({
+        kind: 'publish-feldman-commitment',
+        participantIndex,
+        sessionId,
+    });
+
+    if (!getAcceptedPayloadBySlotKey(poll, feldmanSlotKey)) {
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () =>
+                await createFeldmanCommitmentPayload(authPrivateKey, {
+                    sessionId,
+                    manifestHash,
+                    participantIndex,
+                    commitments:
+                        localDealerState.feldmanCommitments.commitments,
+                    proofs: await buildFeldmanProofs({
+                        commitments:
+                            localDealerState.feldmanCommitments.commitments,
+                        manifestHash,
+                        participantIndex,
+                        secretPolynomial: localDealerState.secretPolynomial,
+                        sessionId,
+                    }),
+                }),
+            deviceState,
+            kind: 'publish-feldman-commitment',
+            poll,
+            slotKey: feldmanSlotKey,
+        });
+    }
+
+    if (
+        countAcceptedMessages(poll, 'feldman-commitment') <
+        poll.submittedParticipantCount
+    ) {
+        return null;
+    }
+
+    const keyConfirmationSlotKey = getLocalPayloadSlotKey({
+        kind: 'publish-key-confirmation',
+        participantIndex,
+        sessionId,
+    });
+
+    if (!getAcceptedPayloadBySlotKey(poll, keyConfirmationSlotKey)) {
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () => {
+                const dkgTranscriptWithoutConfirmations =
+                    acceptedPayloads.filter(
+                        (payload) =>
+                            payload.payload.messageType !==
+                            'key-derivation-confirmation',
+                    );
+                const qualHash = await hashProtocolTranscript(
+                    sortProtocolPayloads(
+                        dkgTranscriptWithoutConfirmations.map(
+                            (payload) => payload.payload,
+                        ),
+                    ),
+                );
+                const feldmanCommitments = acceptedPayloads
+                    .filter((payload) =>
+                        isSignedPayloadOfType(payload, 'feldman-commitment'),
+                    )
+                    .map((payload) => ({
+                        dealerIndex: payload.payload.participantIndex,
+                        commitments: payload.payload
+                            .commitments as readonly EncodedPoint[],
+                    }));
+
+                return await createKeyDerivationConfirmationPayload(
+                    authPrivateKey,
+                    {
+                        sessionId,
+                        manifestHash,
+                        participantIndex,
+                        qualHash,
+                        publicKey: deriveJointPublicKey(
+                            feldmanCommitments,
+                            RISTRETTO_GROUP,
+                        ),
+                    },
+                );
+            },
+            deviceState,
+            kind: 'publish-key-confirmation',
+            poll,
+            slotKey: keyConfirmationSlotKey,
+        });
+    }
+
+    const verifiedDkg = await getVerifiedDkg(poll);
+    if (!verifiedDkg) {
+        return null;
+    }
+
+    const ballotScores = deviceState.storedBallotScores;
+    if (ballotScores && ballotScores.length === poll.choices.length) {
+        for (let offset = 0; offset < ballotScores.length; offset += 1) {
+            const optionIndex = offset + 1;
+            const slotKey = getLocalPayloadSlotKey({
+                kind: 'publish-ballot',
+                optionIndex,
+                participantIndex,
+                sessionId,
+            });
+
+            if (getAcceptedPayloadBySlotKey(poll, slotKey)) {
+                continue;
+            }
+
+            return await getOrCreatePreparedAction({
+                buildSignedPayload: async () => {
+                    const vote = BigInt(ballotScores[offset]);
+                    const randomness = await deriveCoefficient({
+                        coefficientIndex: optionIndex,
+                        participantIndex,
+                        seedHex: deviceState.dkgSecretSeed,
+                    });
+                    const ciphertext = encryptAdditiveWithRandomness(
+                        vote,
+                        verifiedDkg.derivedPublicKey,
+                        randomness,
+                        10n,
+                    );
+                    const context: ProofContext = {
+                        protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                        suiteId: RISTRETTO_GROUP.name,
+                        manifestHash,
+                        sessionId,
+                        label: 'ballot-range-proof',
+                        voterIndex: participantIndex,
+                        optionIndex,
+                    };
+                    const proof = await createDisjunctiveProof(
+                        vote,
+                        randomness,
+                        ciphertext,
+                        verifiedDkg.derivedPublicKey,
+                        scoreVotingDomain(),
+                        RISTRETTO_GROUP,
+                        context,
+                    );
+
+                    return await createBallotSubmissionPayload(authPrivateKey, {
+                        sessionId,
+                        manifestHash,
+                        participantIndex,
+                        optionIndex,
+                        ciphertext,
+                        proof,
+                    });
+                },
+                deviceState,
+                kind: 'publish-ballot',
+                poll,
+                slotKey,
+            });
+        }
+
+        clearStoredBallot(poll.id);
+    }
+
+    const ballotClosePayload = getAcceptedBallotClose(poll);
+    if (!ballotClosePayload) {
+        return null;
+    }
+
+    if (
+        !ballotClosePayload.payload.includedParticipantIndices.includes(
+            participantIndex,
+        )
+    ) {
+        return null;
+    }
+
+    const verifiedBallotsByOption = await buildVerifiedBallotsForReveal({
+        poll,
+        verifiedDkg,
+    });
+
+    if (!verifiedBallotsByOption) {
+        return null;
+    }
+
+    const localContributions = await deriveLocalAcceptedShareContributions({
+        deviceState,
+        poll,
+        verifiedDkg,
+    });
+    const finalShare = deriveFinalShare({
+        contributions: localContributions,
+        participantIndex,
+    });
+
+    for (const optionBallots of verifiedBallotsByOption) {
+        const slotKey = getLocalPayloadSlotKey({
+            kind: 'publish-decryption-share',
+            optionIndex: optionBallots.optionIndex,
+            participantIndex,
+            sessionId,
+        });
+
+        if (getAcceptedPayloadBySlotKey(poll, slotKey)) {
+            continue;
+        }
+
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () => {
+                const verifiedShare = createVerifiedDecryptionShare(
+                    optionBallots.aggregate,
+                    finalShare,
+                );
+                const statement: DLEQStatement = {
+                    publicKey: deriveTranscriptVerificationKey(
+                        verifiedDkg.feldmanCommitments,
+                        participantIndex,
+                        RISTRETTO_GROUP,
+                    ),
+                    ciphertext: optionBallots.aggregate.ciphertext,
+                    decryptionShare: verifiedShare.value,
+                };
+                const context: ProofContext = {
+                    protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                    suiteId: RISTRETTO_GROUP.name,
+                    manifestHash,
+                    sessionId,
+                    label: 'decryption-share-dleq',
+                    participantIndex,
+                    optionIndex: optionBallots.optionIndex,
+                };
+                const proof = await createDLEQProof(
+                    finalShare.value,
+                    statement,
+                    RISTRETTO_GROUP,
+                    context,
+                );
+
+                return await createDecryptionSharePayload(authPrivateKey, {
+                    sessionId,
+                    manifestHash,
+                    participantIndex,
+                    optionIndex: optionBallots.optionIndex,
+                    transcriptHash: optionBallots.aggregate.transcriptHash,
+                    ballotCount: optionBallots.aggregate.ballotCount,
+                    decryptionShare: verifiedShare.value,
+                    proof,
+                });
+            },
+            deviceState,
+            kind: 'publish-decryption-share',
+            poll,
+            slotKey,
+        });
+    }
+
+    if (!creatorIsLocalParticipant) {
+        return null;
+    }
+
+    const acceptedDecryptionSharePayloads =
+        getAcceptedDecryptionSharePayloads(poll);
+    const acceptedTallyPayloads = getAcceptedTallyPayloads(poll);
+
+    for (const optionBallots of verifiedBallotsByOption) {
+        const slotKey = getLocalPayloadSlotKey({
+            kind: 'publish-tally',
+            optionIndex: optionBallots.optionIndex,
+            participantIndex,
+            sessionId,
+        });
+
+        if (getAcceptedPayloadBySlotKey(poll, slotKey)) {
+            continue;
+        }
+
+        if (
+            acceptedTallyPayloads.some(
+                (payload) =>
+                    payload.payload.optionIndex === optionBallots.optionIndex,
+            )
+        ) {
+            continue;
+        }
+
+        const validShares = await Promise.all(
+            acceptedDecryptionSharePayloads
+                .filter(
+                    (payload) =>
+                        payload.payload.optionIndex ===
+                        optionBallots.optionIndex,
+                )
+                .map(async (payload) => {
+                    const statement: DLEQStatement = {
+                        publicKey: deriveTranscriptVerificationKey(
+                            verifiedDkg.feldmanCommitments,
+                            payload.payload.participantIndex,
+                            RISTRETTO_GROUP,
+                        ),
+                        ciphertext: optionBallots.aggregate.ciphertext,
+                        decryptionShare: payload.payload.decryptionShare,
+                    };
+                    const context: ProofContext = {
+                        protocolVersion: SHIPPED_PROTOCOL_VERSION,
+                        suiteId: RISTRETTO_GROUP.name,
+                        manifestHash,
+                        sessionId,
+                        label: 'decryption-share-dleq',
+                        participantIndex: payload.payload.participantIndex,
+                        optionIndex: optionBallots.optionIndex,
+                    };
+                    const verified = await verifyDLEQProof(
+                        parseCompactProof(payload.payload.proof),
+                        statement,
+                        RISTRETTO_GROUP,
+                        context,
+                    );
+
+                    return verified
+                        ? {
+                              index: payload.payload.participantIndex,
+                              value: payload.payload.decryptionShare,
+                          }
+                        : null;
+                }),
+        );
+
+        const selectedShares = validShares
+            .filter(
+                (share): share is { index: number; value: EncodedPoint } =>
+                    share !== null,
+            )
+            .sort((left, right) => left.index - right.index)
+            .slice(0, threshold);
+
+        if (selectedShares.length < threshold) {
+            return null;
+        }
+
+        return await getOrCreatePreparedAction({
+            buildSignedPayload: async () =>
+                await createTallyPublicationPayload(authPrivateKey, {
+                    sessionId,
+                    manifestHash,
+                    participantIndex,
+                    optionIndex: optionBallots.optionIndex,
+                    transcriptHash: optionBallots.aggregate.transcriptHash,
+                    ballotCount: optionBallots.aggregate.ballotCount,
+                    tally: combineDecryptionShares(
+                        optionBallots.aggregate.ciphertext,
+                        selectedShares,
+                        BigInt(optionBallots.aggregate.ballotCount) * 10n,
+                    ),
+                    decryptionParticipantIndices: selectedShares.map(
+                        (share) => share.index,
+                    ),
+                }),
+            deviceState,
+            kind: 'publish-tally',
+            poll,
+            slotKey,
+        });
     }
 
     return null;
 };
 
-export const describeAutoBoardSetupAction = (
-    action: AutoBoardSetupAction | null,
+export const createRevealBallotCloseAction = async ({
+    creatorSession,
+    deviceState,
+    poll,
+    voterSession,
+}: {
+    creatorSession: StoredCreatorSession | null;
+    deviceState: StoredPollDeviceState | null;
+    poll: PollResponse;
+    voterSession: StoredVoterSession | null;
+}): Promise<PreparedCeremonyAction | null> => {
+    const manifestHash = poll.manifestHash;
+    const sessionId = poll.sessionId;
+
+    if (
+        !creatorSession ||
+        !deviceState ||
+        !deviceState.isCreatorParticipant ||
+        !voterSession ||
+        !manifestHash ||
+        !sessionId ||
+        creatorSession.pollId !== poll.id
+    ) {
+        return null;
+    }
+
+    const participantIndices = deriveBallotParticipantSet({
+        ballotPayloads: getAcceptedBallotPayloads(poll),
+        optionCount: poll.choices.length,
+    });
+
+    if (
+        participantIndices.length <
+        majorityThreshold(poll.submittedParticipantCount)
+    ) {
+        return null;
+    }
+
+    const slotKey = getLocalPayloadSlotKey({
+        kind: 'publish-ballot-close',
+        participantIndex: voterSession.voterIndex,
+        sessionId,
+    });
+    const authPrivateKey = await importStoredAuthPrivateKey(
+        deviceState.authPrivateKeyPkcs8,
+    );
+
+    return await getOrCreatePreparedAction({
+        buildSignedPayload: async () =>
+            await createBallotClosePayload(authPrivateKey, {
+                sessionId,
+                manifestHash,
+                participantIndex: voterSession.voterIndex,
+                includedParticipantIndices: participantIndices,
+            }),
+        deviceState,
+        kind: 'publish-ballot-close',
+        poll,
+        slotKey,
+    });
+};
+
+export const describeAutomaticCeremonyAction = (
+    action: PreparedCeremonyAction | null,
 ): string | null => {
     if (!action) {
         return null;
@@ -157,28 +1382,40 @@ export const describeAutoBoardSetupAction = (
 
     switch (action.kind) {
         case 'publish-registration':
-            return 'Syncing your device registration to the shared ceremony log.';
+            return 'Registering your device on the sealed ceremony board.';
         case 'publish-manifest':
-            return 'Freezing the shared manifest so every participant signs the same ceremony.';
+            return 'Freezing the shared manifest for the final submitted roster.';
         case 'accept-manifest':
-            return 'Confirming the frozen manifest before private setup continues.';
+            return 'Confirming the frozen manifest before secure setup continues.';
+        case 'publish-pedersen-commitment':
+            return 'Publishing your encrypted share commitments.';
+        case 'publish-encrypted-share':
+            return 'Sending your encrypted DKG shares to the rest of the group.';
+        case 'publish-feldman-commitment':
+            return 'Publishing your extracted public commitments and coefficient proofs.';
+        case 'publish-key-confirmation':
+            return 'Confirming the shared public key derived from the DKG transcript.';
+        case 'publish-ballot':
+            return 'Encrypting your stored scores and publishing your ballot.';
+        case 'publish-decryption-share':
+            return 'Publishing your threshold decryption share for the reveal.';
+        case 'publish-tally':
+            return 'Publishing the final verified tally for one option.';
+        case 'publish-ballot-close':
+            return 'Closing the counted ballot set so the results can be opened.';
         default:
             return null;
     }
 };
 
-export const signProtocolPayload = async <TPayload extends ProtocolPayload>({
-    authPrivateKey,
-    payload,
+export const clearCommittedPendingPayload = ({
+    pollId,
+    slotKey,
 }: {
-    authPrivateKey: CryptoKey;
-    payload: TPayload;
-}): Promise<SignedPayload<TPayload>> => ({
-    payload,
-    signature: await signPayloadBytes(
-        authPrivateKey,
-        canonicalUnsignedPayloadBytes(payload),
-    ),
-});
+    pollId: string;
+    slotKey: string;
+}): void => {
+    clearPendingPayload(pollId, slotKey);
+};
 
-export type { AutoBoardSetupAction };
+export type { PreparedCeremonyAction };

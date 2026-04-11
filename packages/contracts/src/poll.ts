@@ -1,4 +1,4 @@
-import type { ElectionManifest, KeyAgreementSuite } from 'threshold-elgamal';
+import type { ElectionManifest } from 'threshold-elgamal';
 
 import type { BoardMessageRecord } from './vote.js';
 
@@ -25,7 +25,7 @@ export type PollRosterEntry = {
     authPublicKey: string;
     participantIndex: number;
     transportPublicKey: string;
-    transportSuite: KeyAgreementSuite;
+    transportSuite: 'X25519';
     voterName: string;
 };
 
@@ -54,11 +54,19 @@ export type PollVerificationSummary = {
 
 export type PollPhase =
     | 'open'
-    | 'preparing'
-    | 'voting'
-    | 'opening-results'
+    | 'securing'
+    | 'ready-to-reveal'
+    | 'revealing'
     | 'complete'
     | 'aborted';
+
+export type PollCeremonySummary = {
+    acceptedDecryptionShareCount: number;
+    acceptedEncryptedBallotCount: number;
+    acceptedRegistrationCount: number;
+    completeEncryptedBallotParticipantCount: number;
+    revealReady: boolean;
+};
 
 export type PollResponse = {
     id: string;
@@ -73,8 +81,9 @@ export type PollResponse = {
     sessionId: string | null;
     sessionFingerprint: string | null;
     phase: PollPhase;
-    joinedParticipantCount: number;
-    minimumStartParticipantCount: number;
+    submittedParticipantCount: number;
+    minimumCloseParticipantCount: number;
+    ceremony: PollCeremonySummary;
     boardAudit: PollBoardAudit;
     verification: PollVerificationSummary;
     boardEntries: BoardMessageRecord[];
@@ -82,8 +91,6 @@ export type PollResponse = {
     thresholds: {
         reconstructionThreshold: number | null;
         minimumPublishedVoterCount: number | null;
-        suggestedReconstructionThreshold: number;
-        strictMajorityFloor: number;
         maxParticipants: number;
         validationTarget: number;
     };
@@ -91,8 +98,9 @@ export type PollResponse = {
 
 export type RegisterVoterRequest = {
     authPublicKey: string;
+    creatorToken?: string;
     transportPublicKey: string;
-    transportSuite: KeyAgreementSuite;
+    transportSuite: 'X25519';
     voterName: string;
     voterToken: string;
 };
@@ -105,9 +113,8 @@ export type RegisterVoterResponse = {
     voterToken: string;
 };
 
-export type StartVotingRequest = {
+export type CloseVotingRequest = {
     creatorToken: string;
-    thresholdPercent: number;
 };
 
 export type RecoverSessionRequest =

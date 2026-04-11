@@ -6,11 +6,11 @@ import {
     type PollResponse,
 } from '@sealed-vote/contracts';
 import {
-    canonicalUnsignedPayloadBytes,
+    createRegistrationPayload,
+    createManifestPublicationPayload,
     exportAuthPublicKey,
     exportTransportPublicKey,
     generateTransportKeyPair,
-    signPayloadBytes,
     type RegistrationPayload,
     type SignedPayload,
 } from 'threshold-elgamal';
@@ -87,35 +87,29 @@ const createClosedPollWithParticipants = async (
 
 const createSignedRegistrationPayload = async ({
     authKeyPair,
+    manifestHash = fixedManifestHash,
     participantIndex,
     rosterHash = fixedRosterHash,
+    sessionId = fixedSessionId,
     transportKeyPair,
 }: {
     authKeyPair: CryptoKeyPair;
+    manifestHash?: string;
     participantIndex: number;
     rosterHash?: string;
+    sessionId?: string;
     transportKeyPair: Awaited<ReturnType<typeof generateTransportKeyPair>>;
 }): Promise<SignedPayload<RegistrationPayload>> => {
-    const payload: RegistrationPayload = {
-        sessionId: fixedSessionId,
-        manifestHash: fixedManifestHash,
-        phase: 0,
+    return await createRegistrationPayload(authKeyPair.privateKey, {
+        sessionId,
+        manifestHash,
         participantIndex,
-        messageType: 'registration',
         rosterHash,
         authPublicKey: await exportAuthPublicKey(authKeyPair.publicKey),
         transportPublicKey: await exportTransportPublicKey(
             transportKeyPair.publicKey,
         ),
-    };
-
-    return {
-        payload,
-        signature: await signPayloadBytes(
-            authKeyPair.privateKey,
-            canonicalUnsignedPayloadBytes(payload),
-        ),
-    };
+    });
 };
 
 describe('Board messages endpoint', () => {
@@ -175,7 +169,7 @@ describe('Board messages endpoint', () => {
             assertionCount += 2;
 
             const poll = await fetchPoll(fastify, pollId);
-            expect(poll.phase).toBe('preparing');
+            expect(poll.phase).toBe('securing');
             expect(poll.boardAudit.acceptedCount).toBe(1);
             expect(poll.boardAudit.duplicateCount).toBe(1);
             expect(poll.boardAudit.equivocationCount).toBe(0);
@@ -328,6 +322,103 @@ describe('Board messages endpoint', () => {
                 message: ERROR_MESSAGES.boardMessagePayloadInvalid,
             });
             assertionCount += 2;
+        } finally {
+            const deleteResult = await deletePoll(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(deleteResult.success).toBe(true);
+            assertionCount += 1;
+            expect(assertionCount).toBeGreaterThan(0);
+        }
+    });
+
+    test('accepts manifest publication once the full frozen registration roster is on the board', async () => {
+        const { pollId, creatorToken, participants } =
+            await createClosedPollWithParticipants(fastify);
+        let assertionCount = 0;
+
+        try {
+            const pollBeforeManifest = await fetchPoll(fastify, pollId);
+
+            expect(pollBeforeManifest.manifest).not.toBeNull();
+            expect(pollBeforeManifest.manifestHash).not.toBeNull();
+            expect(pollBeforeManifest.sessionId).not.toBeNull();
+            assertionCount += 3;
+
+            if (
+                !pollBeforeManifest.manifest ||
+                !pollBeforeManifest.manifestHash ||
+                !pollBeforeManifest.sessionId
+            ) {
+                throw new Error(
+                    'Expected the closed poll to expose a manifest, manifest hash, and session id.',
+                );
+            }
+
+            for (const participant of participants) {
+                const registrationPayload =
+                    await createSignedRegistrationPayload({
+                        authKeyPair: participant.authKeyPair,
+                        manifestHash: pollBeforeManifest.manifestHash,
+                        participantIndex: participant.voterIndex,
+                        rosterHash: pollBeforeManifest.manifest.rosterHash,
+                        sessionId: pollBeforeManifest.sessionId,
+                        transportKeyPair: participant.transportKeyPair,
+                    });
+                const registrationPost = await postBoardMessage(
+                    fastify,
+                    pollId,
+                    {
+                        voterToken: participant.voterToken,
+                        signedPayload: registrationPayload,
+                    },
+                );
+
+                expect(registrationPost.success).toBe(true);
+                assertionCount += 1;
+            }
+
+            const creatorParticipant = participants[0];
+            if (!creatorParticipant) {
+                throw new Error(
+                    'Expected a creator participant to publish the manifest.',
+                );
+            }
+
+            const manifestPublication = await createManifestPublicationPayload(
+                creatorParticipant.authKeyPair.privateKey,
+                {
+                    manifest: pollBeforeManifest.manifest,
+                    manifestHash: pollBeforeManifest.manifestHash,
+                    participantIndex: creatorParticipant.voterIndex,
+                    sessionId: pollBeforeManifest.sessionId,
+                },
+            );
+            const manifestPost = await postBoardMessage(fastify, pollId, {
+                voterToken: creatorParticipant.voterToken,
+                signedPayload: manifestPublication,
+            });
+
+            expect(manifestPost.success).toBe(true);
+            if (!manifestPost.success) {
+                throw new Error(
+                    'Expected manifest publication to be accepted.',
+                );
+            }
+            expect(manifestPost.record.classification).toBe('accepted');
+            assertionCount += 2;
+
+            const pollAfterManifest = await fetchPoll(fastify, pollId);
+
+            expect(pollAfterManifest.phase).toBe('securing');
+            expect(pollAfterManifest.boardAudit.acceptedCount).toBe(4);
+            expect(pollAfterManifest.verification.status).toBe('not-ready');
+            expect(pollAfterManifest.verification.reason).not.toContain(
+                'manifest has not been published',
+            );
+            assertionCount += 4;
         } finally {
             const deleteResult = await deletePoll(
                 fastify,

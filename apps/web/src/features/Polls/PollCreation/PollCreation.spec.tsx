@@ -136,7 +136,7 @@ describe('PollCreation', () => {
         });
     });
 
-    it('explains that the threshold is chosen on the live poll page', () => {
+    it('explains that the threshold is derived automatically after close', () => {
         render(
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
@@ -149,7 +149,7 @@ describe('PollCreation', () => {
 
         expect(
             screen.getByText(
-                /The decryption threshold is chosen on the live poll page/i,
+                /The app derives the honest-majority reconstruction threshold automatically from the final submitted roster after voting closes\./i,
             ),
         ).toBeInTheDocument();
     });

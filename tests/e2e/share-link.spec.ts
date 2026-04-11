@@ -8,7 +8,7 @@ import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createPoll,
     deletePolls,
-    registerParticipant,
+    submitVote,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -50,14 +50,15 @@ test('keeps slug-based poll links shareable across platforms', async ({
             participant.page.getByRole('heading', { name: pollName }),
         ).toBeVisible();
         await expect(
-            participant.page.getByText(/Waiting room open/i),
+            participant.page.getByText(/Voting open/i),
         ).toBeVisible();
         await expect(
-            participant.page.getByRole('heading', { name: 'Join this vote' }),
+            participant.page.getByRole('heading', { name: 'Your next step' }),
         ).toBeVisible();
 
-        await registerParticipant({
+        await submitVote({
             page: participant.page,
+            scores: [8, 6],
             voterName: createVoterName('bob', namespace),
         });
         expectNoUnexpectedErrors(tracker);

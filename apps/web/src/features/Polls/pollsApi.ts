@@ -6,12 +6,12 @@ import {
     type BoardMessagesResponse,
     type CreatePollRequest,
     type CreatePollResponse,
+    type CloseVotingRequest,
     type PollResponse,
     type RecoverSessionRequest,
     type RecoverSessionResponse,
     type RegisterVoterRequest,
     type RegisterVoterResponse,
-    type StartVotingRequest,
 } from '@sealed-vote/contracts';
 
 import { apiBaseUrl } from 'app/apiConfig';
@@ -67,14 +67,14 @@ export const pollsApi = createApi({
                 body: recoveryData,
             }),
         }),
-        startVoting: build.mutation<
+        closeVoting: build.mutation<
             void,
-            { pollId: string; startData: StartVotingRequest }
+            { closeData: CloseVotingRequest; pollId: string }
         >({
-            query: ({ pollId, startData }) => ({
-                url: POLL_ROUTES.start(pollId),
+            query: ({ closeData, pollId }) => ({
+                url: POLL_ROUTES.close(pollId),
                 method: 'POST',
-                body: startData,
+                body: closeData,
             }),
             invalidatesTags: (_result, _error, { pollId }) => [
                 { type: 'Poll', id: pollId },
@@ -118,6 +118,6 @@ export const {
     useGetPollQuery,
     usePostBoardMessageMutation,
     useRecoverSessionMutation,
+    useCloseVotingMutation,
     useRegisterVoterMutation,
-    useStartVotingMutation,
 } = pollsApi;

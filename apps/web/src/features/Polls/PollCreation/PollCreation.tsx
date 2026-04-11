@@ -107,8 +107,8 @@ const PollCreationPage = (): React.JSX.Element => {
                         Create a new vote
                     </h1>
                     <p className="page-lead mx-auto max-w-2xl">
-                        Create a score vote, share the link, let people join,
-                        and start voting once the roster looks right.
+                        Create a score vote, share the link, and let people
+                        submit before you close voting.
                     </p>
                 </div>
                 <form
@@ -135,9 +135,9 @@ const PollCreationPage = (): React.JSX.Element => {
                             onRemoveChoice={onRemoveChoice}
                         />
                         <p className="field-note">
-                            The decryption threshold is chosen on the live poll
-                            page right before voting starts, so it can follow
-                            the actual participant count.
+                            The app derives the honest-majority reconstruction
+                            threshold automatically from the final submitted
+                            roster after voting closes.
                         </p>
                         <p className="field-note">
                             This version uses token-only enrollment. The public

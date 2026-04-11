@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-    canRegister,
-    derivePollPhase,
-    suggestedReconstructionThreshold,
-} from '../src/phases';
+import { canRegister, derivePollPhase } from '../src/phases';
 
 describe('phase helpers', () => {
     it('defaults missing polls to the open phase', () => {
@@ -15,9 +11,9 @@ describe('phase helpers', () => {
     it('returns the stored phase when a poll exists', () => {
         expect(
             derivePollPhase({
-                phase: 'preparing',
+                phase: 'securing',
             }),
-        ).toBe('preparing');
+        ).toBe('securing');
         expect(
             derivePollPhase({
                 phase: 'complete',
@@ -41,15 +37,8 @@ describe('phase helpers', () => {
         expect(
             canRegister({
                 isOpen: true,
-                phase: 'preparing',
+                phase: 'securing',
             }),
         ).toBe(false);
-    });
-
-    it('computes strict-majority reconstruction thresholds', () => {
-        expect(suggestedReconstructionThreshold(3)).toBe(2);
-        expect(suggestedReconstructionThreshold(5)).toBe(3);
-        expect(suggestedReconstructionThreshold(6)).toBe(4);
-        expect(suggestedReconstructionThreshold(15)).toBe(8);
     });
 });

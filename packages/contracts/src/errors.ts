@@ -8,8 +8,8 @@ export const ERROR_MESSAGES = {
     pollClosed: 'Poll is closed for new registrations.',
     pollAlreadyClosed: 'Poll is already closed.',
     notEnoughVotersToClose: 'Not enough voters to close the poll.',
-    notEnoughParticipantsToStart:
-        'At least 3 participants must join before voting can start.',
+    notEnoughParticipantsToClose:
+        'At least 3 submitted voters are required before voting can close.',
     invalidCreatorToken: 'Invalid creator token.',
     invalidVoterToken: 'Invalid voter token.',
     creatorTokenConflict:
@@ -17,7 +17,7 @@ export const ERROR_MESSAGES = {
     voterTokenConflict:
         'Voter token was already used for a different voter name.',
     participantDeviceKeysRequired:
-        'Every joined participant must complete device setup before voting can start.',
+        'Every submitted participant must keep the same device keys for the ceremony.',
     maxParticipantsReached:
         'Poll has reached its maximum number of participants.',
     recoverSessionTokenRequired: 'Exactly one recovery token must be provided.',

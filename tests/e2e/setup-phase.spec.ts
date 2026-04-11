@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 import {
+    closeVoting,
     createPoll,
     deletePolls,
-    expectBoardCeremonyVisible,
-    registerParticipant,
+    expectSecuringVisible,
     reloadPollPage,
-    startVoting,
+    submitVote,
+    waitForReadyToReveal,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -24,7 +25,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('completes the explicit manifest setup phase across three live sessions', async ({
+test('secures the frozen roster automatically across three live sessions', async ({
     browser,
     page,
     request,
@@ -40,7 +41,7 @@ test('completes the explicit manifest setup phase across three live sessions', a
 
     const createdPoll = await createPoll({
         page,
-        pollName: createPollName('Manifest setup phase', namespace),
+        pollName: createPollName('Secure frozen roster', namespace),
     });
     createdPolls.push(createdPoll);
 
@@ -50,46 +51,48 @@ test('completes the explicit manifest setup phase across three live sessions', a
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await registerParticipant({
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await registerParticipant({
+        await submitVote({
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [6, 8],
             voterName: participantOneName,
         });
-        await registerParticipant({
+        await submitVote({
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
             voterName: participantTwoName,
         });
 
-        await startVoting(page);
+        await closeVoting(page);
         await reloadPollPage(page);
         await reloadPollPage(participantOne.page);
         await reloadPollPage(participantTwo.page);
 
-        await expectBoardCeremonyVisible(page);
-        await expectBoardCeremonyVisible(participantOne.page);
-        await expectBoardCeremonyVisible(participantTwo.page);
+        await expectSecuringVisible(page);
+        await expectSecuringVisible(participantOne.page);
+        await expectSecuringVisible(participantTwo.page);
 
-        await reloadPollPage(page);
-
+        await waitForReadyToReveal(page);
+        const nextStepPanel = page
+            .getByRole('heading', { name: 'Your next step' })
+            .locator('xpath=..');
         await expect(
-            page.getByText(/^Phase 0 is complete\./).first(),
-        ).toBeVisible({ timeout: 30_000 });
-        await expect(
-            page.getByText('Registrations on board').locator('..').getByText(
-                '3/3',
+            nextStepPanel.getByText(
+                'Enough complete encrypted ballots are ready. Reveal results to freeze the counted set and start decryption.',
+                {
+                    exact: true,
+                },
             ),
-        ).toBeVisible();
+        ).toBeVisible({ timeout: 90_000 });
         await expect(
-            page.getByText('Phase 0 / manifest-publication').first(),
-        ).toBeVisible();
-        await expect(
-            page.getByText('Phase 0 / manifest-acceptance').first(),
-        ).toBeVisible();
+            page.getByRole('button', { name: 'Reveal results' }),
+        ).toBeVisible({ timeout: 90_000 });
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);

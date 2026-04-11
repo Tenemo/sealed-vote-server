@@ -1,13 +1,15 @@
 import { test } from '@playwright/test';
 
 import {
+    closeVoting,
     createPoll,
     deletePolls,
-    expectBoardCeremonyVisible,
     expectParticipantsVisible,
-    registerParticipant,
-    reloadPollPage,
-    startVoting,
+    expectSecuringVisible,
+    revealResults,
+    submitVote,
+    waitForReadyToReveal,
+    waitForVerifiedResults,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -25,7 +27,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('starts one real ceremony across chromium, desktop firefox, and mobile firefox', async ({
+test('completes one real ceremony across chromium, desktop firefox, and mobile firefox', async ({
     page,
     playwright,
     request,
@@ -55,34 +57,41 @@ test('starts one real ceremony across chromium, desktop firefox, and mobile fire
     attachErrorTracking(firefoxMobile.page, 'firefox-mobile', tracker);
 
     try {
-        await registerParticipant({
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await registerParticipant({
+        await submitVote({
             page: firefoxDesktop.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [6, 8],
             voterName: firefoxDesktopName,
         });
-        await registerParticipant({
+        await submitVote({
             page: firefoxMobile.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
             voterName: firefoxMobileName,
         });
 
-        await startVoting(page);
-        await reloadPollPage(page);
-        await reloadPollPage(firefoxDesktop.page);
-        await reloadPollPage(firefoxMobile.page);
-
-        await expectBoardCeremonyVisible(page);
-        await expectBoardCeremonyVisible(firefoxDesktop.page);
-        await expectBoardCeremonyVisible(firefoxMobile.page);
         await expectParticipantsVisible(page, [
             creatorName,
             firefoxDesktopName,
             firefoxMobileName,
         ]);
+        await closeVoting(page);
+
+        await expectSecuringVisible(page);
+        await expectSecuringVisible(firefoxDesktop.page);
+        await expectSecuringVisible(firefoxMobile.page);
+
+        await waitForReadyToReveal(page);
+        await revealResults(page);
+
+        await waitForVerifiedResults({ page });
+        await waitForVerifiedResults({ page: firefoxDesktop.page });
+        await waitForVerifiedResults({ page: firefoxMobile.page });
         expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(firefoxDesktop);

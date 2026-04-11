@@ -48,7 +48,7 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     expectNoUnexpectedErrors(tracker);
 });
 
-test('keeps the poll page usable at 320 pixels wide before voting starts', async ({
+test('keeps the poll page usable at 320 pixels wide before voting closes', async ({
     page,
     request,
 }, testInfo) => {
@@ -71,10 +71,10 @@ test('keeps the poll page usable at 320 pixels wide before voting starts', async
         await expect(
             page.getByRole('heading', { name: pollName }),
         ).toBeVisible();
-        await expect(page.getByText('Waiting room open')).toBeVisible();
+        await expect(page.getByText('Voting open')).toBeVisible();
         await expect(page.getByLabel('Your public name')).toBeVisible();
         await expect(
-            page.getByRole('button', { exact: true, name: 'Join vote' }),
+            page.getByRole('button', { exact: true, name: 'Submit vote' }),
         ).toBeVisible();
         await expect(
             page.getByRole('heading', { name: 'Your next step' }),

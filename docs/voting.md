@@ -1,48 +1,51 @@
 # Voting protocol
 
-The shared protocol logic lives in `packages/protocol`. Both apps now treat the board log as the source of truth and derive ceremony state from ordered signed payloads instead of trusting server-owned phase tables.
+The shared protocol logic lives in `packages/protocol`. The app uses a fast pre-close product flow and then derives the full post-close ceremony from the bulletin board log.
 
 ## Phases
 
-The public read model exposes these phases:
+The public poll read model exposes these phases:
 
 - `open`
-- `preparing`
-- `voting`
-- `opening-results`
+- `securing`
+- `ready-to-reveal`
+- `revealing`
 - `complete`
 - `aborted`
 
-They are derived from the accepted board payloads returned by `GET /api/polls/:pollRef`.
+They are derived from accepted board payloads plus local ceremony verification.
 
-## Flow
+## Product flow
 
-1. A creator creates a poll and receives a `creatorToken`.
-2. Each participant joins the waiting room with a unique public `voterName` and receives a `voterToken` plus `voterIndex`.
-3. The creator starts voting once at least three participants are registered. That same action freezes the roster.
-4. The web client signs and posts protocol payloads to `POST /api/polls/:pollId/board/messages` behind guided poll actions. The normal UI does not expose raw JSON entry.
-5. The backend stores every board entry append-only, computes a hash chain, and classifies each slot as accepted, idempotent retransmission, or equivocation.
-6. The public read model recomputes manifest state, phase digests, verification status, and threshold summaries from the board log only.
-7. Once ballot, decryption-share, and tally-publication payloads are present, clients verify the ceremony locally and present arithmetic means derived from verified additive tallies.
+1. The organizer creates a vote and lands on the live public page immediately.
+2. Each participant opens the link, scores every option from `1` to `10`, and submits one final vote.
+3. The browser stores those plaintext scores locally on-device and registers the participant with the backend for the later ceremony.
+4. The organizer closes voting once at least three submitted participants exist. That freezes the roster.
+5. After close, the app automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
+6. Once enough encrypted ballots exist, the organizer reveals results. That publishes one `ballot-close` payload.
+7. Decryption shares and tally publications arrive asynchronously.
+8. Every client replays the ceremony from the board log and shows verified arithmetic means.
 
 ## Integrity and liveness
 
 - Every board submission is tied to a `voterToken`, and the payload `participantIndex` must match the authenticated voter.
-- Exact retransmissions are idempotent when the unsigned canonical payload bytes match, even if the signature bytes differ.
-- Slot conflicts are treated as equivocation. The route still records the message, but the read model marks the slot as tainted.
-- The current app uses a creator-selected threshold preview before start, with a lower bound at the majority floor and an upper bound at `100%` of the frozen roster. The hard participant cap is 51 and the current verified target is 15 participants.
-- The current app automates the waiting room, registration publication, manifest publication, and manifest acceptance steps. The later DKG, ballot, and decryption authoring flow still depends on proof and VSS helpers that are not yet exported from the library root entrypoint.
-- Token-based enrollment makes the roster publicly auditable, but this version does not claim strong identity binding or Sybil resistance.
+- Exact retransmissions are idempotent when the unsigned canonical payload bytes match.
+- Slot conflicts are treated as equivocation and remain visible in the board audit.
+- The cryptographic threshold is honest-majority only and is derived from the frozen roster with `majorityThreshold`.
+- The hard participant cap is `51`. The current validation target remains `15`.
+- Token-based enrollment makes the roster public and auditable, but this version does not claim strong identity binding or Sybil resistance.
 
 ## Privacy model
 
-- The roster is public. Ballot contents are intended to remain confidential once the full board-backed threshold flow is exercised.
-- The browser stores narrow reconnect metadata locally: creator tokens, voter tokens, voter indices, and poll references.
-- The current UI does not use `redux-persist` or a voting-path service worker cache.
-- Result presentation uses arithmetic means over verified additive tallies, not geometric means.
+- The pre-close roster is public.
+- Plaintext scores stay only on the submitting device until voting closes.
+- Once encrypted ballot payloads are accepted on the board, the local plaintext ballot is deleted.
+- The browser stores only narrow reconnect metadata in local storage. Private device state and post-close ceremony state live in indexed storage.
+- The UI does not expose protocol JSON or manual board posting in the normal flow.
 
 ## Shared helpers
 
 - `acceptedBoardMessages` and `filterBoardMessagesByType` live in `packages/protocol/src/crypto.ts`
-- `derivePollPhase`, `suggestedReconstructionThreshold`, and `canRegister` live in `packages/protocol/src/phases.ts`
+- `derivePollPhase` and `canRegister` live in `packages/protocol/src/phases.ts`
 - `computeArithmeticMean`, `computePublishedResultScores`, and `hasVerifiedTallies` live in `packages/protocol/src/results.ts`
+- `canonicalUnsignedPayloadBytes`, `protocolPayloadSlotKey`, and `sortProtocolPayloads` live in `packages/protocol/src/protocolPayloads.ts`

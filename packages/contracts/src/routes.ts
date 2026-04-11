@@ -7,7 +7,6 @@ export const POLL_ROUTES = {
         `${API_PREFIX}/polls/${pollId}/register`,
     recoverSession: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/recover-session`,
-    start: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/start`,
     close: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/close`,
     boardMessages: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/board/messages`,

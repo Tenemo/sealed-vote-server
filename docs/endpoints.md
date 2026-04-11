@@ -1,6 +1,6 @@
 # API endpoints
 
-The backend routes live under `/api`. The request and response payloads below match the shared contracts in `packages/contracts`.
+The backend routes live under `/api`. The payloads below match the shared contracts in `packages/contracts`.
 
 ## Create poll
 
@@ -26,14 +26,14 @@ The backend routes live under `/api`. The request and response payloads below ma
 - `GET /api/polls/:pollRef`
 - `pollRef` accepts either the poll UUID or the canonical public slug
 - response highlights:
-  - public roster
-  - manifest and manifest hash
-  - session id and human-readable session fingerprint
-  - derived phase
-  - threshold summary
+  - public submitted roster
+  - manifest and manifest hash after close
+  - session id and human-readable session fingerprint after close
+  - derived poll phase
+  - honest-majority threshold summary
   - board audit counts and per-phase digests
   - ordered board entries with accepted, idempotent, or equivocation classification
-  - local verification status and verified arithmetic-mean results when available
+  - verification status and verified arithmetic-mean results when available
 
 Example response:
 
@@ -53,8 +53,8 @@ Example response:
     "manifestHash": null,
     "sessionId": null,
     "sessionFingerprint": null,
-    "joinedParticipantCount": 2,
-    "minimumStartParticipantCount": 3,
+    "submittedParticipantCount": 2,
+    "minimumCloseParticipantCount": 3,
     "boardAudit": {
         "acceptedCount": 0,
         "duplicateCount": 0,
@@ -64,7 +64,7 @@ Example response:
     },
     "verification": {
         "status": "not-ready",
-        "reason": "Manifest publication has not been accepted yet.",
+        "reason": "Voting is still open. The ceremony transcript will begin after the organizer closes the vote.",
         "qualParticipantIndices": [],
         "verifiedOptionTallies": []
     },
@@ -72,10 +72,16 @@ Example response:
     "thresholds": {
         "reconstructionThreshold": null,
         "minimumPublishedVoterCount": null,
-        "suggestedReconstructionThreshold": 2,
-        "strictMajorityFloor": 2,
+        "strictMajorityFloor": null,
         "maxParticipants": 51,
         "validationTarget": 15
+    },
+    "ceremony": {
+        "acceptedRegistrationCount": 0,
+        "acceptedEncryptedBallotCount": 0,
+        "acceptedDecryptionShareCount": 0,
+        "completeEncryptedBallotParticipantCount": 0,
+        "revealReady": false
     }
 }
 ```
@@ -95,30 +101,41 @@ Example response:
 }
 ```
 
-- notes:
-  - voter names are unique within a poll
-  - registration is token-only in this version; there is no strong identity binding
-  - registration closes permanently once the creator starts voting
-  - the app stores the participant auth and transport public keys during join so the later board-backed ceremony can verify that roster
-
-## Start voting
-
-- `POST /api/polls/:pollId/start`
-- request body:
+Optional creator-participant registration:
 
 ```json
 {
+    "authPublicKey": "spki-hex",
     "creatorToken": "creator-token",
-    "thresholdPercent": 60
+    "transportPublicKey": "raw-public-key-hex",
+    "transportSuite": "X25519",
+    "voterName": "Alice",
+    "voterToken": "voter-token"
 }
 ```
 
 - notes:
-  - the poll requires at least three registered participants before it can be started
-  - starting voting freezes the roster and resolves the exact integer reconstruction threshold from the current joined participant count
-  - `minimumPublishedVoterCount` is derived automatically from the frozen threshold
-  - `POST /api/polls/:pollId/close` remains as a compatibility alias for older clients and defaults to the simple-majority threshold preview
-  - the normal UI and tests use `/start`
+  - voter names are unique within a poll
+  - registration is token-only in this version; there is no strong identity binding
+  - the app uses this route when a participant submits their final pre-close vote
+  - registration closes permanently once the organizer closes voting
+  - the app stores the participant auth and transport public keys during submit so the post-close board ceremony can verify the frozen roster
+
+## Close voting
+
+- `POST /api/polls/:pollId/close`
+- request body:
+
+```json
+{
+    "creatorToken": "creator-token"
+}
+```
+
+- notes:
+  - the poll requires at least three submitted participants before it can be closed
+  - closing freezes the submitted roster
+  - the app derives the honest-majority reconstruction threshold from the frozen roster; the UI does not expose a threshold picker
 
 ## List board messages
 
@@ -159,12 +176,13 @@ afterEntryHash=<entry-hash>
 ```
 
 - notes:
-  - board messages are accepted only after voting has started
+  - board messages are accepted only after voting is closed
   - the normal product UI posts these payloads in the background; it does not expose a raw signed-payload form
   - the authenticated voter token must match `signedPayload.payload.participantIndex`
   - the payload must include a valid base protocol shape before signature checks or participant checks run
-  - registration payloads are verified against the embedded auth public key
-  - later payloads are verified against the accepted registration auth key
+  - registration payloads are verified against the embedded auth public key and the stored pre-close device record
+  - manifest-publication payloads are verified against the accepted registration roster without requiring a previously published manifest
+  - later payloads are verified against the accepted registration auth key and the accepted manifest publication
   - exact retransmissions are stored and classified as idempotent
   - conflicting payloads in the same canonical slot are stored and classified as equivocation
 

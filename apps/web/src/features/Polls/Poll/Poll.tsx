@@ -1,15 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
-import {
-    mutedBodyClassName,
-    pageTitleClassName,
-    sectionTitleClassName,
-} from '@/lib/uiClasses';
+import { mutedBodyClassName, pageTitleClassName } from '@/lib/uiClasses';
+import LoadingButton from 'components/LoadingButton/LoadingButton';
 import NotFound from 'components/NotFound/NotFound';
 import {
     findCreatorSessionByPollId,
@@ -17,28 +14,19 @@ import {
 } from 'features/Polls/creatorSessionStorage';
 import { generateClientToken } from 'features/Polls/clientToken';
 import {
+    clearCommittedPendingPayload,
+    createRevealBallotCloseAction,
+    describeAutomaticCeremonyAction,
+    resolveAutomaticCeremonyAction,
+    type PreparedCeremonyAction,
+} from 'features/Polls/pollBoardActions';
+import {
     createPendingPollDeviceState,
     createPollDeviceState,
     findPollDeviceStateByPollId,
     findPollDeviceStateByPollSlug,
-    importStoredAuthPrivateKey,
     savePollDeviceState,
 } from 'features/Polls/pollDeviceStorage';
-import {
-    describeAutoBoardSetupAction,
-    resolveAutoBoardSetupAction,
-    signProtocolPayload,
-} from 'features/Polls/pollBoardActions';
-import {
-    clampThresholdPercent,
-    resolveThresholdPercentRange,
-    resolveThresholdPreview,
-} from 'features/Polls/pollThresholds';
-import {
-    describeFullCeremonySupport,
-    missingFullCeremonyRootExports,
-    supportsFullCeremonyAuthoring,
-} from 'features/Polls/pollCeremonySupport';
 import { derivePollWorkflow } from 'features/Polls/pollWorkflow';
 import {
     findVoterSessionByPollId,
@@ -46,70 +34,101 @@ import {
     saveVoterSession,
 } from 'features/Polls/voterSessionStorage';
 import {
+    useCloseVotingMutation,
     useGetPollQuery,
     usePostBoardMessageMutation,
     useRegisterVoterMutation,
-    useStartVotingMutation,
 } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
+
+const minimumScore = 1;
+const maximumScore = 10;
+const scoreOptions = Array.from(
+    { length: maximumScore - minimumScore + 1 },
+    (_value, offset) => minimumScore + offset,
+);
 
 const phaseLabel = (phase: string): string =>
     (
         ({
             aborted: 'Ceremony aborted',
-            complete: 'Results ready',
-            open: 'Waiting room open',
-            'opening-results': 'Opening results',
-            preparing: 'Preparing devices',
-            voting: 'Voting live',
-        }) as const
+            complete: 'Verified results',
+            open: 'Voting open',
+            'ready-to-reveal': 'Ready to reveal',
+            revealing: 'Revealing results',
+            securing: 'Securing the election',
+        }) satisfies Record<string, string>
     )[phase] ?? phase;
 
-const boardMessageCount = (
-    entries: readonly {
-        classification: 'accepted' | 'idempotent' | 'equivocation';
-        messageType: string;
-    }[],
+const createEmptyScores = (choiceCount: number): (number | null)[] =>
+    Array.from({ length: choiceCount }, () => null);
+
+const formatDateTime = (value: string): string =>
+    new Date(value).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+
+const countAcceptedMessages = (
+    poll: NonNullable<ReturnType<typeof useGetPollQuery>['data']>,
     messageType: string,
 ): number =>
-    entries.filter(
-        (entry) =>
+    poll.boardEntries.filter(
+        (
+            entry: NonNullable<
+                ReturnType<typeof useGetPollQuery>['data']
+            >['boardEntries'][number],
+        ) =>
             entry.classification === 'accepted' &&
             entry.messageType === messageType,
     ).length;
 
-const autoBoardSetupActionLabel = (kind: string): string =>
-    (
-        ({
-            'accept-manifest': 'Confirm manifest',
-            'publish-manifest': 'Freeze manifest',
-            'publish-registration': 'Publish registration',
-        }) as const
-    )[kind] ?? 'Continue setup';
+const isPollParticipantLocal = ({
+    devicePollId,
+    pollId,
+    voterPollId,
+}: {
+    devicePollId: string | null | undefined;
+    pollId: string;
+    voterPollId: string | null | undefined;
+}): boolean => devicePollId === pollId && voterPollId === pollId;
 
-const autoBoardSetupBusyLabel = (kind: string): string =>
-    (
-        ({
-            'accept-manifest': 'Confirming the shared manifest',
-            'publish-manifest': 'Freezing the shared manifest',
-            'publish-registration': 'Publishing your device registration',
-        }) as const
-    )[kind] ?? 'Continuing private setup';
+const buildParticipantSummary = ({
+    count,
+    minimum,
+}: {
+    count: number;
+    minimum: number;
+}): string =>
+    count >= minimum
+        ? `${count} submitted before close`
+        : `${count} submitted, ${minimum - count} more needed before close`;
 
 const PollPage = (): React.JSX.Element => {
     const { pollSlug } = useParams();
     const [registerVoter, registerState] = useRegisterVoterMutation();
+    const [closeVoting, closeState] = useCloseVotingMutation();
     const [postBoardMessage] = usePostBoardMessageMutation();
-    const [startVoting, startState] = useStartVotingMutation();
-    const [voterName, setVoterName] = useState('');
-    const [thresholdPercent, setThresholdPercent] = useState<number | null>(
+    const [voterName, setVoterName] = React.useState('');
+    const [draftScores, setDraftScores] = React.useState<(number | null)[]>([]);
+    const [localError, setLocalError] = React.useState<string | null>(null);
+    const [localNotice, setLocalNotice] = React.useState<string | null>(null);
+    const [automationError, setAutomationError] = React.useState<string | null>(
         null,
     );
-    const [autoSetupStep, setAutoSetupStep] = useState<string | null>(null);
-    const [localError, setLocalError] = useState<string | null>(null);
-    const [localNotice, setLocalNotice] = useState<string | null>(null);
-    const voterNameInputId = React.useId();
-    const thresholdInputId = React.useId();
+    const [automaticAction, setAutomaticAction] =
+        React.useState<PreparedCeremonyAction | null>(null);
+    const [automaticActionDescription, setAutomaticActionDescription] =
+        React.useState<string | null>(null);
+    const [isResolvingAutomaticAction, setIsResolvingAutomaticAction] =
+        React.useState(false);
+    const [automaticResolutionAttempt, setAutomaticResolutionAttempt] =
+        React.useState(0);
+    const [activeActionSlotKey, setActiveActionSlotKey] = React.useState<
+        string | null
+    >(null);
+    const [isRevealSubmitting, setIsRevealSubmitting] = React.useState(false);
+    const [copyNotice, setCopyNotice] = React.useState<string | null>(null);
 
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
@@ -127,7 +146,7 @@ const PollPage = (): React.JSX.Element => {
         refetchOnReconnect: true,
     });
 
-    const creatorSession = useMemo(() => {
+    const creatorSession = React.useMemo(() => {
         if (!poll) {
             return null;
         }
@@ -138,7 +157,7 @@ const PollPage = (): React.JSX.Element => {
         );
     }, [poll]);
 
-    const voterSession = useMemo(() => {
+    const voterSession = React.useMemo(() => {
         if (!poll) {
             return null;
         }
@@ -149,7 +168,7 @@ const PollPage = (): React.JSX.Element => {
         );
     }, [poll]);
 
-    const deviceState = useMemo(() => {
+    const deviceState = React.useMemo(() => {
         if (!poll) {
             return null;
         }
@@ -160,90 +179,149 @@ const PollPage = (): React.JSX.Element => {
         );
     }, [poll]);
 
-    useEffect(() => {
-        if (!poll || poll.phase !== 'open') {
+    React.useEffect(() => {
+        if (!poll) {
             return;
         }
 
-        const range = resolveThresholdPercentRange(poll.joinedParticipantCount);
-
-        setThresholdPercent((currentValue) =>
-            currentValue === null
-                ? range.defaultPercent
-                : clampThresholdPercent(
-                      poll.joinedParticipantCount,
-                      currentValue,
-                  ),
+        setDraftScores((currentScores) =>
+            currentScores.length === poll.choices.length
+                ? currentScores
+                : createEmptyScores(poll.choices.length),
         );
     }, [poll]);
 
-    const autoBoardSetupAction = useMemo(
-        () =>
-            poll
-                ? resolveAutoBoardSetupAction({
-                      deviceState,
-                      poll,
-                      voterSession,
-                  })
-                : null,
-        [deviceState, poll, voterSession],
-    );
+    React.useEffect(() => {
+        if (!copyNotice || typeof window.setTimeout !== 'function') {
+            return;
+        }
 
-    const submitAutoBoardSetupAction = React.useCallback(
-        async (
-            action: NonNullable<typeof autoBoardSetupAction>,
-        ): Promise<void> => {
-            if (!poll || !deviceState || !voterSession) {
+        const timeoutId = window.setTimeout(() => {
+            setCopyNotice(null);
+        }, 2_000);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [copyNotice]);
+
+    React.useEffect(() => {
+        let cancelled = false;
+
+        const resolveAction = async (): Promise<void> => {
+            if (!poll || poll.phase === 'open' || poll.phase === 'complete') {
+                if (cancelled) {
+                    return;
+                }
+
+                setAutomaticAction(null);
+                setAutomaticActionDescription(null);
+                setAutomationError(null);
+                setIsResolvingAutomaticAction(false);
+                return;
+            }
+
+            setIsResolvingAutomaticAction(true);
+
+            try {
+                const nextAction = await resolveAutomaticCeremonyAction({
+                    creatorSession,
+                    deviceState,
+                    poll,
+                    voterSession,
+                });
+
+                if (cancelled) {
+                    return;
+                }
+
+                setAutomaticAction(nextAction);
+                setAutomaticActionDescription(
+                    describeAutomaticCeremonyAction(nextAction),
+                );
+                setAutomationError(null);
+            } catch (resolutionError) {
+                if (cancelled) {
+                    return;
+                }
+
+                setAutomaticAction(null);
+                setAutomaticActionDescription(null);
+                setAutomationError(renderError(resolutionError));
+            } finally {
+                if (!cancelled) {
+                    setIsResolvingAutomaticAction(false);
+                }
+            }
+        };
+
+        void resolveAction();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        automaticResolutionAttempt,
+        creatorSession,
+        deviceState,
+        poll,
+        voterSession,
+    ]);
+
+    const submitPreparedAction = React.useCallback(
+        async (action: PreparedCeremonyAction): Promise<void> => {
+            if (!poll || !voterSession) {
                 return;
             }
 
             setLocalError(null);
-            setAutoSetupStep(action.kind);
+            setLocalNotice(null);
+            setAutomationError(null);
+            setAutomaticAction(null);
+            setAutomaticActionDescription(null);
+            setActiveActionSlotKey(action.slotKey);
 
             try {
-                const authPrivateKey = await importStoredAuthPrivateKey(
-                    deviceState.authPrivateKeyPkcs8,
-                );
-                const signedPayload = await signProtocolPayload({
-                    authPrivateKey,
-                    payload: action.payload,
-                });
-
                 await postBoardMessage({
                     pollId: poll.id,
                     boardMessage: {
-                        signedPayload,
+                        signedPayload: action.signedPayload,
                         voterToken: voterSession.voterToken,
                     },
                 }).unwrap();
 
+                clearCommittedPendingPayload({
+                    pollId: poll.id,
+                    slotKey: action.slotKey,
+                });
                 await refetch();
             } catch (submissionError) {
-                setLocalError(renderError(submissionError));
+                setAutomationError(renderError(submissionError));
             } finally {
-                setAutoSetupStep(null);
+                setActiveActionSlotKey(null);
             }
         },
-        [deviceState, poll, postBoardMessage, refetch, voterSession],
+        [poll, postBoardMessage, refetch, voterSession],
     );
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (
-            poll?.phase !== 'preparing' ||
-            autoBoardSetupAction === null ||
-            autoSetupStep !== null ||
-            localError !== null
+            !poll ||
+            (poll.phase !== 'securing' && poll.phase !== 'revealing') ||
+            !automaticAction ||
+            !!activeActionSlotKey ||
+            !!automationError
         ) {
             return;
         }
 
-        void submitAutoBoardSetupAction(autoBoardSetupAction);
+        void submitPreparedAction(automaticAction);
     }, [
-        autoBoardSetupAction,
-        autoSetupStep,
-        localError,
-        poll?.phase,
-        submitAutoBoardSetupAction,
+        activeActionSlotKey,
+        automaticAction,
+        automationError,
+        poll,
+        submitPreparedAction,
     ]);
 
     if (
@@ -256,85 +334,7 @@ const PollPage = (): React.JSX.Element => {
         return <NotFound />;
     }
 
-    const onRegister = async (
-        event: React.FormEvent<HTMLFormElement>,
-    ): Promise<void> => {
-        event.preventDefault();
-
-        if (!poll) {
-            return;
-        }
-
-        setLocalError(null);
-        setLocalNotice(null);
-
-        try {
-            const pendingDeviceState = await createPendingPollDeviceState();
-            const voterToken = generateClientToken();
-            const response = await registerVoter({
-                pollId: poll.id,
-                voterData: {
-                    authPublicKey: pendingDeviceState.authPublicKey,
-                    transportPublicKey: pendingDeviceState.transportPublicKey,
-                    transportSuite: pendingDeviceState.transportSuite,
-                    voterName: voterName.trim(),
-                    voterToken,
-                },
-            }).unwrap();
-            const persistedDeviceState = await createPollDeviceState({
-                pendingState: pendingDeviceState,
-                pollId: poll.id,
-                pollSlug: poll.slug,
-                voterIndex: response.voterIndex,
-                voterName: response.voterName,
-                voterToken: response.voterToken,
-            });
-
-            savePollDeviceState(persistedDeviceState);
-            saveVoterSession({
-                pollId: poll.id,
-                pollSlug: poll.slug,
-                voterIndex: response.voterIndex,
-                voterName: response.voterName,
-                voterToken: response.voterToken,
-            });
-            setLocalNotice(
-                `Joined as ${response.voterName}. Your participant number is ${response.voterIndex}.`,
-            );
-            setVoterName('');
-            await refetch();
-        } catch (submissionError) {
-            setLocalError(renderError(submissionError));
-        }
-    };
-
-    const onStartVoting = async (): Promise<void> => {
-        if (!poll || !creatorSession || thresholdPercent === null) {
-            return;
-        }
-
-        setLocalError(null);
-        setLocalNotice(null);
-
-        try {
-            await startVoting({
-                pollId: poll.id,
-                startData: {
-                    creatorToken: creatorSession.creatorToken,
-                    thresholdPercent: clampThresholdPercent(
-                        poll.joinedParticipantCount,
-                        thresholdPercent,
-                    ),
-                },
-            }).unwrap();
-            setLocalNotice('Voting started. The roster is now frozen.');
-            await refetch();
-        } catch (submissionError) {
-            setLocalError(renderError(submissionError));
-        }
-    };
-
-    if (isLoading && !poll) {
+    if (!poll) {
         return (
             <div className="flex min-h-[40vh] items-center justify-center">
                 <Panel className="loading-panel max-w-xl">
@@ -344,783 +344,857 @@ const PollPage = (): React.JSX.Element => {
         );
     }
 
-    if (!poll) {
-        return (
-            <Alert announcement="assertive" variant="destructive">
-                <AlertDescription>{renderError(error)}</AlertDescription>
-            </Alert>
-        );
-    }
-
-    const workflow = derivePollWorkflow({
-        creatorSessionPollId: creatorSession?.pollId ?? null,
-        deviceState,
-        hasAutoSetupAction: autoBoardSetupAction !== null,
-        hasSetupFailure: localError !== null,
-        poll,
-        voterSession,
+    const submittedParticipantSummary = buildParticipantSummary({
+        count: poll.submittedParticipantCount,
+        minimum: poll.minimumCloseParticipantCount,
     });
-    const thresholdRange = resolveThresholdPercentRange(
-        poll.joinedParticipantCount,
-    );
-    const effectiveThresholdPercent = clampThresholdPercent(
-        poll.joinedParticipantCount,
-        thresholdPercent ?? thresholdRange.defaultPercent,
-    );
-    const thresholdPreview = resolveThresholdPreview(
-        poll.joinedParticipantCount,
-        effectiveThresholdPercent,
-    );
-    const previewParticipantCount = Math.max(
-        poll.joinedParticipantCount,
-        poll.minimumStartParticipantCount,
-    );
-    const maximumSupportedThreshold = previewParticipantCount;
-    const isFullThresholdSelected =
-        thresholdPreview === previewParticipantCount;
-    const autoBoardSetupDescription =
-        describeAutoBoardSetupAction(autoBoardSetupAction);
-    const shareableUrl =
+    const shareUrl =
         typeof window === 'undefined'
             ? `https://sealed.vote/votes/${poll.slug}`
             : window.location.href;
-    const acceptedRegistrations = boardMessageCount(
-        poll.boardEntries,
-        'registration',
-    );
-    const acceptedManifestAcceptances = boardMessageCount(
-        poll.boardEntries,
+    const localParticipant = isPollParticipantLocal({
+        devicePollId: deviceState?.pollId,
+        pollId: poll.id,
+        voterPollId: voterSession?.pollId,
+    });
+    const workflow = derivePollWorkflow({
+        creatorSessionPollId: creatorSession?.pollId ?? null,
+        deviceState,
+        hasAutomaticCeremonyAction: automaticAction !== null,
+        hasAutomationFailure: automationError !== null,
+        isSubmittingVote: registerState.isLoading,
+        poll,
+        voterSession,
+    });
+    const hasCompleteDraft = draftScores.every((score) => score !== null);
+    const isCreatorParticipant = !!deviceState?.isCreatorParticipant;
+    const acceptedRegistrations = countAcceptedMessages(poll, 'registration');
+    const acceptedManifestAcceptances = countAcceptedMessages(
+        poll,
         'manifest-acceptance',
     );
-    const hasManifestPublication =
-        boardMessageCount(poll.boardEntries, 'manifest-publication') > 0;
-    const acceptedBallots = boardMessageCount(
-        poll.boardEntries,
-        'ballot-submission',
+    const acceptedKeyConfirmations = countAcceptedMessages(
+        poll,
+        'key-derivation-confirmation',
     );
-    const acceptedDecryptionShares = boardMessageCount(
-        poll.boardEntries,
-        'decryption-share',
-    );
-    const fullCeremonySupportDescription = describeFullCeremonySupport();
-    const manifestPublisherIndex = poll.rosterEntries[0]?.participantIndex ?? 1;
-    const preparingStatusNote =
-        poll.phase !== 'preparing'
-            ? null
-            : acceptedRegistrations < poll.joinedParticipantCount
-              ? `Waiting for ${poll.joinedParticipantCount - acceptedRegistrations} participant registration${poll.joinedParticipantCount - acceptedRegistrations === 1 ? '' : 's'} to reach the board.`
-              : !hasManifestPublication
-                ? `Waiting for participant ${manifestPublisherIndex} to freeze the shared manifest.`
-                : acceptedManifestAcceptances < poll.joinedParticipantCount
-                  ? `Waiting for ${poll.joinedParticipantCount - acceptedManifestAcceptances} participant confirmation${poll.joinedParticipantCount - acceptedManifestAcceptances === 1 ? '' : 's'} of the frozen manifest.`
-                  : supportsFullCeremonyAuthoring
-                    ? 'Phase 0 is complete. The later private setup is ready to continue in this build.'
-                    : `Phase 0 is complete. ${fullCeremonySupportDescription}`;
+    const canSubmitVote =
+        workflow.canSubmitVote &&
+        !registerState.isLoading &&
+        !!voterName.trim() &&
+        hasCompleteDraft;
+    const canCopyShareUrl =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.clipboard?.writeText === 'function';
 
-    const waitingRoomSummary = poll.isOpen
-        ? poll.joinedParticipantCount >= poll.minimumStartParticipantCount
-            ? 'The roster can be started at any time.'
-            : `Waiting for at least ${poll.minimumStartParticipantCount} joined participants before voting can begin.`
-        : 'The roster is now frozen for this ceremony.';
+    const onScoreChange = (choiceIndex: number, score: number): void => {
+        setDraftScores((currentScores) =>
+            currentScores.map((currentScore, index) =>
+                index === choiceIndex ? score : currentScore,
+            ),
+        );
+    };
 
-    const nextStepHeading =
-        workflow.currentStep === 'anonymous-joinable'
-            ? 'Join this vote'
-            : workflow.currentStep === 'creator-configuring-threshold'
-              ? 'Waiting room'
-              : workflow.currentStep === 'joined-and-waiting-for-start'
-                ? 'Waiting room'
-                : workflow.currentStep === 'preparing-auto'
-                  ? 'Preparing your device'
-                  : workflow.currentStep === 'preparing-action-required'
-                    ? 'Retry private setup'
-                    : workflow.currentStep === 'preparing-waiting'
-                      ? 'Preparing your device'
-                      : workflow.currentStep === 'local-state-missing'
-                        ? 'Preparing your device'
-                        : workflow.currentStep === 'ready-to-vote'
-                          ? 'Voting is live'
-                          : workflow.currentStep ===
-                              'vote-submitted-and-waiting'
-                            ? 'Vote submitted'
-                            : workflow.currentStep ===
-                                'ready-to-help-open-results'
-                              ? 'Help open results'
-                              : workflow.currentStep === 'waiting-for-results'
-                                ? 'Waiting for results'
-                                : workflow.currentStep === 'complete'
-                                  ? 'Verified results'
-                                  : 'Ceremony aborted';
+    const onCopyShareUrl = async (): Promise<void> => {
+        if (!canCopyShareUrl) {
+            return;
+        }
 
-    const nextStepDescription =
-        workflow.currentStep === 'anonymous-joinable'
-            ? 'Pick the public name that should appear on the roster. Everyone in the vote can see this list.'
-            : workflow.currentStep === 'creator-configuring-threshold'
-              ? 'People can keep joining from the shared link. You can also join yourself before you start voting.'
-              : workflow.currentStep === 'joined-and-waiting-for-start'
-                ? 'You are already on the public roster. The creator can start voting as soon as the group is ready.'
-                : workflow.currentStep === 'preparing-auto'
-                  ? (autoBoardSetupDescription ??
-                    preparingStatusNote ??
-                    'The vote has started and the private setup transcript is still being prepared.')
-                  : workflow.currentStep === 'preparing-action-required'
-                    ? 'Automatic setup hit an error on this device. Retry the private setup step to continue.'
-                    : workflow.currentStep === 'preparing-waiting'
-                      ? (preparingStatusNote ??
-                        'The vote has started and the private setup transcript is still being prepared.')
-                      : workflow.currentStep === 'local-state-missing'
-                        ? 'This browser is missing the local device state needed to continue the private ceremony.'
-                        : workflow.currentStep === 'ready-to-vote'
-                          ? 'Voting is open. The board transcript is ready for ballot publication.'
-                          : workflow.currentStep ===
-                              'vote-submitted-and-waiting'
-                            ? 'Your ballot is already on the board. You can leave this page and come back later.'
-                            : workflow.currentStep ===
-                                'ready-to-help-open-results'
-                              ? 'Voting is closed. Your device may still be needed to help open the final tally.'
-                              : workflow.currentStep === 'waiting-for-results'
-                                ? 'Your part is done. Results will appear here once enough valid decryption shares are published.'
-                                : workflow.currentStep === 'complete'
-                                  ? 'The published result has been verified against the full ceremony transcript.'
-                                  : 'This ceremony ended in an aborted state. The audit rail on the right shows what was recorded.';
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopyNotice('Link copied.');
+        } catch {
+            setCopyNotice('Copy failed.');
+        }
+    };
+
+    const onSubmitVote = async (
+        event: React.FormEvent<HTMLFormElement>,
+    ): Promise<void> => {
+        event.preventDefault();
+
+        const normalizedVoterName = voterName.trim();
+
+        if (!canSubmitVote || !poll) {
+            return;
+        }
+
+        setLocalError(null);
+        setLocalNotice(null);
+
+        try {
+            const pendingState = await createPendingPollDeviceState();
+            const voterToken = generateClientToken();
+            const response = await registerVoter({
+                pollId: poll.id,
+                voterData: {
+                    authPublicKey: pendingState.authPublicKey,
+                    creatorToken:
+                        creatorSession?.pollId === poll.id
+                            ? creatorSession.creatorToken
+                            : undefined,
+                    transportPublicKey: pendingState.transportPublicKey,
+                    transportSuite: pendingState.transportSuite,
+                    voterName: normalizedVoterName,
+                    voterToken,
+                },
+            }).unwrap();
+
+            const storedScores = draftScores.map((score) => {
+                if (score === null) {
+                    throw new Error(
+                        'Every option must have a score before submission.',
+                    );
+                }
+
+                return score;
+            });
+            const nextDeviceState = await createPollDeviceState({
+                pendingState,
+                pollId: poll.id,
+                pollSlug: poll.slug,
+                storedBallotScores: storedScores,
+                voterIndex: response.voterIndex,
+                voterName: response.voterName,
+                voterToken: response.voterToken,
+                isCreatorParticipant: creatorSession?.pollId === poll.id,
+            });
+
+            savePollDeviceState(nextDeviceState);
+            saveVoterSession({
+                pollId: poll.id,
+                pollSlug: poll.slug,
+                voterIndex: response.voterIndex,
+                voterName: response.voterName,
+                voterToken: response.voterToken,
+            });
+            setLocalNotice(
+                'Vote stored on this device. You can close the app and come back after voting closes.',
+            );
+            await refetch();
+        } catch (submissionError) {
+            setLocalError(renderError(submissionError));
+        }
+    };
+
+    const onCloseVoting = async (): Promise<void> => {
+        if (!creatorSession || !workflow.canCloseVoting) {
+            return;
+        }
+
+        setLocalError(null);
+        setLocalNotice(null);
+
+        try {
+            await closeVoting({
+                pollId: poll.id,
+                closeData: {
+                    creatorToken: creatorSession.creatorToken,
+                },
+            }).unwrap();
+            setLocalNotice(
+                'Voting closed. The submitted roster is now being secured.',
+            );
+            await refetch();
+        } catch (closeError) {
+            setLocalError(renderError(closeError));
+        }
+    };
+
+    const onRevealResults = async (): Promise<void> => {
+        if (!workflow.canRevealResults) {
+            return;
+        }
+
+        setLocalError(null);
+        setLocalNotice(null);
+        setAutomationError(null);
+        setIsRevealSubmitting(true);
+
+        try {
+            const revealAction = await createRevealBallotCloseAction({
+                creatorSession,
+                deviceState,
+                poll,
+                voterSession,
+            });
+
+            if (!revealAction) {
+                throw new Error(
+                    'Results are not ready to reveal from this device yet.',
+                );
+            }
+
+            await submitPreparedAction(revealAction);
+            setLocalNotice('Reveal started. Decryption shares are arriving.');
+        } catch (revealError) {
+            setLocalError(renderError(revealError));
+        } finally {
+            setIsRevealSubmitting(false);
+        }
+    };
+
+    const primaryExplanation =
+        workflow.currentStep === 'anonymous-ready-to-vote'
+            ? 'Score every option from 1 to 10, submit once, and come back after the organizer closes voting.'
+            : workflow.currentStep === 'submitting-vote'
+              ? 'Saving your final local vote and registering this device for the later ceremony.'
+              : workflow.currentStep === 'creator-must-submit-first'
+                ? 'You still need to submit your own vote from this browser before you can close voting or reveal results.'
+                : workflow.currentStep === 'vote-stored-waiting-for-close'
+                  ? 'Your plaintext scores are stored only on this device until the organizer closes voting.'
+                  : workflow.currentStep === 'creator-can-close'
+                    ? 'Everyone who submitted before you close will be included. Everyone else stays out.'
+                    : workflow.currentStep === 'securing-auto'
+                      ? (automaticActionDescription ??
+                        'Securing the election in the background.')
+                      : workflow.currentStep === 'securing-retry-required'
+                        ? (automationError ??
+                          'Automatic setup needs a manual retry from this browser.')
+                        : workflow.currentStep === 'securing-waiting'
+                          ? 'Waiting for the rest of the group to finish the secure setup and encrypted ballot publication.'
+                          : workflow.currentStep === 'ready-to-reveal'
+                            ? 'Enough complete encrypted ballots are ready. Reveal results to freeze the counted set and start decryption.'
+                            : workflow.currentStep === 'revealing-auto'
+                              ? (automaticActionDescription ??
+                                'Publishing decryption material in the background.')
+                              : workflow.currentStep === 'revealing-waiting'
+                                ? 'Waiting for threshold decryption shares and final tally publication.'
+                                : workflow.currentStep === 'waiting-for-results'
+                                  ? 'The ceremony is moving without any action needed from this browser.'
+                                  : workflow.currentStep ===
+                                      'local-vote-missing'
+                                    ? 'This browser no longer has the local vote and device state required to continue after close.'
+                                    : workflow.currentStep === 'complete'
+                                      ? 'Every result shown below was replayed and verified from the public board log.'
+                                      : 'The ceremony could not be verified from the public board log.';
 
     return (
-        <section className="mx-auto flex w-full max-w-[88rem] flex-col gap-6">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.95fr)]">
-                <div className="min-w-0 space-y-6">
+        <section className="mx-auto w-full max-w-[96rem] space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.9fr)_minmax(21rem,1fr)]">
+                <div className="space-y-6">
                     <Panel className="space-y-5">
-                        <div className="space-y-3">
-                            <div className="flex flex-wrap items-center gap-3">
-                                <span className="rounded-full border border-border/70 bg-accent px-3 py-1 text-xs font-medium tracking-wide text-foreground/90">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="space-y-3">
+                                <p className="text-sm text-secondary">
                                     {phaseLabel(poll.phase)}
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                    {poll.joinedParticipantCount} joined
-                                </span>
+                                </p>
+                                <h1 className={pageTitleClassName}>
+                                    {poll.pollName}
+                                </h1>
+                                <p className="page-lead max-w-3xl">
+                                    {primaryExplanation}
+                                </p>
                             </div>
-                            <h1 className={pageTitleClassName}>
-                                {poll.pollName}
-                            </h1>
-                            <p className={mutedBodyClassName}>
-                                Share this link so people can join from their
-                                own devices:
-                                <span className="mt-2 block break-all font-mono text-xs text-foreground/80 sm:text-sm">
-                                    {shareableUrl}
-                                </span>
-                            </p>
+                            <div className="grid gap-2 text-sm text-secondary sm:grid-cols-2 lg:grid-cols-1">
+                                <div>
+                                    <div className="font-medium text-foreground">
+                                        Created
+                                    </div>
+                                    <div>{formatDateTime(poll.createdAt)}</div>
+                                </div>
+                                <div>
+                                    <div className="font-medium text-foreground">
+                                        Submitted participants
+                                    </div>
+                                    <div>{submittedParticipantSummary}</div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            <Panel padding="compact" tone="subtle">
-                                <p className="text-sm font-medium">
-                                    {poll.isOpen
-                                        ? 'Waiting room'
-                                        : 'Frozen roster'}
-                                </p>
-                                <p className="text-2xl font-semibold">
-                                    {poll.joinedParticipantCount}
-                                </p>
-                                <p className={mutedBodyClassName}>
-                                    {waitingRoomSummary}
-                                </p>
-                            </Panel>
-                            <Panel padding="compact" tone="subtle">
-                                <p className="text-sm font-medium">
-                                    Decryption threshold
-                                </p>
-                                <p className="text-2xl font-semibold">
-                                    {poll.thresholds.reconstructionThreshold ??
-                                        'Pending'}
-                                </p>
-                                <p className={mutedBodyClassName}>
-                                    {poll.isOpen
-                                        ? `${effectiveThresholdPercent}% would currently resolve to ${thresholdPreview} of ${previewParticipantCount} participants.`
-                                        : 'The frozen count needed to help open the result.'}
-                                </p>
-                            </Panel>
-                            <Panel padding="compact" tone="subtle">
-                                <p className="text-sm font-medium">
-                                    Fingerprint
-                                </p>
-                                <p className="text-sm font-semibold">
-                                    {poll.sessionFingerprint ?? 'Pending'}
-                                </p>
-                                <p className={mutedBodyClassName}>
-                                    Compare this if your group wants an extra
-                                    check that everyone sees the same ceremony.
-                                </p>
-                            </Panel>
-                        </div>
-                    </Panel>
 
-                    {localError && (
-                        <Alert announcement="assertive" variant="destructive">
-                            <AlertDescription>{localError}</AlertDescription>
-                        </Alert>
-                    )}
-                    {localNotice && (
-                        <Alert variant="info">
-                            <AlertDescription>{localNotice}</AlertDescription>
-                        </Alert>
-                    )}
-                    {error && (
-                        <Alert announcement="assertive" variant="destructive">
-                            <AlertDescription>
-                                {renderError(error)}
-                            </AlertDescription>
-                        </Alert>
-                    )}
-
-                    <Panel className="space-y-4">
-                        <div className="space-y-1">
-                            <h2 className={sectionTitleClassName}>
-                                Participants
-                            </h2>
-                            <p className={mutedBodyClassName}>
-                                {poll.isOpen
-                                    ? 'People appear here as soon as they join from the shared link.'
-                                    : 'This is the frozen roster for the current ceremony.'}
-                            </p>
-                        </div>
-                        {poll.voters.length === 0 ? (
-                            <p className="empty-state">
-                                No one has joined yet.
-                            </p>
-                        ) : (
-                            <ul
-                                aria-label="Participants roster"
-                                className="space-y-2"
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                            <div className="space-y-2">
+                                <div className="text-sm font-medium text-foreground">
+                                    Shareable vote link
+                                </div>
+                                <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm break-all">
+                                    {shareUrl}
+                                </div>
+                                {copyNotice ? (
+                                    <p className={mutedBodyClassName}>
+                                        {copyNotice}
+                                    </p>
+                                ) : null}
+                            </div>
+                            <Button
+                                disabled={!canCopyShareUrl}
+                                onClick={() => {
+                                    void onCopyShareUrl();
+                                }}
+                                size="lg"
+                                variant="outline"
                             >
-                                {poll.voters.map((participant) => (
-                                    <li
-                                        className="rounded-[var(--radius-md)] border border-border/70 bg-card px-3 py-3"
-                                        key={participant.voterIndex}
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <span className="font-medium">
-                                                {participant.voterIndex}.{' '}
-                                                {participant.voterName}
-                                            </span>
-                                            <span className="text-sm text-muted-foreground">
-                                                {participant.deviceReady
-                                                    ? 'Ready'
-                                                    : 'Joining'}
-                                            </span>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                                Copy link
+                            </Button>
+                        </div>
                     </Panel>
 
-                    <Panel className="space-y-4">
-                        <div className="space-y-1">
-                            <h2 className={sectionTitleClassName}>
+                    {(localError || automationError || localNotice) && (
+                        <div className="space-y-3">
+                            {localError ? (
+                                <Alert
+                                    announcement="assertive"
+                                    variant="destructive"
+                                >
+                                    <AlertDescription>
+                                        {localError}
+                                    </AlertDescription>
+                                </Alert>
+                            ) : null}
+                            {automationError ? (
+                                <Alert
+                                    announcement="polite"
+                                    variant="destructive"
+                                >
+                                    <AlertDescription>
+                                        {automationError}
+                                    </AlertDescription>
+                                </Alert>
+                            ) : null}
+                            {localNotice ? (
+                                <Alert announcement="polite" variant="success">
+                                    <AlertDescription>
+                                        {localNotice}
+                                    </AlertDescription>
+                                </Alert>
+                            ) : null}
+                        </div>
+                    )}
+
+                    <Panel className="space-y-5">
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-semibold">
                                 Your next step
                             </h2>
                             <p className={mutedBodyClassName}>
-                                {nextStepDescription}
+                                {primaryExplanation}
                             </p>
                         </div>
 
-                        <Panel borderStyle="dashed" tone="subtle">
-                            <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-semibold">
-                                        {nextStepHeading}
-                                    </h3>
-                                    <p className={mutedBodyClassName}>
-                                        {nextStepDescription}
-                                    </p>
+                        {poll.phase === 'open' && !localParticipant ? (
+                            <form
+                                className="space-y-6"
+                                noValidate
+                                onSubmit={(event) => {
+                                    void onSubmitVote(event);
+                                }}
+                            >
+                                <div className="space-y-2">
+                                    <label
+                                        className="text-sm font-medium"
+                                        htmlFor="poll-voter-name"
+                                    >
+                                        Your public name
+                                    </label>
+                                    <input
+                                        autoComplete="nickname"
+                                        className="flex h-10 w-full rounded-[var(--radius-md)] border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                        id="poll-voter-name"
+                                        maxLength={32}
+                                        onChange={(event) => {
+                                            setVoterName(event.target.value);
+                                        }}
+                                        placeholder="How should the roster show you?"
+                                        value={voterName}
+                                    />
                                 </div>
 
-                                {voterSession === null &&
-                                    poll.phase === 'open' && (
-                                        <form
-                                            className="space-y-4"
-                                            onSubmit={(event) =>
-                                                void onRegister(event)
-                                            }
-                                        >
-                                            <label
-                                                className="flex flex-col gap-2"
-                                                htmlFor={voterNameInputId}
-                                            >
-                                                <span className="text-sm font-medium">
-                                                    Your public name
-                                                </span>
-                                                <input
-                                                    className="h-11 rounded-[var(--radius-md)] border border-border bg-background px-3 text-base"
-                                                    id={voterNameInputId}
-                                                    maxLength={32}
-                                                    onChange={(event) =>
-                                                        setVoterName(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    value={voterName}
-                                                />
-                                            </label>
-                                            <Button
-                                                disabled={
-                                                    registerState.isLoading ||
-                                                    !voterName.trim()
-                                                }
-                                                size="lg"
-                                                type="submit"
-                                            >
-                                                Join vote
-                                            </Button>
-                                        </form>
-                                    )}
-
-                                {workflow.currentStep ===
-                                    'joined-and-waiting-for-start' && (
-                                    <p className="empty-state">
-                                        You are already in the waiting room. You
-                                        do not need to keep this page open while
-                                        more people join.
-                                    </p>
-                                )}
-
-                                {workflow.currentStep ===
-                                    'vote-submitted-and-waiting' && (
-                                    <p className="empty-state">
-                                        Your ballot is already published.
-                                        Results will unlock once the ceremony
-                                        reaches the final opening phase.
-                                    </p>
-                                )}
-
-                                {workflow.currentStep ===
-                                    'waiting-for-results' && (
-                                    <p className="empty-state">
-                                        Your part is done. This page will update
-                                        automatically while the final shares are
-                                        collected.
-                                    </p>
-                                )}
-
-                                {workflow.currentStep === 'complete' && (
-                                    <p className="empty-state">
-                                        The verified result is available below.
-                                    </p>
-                                )}
-
-                                {workflow.currentStep === 'aborted' && (
-                                    <p className="empty-state">
-                                        This ceremony aborted before a verified
-                                        result was produced.
-                                    </p>
-                                )}
-
-                                {workflow.currentStep !==
-                                    'anonymous-joinable' &&
-                                    workflow.currentStep !==
-                                        'creator-configuring-threshold' &&
-                                    workflow.currentStep !==
-                                        'joined-and-waiting-for-start' &&
-                                    workflow.currentStep !==
-                                        'vote-submitted-and-waiting' &&
-                                    workflow.currentStep !==
-                                        'waiting-for-results' &&
-                                    workflow.currentStep !== 'complete' &&
-                                    workflow.currentStep !== 'aborted' && (
-                                        <p className="empty-state">
-                                            {workflow.missingLocalState
-                                                ? 'This browser is missing the local ceremony state needed for later private actions.'
-                                                : (autoBoardSetupDescription ??
-                                                  preparingStatusNote ??
-                                                  'The private ceremony is progressing through the shared board transcript. This screen will keep tracking your next required action.')}
-                                        </p>
-                                    )}
-
-                                {poll.phase === 'preparing' &&
-                                    !workflow.missingLocalState &&
-                                    workflow.currentStep === 'preparing-auto' &&
-                                    autoBoardSetupAction && (
-                                        <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border/70 bg-card px-4 py-3">
-                                            <Spinner className="size-5" />
-                                            <p className={mutedBodyClassName}>
-                                                {autoBoardSetupBusyLabel(
-                                                    autoBoardSetupAction.kind,
-                                                )}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                {poll.phase === 'preparing' &&
-                                    !workflow.missingLocalState &&
-                                    workflow.currentStep ===
-                                        'preparing-action-required' &&
-                                    autoBoardSetupAction && (
-                                        <div className="flex flex-wrap gap-3">
-                                            <Button
-                                                disabled={
-                                                    autoSetupStep !== null
-                                                }
-                                                onClick={() =>
-                                                    void submitAutoBoardSetupAction(
-                                                        autoBoardSetupAction,
-                                                    )
-                                                }
-                                                size="lg"
-                                            >
-                                                {autoSetupStep ===
-                                                autoBoardSetupAction.kind
-                                                    ? 'Retrying...'
-                                                    : `Retry ${autoBoardSetupActionLabel(
-                                                          autoBoardSetupAction.kind,
-                                                      )}`}
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                {poll.phase === 'preparing' &&
-                                    !workflow.missingLocalState && (
-                                        <div className="grid gap-3 sm:grid-cols-3">
-                                            <Panel
-                                                padding="compact"
-                                                tone="subtle"
-                                            >
-                                                <p className="text-sm font-medium">
-                                                    Registrations on board
-                                                </p>
-                                                <p className="text-2xl font-semibold">
-                                                    {acceptedRegistrations}/
-                                                    {
-                                                        poll.joinedParticipantCount
-                                                    }
-                                                </p>
-                                                <p
-                                                    className={
-                                                        mutedBodyClassName
-                                                    }
-                                                >
-                                                    Each participant signs one
-                                                    hidden board registration
-                                                    after the roster is frozen.
-                                                </p>
-                                            </Panel>
-                                            <Panel
-                                                padding="compact"
-                                                tone="subtle"
-                                            >
-                                                <p className="text-sm font-medium">
-                                                    Manifest
-                                                </p>
-                                                <p className="text-2xl font-semibold">
-                                                    {hasManifestPublication
-                                                        ? 'Published'
-                                                        : 'Pending'}
-                                                </p>
-                                                <p
-                                                    className={
-                                                        mutedBodyClassName
-                                                    }
-                                                >
-                                                    One participant anchors the
-                                                    frozen manifest before
-                                                    everyone confirms it.
-                                                </p>
-                                            </Panel>
-                                            <Panel
-                                                padding="compact"
-                                                tone="subtle"
-                                            >
-                                                <p className="text-sm font-medium">
-                                                    Confirmations
-                                                </p>
-                                                <p className="text-2xl font-semibold">
-                                                    {
-                                                        acceptedManifestAcceptances
-                                                    }
-                                                    /
-                                                    {
-                                                        poll.joinedParticipantCount
-                                                    }
-                                                </p>
-                                                <p
-                                                    className={
-                                                        mutedBodyClassName
-                                                    }
-                                                >
-                                                    Every participant confirms
-                                                    the same frozen ceremony
-                                                    before private setup
-                                                    continues.
-                                                </p>
-                                            </Panel>
-                                        </div>
-                                    )}
-                            </div>
-                        </Panel>
-
-                        {creatorSession && poll.phase === 'open' && (
-                            <Panel borderStyle="dashed" tone="subtle">
                                 <div className="space-y-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-lg font-semibold">
-                                            Creator controls
+                                    <div className="space-y-2">
+                                        <h3 className="text-base font-semibold">
+                                            Score every option
                                         </h3>
                                         <p className={mutedBodyClassName}>
-                                            Starting voting freezes the current
-                                            roster and locks the exact
-                                            decryption threshold.
+                                            Every option must get one score from
+                                            1 to 10. You can submit only once.
                                         </p>
                                     </div>
-                                    <label
-                                        className="flex flex-col gap-3"
-                                        htmlFor={thresholdInputId}
+
+                                    {poll.choices.map((choice, choiceIndex) => (
+                                        <div
+                                            className="space-y-3 rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4"
+                                            key={choice}
+                                        >
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div>
+                                                    <div className="text-sm font-medium text-foreground">
+                                                        {choice}
+                                                    </div>
+                                                    <div className="text-sm text-secondary">
+                                                        {draftScores[
+                                                            choiceIndex
+                                                        ] === null
+                                                            ? 'Pick a score'
+                                                            : `Selected score: ${draftScores[choiceIndex]}`}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+                                                {scoreOptions.map((score) => (
+                                                    <Button
+                                                        aria-label={`Score ${choice} as ${score}`}
+                                                        className="w-full"
+                                                        key={score}
+                                                        onClick={() => {
+                                                            onScoreChange(
+                                                                choiceIndex,
+                                                                score,
+                                                            );
+                                                        }}
+                                                        type="button"
+                                                        variant={
+                                                            draftScores[
+                                                                choiceIndex
+                                                            ] === score
+                                                                ? 'default'
+                                                                : 'outline'
+                                                        }
+                                                    >
+                                                        {score}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex flex-wrap justify-end gap-3">
+                                    <LoadingButton
+                                        className="w-full sm:w-auto"
+                                        disabled={!canSubmitVote}
+                                        loading={registerState.isLoading}
+                                        loadingLabel="Submitting vote"
+                                        size="lg"
+                                        type="submit"
                                     >
-                                        <span className="text-sm font-medium">
-                                            {effectiveThresholdPercent}% maps to{' '}
-                                            {thresholdPreview} of{' '}
-                                            {previewParticipantCount}{' '}
-                                            participants
-                                        </span>
-                                        <input
-                                            className="w-full accent-white"
-                                            id={thresholdInputId}
-                                            max={thresholdRange.maxPercent}
-                                            min={thresholdRange.minPercent}
-                                            onChange={(event) =>
-                                                setThresholdPercent(
-                                                    Number(event.target.value),
-                                                )
-                                            }
-                                            step={1}
-                                            type="range"
-                                            value={effectiveThresholdPercent}
-                                        />
-                                    </label>
-                                    <p className={mutedBodyClassName}>
-                                        The threshold can range from the
-                                        majority floor of{' '}
-                                        {poll.thresholds.strictMajorityFloor} to{' '}
-                                        {maximumSupportedThreshold} for the
-                                        current roster size.
+                                        Submit vote
+                                    </LoadingButton>
+                                </div>
+                            </form>
+                        ) : poll.phase === 'open' ? (
+                            <div className="space-y-4">
+                                <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4">
+                                    <div className="text-base font-semibold">
+                                        Vote stored on this device
+                                    </div>
+                                    <p className={`${mutedBodyClassName} mt-2`}>
+                                        {workflow.currentStep ===
+                                        'creator-can-close'
+                                            ? 'Your vote is in. You can close voting when you are ready to freeze the submitted roster.'
+                                            : 'Your plaintext scores stay on this device until voting closes. You can leave now and come back later.'}
                                     </p>
-                                    {isFullThresholdSelected && (
-                                        <p className={mutedBodyClassName}>
-                                            100% means every participant must
-                                            return to help open results. This
-                                            maximizes the threshold but it is
-                                            the most fragile setting for
-                                            liveness.
-                                        </p>
-                                    )}
-                                    <Button
-                                        disabled={
-                                            startState.isLoading ||
-                                            poll.joinedParticipantCount <
-                                                poll.minimumStartParticipantCount
-                                        }
-                                        onClick={() => void onStartVoting()}
+                                </div>
+
+                                {workflow.currentStep ===
+                                'creator-must-submit-first' ? (
+                                    <Alert announcement="polite" variant="info">
+                                        <AlertDescription>
+                                            The creator must submit a vote from
+                                            this browser before close or reveal
+                                            will be available.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : null}
+
+                                {workflow.canCloseVoting ? (
+                                    <div className="flex flex-wrap justify-end gap-3">
+                                        <LoadingButton
+                                            className="w-full sm:w-auto"
+                                            disabled={!workflow.canCloseVoting}
+                                            loading={closeState.isLoading}
+                                            loadingLabel="Closing voting"
+                                            onClick={() => {
+                                                void onCloseVoting();
+                                            }}
+                                            size="lg"
+                                        >
+                                            Close voting
+                                        </LoadingButton>
+                                    </div>
+                                ) : isCreatorParticipant ? (
+                                    <p className={mutedBodyClassName}>
+                                        {poll.submittedParticipantCount <
+                                        poll.minimumCloseParticipantCount
+                                            ? `At least ${poll.minimumCloseParticipantCount} submitted participants are required before closing.`
+                                            : 'Waiting for you to close the submitted roster.'}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : poll.phase === 'ready-to-reveal' &&
+                          workflow.canRevealResults ? (
+                            <div className="space-y-4">
+                                <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4">
+                                    <div className="text-base font-semibold">
+                                        Results are ready to open
+                                    </div>
+                                    <p className={`${mutedBodyClassName} mt-2`}>
+                                        Revealing results publishes one
+                                        organizer-signed ballot cutoff and
+                                        starts the threshold decryption phase.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-3">
+                                    <LoadingButton
+                                        className="w-full sm:w-auto"
+                                        disabled={!workflow.canRevealResults}
+                                        loading={isRevealSubmitting}
+                                        loadingLabel="Revealing results"
+                                        onClick={() => {
+                                            void onRevealResults();
+                                        }}
                                         size="lg"
                                     >
-                                        Start voting
-                                    </Button>
+                                        Reveal results
+                                    </LoadingButton>
                                 </div>
-                            </Panel>
+                            </div>
+                        ) : workflow.currentStep ===
+                          'securing-retry-required' ? (
+                            <div className="flex flex-wrap justify-end gap-3">
+                                <Button
+                                    className="w-full sm:w-auto"
+                                    onClick={() => {
+                                        setAutomationError(null);
+                                        setAutomaticResolutionAttempt(
+                                            (currentAttempt) =>
+                                                currentAttempt + 1,
+                                        );
+                                    }}
+                                    size="lg"
+                                    variant="outline"
+                                >
+                                    Retry setup
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4">
+                                {isResolvingAutomaticAction ||
+                                activeActionSlotKey ? (
+                                    <Spinner className="size-5" label={null} />
+                                ) : null}
+                                <p className="text-sm text-secondary">
+                                    {primaryExplanation}
+                                </p>
+                            </div>
                         )}
                     </Panel>
 
-                    {poll.verification.verifiedOptionTallies.length > 0 && (
+                    {poll.verification.status === 'verified' ? (
                         <Panel className="space-y-4">
-                            <div className="space-y-1">
-                                <h2 className={sectionTitleClassName}>
+                            <div className="space-y-2">
+                                <h2 className="text-xl font-semibold">
                                     Results
                                 </h2>
                                 <p className={mutedBodyClassName}>
-                                    Arithmetic means are shown only after the
-                                    published tally has been fully verified.
+                                    Arithmetic means are shown in the same 1.0
+                                    to 10.0 range that each participant used.
                                 </p>
                             </div>
-                            <div className="space-y-3">
+                            <div className="grid gap-3">
                                 {poll.verification.verifiedOptionTallies.map(
                                     (result) => (
                                         <div
-                                            className="rounded-[var(--radius-md)] border border-border/70 bg-card p-4"
+                                            className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4"
                                             key={result.optionIndex}
                                         >
-                                            <p className="font-semibold">
-                                                {poll.choices[
-                                                    result.optionIndex - 1
-                                                ] ??
-                                                    `Option ${result.optionIndex}`}
-                                            </p>
-                                            <p className={mutedBodyClassName}>
-                                                Mean: {result.mean}
-                                            </p>
-                                            <p className={mutedBodyClassName}>
-                                                Verified tally: {result.tally}
-                                            </p>
-                                            <p className={mutedBodyClassName}>
-                                                Accepted ballots:{' '}
-                                                {result.acceptedBallotCount}
-                                            </p>
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                                <div className="space-y-1">
+                                                    <div className="text-sm font-medium text-foreground">
+                                                        {
+                                                            poll.choices[
+                                                                result.optionIndex -
+                                                                    1
+                                                            ]
+                                                        }
+                                                    </div>
+                                                    <div className="text-sm text-secondary">
+                                                        {
+                                                            result.acceptedBallotCount
+                                                        }{' '}
+                                                        accepted ballots
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-3xl font-semibold">
+                                                        {result.mean.toFixed(2)}
+                                                    </div>
+                                                    <div className="text-sm text-secondary">
+                                                        Tally {result.tally}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     ),
                                 )}
                             </div>
                         </Panel>
-                    )}
+                    ) : null}
                 </div>
-                <aside className="min-w-0 space-y-6">
-                    <Panel
-                        aria-label="Audit and verification details"
-                        className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto"
-                        tabIndex={0}
-                    >
-                        <div className="space-y-1">
-                            <h2 className={sectionTitleClassName}>
+
+                <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+                    <Panel className="space-y-4">
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-semibold">
                                 Audit and verification
                             </h2>
                             <p className={mutedBodyClassName}>
-                                The right rail keeps the technical and
-                                cryptographic state visible without getting in
-                                the way of the main flow.
+                                The main flow hides the cryptography. This rail
+                                shows what the board currently proves.
                             </p>
                         </div>
 
-                        <div className="space-y-2">
-                            <p className={mutedBodyClassName}>
-                                Verification status: {poll.verification.status}
-                            </p>
-                            {poll.verification.reason && (
-                                <p className={mutedBodyClassName}>
-                                    {poll.verification.reason}
-                                </p>
-                            )}
-                            <p className={mutedBodyClassName}>
-                                Accepted board messages:{' '}
-                                {poll.boardAudit.acceptedCount}
-                            </p>
-                            <p className={mutedBodyClassName}>
-                                Idempotent retransmissions:{' '}
-                                {poll.boardAudit.duplicateCount}
-                            </p>
-                            <p className={mutedBodyClassName}>
-                                Equivocations:{' '}
-                                {poll.boardAudit.equivocationCount}
-                            </p>
-                        </div>
-
-                        <div className="space-y-2 border-t border-border/60 pt-4">
-                            <p className={mutedBodyClassName}>
-                                Reconstruction threshold:{' '}
-                                {poll.thresholds.reconstructionThreshold ??
-                                    'Pending'}
-                            </p>
-                            <p className={mutedBodyClassName}>
-                                This is the number of valid decryption shares
-                                needed before the tally can be opened.
-                            </p>
-                            <p className={mutedBodyClassName}>
-                                Minimum published voter count:{' '}
-                                {poll.thresholds.minimumPublishedVoterCount ??
-                                    'Pending'}
-                            </p>
-                            <p className={mutedBodyClassName}>
-                                This is the publication floor. Results stay
-                                unpublished until at least this many accepted
-                                voters exist.
-                            </p>
-                        </div>
-
-                        <div className="space-y-2 border-t border-border/60 pt-4">
-                            <p className={mutedBodyClassName}>
-                                Accepted ballots: {acceptedBallots}
-                            </p>
-                            <p className={mutedBodyClassName}>
-                                Accepted decryption shares:{' '}
-                                {acceptedDecryptionShares}
-                            </p>
-                            <div className="space-y-1">
-                                <p className={mutedBodyClassName}>
-                                    Ceremony digest
-                                </p>
-                                <p className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
-                                    {poll.boardAudit.ceremonyDigest ??
-                                        'Pending'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {!supportsFullCeremonyAuthoring && (
-                            <div className="space-y-2 border-t border-border/60 pt-4">
-                                <h3 className="text-base font-semibold">
-                                    Current library gap
-                                </h3>
-                                <p className={mutedBodyClassName}>
-                                    {fullCeremonySupportDescription}
-                                </p>
-                                <p className={mutedBodyClassName}>
-                                    Missing root exports:{' '}
-                                    {missingFullCeremonyRootExports.join(', ')}
-                                </p>
-                            </div>
-                        )}
-
-                        {poll.boardAudit.phaseDigests.length > 0 && (
-                            <div className="space-y-2 border-t border-border/60 pt-4">
-                                <h3 className="text-base font-semibold">
-                                    Phase digests
-                                </h3>
-                                <div className="space-y-2">
-                                    {poll.boardAudit.phaseDigests.map(
-                                        (phaseDigest) => (
-                                            <div
-                                                className="rounded-[var(--radius-md)] border border-border/70 bg-card px-3 py-3"
-                                                key={phaseDigest.phase}
-                                            >
-                                                <p className="text-sm font-medium">
-                                                    Phase {phaseDigest.phase}
-                                                </p>
-                                                <p className="break-all text-sm text-muted-foreground">
-                                                    {phaseDigest.digest}
-                                                </p>
-                                            </div>
-                                        ),
-                                    )}
+                        <div className="space-y-3 text-sm">
+                            <div>
+                                <div className="font-medium text-foreground">
+                                    Verification
+                                </div>
+                                <div className="text-secondary">
+                                    {poll.verification.status === 'verified'
+                                        ? 'Verified from the public board log.'
+                                        : (poll.verification.reason ??
+                                          'Waiting for enough public data to verify the full ceremony.')}
                                 </div>
                             </div>
-                        )}
+                            <div>
+                                <div className="font-medium text-foreground">
+                                    Reconstruction threshold
+                                </div>
+                                <div className="text-secondary">
+                                    {poll.thresholds.reconstructionThreshold ??
+                                        'Pending close'}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="font-medium text-foreground">
+                                    Minimum published voter count
+                                </div>
+                                <div className="text-secondary">
+                                    {poll.thresholds
+                                        .minimumPublishedVoterCount ??
+                                        'Pending close'}
+                                </div>
+                            </div>
+                            {poll.sessionFingerprint ? (
+                                <div>
+                                    <div className="font-medium text-foreground">
+                                        Session fingerprint
+                                    </div>
+                                    <div className="text-secondary break-all">
+                                        {poll.sessionFingerprint}
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
                     </Panel>
 
                     <Panel className="space-y-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <h2 className={sectionTitleClassName}>
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-semibold">
+                                Ceremony progress
+                            </h2>
+                            <p className={mutedBodyClassName}>
+                                Counts are derived from the accepted board log.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-3 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Submitted participants
+                                </span>
+                                <span>{poll.submittedParticipantCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Board registrations
+                                </span>
+                                <span>
+                                    {acceptedRegistrations}/
+                                    {poll.submittedParticipantCount}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Manifest acceptances
+                                </span>
+                                <span>
+                                    {acceptedManifestAcceptances}/
+                                    {poll.submittedParticipantCount}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Key confirmations
+                                </span>
+                                <span>
+                                    {acceptedKeyConfirmations}/
+                                    {poll.submittedParticipantCount}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Complete encrypted ballots
+                                </span>
+                                <span>
+                                    {
+                                        poll.ceremony
+                                            .completeEncryptedBallotParticipantCount
+                                    }
+                                    /{poll.submittedParticipantCount}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Decryption shares
+                                </span>
+                                <span>
+                                    {poll.ceremony.acceptedDecryptionShareCount}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Reveal status
+                                </span>
+                                <span>
+                                    {poll.ceremony.revealReady
+                                        ? 'Ready'
+                                        : 'Pending'}
+                                </span>
+                            </div>
+                        </div>
+                    </Panel>
+
+                    <Panel className="space-y-4">
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-semibold">
+                                Participants
+                            </h2>
+                            <p className={mutedBodyClassName}>
+                                The pre-close roster is public and auditable.
+                            </p>
+                        </div>
+
+                        <ul
+                            aria-label="Participants roster"
+                            className="space-y-2"
+                        >
+                            {poll.voters.map((participant) => (
+                                <li
+                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm"
+                                    key={participant.voterIndex}
+                                >
+                                    <div className="font-medium text-foreground">
+                                        {participant.voterIndex}.{' '}
+                                        {participant.voterName}
+                                    </div>
+                                    <div className="text-secondary">
+                                        {participant.deviceReady
+                                            ? 'Device keys submitted'
+                                            : 'Device keys pending'}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </Panel>
+
+                    <Panel className="space-y-4">
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-semibold">
                                 Board activity
                             </h2>
-                            {isFetching && <Spinner className="size-5" />}
-                        </div>
-                        {poll.boardEntries.length === 0 ? (
-                            <p className="empty-state">
-                                No board activity has been published yet.
+                            <p className={mutedBodyClassName}>
+                                Digests and message counts come from the
+                                accepted bulletin board log.
                             </p>
-                        ) : (
-                            <div className="space-y-3">
-                                {poll.boardEntries.slice(-12).map((entry) => (
-                                    <div
-                                        className="rounded-[var(--radius-md)] border border-border/70 bg-card px-3 py-3"
-                                        key={entry.id}
-                                    >
-                                        <p className="text-sm font-medium">
-                                            Phase {entry.phase} /{' '}
-                                            {entry.messageType}
-                                        </p>
-                                        <p className={mutedBodyClassName}>
-                                            Participant {entry.participantIndex}
-                                            . {entry.classification}
-                                        </p>
-                                    </div>
-                                ))}
+                        </div>
+
+                        <div className="space-y-3 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">Accepted</span>
+                                <span>{poll.boardAudit.acceptedCount}</span>
                             </div>
-                        )}
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Duplicates
+                                </span>
+                                <span>{poll.boardAudit.duplicateCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Equivocations
+                                </span>
+                                <span>{poll.boardAudit.equivocationCount}</span>
+                            </div>
+                            {poll.boardAudit.ceremonyDigest ? (
+                                <div>
+                                    <div className="font-medium text-foreground">
+                                        Ceremony digest
+                                    </div>
+                                    <div className="text-secondary break-all">
+                                        {poll.boardAudit.ceremonyDigest}
+                                    </div>
+                                </div>
+                            ) : null}
+                            {poll.boardAudit.phaseDigests.length ? (
+                                <div className="space-y-2">
+                                    <div className="font-medium text-foreground">
+                                        Phase digests
+                                    </div>
+                                    <ul className="space-y-2">
+                                        {poll.boardAudit.phaseDigests.map(
+                                            (digest) => (
+                                                <li
+                                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-3 py-3"
+                                                    key={`${digest.phase}-${digest.digest}`}
+                                                >
+                                                    <div className="font-medium text-foreground">
+                                                        Phase {digest.phase}
+                                                    </div>
+                                                    <div className="text-secondary break-all">
+                                                        {digest.digest}
+                                                    </div>
+                                                </li>
+                                            ),
+                                        )}
+                                    </ul>
+                                </div>
+                            ) : null}
+                            {poll.boardEntries.length ? (
+                                <div className="space-y-2">
+                                    <div className="font-medium text-foreground">
+                                        Latest entries
+                                    </div>
+                                    <div className="space-y-2">
+                                        {poll.boardEntries
+                                            .slice(-8)
+                                            .reverse()
+                                            .map((entry) => (
+                                                <div
+                                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-3 py-3 text-sm"
+                                                    key={entry.id}
+                                                >
+                                                    <div className="font-medium text-foreground">
+                                                        Participant{' '}
+                                                        {entry.participantIndex}
+                                                        . {entry.messageType}
+                                                    </div>
+                                                    <div className="text-secondary">
+                                                        {entry.classification}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
                     </Panel>
-                </aside>
+                </div>
             </div>
+
+            {(isLoading || isFetching) && (
+                <div aria-live="polite" className="sr-only">
+                    Refreshing vote state
+                </div>
+            )}
         </section>
     );
 };

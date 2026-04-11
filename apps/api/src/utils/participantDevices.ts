@@ -1,17 +1,15 @@
-import type { KeyAgreementSuite } from 'threshold-elgamal';
-
 export type ParticipantDeviceRecord = {
     authPublicKey: string;
     transportPublicKey: string;
-    transportSuite: KeyAgreementSuite;
+    transportSuite: 'X25519';
 };
 
 export const serializeParticipantDeviceRecord = (
     value: ParticipantDeviceRecord,
 ): string => JSON.stringify(value);
 
-const isKeyAgreementSuite = (value: unknown): value is KeyAgreementSuite =>
-    value === 'X25519' || value === 'P-256';
+const isTransportSuite = (value: unknown): value is 'X25519' =>
+    value === 'X25519';
 
 export const parseParticipantDeviceRecord = (
     value: string | null | undefined,
@@ -28,7 +26,7 @@ export const parseParticipantDeviceRecord = (
             parsed.authPublicKey.length < 1 ||
             typeof parsed.transportPublicKey !== 'string' ||
             parsed.transportPublicKey.length < 1 ||
-            !isKeyAgreementSuite(parsed.transportSuite)
+            !isTransportSuite(parsed.transportSuite)
         ) {
             return null;
         }

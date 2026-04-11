@@ -32,9 +32,9 @@ const RecoverSessionResponseSchema = Type.Object({
     pollSlug: Type.String(),
     phase: Type.Union([
         Type.Literal('open'),
-        Type.Literal('preparing'),
-        Type.Literal('voting'),
-        Type.Literal('opening-results'),
+        Type.Literal('securing'),
+        Type.Literal('ready-to-reveal'),
+        Type.Literal('revealing'),
         Type.Literal('complete'),
         Type.Literal('aborted'),
     ]),

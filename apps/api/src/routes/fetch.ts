@@ -21,7 +21,7 @@ const PollRosterEntrySchema = Type.Object({
     authPublicKey: Type.String(),
     participantIndex: Type.Number(),
     transportPublicKey: Type.String(),
-    transportSuite: Type.Union([Type.Literal('X25519'), Type.Literal('P-256')]),
+    transportSuite: Type.Literal('X25519'),
     voterName: Type.String(),
 });
 
@@ -39,14 +39,21 @@ const PollResponseSchema = Type.Object({
     sessionFingerprint: Type.Union([Type.String(), Type.Null()]),
     phase: Type.Union([
         Type.Literal('open'),
-        Type.Literal('preparing'),
-        Type.Literal('voting'),
-        Type.Literal('opening-results'),
+        Type.Literal('securing'),
+        Type.Literal('ready-to-reveal'),
+        Type.Literal('revealing'),
         Type.Literal('complete'),
         Type.Literal('aborted'),
     ]),
-    joinedParticipantCount: Type.Number(),
-    minimumStartParticipantCount: Type.Number(),
+    submittedParticipantCount: Type.Number(),
+    minimumCloseParticipantCount: Type.Number(),
+    ceremony: Type.Object({
+        acceptedDecryptionShareCount: Type.Number(),
+        acceptedEncryptedBallotCount: Type.Number(),
+        acceptedRegistrationCount: Type.Number(),
+        completeEncryptedBallotParticipantCount: Type.Number(),
+        revealReady: Type.Boolean(),
+    }),
     boardAudit: Type.Object({
         acceptedCount: Type.Number(),
         duplicateCount: Type.Number(),
@@ -81,8 +88,6 @@ const PollResponseSchema = Type.Object({
     thresholds: Type.Object({
         reconstructionThreshold: Type.Union([Type.Number(), Type.Null()]),
         minimumPublishedVoterCount: Type.Union([Type.Number(), Type.Null()]),
-        suggestedReconstructionThreshold: Type.Number(),
-        strictMajorityFloor: Type.Number(),
         maxParticipants: Type.Number(),
         validationTarget: Type.Number(),
     }),

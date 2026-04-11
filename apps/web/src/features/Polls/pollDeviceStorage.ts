@@ -1,10 +1,9 @@
-import { bytesToHex, hexToBytes } from 'threshold-elgamal';
 import {
     exportAuthPublicKey,
     exportTransportPublicKey,
     generateAuthKeyPair,
     generateTransportKeyPair,
-    type KeyAgreementSuite,
+    type SignedPayload,
 } from 'threshold-elgamal';
 
 type StoredPollDeviceState = {
@@ -12,11 +11,14 @@ type StoredPollDeviceState = {
     authPublicKey: string;
     dkgBlindingSeed: string;
     dkgSecretSeed: string;
+    isCreatorParticipant: boolean;
+    pendingPayloads: Record<string, SignedPayload>;
     pollId: string;
     pollSlug: string;
+    storedBallotScores: number[] | null;
     transportPrivateKeyPkcs8: string;
     transportPublicKey: string;
-    transportSuite: KeyAgreementSuite;
+    transportSuite: 'X25519';
     voterIndex: number;
     voterName: string;
     voterToken: string;
@@ -37,11 +39,55 @@ type StoredPollDeviceStates = Record<string, StoredPollDeviceState>;
 
 const storageKey = 'sealed-vote.poll-device-state.v1';
 
+const bytesToHex = (bytes: Uint8Array): string =>
+    Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+const hexToBytes = (hexValue: string): Uint8Array => {
+    const normalized = hexValue.trim();
+    const bytes = new Uint8Array(normalized.length / 2);
+
+    for (let index = 0; index < normalized.length; index += 2) {
+        bytes[index / 2] = Number.parseInt(
+            normalized.slice(index, index + 2),
+            16,
+        );
+    }
+
+    return bytes;
+};
+
 const canUseLocalStorage = (): boolean =>
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
-const isKeyAgreementSuite = (value: unknown): value is KeyAgreementSuite =>
-    value === 'X25519' || value === 'P-256';
+const isTransportSuite = (value: unknown): value is 'X25519' =>
+    value === 'X25519';
+
+const isSignedPayloadRecord = (
+    value: unknown,
+): value is Record<string, SignedPayload> => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return false;
+    }
+
+    return Object.values(value).every(
+        (entry) =>
+            typeof entry === 'object' &&
+            entry !== null &&
+            'payload' in entry &&
+            'signature' in entry,
+    );
+};
+
+const isStoredBallotScores = (value: unknown): value is number[] | null =>
+    value === null ||
+    (Array.isArray(value) &&
+        value.every(
+            (score) =>
+                typeof score === 'number' &&
+                Number.isInteger(score) &&
+                score >= 1 &&
+                score <= 10,
+        ));
 
 const isStoredPollDeviceState = (
     value: unknown,
@@ -61,15 +107,18 @@ const isStoredPollDeviceState = (
         candidate.dkgBlindingSeed.length > 0 &&
         typeof candidate.dkgSecretSeed === 'string' &&
         candidate.dkgSecretSeed.length > 0 &&
+        typeof candidate.isCreatorParticipant === 'boolean' &&
+        isSignedPayloadRecord(candidate.pendingPayloads) &&
         typeof candidate.pollId === 'string' &&
         candidate.pollId.length > 0 &&
         typeof candidate.pollSlug === 'string' &&
         candidate.pollSlug.length > 0 &&
+        isStoredBallotScores(candidate.storedBallotScores) &&
         typeof candidate.transportPrivateKeyPkcs8 === 'string' &&
         candidate.transportPrivateKeyPkcs8.length > 0 &&
         typeof candidate.transportPublicKey === 'string' &&
         candidate.transportPublicKey.length > 0 &&
-        isKeyAgreementSuite(candidate.transportSuite) &&
+        isTransportSuite(candidate.transportSuite) &&
         typeof candidate.voterIndex === 'number' &&
         Number.isInteger(candidate.voterIndex) &&
         candidate.voterIndex > 0 &&
@@ -166,30 +215,10 @@ export const importStoredAuthPrivateKey = async (
         'pkcs8',
         toWebCryptoBuffer(authPrivateKeyPkcs8),
         {
-            name: 'ECDSA',
-            namedCurve: 'P-256',
+            name: 'Ed25519',
         },
         false,
         ['sign'],
-    );
-
-const importTransportPrivateKey = async (
-    transportPrivateKeyPkcs8: string,
-    suite: KeyAgreementSuite,
-): Promise<CryptoKey> =>
-    await window.crypto.subtle.importKey(
-        'pkcs8',
-        toWebCryptoBuffer(transportPrivateKeyPkcs8),
-        suite === 'X25519'
-            ? {
-                  name: 'X25519',
-              }
-            : {
-                  name: 'ECDH',
-                  namedCurve: 'P-256',
-              },
-        false,
-        ['deriveBits'],
     );
 
 const generateSeedHex = (): string => {
@@ -228,23 +257,30 @@ export const createPollDeviceState = async ({
     pendingState,
     pollId,
     pollSlug,
+    storedBallotScores,
     voterIndex,
     voterName,
     voterToken,
+    isCreatorParticipant = false,
 }: {
     pendingState?: PendingPollDeviceState;
     pollId: string;
     pollSlug: string;
+    storedBallotScores: number[];
     voterIndex: number;
     voterName: string;
     voterToken: string;
+    isCreatorParticipant?: boolean;
 }): Promise<StoredPollDeviceState> => {
     const baseState = pendingState ?? (await createPendingPollDeviceState());
 
     return {
         ...baseState,
+        isCreatorParticipant,
+        pendingPayloads: {},
         pollId,
         pollSlug,
+        storedBallotScores: [...storedBallotScores],
         voterIndex,
         voterName,
         voterToken,
@@ -255,6 +291,23 @@ export const savePollDeviceState = (state: StoredPollDeviceState): void => {
     const storedStates = readStoredStates();
     storedStates[state.pollId] = state;
     writeStoredStates(storedStates);
+};
+
+export const updatePollDeviceState = (
+    pollId: string,
+    updater: (state: StoredPollDeviceState) => StoredPollDeviceState,
+): StoredPollDeviceState | null => {
+    const storedStates = readStoredStates();
+    const currentState = storedStates[pollId];
+
+    if (!currentState) {
+        return null;
+    }
+
+    const nextState = updater(currentState);
+    storedStates[pollId] = nextState;
+    writeStoredStates(storedStates);
+    return nextState;
 };
 
 export const findPollDeviceStateByPollId = (
@@ -282,9 +335,14 @@ export const removePollDeviceState = (pollId: string): void => {
 export const restoreStoredTransportPrivateKey = async (
     state: StoredPollDeviceState,
 ): Promise<CryptoKey> =>
-    await importTransportPrivateKey(
-        state.transportPrivateKeyPkcs8,
-        state.transportSuite,
+    await window.crypto.subtle.importKey(
+        'pkcs8',
+        toWebCryptoBuffer(state.transportPrivateKeyPkcs8),
+        {
+            name: 'X25519',
+        },
+        false,
+        ['deriveBits'],
     );
 
 export type { PendingPollDeviceState, StoredPollDeviceState };
