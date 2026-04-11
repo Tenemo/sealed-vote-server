@@ -25,6 +25,11 @@ const PollRosterEntrySchema = Type.Object({
     voterName: Type.String(),
 });
 
+const ElectionManifestSchema = Type.Object({
+    optionList: Type.Array(Type.String()),
+    rosterHash: Type.String(),
+});
+
 const PollResponseSchema = Type.Object({
     id: Type.String(),
     slug: Type.String(),
@@ -33,7 +38,7 @@ const PollResponseSchema = Type.Object({
     choices: Type.Array(Type.String()),
     voters: Type.Array(PollRosterParticipantSchema),
     isOpen: Type.Boolean(),
-    manifest: Type.Union([Type.Any(), Type.Null()]),
+    manifest: Type.Union([ElectionManifestSchema, Type.Null()]),
     manifestHash: Type.Union([Type.String(), Type.Null()]),
     sessionId: Type.Union([Type.String(), Type.Null()]),
     sessionFingerprint: Type.Union([Type.String(), Type.Null()]),

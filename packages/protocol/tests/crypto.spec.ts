@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     acceptedBoardMessages,
     filterBoardMessagesByType,
-} from '../src/crypto';
+} from '../src/boardMessages';
 
 import type { BoardMessageRecord } from '@sealed-vote/contracts';
 import type { SignedPayload } from 'threshold-elgamal';

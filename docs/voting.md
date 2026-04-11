@@ -22,8 +22,8 @@ They are derived from accepted board payloads plus local ceremony verification.
 3. The browser stores those plaintext scores locally on-device and registers the participant with the backend for the later ceremony.
 4. The organizer closes voting once at least three submitted participants exist. That freezes the roster.
 5. After close, the app automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
-6. Once enough encrypted ballots exist, the organizer reveals results. That publishes one `ballot-close` payload.
-7. Decryption shares and tally publications arrive asynchronously.
+6. Once every submitted participant has a complete encrypted ballot, the creator browser automatically publishes one `ballot-close` payload.
+7. Decryption shares and tally publications arrive asynchronously after the counted ballot set is frozen.
 8. Every client replays the ceremony from the board log and shows verified arithmetic means.
 
 ## Integrity and liveness
@@ -45,7 +45,7 @@ They are derived from accepted board payloads plus local ceremony verification.
 
 ## Shared helpers
 
-- `acceptedBoardMessages` and `filterBoardMessagesByType` live in `packages/protocol/src/crypto.ts`
+- `acceptedBoardMessages` and `filterBoardMessagesByType` live in `packages/protocol/src/boardMessages.ts`
 - `derivePollPhase` and `canRegister` live in `packages/protocol/src/phases.ts`
 - `computeArithmeticMean`, `computePublishedResultScores`, and `hasVerifiedTallies` live in `packages/protocol/src/results.ts`
 - `canonicalUnsignedPayloadBytes`, `protocolPayloadSlotKey`, and `sortProtocolPayloads` live in `packages/protocol/src/protocolPayloads.ts`

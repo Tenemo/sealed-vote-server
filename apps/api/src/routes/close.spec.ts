@@ -1,8 +1,10 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { eq } from 'drizzle-orm';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
+import { publicKeyShares } from '../db/schema';
 import { createPoll, deletePoll, registerVoter } from '../testUtils';
 
 import { PollResponse } from './fetch';
@@ -121,6 +123,35 @@ describe('POST /polls/:pollId/close', () => {
         expect(
             (JSON.parse(replayResponse.body) as CloseVotingResponse).message,
         ).toBe('Voting closed successfully.');
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+
+    test('rejects close when a stored participant device record is malformed', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
+        await registerVoter(fastify, pollId, 'Voter3');
+
+        await fastify.db
+            .update(publicKeyShares)
+            .set({
+                publicKeyShare: '{"transportSuite":"X25519"}',
+            })
+            .where(eq(publicKeyShares.pollId, pollId));
+
+        const closeResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+
+        expect(closeResponse.statusCode).toBe(400);
+        expect(
+            (JSON.parse(closeResponse.body) as CloseVotingResponse).message,
+        ).toBe(ERROR_MESSAGES.participantDeviceKeysRequired);
 
         await deletePoll(fastify, pollId, creatorToken);
     });

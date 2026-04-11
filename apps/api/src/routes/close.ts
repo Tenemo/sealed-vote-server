@@ -11,6 +11,7 @@ import createError from 'http-errors';
 import type { DatabaseTransaction } from '../db/client.js';
 import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
+import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
 import { countPollVoters } from '../utils/pollCounts.js';
 import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
 import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
@@ -57,8 +58,7 @@ const validateParticipantDeviceReadiness = async (
 
     const everyParticipantHasDeviceKeys = submittedParticipants.every(
         (participant) =>
-            typeof participant.publicKeyShare === 'string' &&
-            participant.publicKeyShare.length > 0,
+            parseParticipantDeviceRecord(participant.publicKeyShare) !== null,
     );
 
     if (!everyParticipantHasDeviceKeys) {

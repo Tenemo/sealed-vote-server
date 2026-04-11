@@ -30,19 +30,25 @@ const createRegistrationPayload = async ({
 }): Promise<{
     authPublicKey: string;
     transportPublicKey: string;
-    transportSuite: 'X25519' | 'P-256';
+    transportSuite: 'X25519';
     voterName: string;
     voterToken: string;
 }> => {
     const authKeyPair = await generateAuthKeyPair();
     const transportKeyPair = await generateTransportKeyPair();
 
+    if (transportKeyPair.suite !== 'X25519') {
+        throw new Error(
+            `Expected an X25519 transport key pair, received ${transportKeyPair.suite}.`,
+        );
+    }
+
     return {
         authPublicKey: await exportAuthPublicKey(authKeyPair.publicKey),
         transportPublicKey: await exportTransportPublicKey(
             transportKeyPair.publicKey,
         ),
-        transportSuite: transportKeyPair.suite,
+        transportSuite: 'X25519',
         voterName,
         voterToken,
     };
