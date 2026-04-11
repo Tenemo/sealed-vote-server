@@ -47,14 +47,16 @@ import {
     type SignedPayload,
 } from 'threshold-elgamal';
 
-import type { StoredCreatorSession } from './creatorSessionStorage';
 import {
     importStoredAuthPrivateKey,
     restoreStoredTransportPrivateKey,
     updatePollDeviceState,
     type StoredPollDeviceState,
 } from './pollDeviceStorage';
-import type { StoredVoterSession } from './voterSessionStorage';
+import type {
+    StoredCreatorSession,
+    StoredVoterSession,
+} from './pollSessionStorage';
 
 const deriveFinalShare = ({
     contributions,

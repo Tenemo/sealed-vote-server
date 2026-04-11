@@ -23,12 +23,6 @@ export const polls = pgTable(
         slug: text('slug').notNull(),
         creatorTokenHash: char('creator_token_hash', { length: 64 }).notNull(),
         isOpen: boolean('is_open').notNull().default(true),
-        requestedReconstructionThreshold: integer(
-            'requested_reconstruction_threshold',
-        ),
-        requestedMinimumPublishedVoterCount: integer(
-            'requested_minimum_published_voter_count',
-        ),
         protocolVersion: text('protocol_version').notNull().default('v1'),
         createdAt: timestamp('created_at', {
             mode: 'date',
@@ -159,66 +153,11 @@ export const publicKeyShares = pgTable(
     ],
 );
 
-export const encryptedVotes = pgTable(
-    'encrypted_votes',
-    {
-        id: uuid('id')
-            .primaryKey()
-            .default(sql`gen_random_uuid()`),
-        votes: jsonb('votes').$type<unknown[]>().notNull(),
-        pollId: uuid('poll_id').notNull(),
-        voterId: uuid('voter_id').notNull(),
-    },
-    (table) => [
-        foreignKey({
-            columns: [table.pollId],
-            foreignColumns: [polls.id],
-            name: 'fk_encrypted_votes_poll_id',
-        }).onDelete('cascade'),
-        foreignKey({
-            columns: [table.voterId],
-            foreignColumns: [voters.id],
-            name: 'fk_encrypted_votes_voter_id',
-        }).onDelete('cascade'),
-        unique('unique_vote_per_voter').on(table.pollId, table.voterId),
-    ],
-);
-
-export const decryptionShares = pgTable(
-    'decryption_shares',
-    {
-        id: uuid('id')
-            .primaryKey()
-            .default(sql`gen_random_uuid()`),
-        shares: jsonb('shares').$type<string[]>().notNull(),
-        pollId: uuid('poll_id').notNull(),
-        voterId: uuid('voter_id').notNull(),
-    },
-    (table) => [
-        foreignKey({
-            columns: [table.pollId],
-            foreignColumns: [polls.id],
-            name: 'fk_decryption_shares_poll_id',
-        }).onDelete('cascade'),
-        foreignKey({
-            columns: [table.voterId],
-            foreignColumns: [voters.id],
-            name: 'fk_decryption_shares_voter_id',
-        }).onDelete('cascade'),
-        unique('unique_decryption_shares_per_voter').on(
-            table.pollId,
-            table.voterId,
-        ),
-    ],
-);
-
 export const pollsRelations = relations(polls, ({ many }) => ({
     choices: many(choices),
     voters: many(voters),
     boardMessages: many(boardMessages),
     publicKeyShares: many(publicKeyShares),
-    encryptedVotes: many(encryptedVotes),
-    decryptionShares: many(decryptionShares),
 }));
 
 export const choicesRelations = relations(choices, ({ one }) => ({
@@ -234,8 +173,6 @@ export const votersRelations = relations(voters, ({ many, one }) => ({
         references: [polls.id],
     }),
     publicKeyShares: many(publicKeyShares),
-    encryptedVotes: many(encryptedVotes),
-    decryptionShares: many(decryptionShares),
 }));
 
 export const boardMessagesRelations = relations(boardMessages, ({ one }) => ({
@@ -259,31 +196,6 @@ export const publicKeySharesRelations = relations(
     }),
 );
 
-export const encryptedVotesRelations = relations(encryptedVotes, ({ one }) => ({
-    poll: one(polls, {
-        fields: [encryptedVotes.pollId],
-        references: [polls.id],
-    }),
-    voter: one(voters, {
-        fields: [encryptedVotes.voterId],
-        references: [voters.id],
-    }),
-}));
-
-export const decryptionSharesRelations = relations(
-    decryptionShares,
-    ({ one }) => ({
-        poll: one(polls, {
-            fields: [decryptionShares.pollId],
-            references: [polls.id],
-        }),
-        voter: one(voters, {
-            fields: [decryptionShares.voterId],
-            references: [voters.id],
-        }),
-    }),
-);
-
 export const schema = {
     polls,
     pollsRelations,
@@ -295,10 +207,6 @@ export const schema = {
     boardMessagesRelations,
     publicKeyShares,
     publicKeySharesRelations,
-    encryptedVotes,
-    encryptedVotesRelations,
-    decryptionShares,
-    decryptionSharesRelations,
 };
 
 export type DatabaseSchema = typeof schema;

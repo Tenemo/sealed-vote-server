@@ -11,7 +11,10 @@ import NotFound from 'components/NotFound/NotFound';
 import {
     findCreatorSessionByPollId,
     findCreatorSessionByPollSlug,
-} from 'features/Polls/creatorSessionStorage';
+    findVoterSessionByPollId,
+    findVoterSessionByPollSlug,
+    saveVoterSession,
+} from 'features/Polls/pollSessionStorage';
 import { generateClientToken } from 'features/Polls/clientToken';
 import {
     clearCommittedPendingPayload,
@@ -28,11 +31,6 @@ import {
     savePollDeviceState,
 } from 'features/Polls/pollDeviceStorage';
 import { derivePollWorkflow } from 'features/Polls/pollWorkflow';
-import {
-    findVoterSessionByPollId,
-    findVoterSessionByPollSlug,
-    saveVoterSession,
-} from 'features/Polls/voterSessionStorage';
 import {
     useCloseVotingMutation,
     useGetPollQuery,

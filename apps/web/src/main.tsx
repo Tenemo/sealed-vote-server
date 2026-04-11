@@ -4,7 +4,6 @@ import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 
-import { TooltipProvider } from '@/components/ui/tooltip';
 import App from 'app/App';
 import { store } from 'app/store';
 
@@ -14,11 +13,9 @@ export const Root = (): React.JSX.Element => (
     <React.StrictMode>
         <Provider store={store}>
             <HelmetProvider>
-                <TooltipProvider>
-                    <BrowserRouter>
-                        <App />
-                    </BrowserRouter>
-                </TooltipProvider>
+                <BrowserRouter>
+                    <App />
+                </BrowserRouter>
             </HelmetProvider>
         </Provider>
     </React.StrictMode>

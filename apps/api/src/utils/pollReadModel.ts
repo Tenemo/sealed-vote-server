@@ -26,23 +26,16 @@ import { polls } from '../db/schema.js';
 import { classifyBoardMessages, getBoardMessageRows } from './boardMessages.js';
 import { normalizeDatabaseTimestamp } from './db.js';
 import { parseParticipantDeviceRecord } from './participantDevices.js';
+import { maxPollParticipants } from './pollLimits.js';
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 type PollRow = Pick<
     typeof polls.$inferSelect,
-    | 'createdAt'
-    | 'id'
-    | 'isOpen'
-    | 'pollName'
-    | 'protocolVersion'
-    | 'requestedMinimumPublishedVoterCount'
-    | 'requestedReconstructionThreshold'
-    | 'slug'
+    'createdAt' | 'id' | 'isOpen' | 'pollName' | 'slug'
 >;
 
 const minimumSupportedParticipantCount = 3;
 const validationTarget = 15;
-const maximumParticipantCount = 51;
 
 const formatSessionFingerprint = (value: string): string =>
     value
@@ -112,7 +105,7 @@ const buildThresholdSummary = ({
     return {
         reconstructionThreshold,
         minimumPublishedVoterCount: reconstructionThreshold,
-        maxParticipants: maximumParticipantCount,
+        maxParticipants: maxPollParticipants,
         validationTarget,
     };
 };
@@ -426,9 +419,6 @@ const getPollRow = async (
             id: true,
             isOpen: true,
             pollName: true,
-            protocolVersion: true,
-            requestedMinimumPublishedVoterCount: true,
-            requestedReconstructionThreshold: true,
             slug: true,
         },
         with: {

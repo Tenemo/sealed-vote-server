@@ -50,6 +50,13 @@
       "when": 1775848960000,
       "tag": "0006_board_log_rewrite",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775941195208,
+      "tag": "0007_remove_legacy_submission_tables",
+      "breakpoints": true
     }
   ]
 }

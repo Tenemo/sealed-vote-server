@@ -3,9 +3,7 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 
 import { pollsApi } from 'features/Polls/pollsApi';
 
-export const rootReducer = combineSlices(pollsApi);
-
-export type RootState = ReturnType<typeof rootReducer>;
+const rootReducer = combineSlices(pollsApi);
 
 export const store = configureStore({
     reducer: rootReducer,
@@ -15,6 +13,3 @@ export const store = configureStore({
 });
 
 setupListeners(store.dispatch);
-
-export type AppStore = typeof store;
-export type AppDispatch = AppStore['dispatch'];

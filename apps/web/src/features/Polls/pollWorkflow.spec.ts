@@ -3,7 +3,7 @@ import type { PollResponse } from '@sealed-vote/contracts';
 import { derivePollWorkflow } from './pollWorkflow';
 
 import type { StoredPollDeviceState } from 'features/Polls/pollDeviceStorage';
-import type { StoredVoterSession } from 'features/Polls/voterSessionStorage';
+import type { StoredVoterSession } from 'features/Polls/pollSessionStorage';
 
 const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     id: 'poll-1',

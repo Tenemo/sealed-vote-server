@@ -1,7 +1,7 @@
 import type { PollResponse } from '@sealed-vote/contracts';
 
 import type { StoredPollDeviceState } from './pollDeviceStorage';
-import type { StoredVoterSession } from './voterSessionStorage';
+import type { StoredVoterSession } from './pollSessionStorage';
 
 export type ViewerWorkflowState =
     | 'anonymous-ready-to-vote'

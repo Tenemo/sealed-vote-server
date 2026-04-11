@@ -128,8 +128,6 @@ export const start = async (fastify: FastifyInstance): Promise<void> => {
                         .update(polls)
                         .set({
                             isOpen: false,
-                            requestedMinimumPublishedVoterCount: null,
-                            requestedReconstructionThreshold: null,
                         })
                         .where(eq(polls.id, req.params.pollId));
 
