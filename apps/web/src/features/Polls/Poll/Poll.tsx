@@ -34,6 +34,11 @@ import {
     resolveThresholdPercentRange,
     resolveThresholdPreview,
 } from 'features/Polls/pollThresholds';
+import {
+    describeFullCeremonySupport,
+    missingFullCeremonyRootExports,
+    supportsFullCeremonyAuthoring,
+} from 'features/Polls/pollCeremonySupport';
 import { derivePollWorkflow } from 'features/Polls/pollWorkflow';
 import {
     findVoterSessionByPollId,
@@ -72,6 +77,24 @@ const boardMessageCount = (
             entry.classification === 'accepted' &&
             entry.messageType === messageType,
     ).length;
+
+const autoBoardSetupActionLabel = (kind: string): string =>
+    (
+        ({
+            'accept-manifest': 'Confirm manifest',
+            'publish-manifest': 'Freeze manifest',
+            'publish-registration': 'Publish registration',
+        }) as const
+    )[kind] ?? 'Continue setup';
+
+const autoBoardSetupBusyLabel = (kind: string): string =>
+    (
+        ({
+            'accept-manifest': 'Confirming the shared manifest',
+            'publish-manifest': 'Freezing the shared manifest',
+            'publish-registration': 'Publishing your device registration',
+        }) as const
+    )[kind] ?? 'Continuing private setup';
 
 const PollPage = (): React.JSX.Element => {
     const { pollSlug } = useParams();
@@ -166,21 +189,16 @@ const PollPage = (): React.JSX.Element => {
         [deviceState, poll, voterSession],
     );
 
-    useEffect(() => {
-        if (
-            !poll ||
-            !deviceState ||
-            !voterSession ||
-            !autoBoardSetupAction ||
-            autoSetupStep !== null
-        ) {
-            return;
-        }
+    const submitAutoBoardSetupAction = React.useCallback(
+        async (
+            action: NonNullable<typeof autoBoardSetupAction>,
+        ): Promise<void> => {
+            if (!poll || !deviceState || !voterSession) {
+                return;
+            }
 
-        let cancelled = false;
-
-        const syncBoardSetup = async (): Promise<void> => {
-            setAutoSetupStep(autoBoardSetupAction.kind);
+            setLocalError(null);
+            setAutoSetupStep(action.kind);
 
             try {
                 const authPrivateKey = await importStoredAuthPrivateKey(
@@ -188,7 +206,7 @@ const PollPage = (): React.JSX.Element => {
                 );
                 const signedPayload = await signProtocolPayload({
                     authPrivateKey,
-                    payload: autoBoardSetupAction.payload,
+                    payload: action.payload,
                 });
 
                 await postBoardMessage({
@@ -199,33 +217,33 @@ const PollPage = (): React.JSX.Element => {
                     },
                 }).unwrap();
 
-                if (!cancelled) {
-                    await refetch();
-                }
+                await refetch();
             } catch (submissionError) {
-                if (!cancelled) {
-                    setLocalError(renderError(submissionError));
-                }
+                setLocalError(renderError(submissionError));
             } finally {
-                if (!cancelled) {
-                    setAutoSetupStep(null);
-                }
+                setAutoSetupStep(null);
             }
-        };
+        },
+        [deviceState, poll, postBoardMessage, refetch, voterSession],
+    );
 
-        void syncBoardSetup();
+    useEffect(() => {
+        if (
+            poll?.phase !== 'preparing' ||
+            autoBoardSetupAction === null ||
+            autoSetupStep !== null ||
+            localError !== null
+        ) {
+            return;
+        }
 
-        return () => {
-            cancelled = true;
-        };
+        void submitAutoBoardSetupAction(autoBoardSetupAction);
     }, [
         autoBoardSetupAction,
         autoSetupStep,
-        deviceState,
-        poll,
-        postBoardMessage,
-        refetch,
-        voterSession,
+        localError,
+        poll?.phase,
+        submitAutoBoardSetupAction,
     ]);
 
     if (
@@ -337,6 +355,8 @@ const PollPage = (): React.JSX.Element => {
     const workflow = derivePollWorkflow({
         creatorSessionPollId: creatorSession?.pollId ?? null,
         deviceState,
+        hasAutoSetupAction: autoBoardSetupAction !== null,
+        hasSetupFailure: localError !== null,
         poll,
         voterSession,
     });
@@ -355,7 +375,9 @@ const PollPage = (): React.JSX.Element => {
         poll.joinedParticipantCount,
         poll.minimumStartParticipantCount,
     );
-    const maximumSupportedThreshold = previewParticipantCount - 1;
+    const maximumSupportedThreshold = previewParticipantCount;
+    const isFullThresholdSelected =
+        thresholdPreview === previewParticipantCount;
     const autoBoardSetupDescription =
         describeAutoBoardSetupAction(autoBoardSetupAction);
     const shareableUrl =
@@ -380,6 +402,20 @@ const PollPage = (): React.JSX.Element => {
         poll.boardEntries,
         'decryption-share',
     );
+    const fullCeremonySupportDescription = describeFullCeremonySupport();
+    const manifestPublisherIndex = poll.rosterEntries[0]?.participantIndex ?? 1;
+    const preparingStatusNote =
+        poll.phase !== 'preparing'
+            ? null
+            : acceptedRegistrations < poll.joinedParticipantCount
+              ? `Waiting for ${poll.joinedParticipantCount - acceptedRegistrations} participant registration${poll.joinedParticipantCount - acceptedRegistrations === 1 ? '' : 's'} to reach the board.`
+              : !hasManifestPublication
+                ? `Waiting for participant ${manifestPublisherIndex} to freeze the shared manifest.`
+                : acceptedManifestAcceptances < poll.joinedParticipantCount
+                  ? `Waiting for ${poll.joinedParticipantCount - acceptedManifestAcceptances} participant confirmation${poll.joinedParticipantCount - acceptedManifestAcceptances === 1 ? '' : 's'} of the frozen manifest.`
+                  : supportsFullCeremonyAuthoring
+                    ? 'Phase 0 is complete. The later private setup is ready to continue in this build.'
+                    : `Phase 0 is complete. ${fullCeremonySupportDescription}`;
 
     const waitingRoomSummary = poll.isOpen
         ? poll.joinedParticipantCount >= poll.minimumStartParticipantCount
@@ -388,45 +424,65 @@ const PollPage = (): React.JSX.Element => {
         : 'The roster is now frozen for this ceremony.';
 
     const nextStepHeading =
-        workflow.currentStep === 'anonymous-waiting-to-join'
+        workflow.currentStep === 'anonymous-joinable'
             ? 'Join this vote'
-            : workflow.currentStep === 'joined-and-waiting-for-start'
+            : workflow.currentStep === 'creator-configuring-threshold'
               ? 'Waiting room'
-              : workflow.currentStep === 'preparing-device'
-                ? 'Preparing your device'
-                : workflow.currentStep === 'ready-to-vote'
-                  ? 'Voting is live'
-                  : workflow.currentStep === 'vote-submitted-and-waiting'
-                    ? 'Vote submitted'
-                    : workflow.currentStep === 'ready-to-help-open-results'
-                      ? 'Help open results'
-                      : workflow.currentStep === 'waiting-for-results'
-                        ? 'Waiting for results'
-                        : workflow.currentStep === 'complete'
-                          ? 'Verified results'
-                          : 'Ceremony aborted';
+              : workflow.currentStep === 'joined-and-waiting-for-start'
+                ? 'Waiting room'
+                : workflow.currentStep === 'preparing-auto'
+                  ? 'Preparing your device'
+                  : workflow.currentStep === 'preparing-action-required'
+                    ? 'Retry private setup'
+                    : workflow.currentStep === 'preparing-waiting'
+                      ? 'Preparing your device'
+                      : workflow.currentStep === 'local-state-missing'
+                        ? 'Preparing your device'
+                        : workflow.currentStep === 'ready-to-vote'
+                          ? 'Voting is live'
+                          : workflow.currentStep ===
+                              'vote-submitted-and-waiting'
+                            ? 'Vote submitted'
+                            : workflow.currentStep ===
+                                'ready-to-help-open-results'
+                              ? 'Help open results'
+                              : workflow.currentStep === 'waiting-for-results'
+                                ? 'Waiting for results'
+                                : workflow.currentStep === 'complete'
+                                  ? 'Verified results'
+                                  : 'Ceremony aborted';
 
     const nextStepDescription =
-        workflow.currentStep === 'anonymous-waiting-to-join'
+        workflow.currentStep === 'anonymous-joinable'
             ? 'Pick the public name that should appear on the roster. Everyone in the vote can see this list.'
-            : workflow.currentStep === 'joined-and-waiting-for-start'
-              ? 'You are already on the public roster. The creator can start voting as soon as the group is ready.'
-              : workflow.currentStep === 'preparing-device'
-                ? workflow.missingLocalState
-                    ? 'This browser is missing the local device state needed to continue the private ceremony.'
-                    : (autoBoardSetupDescription ??
-                      'The vote has started and the private setup transcript is still being prepared.')
-                : workflow.currentStep === 'ready-to-vote'
-                  ? 'Voting is open. The board transcript is ready for ballot publication.'
-                  : workflow.currentStep === 'vote-submitted-and-waiting'
-                    ? 'Your ballot is already on the board. You can leave this page and come back later.'
-                    : workflow.currentStep === 'ready-to-help-open-results'
-                      ? 'Voting is closed. Your device may still be needed to help open the final tally.'
-                      : workflow.currentStep === 'waiting-for-results'
-                        ? 'Your part is done. Results will appear here once enough valid decryption shares are published.'
-                        : workflow.currentStep === 'complete'
-                          ? 'The published result has been verified against the full ceremony transcript.'
-                          : 'This ceremony ended in an aborted state. The audit rail on the right shows what was recorded.';
+            : workflow.currentStep === 'creator-configuring-threshold'
+              ? 'People can keep joining from the shared link. You can also join yourself before you start voting.'
+              : workflow.currentStep === 'joined-and-waiting-for-start'
+                ? 'You are already on the public roster. The creator can start voting as soon as the group is ready.'
+                : workflow.currentStep === 'preparing-auto'
+                  ? (autoBoardSetupDescription ??
+                    preparingStatusNote ??
+                    'The vote has started and the private setup transcript is still being prepared.')
+                  : workflow.currentStep === 'preparing-action-required'
+                    ? 'Automatic setup hit an error on this device. Retry the private setup step to continue.'
+                    : workflow.currentStep === 'preparing-waiting'
+                      ? (preparingStatusNote ??
+                        'The vote has started and the private setup transcript is still being prepared.')
+                      : workflow.currentStep === 'local-state-missing'
+                        ? 'This browser is missing the local device state needed to continue the private ceremony.'
+                        : workflow.currentStep === 'ready-to-vote'
+                          ? 'Voting is open. The board transcript is ready for ballot publication.'
+                          : workflow.currentStep ===
+                              'vote-submitted-and-waiting'
+                            ? 'Your ballot is already on the board. You can leave this page and come back later.'
+                            : workflow.currentStep ===
+                                'ready-to-help-open-results'
+                              ? 'Voting is closed. Your device may still be needed to help open the final tally.'
+                              : workflow.currentStep === 'waiting-for-results'
+                                ? 'Your part is done. Results will appear here once enough valid decryption shares are published.'
+                                : workflow.currentStep === 'complete'
+                                  ? 'The published result has been verified against the full ceremony transcript.'
+                                  : 'This ceremony ended in an aborted state. The audit rail on the right shows what was recorded.';
 
     return (
         <section className="mx-auto flex w-full max-w-[88rem] flex-col gap-6">
@@ -577,8 +633,7 @@ const PollPage = (): React.JSX.Element => {
                                     </p>
                                 </div>
 
-                                {workflow.currentStep ===
-                                    'anonymous-waiting-to-join' &&
+                                {voterSession === null &&
                                     poll.phase === 'open' && (
                                         <form
                                             className="space-y-4"
@@ -659,7 +714,9 @@ const PollPage = (): React.JSX.Element => {
                                 )}
 
                                 {workflow.currentStep !==
-                                    'anonymous-waiting-to-join' &&
+                                    'anonymous-joinable' &&
+                                    workflow.currentStep !==
+                                        'creator-configuring-threshold' &&
                                     workflow.currentStep !==
                                         'joined-and-waiting-for-start' &&
                                     workflow.currentStep !==
@@ -672,8 +729,50 @@ const PollPage = (): React.JSX.Element => {
                                             {workflow.missingLocalState
                                                 ? 'This browser is missing the local ceremony state needed for later private actions.'
                                                 : (autoBoardSetupDescription ??
+                                                  preparingStatusNote ??
                                                   'The private ceremony is progressing through the shared board transcript. This screen will keep tracking your next required action.')}
                                         </p>
+                                    )}
+
+                                {poll.phase === 'preparing' &&
+                                    !workflow.missingLocalState &&
+                                    workflow.currentStep === 'preparing-auto' &&
+                                    autoBoardSetupAction && (
+                                        <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-border/70 bg-card px-4 py-3">
+                                            <Spinner className="size-5" />
+                                            <p className={mutedBodyClassName}>
+                                                {autoBoardSetupBusyLabel(
+                                                    autoBoardSetupAction.kind,
+                                                )}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                {poll.phase === 'preparing' &&
+                                    !workflow.missingLocalState &&
+                                    workflow.currentStep ===
+                                        'preparing-action-required' &&
+                                    autoBoardSetupAction && (
+                                        <div className="flex flex-wrap gap-3">
+                                            <Button
+                                                disabled={
+                                                    autoSetupStep !== null
+                                                }
+                                                onClick={() =>
+                                                    void submitAutoBoardSetupAction(
+                                                        autoBoardSetupAction,
+                                                    )
+                                                }
+                                                size="lg"
+                                            >
+                                                {autoSetupStep ===
+                                                autoBoardSetupAction.kind
+                                                    ? 'Retrying...'
+                                                    : `Retry ${autoBoardSetupActionLabel(
+                                                          autoBoardSetupAction.kind,
+                                                      )}`}
+                                            </Button>
+                                        </div>
                                     )}
 
                                 {poll.phase === 'preparing' &&
@@ -795,13 +894,21 @@ const PollPage = (): React.JSX.Element => {
                                         />
                                     </label>
                                     <p className={mutedBodyClassName}>
-                                        The current beta protocol supports
-                                        threshold counts from{' '}
+                                        The threshold can range from the
+                                        majority floor of{' '}
                                         {poll.thresholds.strictMajorityFloor} to{' '}
                                         {maximumSupportedThreshold} for the
-                                        current roster size. Full n-of-n is not
-                                        supported by the published protocol yet.
+                                        current roster size.
                                     </p>
+                                    {isFullThresholdSelected && (
+                                        <p className={mutedBodyClassName}>
+                                            100% means every participant must
+                                            return to help open results. This
+                                            maximizes the threshold but it is
+                                            the most fragile setting for
+                                            liveness.
+                                        </p>
+                                    )}
                                     <Button
                                         disabled={
                                             startState.isLoading ||
@@ -939,6 +1046,21 @@ const PollPage = (): React.JSX.Element => {
                                 </p>
                             </div>
                         </div>
+
+                        {!supportsFullCeremonyAuthoring && (
+                            <div className="space-y-2 border-t border-border/60 pt-4">
+                                <h3 className="text-base font-semibold">
+                                    Current library gap
+                                </h3>
+                                <p className={mutedBodyClassName}>
+                                    {fullCeremonySupportDescription}
+                                </p>
+                                <p className={mutedBodyClassName}>
+                                    Missing root exports:{' '}
+                                    {missingFullCeremonyRootExports.join(', ')}
+                                </p>
+                            </div>
+                        )}
 
                         {poll.boardAudit.phaseDigests.length > 0 && (
                             <div className="space-y-2 border-t border-border/60 pt-4">

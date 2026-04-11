@@ -117,7 +117,8 @@ Example response:
   - the poll requires at least three registered participants before it can be started
   - starting voting freezes the roster and resolves the exact integer reconstruction threshold from the current joined participant count
   - `minimumPublishedVoterCount` is derived automatically from the frozen threshold
-  - `POST /api/polls/:pollId/close` remains as a compatibility alias, but the normal UI and tests use `/start`
+  - `POST /api/polls/:pollId/close` remains as a compatibility alias for older clients and defaults to the simple-majority threshold preview
+  - the normal UI and tests use `/start`
 
 ## List board messages
 

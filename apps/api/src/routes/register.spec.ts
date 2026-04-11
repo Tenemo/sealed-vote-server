@@ -8,7 +8,7 @@ import {
     exportTransportPublicKey,
     generateAuthKeyPair,
     generateTransportKeyPair,
-} from 'threshold-elgamal/transport';
+} from 'threshold-elgamal';
 
 import { buildServer } from '../buildServer';
 import {

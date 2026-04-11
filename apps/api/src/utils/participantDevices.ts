@@ -1,4 +1,4 @@
-import type { KeyAgreementSuite } from 'threshold-elgamal/transport';
+import type { KeyAgreementSuite } from 'threshold-elgamal';
 
 export type ParticipantDeviceRecord = {
     authPublicKey: string;

@@ -5,9 +5,13 @@ import type { StoredPollDeviceState } from './pollDeviceStorage';
 import type { StoredVoterSession } from 'features/Polls/voterSessionStorage';
 
 type ViewerWorkflowState =
-    | 'anonymous-waiting-to-join'
+    | 'anonymous-joinable'
+    | 'creator-configuring-threshold'
     | 'joined-and-waiting-for-start'
-    | 'preparing-device'
+    | 'preparing-auto'
+    | 'preparing-action-required'
+    | 'preparing-waiting'
+    | 'local-state-missing'
     | 'ready-to-vote'
     | 'vote-submitted-and-waiting'
     | 'ready-to-help-open-results'
@@ -39,11 +43,15 @@ const hasAcceptedMessage = (
 export const derivePollWorkflow = ({
     creatorSessionPollId,
     deviceState,
+    hasAutoSetupAction,
+    hasSetupFailure,
     poll,
     voterSession,
 }: {
     creatorSessionPollId: string | null;
     deviceState: StoredPollDeviceState | null;
+    hasAutoSetupAction: boolean;
+    hasSetupFailure: boolean;
     poll: PollResponse;
     voterSession: StoredVoterSession | null;
 }): DerivedPollWorkflow => {
@@ -73,8 +81,11 @@ export const derivePollWorkflow = ({
 
     if (!voterSession) {
         return {
-            canAct: false,
-            currentStep: 'anonymous-waiting-to-join',
+            canAct: isCreator && poll.phase === 'open',
+            currentStep:
+                isCreator && poll.phase === 'open'
+                    ? 'creator-configuring-threshold'
+                    : 'anonymous-joinable',
             hasSubmittedBallot: false,
             hasSubmittedDecryptionShare: false,
             isCreator,
@@ -108,8 +119,14 @@ export const derivePollWorkflow = ({
 
     if (poll.phase === 'preparing') {
         return {
-            canAct: !missingLocalState,
-            currentStep: 'preparing-device',
+            canAct: !missingLocalState && hasSetupFailure && hasAutoSetupAction,
+            currentStep: missingLocalState
+                ? 'local-state-missing'
+                : hasAutoSetupAction
+                  ? hasSetupFailure
+                      ? 'preparing-action-required'
+                      : 'preparing-auto'
+                  : 'preparing-waiting',
             hasSubmittedBallot,
             hasSubmittedDecryptionShare,
             isCreator,

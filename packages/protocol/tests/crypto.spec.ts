@@ -6,7 +6,7 @@ import {
 } from '../src/crypto';
 
 import type { BoardMessageRecord } from '@sealed-vote/contracts';
-import type { SignedPayload } from 'threshold-elgamal/protocol';
+import type { SignedPayload } from 'threshold-elgamal';
 
 const createSignedPayload = (
     messageType: SignedPayload['payload']['messageType'],

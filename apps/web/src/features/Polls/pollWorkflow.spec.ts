@@ -1,5 +1,5 @@
 import type { PollResponse } from '@sealed-vote/contracts';
-import type { EncodedPoint } from 'threshold-elgamal/core';
+import type { EncodedPoint } from 'threshold-elgamal';
 
 import { derivePollWorkflow } from './pollWorkflow';
 
@@ -83,12 +83,14 @@ describe('pollWorkflow', () => {
             derivePollWorkflow({
                 creatorSessionPollId: null,
                 deviceState: null,
+                hasAutoSetupAction: false,
+                hasSetupFailure: false,
                 poll: createPoll(),
                 voterSession: null,
             }),
         ).toMatchObject({
             canAct: false,
-            currentStep: 'anonymous-waiting-to-join',
+            currentStep: 'anonymous-joinable',
             isCreator: false,
             missingLocalState: false,
         });
@@ -99,6 +101,8 @@ describe('pollWorkflow', () => {
             derivePollWorkflow({
                 creatorSessionPollId: null,
                 deviceState: createDeviceState(),
+                hasAutoSetupAction: false,
+                hasSetupFailure: false,
                 poll: createPoll(),
                 voterSession: createVoterSession(),
             }),
@@ -114,6 +118,8 @@ describe('pollWorkflow', () => {
             derivePollWorkflow({
                 creatorSessionPollId: null,
                 deviceState: null,
+                hasAutoSetupAction: true,
+                hasSetupFailure: false,
                 poll: createPoll({
                     isOpen: false,
                     phase: 'preparing',
@@ -122,8 +128,44 @@ describe('pollWorkflow', () => {
             }),
         ).toMatchObject({
             canAct: false,
-            currentStep: 'preparing-device',
+            currentStep: 'local-state-missing',
             missingLocalState: true,
+        });
+    });
+
+    it('distinguishes automatic setup work from retryable setup failures', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutoSetupAction: true,
+                hasSetupFailure: false,
+                poll: createPoll({
+                    isOpen: false,
+                    phase: 'preparing',
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canAct: false,
+            currentStep: 'preparing-auto',
+        });
+
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutoSetupAction: true,
+                hasSetupFailure: true,
+                poll: createPoll({
+                    isOpen: false,
+                    phase: 'preparing',
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canAct: true,
+            currentStep: 'preparing-action-required',
         });
     });
 
@@ -134,6 +176,8 @@ describe('pollWorkflow', () => {
             derivePollWorkflow({
                 creatorSessionPollId: null,
                 deviceState: createDeviceState(),
+                hasAutoSetupAction: false,
+                hasSetupFailure: false,
                 poll: createPoll({
                     isOpen: false,
                     phase: 'voting',
@@ -182,6 +226,8 @@ describe('pollWorkflow', () => {
             derivePollWorkflow({
                 creatorSessionPollId: null,
                 deviceState: createDeviceState(),
+                hasAutoSetupAction: false,
+                hasSetupFailure: false,
                 poll: createPoll({
                     isOpen: false,
                     phase: 'opening-results',

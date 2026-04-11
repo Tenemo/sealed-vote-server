@@ -11,7 +11,7 @@ import {
     unique,
     uuid,
 } from 'drizzle-orm/pg-core';
-import type { SignedPayload } from 'threshold-elgamal/protocol';
+import type { SignedPayload } from 'threshold-elgamal';
 
 export const polls = pgTable(
     'polls',

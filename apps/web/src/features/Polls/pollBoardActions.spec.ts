@@ -2,7 +2,7 @@ import type { PollResponse } from '@sealed-vote/contracts';
 import type {
     EncodedAuthPublicKey,
     EncodedTransportPublicKey,
-} from 'threshold-elgamal/transport';
+} from 'threshold-elgamal';
 
 import {
     describeAutoBoardSetupAction,
@@ -39,7 +39,6 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse =>
         ],
         manifest: {
             protocolVersion: 'v1',
-            suiteId: 'ristretto255',
             reconstructionThreshold: 2,
             participantCount: 3,
             minimumPublishedVoterCount: 3,

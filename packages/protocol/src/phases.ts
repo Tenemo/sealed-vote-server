@@ -1,5 +1,5 @@
 import type { PollPhase, PollResponse } from '@sealed-vote/contracts';
-import { majorityThreshold } from 'threshold-elgamal/core';
+import { majorityThreshold } from 'threshold-elgamal';
 
 export const derivePollPhase = (
     poll: Pick<PollResponse, 'phase'> | null | undefined,

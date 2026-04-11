@@ -91,8 +91,8 @@ export const startVoting = async (page: Page): Promise<void> => {
         name: 'Start voting',
     });
 
-    await expect(startButton).toBeVisible();
-    await expect(startButton).toBeEnabled();
+    await expect(startButton).toBeVisible({ timeout: 30_000 });
+    await expect(startButton).toBeEnabled({ timeout: 30_000 });
     await startButton.click();
     await expect(
         page.getByText('Voting started. The roster is now frozen.'),

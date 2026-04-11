@@ -1,11 +1,10 @@
 import { isUuid, type PollResponse } from '@sealed-vote/contracts';
 import { eq } from 'drizzle-orm';
-import { majorityThreshold } from 'threshold-elgamal/core';
 import {
+    assertThreshold,
+    majorityThreshold,
     replayGjkrTranscript,
     verifyDKGTranscript,
-} from 'threshold-elgamal/dkg';
-import {
     defaultMinimumPublishedVoterCount,
     deriveSessionId,
     formatSessionFingerprint,
@@ -14,15 +13,13 @@ import {
     verifyElectionCeremonyDetailedResult,
     type BallotSubmissionPayload,
     type DecryptionSharePayload,
+    type EncodedAuthPublicKey,
+    type EncodedTransportPublicKey,
     type ElectionManifest,
     type ManifestPublicationPayload,
     type SignedPayload,
     type TallyPublicationPayload,
-} from 'threshold-elgamal/protocol';
-import type {
-    EncodedAuthPublicKey,
-    EncodedTransportPublicKey,
-} from 'threshold-elgamal/transport';
+} from 'threshold-elgamal';
 
 import type { Database, DatabaseTransaction } from '../db/client.js';
 import { polls } from '../db/schema.js';
@@ -57,17 +54,20 @@ const getRequestedThresholdError = (
     participantCount: number,
 ): string | null => {
     if (participantCount < minimumSupportedParticipantCount) {
-        return 'Strict-majority ceremonies require at least 3 participants.';
+        return 'Distributed ceremonies require at least 3 participants.';
     }
 
     const effectiveThreshold =
         requestedReconstructionThreshold ?? majorityThreshold(participantCount);
 
-    if (
-        effectiveThreshold < majorityThreshold(participantCount) ||
-        effectiveThreshold > participantCount - 1
-    ) {
-        return `Reconstruction threshold must stay within the strict-majority range for ${participantCount} participants.`;
+    if (effectiveThreshold < majorityThreshold(participantCount)) {
+        return `Reconstruction threshold must stay at or above the strict-majority floor for ${participantCount} participants.`;
+    }
+
+    try {
+        assertThreshold(effectiveThreshold, participantCount);
+    } catch {
+        return `Reconstruction threshold must stay within the supported range for ${participantCount} participants.`;
     }
 
     if (
@@ -314,10 +314,8 @@ const buildVerificationSummary = async ({
     try {
         const dkgState = replayGjkrTranscript(
             {
-                protocol: 'gjkr',
                 sessionId,
                 manifestHash,
-                group: manifest.suiteId,
                 participantCount: manifest.participantCount,
                 threshold: manifest.reconstructionThreshold,
             },
@@ -352,7 +350,6 @@ const buildVerificationSummary = async ({
         }
 
         const verifiedDKG = await verifyDKGTranscript({
-            protocol: 'gjkr',
             transcript: dkgTranscript,
             manifest,
             sessionId,
@@ -408,7 +405,6 @@ const buildVerificationSummary = async ({
     }
 
     const verificationResult = await verifyElectionCeremonyDetailedResult({
-        protocol: 'gjkr',
         manifest,
         sessionId,
         dkgTranscript,
@@ -551,7 +547,6 @@ export const getPollFetchReadModel = async (
         rosterEntries.length === participantCount
             ? ({
                   protocolVersion: poll.protocolVersion,
-                  suiteId: 'ristretto255',
                   reconstructionThreshold: thresholds.reconstructionThreshold,
                   participantCount,
                   minimumPublishedVoterCount:

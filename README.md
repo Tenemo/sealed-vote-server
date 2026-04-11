@@ -16,7 +16,7 @@
 
 ---
 
-[sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around `threshold-elgamal` `1.0.0-beta.5`. It uses a public roster, an append-only bulletin-board-style log, and local verification so that voters can audit who is participating while keeping ballot contents confidential.
+[sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around `threshold-elgamal` `1.0.0-beta.6`. It uses a public roster, an append-only bulletin-board-style log, and local verification so that voters can audit who is participating while keeping ballot contents confidential.
 
 https://github.com/user-attachments/assets/f4334c3c-1781-462c-9f0e-3e7ccda372f1
 
@@ -38,7 +38,7 @@ The frontend and backend both rely on [`threshold-elgamal`](https://www.npmjs.co
 3. Once at least three participants are registered, the creator starts voting and the roster becomes fixed.
 4. The client signs and appends protocol payloads to the board log behind guided UI actions. The board is append-only and every message is classified as accepted, idempotent, or equivocation.
 5. The public read model derives ceremony phase, digests, manifest state, and verification status only from the ordered board entries.
-6. When ballot and decryption payloads are eventually published, clients recompute the aggregate locally and verify the ceremony before presenting arithmetic-mean results.
+6. The current app completes the open waiting room, manifest freeze, and manifest-acceptance flow. The later DKG, ballot, and result-opening steps still depend on proof and VSS authoring helpers that are not yet exported from the library root entrypoint.
 
 This repository currently targets a hardened research prototype, not audited production voting software.
 

@@ -14,13 +14,16 @@ export const resolveThresholdPercentRange = (
     minPercent: number;
 } => {
     const safeParticipantCount = resolvedParticipantCount(participantCount);
+    const strictMajorityFloor =
+        resolveStrictMajorityFloor(safeParticipantCount);
+    const defaultPercent = Math.floor(
+        (strictMajorityFloor / safeParticipantCount) * 100,
+    );
 
     return {
-        defaultPercent: 51,
-        maxPercent: Math.floor(
-            ((safeParticipantCount - 1) / safeParticipantCount) * 100,
-        ),
-        minPercent: 51,
+        defaultPercent,
+        maxPercent: 100,
+        minPercent: defaultPercent,
     };
 };
 
@@ -52,7 +55,7 @@ export const resolveThresholdPreview = (
     );
 
     return Math.min(
-        safeParticipantCount - 1,
+        safeParticipantCount,
         Math.max(strictMajorityFloor, resolvedThreshold),
     );
 };

@@ -31,7 +31,7 @@ describe('POST /polls/:pollId/start', () => {
             url: `/api/polls/${pollId}/start`,
             payload: {
                 creatorToken,
-                thresholdPercent: 67,
+                thresholdPercent: 66,
             },
         });
 
@@ -62,7 +62,7 @@ describe('POST /polls/:pollId/start', () => {
             url: `/api/polls/${pollId}/start`,
             payload: {
                 creatorToken,
-                thresholdPercent: 67,
+                thresholdPercent: 66,
             },
         });
 
@@ -82,7 +82,7 @@ describe('POST /polls/:pollId/start', () => {
             url: `/api/polls/${pollId}/start`,
             payload: {
                 creatorToken: wrongButValidCreatorToken,
-                thresholdPercent: 67,
+                thresholdPercent: 66,
             },
         });
 
@@ -90,6 +90,37 @@ describe('POST /polls/:pollId/start', () => {
         expect(
             (JSON.parse(startResponse.body) as StartVotingResponse).message,
         ).toBe(ERROR_MESSAGES.invalidCreatorToken);
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+
+    test('keeps the legacy close alias compatible with creator-token-only requests', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
+        await registerVoter(fastify, pollId, 'Voter3');
+
+        const closeResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/close`,
+            payload: {
+                creatorToken,
+            },
+        });
+
+        expect(closeResponse.statusCode).toBe(200);
+        expect(
+            (JSON.parse(closeResponse.body) as StartVotingResponse).message,
+        ).toBe('Voting started successfully');
+
+        const getResponse = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
+        });
+        const poll = JSON.parse(getResponse.body) as PollResponse;
+
+        expect(poll.isOpen).toBe(false);
+        expect(poll.thresholds.reconstructionThreshold).toBe(2);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -105,7 +136,7 @@ describe('POST /polls/:pollId/start', () => {
             url: `/api/polls/${pollId}/start`,
             payload: {
                 creatorToken,
-                thresholdPercent: 67,
+                thresholdPercent: 66,
             },
         });
         const replayResponse = await fastify.inject({
@@ -126,6 +157,35 @@ describe('POST /polls/:pollId/start', () => {
         await deletePoll(fastify, pollId, creatorToken);
     });
 
+    test('allows n-of-n when the creator chooses 100 percent', async () => {
+        const { pollId, creatorToken } = await createPoll(fastify);
+        await registerVoter(fastify, pollId, 'Voter1');
+        await registerVoter(fastify, pollId, 'Voter2');
+        await registerVoter(fastify, pollId, 'Voter3');
+
+        const startResponse = await fastify.inject({
+            method: 'POST',
+            url: `/api/polls/${pollId}/start`,
+            payload: {
+                creatorToken,
+                thresholdPercent: 100,
+            },
+        });
+
+        expect(startResponse.statusCode).toBe(200);
+
+        const getResponse = await fastify.inject({
+            method: 'GET',
+            url: `/api/polls/${pollId}`,
+        });
+        const poll = JSON.parse(getResponse.body) as PollResponse;
+
+        expect(poll.thresholds.reconstructionThreshold).toBe(3);
+        expect(poll.thresholds.minimumPublishedVoterCount).toBe(3);
+
+        await deletePoll(fastify, pollId, creatorToken);
+    });
+
     test('should return an error for starting a non-existing poll', async () => {
         const nonExistingPollId = '48a16d54-0000-0000-0000-67083a00e107';
 
@@ -134,7 +194,7 @@ describe('POST /polls/:pollId/start', () => {
             url: `/api/polls/${nonExistingPollId}/start`,
             payload: {
                 creatorToken: wrongButValidCreatorToken,
-                thresholdPercent: 67,
+                thresholdPercent: 66,
             },
         });
 

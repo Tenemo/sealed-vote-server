@@ -1,5 +1,4 @@
-import type { ElectionManifest } from 'threshold-elgamal/protocol';
-import type { KeyAgreementSuite } from 'threshold-elgamal/transport';
+import type { ElectionManifest, KeyAgreementSuite } from 'threshold-elgamal';
 
 import type { BoardMessageRecord } from './vote.js';
 

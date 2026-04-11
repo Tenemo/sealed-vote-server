@@ -30,7 +30,8 @@ They are derived from the accepted board payloads returned by `GET /api/polls/:p
 - Every board submission is tied to a `voterToken`, and the payload `participantIndex` must match the authenticated voter.
 - Exact retransmissions are idempotent when the unsigned canonical payload bytes match, even if the signature bytes differ.
 - Slot conflicts are treated as equivocation. The route still records the message, but the read model marks the slot as tainted.
-- The current app uses a creator-selected strict-majority threshold preview before start, with a hard upper bound of 51 participants. The current verified target is 15 participants.
+- The current app uses a creator-selected threshold preview before start, with a lower bound at the majority floor and an upper bound at `100%` of the frozen roster. The hard participant cap is 51 and the current verified target is 15 participants.
+- The current app automates the waiting room, registration publication, manifest publication, and manifest acceptance steps. The later DKG, ballot, and decryption authoring flow still depends on proof and VSS helpers that are not yet exported from the library root entrypoint.
 - Token-based enrollment makes the roster publicly auditable, but this version does not claim strong identity binding or Sybil resistance.
 
 ## Privacy model

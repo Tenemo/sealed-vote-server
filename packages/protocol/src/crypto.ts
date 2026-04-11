@@ -1,8 +1,5 @@
 import type { BoardMessageRecord } from '@sealed-vote/contracts';
-import type {
-    ProtocolMessageType,
-    SignedPayload,
-} from 'threshold-elgamal/protocol';
+import type { ProtocolMessageType, SignedPayload } from 'threshold-elgamal';
 
 export const filterBoardMessagesByType = (
     boardEntries: readonly BoardMessageRecord[],

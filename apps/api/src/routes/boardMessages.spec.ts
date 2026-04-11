@@ -5,17 +5,15 @@ import {
     POLL_ROUTES,
     type PollResponse,
 } from '@sealed-vote/contracts';
-import type {
-    RegistrationPayload,
-    SignedPayload,
-} from 'threshold-elgamal/protocol';
-import { canonicalUnsignedPayloadBytes } from 'threshold-elgamal/protocol';
 import {
+    canonicalUnsignedPayloadBytes,
     exportAuthPublicKey,
     exportTransportPublicKey,
     generateTransportKeyPair,
     signPayloadBytes,
-} from 'threshold-elgamal/transport';
+    type RegistrationPayload,
+    type SignedPayload,
+} from 'threshold-elgamal';
 import type { FastifyInstance } from 'fastify';
 
 import { buildServer } from '../buildServer';

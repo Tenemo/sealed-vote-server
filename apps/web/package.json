@@ -9,7 +9,6 @@
         "node": ">=24.14.1"
     },
     "scripts": {
-        "start": "vite",
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",

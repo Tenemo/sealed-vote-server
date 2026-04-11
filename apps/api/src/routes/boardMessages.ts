@@ -11,16 +11,14 @@ import {
     canonicalUnsignedPayloadBytes,
     hashElectionManifest,
     hashRosterEntries,
+    importAuthPublicKey,
     validateElectionManifest,
     type ManifestPublicationPayload,
     type ProtocolMessageType,
     type RegistrationPayload,
     type SignedPayload,
-} from 'threshold-elgamal/protocol';
-import {
-    importAuthPublicKey,
     verifyPayloadSignature,
-} from 'threshold-elgamal/transport';
+} from 'threshold-elgamal';
 
 import type { DatabaseTransaction } from '../db/client.js';
 import { boardMessages } from '../db/schema.js';

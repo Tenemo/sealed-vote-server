@@ -1,15 +1,11 @@
-import { bytesToHex, hexToBytes } from 'threshold-elgamal/serialize';
+import { bytesToHex, hexToBytes } from 'threshold-elgamal';
 import {
     exportAuthPublicKey,
     exportTransportPublicKey,
     generateAuthKeyPair,
     generateTransportKeyPair,
     type KeyAgreementSuite,
-} from 'threshold-elgamal/transport';
-import {
-    exportTransportPrivateKey,
-    importTransportPrivateKey,
-} from 'threshold-elgamal/transport/advanced';
+} from 'threshold-elgamal';
 
 type StoredPollDeviceState = {
     authPrivateKeyPkcs8: string;
@@ -143,6 +139,17 @@ const exportAuthPrivateKey = async (privateKey: CryptoKey): Promise<string> => {
     return bytesToHex(new Uint8Array(exportedKey));
 };
 
+const exportTransportPrivateKey = async (
+    privateKey: CryptoKey,
+): Promise<string> => {
+    const exportedKey = await window.crypto.subtle.exportKey(
+        'pkcs8',
+        privateKey,
+    );
+
+    return bytesToHex(new Uint8Array(exportedKey));
+};
+
 const toWebCryptoBuffer = (hexValue: string): ArrayBuffer => {
     const bytes = Uint8Array.from(hexToBytes(hexValue));
 
@@ -164,6 +171,25 @@ export const importStoredAuthPrivateKey = async (
         },
         false,
         ['sign'],
+    );
+
+const importTransportPrivateKey = async (
+    transportPrivateKeyPkcs8: string,
+    suite: KeyAgreementSuite,
+): Promise<CryptoKey> =>
+    await window.crypto.subtle.importKey(
+        'pkcs8',
+        toWebCryptoBuffer(transportPrivateKeyPkcs8),
+        suite === 'X25519'
+            ? {
+                  name: 'X25519',
+              }
+            : {
+                  name: 'ECDH',
+                  namedCurve: 'P-256',
+              },
+        false,
+        ['deriveBits'],
     );
 
 const generateSeedHex = (): string => {
@@ -257,9 +283,7 @@ export const restoreStoredTransportPrivateKey = async (
     state: StoredPollDeviceState,
 ): Promise<CryptoKey> =>
     await importTransportPrivateKey(
-        state.transportPrivateKeyPkcs8 as Parameters<
-            typeof importTransportPrivateKey
-        >[0],
+        state.transportPrivateKeyPkcs8,
         state.transportSuite,
     );
 

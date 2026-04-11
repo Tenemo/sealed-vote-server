@@ -1,7 +1,4 @@
-import type {
-    ProtocolMessageType,
-    SignedPayload,
-} from 'threshold-elgamal/protocol';
+import type { ProtocolMessageType, SignedPayload } from 'threshold-elgamal';
 
 export type BoardMessageRequest = {
     signedPayload: SignedPayload;

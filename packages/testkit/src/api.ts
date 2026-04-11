@@ -16,7 +16,7 @@ import {
     exportTransportPublicKey,
     generateAuthKeyPair,
     generateTransportKeyPair,
-} from 'threshold-elgamal/transport';
+} from 'threshold-elgamal';
 
 export const getUniquePollName = (baseName?: string): string =>
     `${baseName ?? 'Test poll'}-${randomBytes(8).toString('hex')}`;

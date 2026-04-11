@@ -6,12 +6,10 @@ import {
     type ProtocolPayload,
     type RegistrationPayload,
     type SignedPayload,
-} from 'threshold-elgamal/protocol';
-import {
     signPayloadBytes,
     type EncodedAuthPublicKey,
     type EncodedTransportPublicKey,
-} from 'threshold-elgamal/transport';
+} from 'threshold-elgamal';
 
 import type { StoredPollDeviceState } from './pollDeviceStorage';
 import type { StoredVoterSession } from './voterSessionStorage';

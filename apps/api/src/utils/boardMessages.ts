@@ -7,7 +7,7 @@ import {
     canonicalUnsignedPayloadBytes,
     payloadSlotKey,
     type SignedPayload,
-} from 'threshold-elgamal/protocol';
+} from 'threshold-elgamal';
 
 import type { Database, DatabaseTransaction } from '../db/client.js';
 import { boardMessages } from '../db/schema.js';

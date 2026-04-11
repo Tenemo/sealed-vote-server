@@ -68,9 +68,9 @@ export const SignedPayloadSchema = Type.Object(
 export const BoardMessageRecordSchema = Type.Object({
     id: Type.String(),
     createdAt: Type.String(),
-    phase: Type.Number(),
-    participantIndex: Type.Number(),
-    messageType: Type.String(),
+    phase: Type.Integer({ minimum: 0 }),
+    participantIndex: Type.Integer({ minimum: 1 }),
+    messageType: ProtocolMessageTypeSchema,
     slotKey: Type.String(),
     unsignedHash: Type.String(),
     previousEntryHash: Type.Union([Type.String(), Type.Null()]),
