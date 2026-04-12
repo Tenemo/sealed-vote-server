@@ -1,19 +1,21 @@
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
 
+import {
+    closeVoting,
+    createPoll,
+    deletePolls,
+    expectAcceptedBallotCount,
+    expectParticipantsVisible,
+    expectSecuringVisible,
+    submitVote,
+    waitForAutomaticReveal,
+    waitForVerifiedResults,
+    type CreatedPoll,
+} from './support/pollFlow';
 import {
     closeParticipant,
     launchFirefoxParticipant,
 } from './support/participants';
-import {
-    beginVote,
-    createPoll,
-    deletePolls,
-    expectParticipantsVisible,
-    expectResultsVisible,
-    getShareLinkValue,
-    joinPoll,
-    type CreatedPoll,
-} from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -25,7 +27,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('completes one real poll across desktop chromium, desktop firefox, and mobile firefox', async ({
+test('completes one real ceremony across chromium, desktop firefox, and mobile firefox', async ({
     page,
     playwright,
     request,
@@ -41,11 +43,9 @@ test('completes one real poll across desktop chromium, desktop firefox, and mobi
 
     const createdPoll = await createPoll({
         page,
-        pollName: createPollName('Mixed platform vote', namespace),
+        pollName: createPollName('Mixed platform ceremony', namespace),
     });
     createdPolls.push(createdPoll);
-
-    expect(await getShareLinkValue(page)).toBe(createdPoll.pollUrl);
 
     const firefoxDesktop = await launchFirefoxParticipant({ playwright });
     const firefoxMobile = await launchFirefoxParticipant({
@@ -57,32 +57,50 @@ test('completes one real poll across desktop chromium, desktop firefox, and mobi
     attachErrorTracking(firefoxMobile.page, 'firefox-mobile', tracker);
 
     try {
-        await joinPoll({
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await joinPoll({
+        await submitVote({
             page: firefoxDesktop.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [6, 8],
             voterName: firefoxDesktopName,
         });
-        await joinPoll({
+        await submitVote({
             page: firefoxMobile.page,
             pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
             voterName: firefoxMobileName,
         });
 
-        await beginVote(page);
-
-        await expectResultsVisible(page);
-        await expectResultsVisible(firefoxDesktop.page);
-        await expectResultsVisible(firefoxMobile.page);
         await expectParticipantsVisible(page, [
             creatorName,
             firefoxDesktopName,
             firefoxMobileName,
         ]);
-        expectNoUnexpectedErrors(tracker);
+        await closeVoting(page);
+
+        await expectSecuringVisible(page);
+        await expectSecuringVisible(firefoxDesktop.page);
+        await expectSecuringVisible(firefoxMobile.page);
+
+        await waitForAutomaticReveal(page);
+
+        await waitForVerifiedResults({ page });
+        await waitForVerifiedResults({ page: firefoxDesktop.page });
+        await waitForVerifiedResults({ page: firefoxMobile.page });
+        await expectAcceptedBallotCount({ count: 3, page });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: firefoxDesktop.page,
+        });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: firefoxMobile.page,
+        });
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(firefoxDesktop);
         await closeParticipant(firefoxMobile);

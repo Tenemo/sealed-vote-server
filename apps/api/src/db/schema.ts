@@ -1,9 +1,7 @@
-import type { EncryptedMessage } from '@sealed-vote/contracts';
 import { relations, sql } from 'drizzle-orm';
 import {
     boolean,
     char,
-    doublePrecision,
     foreignKey,
     integer,
     jsonb,
@@ -13,6 +11,7 @@ import {
     unique,
     uuid,
 } from 'drizzle-orm/pg-core';
+import type { SignedPayload } from 'threshold-elgamal';
 
 export const polls = pgTable(
     'polls',
@@ -24,19 +23,7 @@ export const polls = pgTable(
         slug: text('slug').notNull(),
         creatorTokenHash: char('creator_token_hash', { length: 64 }).notNull(),
         isOpen: boolean('is_open').notNull().default(true),
-        commonPublicKey: text('common_public_key'),
-        encryptedTallies: jsonb('encrypted_tallies')
-            .$type<EncryptedMessage[]>()
-            .notNull()
-            .default(sql`'[]'::jsonb`),
-        resultTallies: text('result_tallies')
-            .array()
-            .notNull()
-            .default(sql`'{}'::text[]`),
-        resultScores: doublePrecision('result_scores')
-            .array()
-            .notNull()
-            .default(sql`'{}'::double precision[]`),
+        protocolVersion: text('protocol_version').notNull().default('v1'),
         createdAt: timestamp('created_at', {
             mode: 'date',
             withTimezone: false,
@@ -106,6 +93,69 @@ export const voters = pgTable(
     ],
 );
 
+export const boardMessages = pgTable(
+    'board_messages',
+    {
+        id: uuid('id')
+            .primaryKey()
+            .default(sql`gen_random_uuid()`),
+        pollId: uuid('poll_id').notNull(),
+        participantIndex: integer('participant_index').notNull(),
+        phase: integer('phase').notNull(),
+        messageType: text('message_type').notNull(),
+        slotKey: text('slot_key').notNull(),
+        unsignedHash: char('unsigned_hash', { length: 64 }).notNull(),
+        previousEntryHash: char('previous_entry_hash', { length: 64 }),
+        entryHash: char('entry_hash', { length: 64 }).notNull(),
+        signedPayload: jsonb('signed_payload').$type<SignedPayload>().notNull(),
+        createdAt: timestamp('created_at', {
+            mode: 'date',
+            withTimezone: false,
+        })
+            .notNull()
+            .defaultNow(),
+    },
+    (table) => [
+        foreignKey({
+            columns: [table.pollId],
+            foreignColumns: [polls.id],
+            name: 'fk_board_messages_poll_id',
+        }).onDelete('cascade'),
+        unique('unique_board_message_entry_hash').on(table.entryHash),
+    ],
+);
+
+export const pollCeremonySessions = pgTable(
+    'poll_ceremony_sessions',
+    {
+        id: uuid('id')
+            .primaryKey()
+            .default(sql`gen_random_uuid()`),
+        pollId: uuid('poll_id').notNull(),
+        sequence: integer('sequence').notNull(),
+        activeParticipantIndices: jsonb('active_participant_indices')
+            .$type<number[]>()
+            .notNull(),
+        createdAt: timestamp('created_at', {
+            mode: 'date',
+            withTimezone: false,
+        })
+            .notNull()
+            .defaultNow(),
+    },
+    (table) => [
+        foreignKey({
+            columns: [table.pollId],
+            foreignColumns: [polls.id],
+            name: 'fk_poll_ceremony_sessions_poll_id',
+        }).onDelete('cascade'),
+        unique('unique_poll_ceremony_session_sequence').on(
+            table.pollId,
+            table.sequence,
+        ),
+    ],
+);
+
 export const publicKeyShares = pgTable(
     'public_key_shares',
     {
@@ -134,65 +184,12 @@ export const publicKeyShares = pgTable(
     ],
 );
 
-export const encryptedVotes = pgTable(
-    'encrypted_votes',
-    {
-        id: uuid('id')
-            .primaryKey()
-            .default(sql`gen_random_uuid()`),
-        votes: jsonb('votes').$type<EncryptedMessage[]>().notNull(),
-        pollId: uuid('poll_id').notNull(),
-        voterId: uuid('voter_id').notNull(),
-    },
-    (table) => [
-        foreignKey({
-            columns: [table.pollId],
-            foreignColumns: [polls.id],
-            name: 'fk_encrypted_votes_poll_id',
-        }).onDelete('cascade'),
-        foreignKey({
-            columns: [table.voterId],
-            foreignColumns: [voters.id],
-            name: 'fk_encrypted_votes_voter_id',
-        }).onDelete('cascade'),
-        unique('unique_vote_per_voter').on(table.pollId, table.voterId),
-    ],
-);
-
-export const decryptionShares = pgTable(
-    'decryption_shares',
-    {
-        id: uuid('id')
-            .primaryKey()
-            .default(sql`gen_random_uuid()`),
-        shares: jsonb('shares').$type<string[]>().notNull(),
-        pollId: uuid('poll_id').notNull(),
-        voterId: uuid('voter_id').notNull(),
-    },
-    (table) => [
-        foreignKey({
-            columns: [table.pollId],
-            foreignColumns: [polls.id],
-            name: 'fk_decryption_shares_poll_id',
-        }).onDelete('cascade'),
-        foreignKey({
-            columns: [table.voterId],
-            foreignColumns: [voters.id],
-            name: 'fk_decryption_shares_voter_id',
-        }).onDelete('cascade'),
-        unique('unique_decryption_shares_per_voter').on(
-            table.pollId,
-            table.voterId,
-        ),
-    ],
-);
-
 export const pollsRelations = relations(polls, ({ many }) => ({
     choices: many(choices),
     voters: many(voters),
+    boardMessages: many(boardMessages),
+    pollCeremonySessions: many(pollCeremonySessions),
     publicKeyShares: many(publicKeyShares),
-    encryptedVotes: many(encryptedVotes),
-    decryptionShares: many(decryptionShares),
 }));
 
 export const choicesRelations = relations(choices, ({ one }) => ({
@@ -208,9 +205,24 @@ export const votersRelations = relations(voters, ({ many, one }) => ({
         references: [polls.id],
     }),
     publicKeyShares: many(publicKeyShares),
-    encryptedVotes: many(encryptedVotes),
-    decryptionShares: many(decryptionShares),
 }));
+
+export const boardMessagesRelations = relations(boardMessages, ({ one }) => ({
+    poll: one(polls, {
+        fields: [boardMessages.pollId],
+        references: [polls.id],
+    }),
+}));
+
+export const pollCeremonySessionsRelations = relations(
+    pollCeremonySessions,
+    ({ one }) => ({
+        poll: one(polls, {
+            fields: [pollCeremonySessions.pollId],
+            references: [polls.id],
+        }),
+    }),
+);
 
 export const publicKeySharesRelations = relations(
     publicKeyShares,
@@ -226,31 +238,6 @@ export const publicKeySharesRelations = relations(
     }),
 );
 
-export const encryptedVotesRelations = relations(encryptedVotes, ({ one }) => ({
-    poll: one(polls, {
-        fields: [encryptedVotes.pollId],
-        references: [polls.id],
-    }),
-    voter: one(voters, {
-        fields: [encryptedVotes.voterId],
-        references: [voters.id],
-    }),
-}));
-
-export const decryptionSharesRelations = relations(
-    decryptionShares,
-    ({ one }) => ({
-        poll: one(polls, {
-            fields: [decryptionShares.pollId],
-            references: [polls.id],
-        }),
-        voter: one(voters, {
-            fields: [decryptionShares.voterId],
-            references: [voters.id],
-        }),
-    }),
-);
-
 export const schema = {
     polls,
     pollsRelations,
@@ -258,12 +245,12 @@ export const schema = {
     choicesRelations,
     voters,
     votersRelations,
+    boardMessages,
+    boardMessagesRelations,
+    pollCeremonySessions,
+    pollCeremonySessionsRelations,
     publicKeyShares,
     publicKeySharesRelations,
-    encryptedVotes,
-    encryptedVotesRelations,
-    decryptionShares,
-    decryptionSharesRelations,
 };
 
 export type DatabaseSchema = typeof schema;

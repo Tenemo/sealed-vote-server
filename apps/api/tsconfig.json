@@ -9,7 +9,7 @@
         "target": "esnext",
         "module": "esnext",
         "esModuleInterop": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "ignoreDeprecations": "6.0",
         "allowArbitraryExtensions": true,
         "removeComments": true,

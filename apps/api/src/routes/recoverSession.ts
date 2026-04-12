@@ -3,19 +3,12 @@ import type {
     RecoverSessionRequest as RecoverSessionRequestContract,
     RecoverSessionResponse as RecoverSessionResponseContract,
 } from '@sealed-vote/contracts';
-import { derivePollPhase } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import {
-    decryptionShares,
-    encryptedVotes,
-    publicKeyShares,
-} from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
-import { getPollPhaseReadModelById } from '../utils/pollReadModel.js';
-import { getExistingPollSubmissionValue } from '../utils/pollSubmissions.js';
+import { getPollById } from '../utils/pollReadModel.js';
 import {
     authenticateVoterReadOnly,
     hashSecureToken,
@@ -38,20 +31,16 @@ const RecoverSessionResponseSchema = Type.Object({
     pollId: Type.String(),
     pollSlug: Type.String(),
     phase: Type.Union([
-        Type.Literal('registration'),
-        Type.Literal('key-generation'),
-        Type.Literal('voting'),
-        Type.Literal('tallying'),
-        Type.Literal('decryption'),
+        Type.Literal('open'),
+        Type.Literal('securing'),
+        Type.Literal('ready-to-reveal'),
+        Type.Literal('revealing'),
         Type.Literal('complete'),
+        Type.Literal('aborted'),
     ]),
     isOpen: Type.Boolean(),
     voterName: Type.Union([Type.String(), Type.Null()]),
     voterIndex: Type.Union([Type.Number(), Type.Null()]),
-    hasSubmittedPublicKeyShare: Type.Boolean(),
-    hasSubmittedVote: Type.Boolean(),
-    hasSubmittedDecryptionShares: Type.Boolean(),
-    resultsAvailable: Type.Boolean(),
 });
 
 const schema = {
@@ -97,37 +86,28 @@ export const recoverSession = async (
             }
 
             return await withTransaction(fastify, async (tx) => {
-                const poll = await tx.query.polls.findFirst({
-                    where: (fields, { eq: isEqual }) =>
-                        isEqual(fields.id, pollId),
-                    columns: {
-                        creatorTokenHash: true,
-                    },
-                });
-                const phaseReadModel = await getPollPhaseReadModelById(
-                    tx,
-                    pollId,
-                );
+                const poll = await getPollById(tx, pollId);
 
-                if (!poll || !phaseReadModel) {
+                if (!poll) {
                     throw createError(
                         404,
                         `Poll with ID ${pollId} does not exist.`,
                     );
                 }
 
-                const phase = derivePollPhase({
-                    commonPublicKey: phaseReadModel.commonPublicKey,
-                    encryptedTallyCount: phaseReadModel.encryptedTallyCount,
-                    encryptedVoteCount: phaseReadModel.encryptedVoteCount,
-                    isOpen: phaseReadModel.isOpen,
-                    resultScoreCount: phaseReadModel.resultScoreCount,
-                    voterCount: phaseReadModel.voterCount,
-                });
-
                 if (creatorToken) {
+                    const creator = await tx.query.polls.findFirst({
+                        where: (fields, { eq: isEqual }) =>
+                            isEqual(fields.id, pollId),
+                        columns: {
+                            creatorTokenHash: true,
+                        },
+                    });
+
                     if (
-                        poll.creatorTokenHash !== hashSecureToken(creatorToken)
+                        !creator ||
+                        creator.creatorTokenHash !==
+                            hashSecureToken(creatorToken)
                     ) {
                         throw createError(
                             403,
@@ -138,15 +118,11 @@ export const recoverSession = async (
                     return {
                         role: 'creator',
                         pollId,
-                        pollSlug: phaseReadModel.slug,
-                        phase,
-                        isOpen: phaseReadModel.isOpen,
+                        pollSlug: poll.slug,
+                        phase: poll.phase,
+                        isOpen: poll.isOpen,
                         voterName: null,
                         voterIndex: null,
-                        hasSubmittedPublicKeyShare: false,
-                        hasSubmittedVote: false,
-                        hasSubmittedDecryptionShares: false,
-                        resultsAvailable: phaseReadModel.resultScoreCount > 0,
                     };
                 }
 
@@ -156,49 +132,14 @@ export const recoverSession = async (
                     voterToken!,
                 );
 
-                const [publicKeyShare, existingVote, existingDecryptionShares] =
-                    await Promise.all([
-                        getExistingPollSubmissionValue<string>({
-                            db: tx,
-                            pollId,
-                            table: publicKeyShares,
-                            valueColumn: publicKeyShares.publicKeyShare,
-                            voterId: voter.id,
-                        }),
-                        getExistingPollSubmissionValue<
-                            typeof encryptedVotes.$inferSelect.votes
-                        >({
-                            db: tx,
-                            pollId,
-                            table: encryptedVotes,
-                            valueColumn: encryptedVotes.votes,
-                            voterId: voter.id,
-                        }),
-                        getExistingPollSubmissionValue<
-                            typeof decryptionShares.$inferSelect.shares
-                        >({
-                            db: tx,
-                            pollId,
-                            table: decryptionShares,
-                            valueColumn: decryptionShares.shares,
-                            voterId: voter.id,
-                        }),
-                    ]);
-
                 return {
                     role: 'voter',
                     pollId,
-                    pollSlug: phaseReadModel.slug,
-                    phase,
-                    isOpen: phaseReadModel.isOpen,
+                    pollSlug: poll.slug,
+                    phase: poll.phase,
+                    isOpen: poll.isOpen,
                     voterName: voter.voterName,
                     voterIndex: voter.voterIndex,
-                    hasSubmittedPublicKeyShare: Boolean(publicKeyShare),
-                    hasSubmittedVote: Boolean(existingVote),
-                    hasSubmittedDecryptionShares: Boolean(
-                        existingDecryptionShares,
-                    ),
-                    resultsAvailable: phaseReadModel.resultScoreCount > 0,
                 };
             });
         },

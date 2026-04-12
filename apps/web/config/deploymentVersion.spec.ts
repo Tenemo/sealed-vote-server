@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest';
 import { resolveDeploymentCommitSha } from './deploymentVersion';
 
 describe('resolveDeploymentCommitSha', () => {
+    // This config test looks deployment-specific, but it protects the commit
+    // badge and health metadata across Netlify, Railway, GitHub Actions, and
+    // local checkouts where the available source of truth differs.
     test('returns null when no deployment SHA is configured', () => {
         expect(
             resolveDeploymentCommitSha(

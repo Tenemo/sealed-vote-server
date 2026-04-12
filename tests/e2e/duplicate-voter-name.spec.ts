@@ -1,12 +1,17 @@
 import { expect, test } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
+import { gotoInteractablePage } from './support/navigation.mts';
 import {
     closeParticipant,
     openProjectParticipant,
 } from './support/participants';
-import { gotoInteractablePage } from './support/navigation.mts';
-import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
+import {
+    createPoll,
+    deletePolls,
+    submitVote,
+    type CreatedPoll,
+} from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -18,7 +23,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('blocks duplicate voter names before registration submission', async ({
+test('shows the duplicate voter-name error and still allows a unique retry', async ({
     browser,
     page,
     request,
@@ -37,38 +42,55 @@ test('blocks duplicate voter names before registration submission', async ({
     });
     createdPolls.push(createdPoll);
 
-    await page.getByLabel('Voter name').fill(firstVoterName);
-    await page.getByRole('button', { exact: true, name: 'Vote' }).click();
+    await submitVote({
+        page,
+        scores: [9, 4],
+        voterName: firstVoterName,
+    });
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'page-2', tracker);
+    attachErrorTracking(participant.page, 'page-2', tracker, {
+        allowedApiStatuses: [409],
+    });
 
     try {
         await gotoInteractablePage(participant.page, createdPoll.pollUrl);
 
-        const secondVoteButton = participant.page.getByRole('button', {
-            exact: true,
-            name: 'Vote',
-        });
-
-        await participant.page.getByLabel('Voter name').fill(firstVoterName);
+        await participant.page
+            .getByLabel('Your public name')
+            .fill(firstVoterName);
+        await participant.page
+            .getByRole('button', { name: 'Score Apples as 8' })
+            .click();
+        await participant.page
+            .getByRole('button', { name: 'Score Bananas as 6' })
+            .click();
+        await participant.page
+            .getByRole('button', { exact: true, name: 'Submit vote' })
+            .click();
 
         await expect(
-            participant.page.getByText('This voter name already exists'),
+            participant.page.getByText(
+                'Voter name is already taken for this vote.',
+            ),
         ).toBeVisible();
-        await expect(secondVoteButton).toBeDisabled();
         await expectNoAxeViolations(
             participant.page,
             'duplicate voter name validation state',
         );
 
-        await participant.page.getByLabel('Voter name').fill(secondVoterName);
+        await participant.page
+            .getByLabel('Your public name')
+            .fill(secondVoterName);
+        await participant.page
+            .getByRole('button', { exact: true, name: 'Submit vote' })
+            .click();
 
         await expect(
-            participant.page.getByText('This voter name already exists'),
-        ).toBeHidden();
-        await expect(secondVoteButton).toBeEnabled();
-        expectNoUnexpectedErrors(tracker);
+            participant.page.getByText('Vote stored on this device', {
+                exact: true,
+            }),
+        ).toBeVisible({ timeout: 30_000 });
     } finally {
         await closeParticipant(participant);
         await deletePolls(request, createdPolls);

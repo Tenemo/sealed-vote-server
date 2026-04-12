@@ -1,149 +1,48 @@
-import { combinePublicKeys, generateKeys } from 'threshold-elgamal';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-    computeEncryptedTallies,
-    createDecryptionSharesForTallies,
-    serializeVotes,
-} from '../src/crypto';
-import { computeGeometricMean, verifyPublishedResults } from '../src/results';
+    computeArithmeticMean,
+    computePublishedResultScores,
+    hasVerifiedTallies,
+} from '../src/results';
 
-describe('computeGeometricMean', () => {
-    test('computes geometric means using the voter count', () => {
-        const [firstResult, secondResult] = computeGeometricMean(
-            ['1000', '125'],
-            3,
-        );
-
-        expect(firstResult).toBeCloseTo(10);
-        expect(secondResult).toBeCloseTo(5);
+describe('result helpers', () => {
+    it('computes arithmetic means from bigint and string tallies', () => {
+        expect(computeArithmeticMean(15n, 3)).toBe(5);
+        expect(computeArithmeticMean('10', 4)).toBe(2.5);
+        expect(computeArithmeticMean('7', 3)).toBe(2.333333);
     });
 
-    test('throws for empty voter counts', () => {
-        expect(() => computeGeometricMean(['10'], 0)).toThrow(
-            'Voter count must be greater than 0.',
+    it('rejects invalid arithmetic-mean inputs', () => {
+        expect(() => computeArithmeticMean('10', 0)).toThrow(
+            'Voter count must be greater than zero.',
+        );
+        expect(() => computeArithmeticMean('not-a-number', 2)).toThrow(
+            'Tally must be numeric.',
         );
     });
 
-    test('leaves one-voter results unchanged', () => {
-        expect(computeGeometricMean(['4', '9', '16'], 1)).toEqual([4, 9, 16]);
-    });
-
-    test('keeps large tally strings precise before rounding to published scores', () => {
-        expect(computeGeometricMean(['1000000000000000000'], 2)).toEqual([
-            1000000000,
+    it('maps multiple tallies into rounded published scores', () => {
+        expect(computePublishedResultScores(['12', '19', '7'], 4)).toEqual([
+            3, 4.75, 1.75,
         ]);
     });
 
-    test('rounds mixed vote distributions to 6 decimal places', () => {
-        expect(computeGeometricMean(['240'], 3)).toEqual([6.214465]);
-    });
-});
-
-describe('verifyPublishedResults', () => {
-    test('verifies published tallies and scores against the ciphertexts and shares', () => {
-        const voter1 = generateKeys(1, 2);
-        const voter2 = generateKeys(2, 2);
-        const commonPublicKey = combinePublicKeys([
-            voter1.publicKey,
-            voter2.publicKey,
-        ]);
-        const encryptedTallies = computeEncryptedTallies([
-            serializeVotes(
-                {
-                    Apples: 2,
-                    Bananas: 5,
-                },
-                ['Apples', 'Bananas'],
-                commonPublicKey,
-            ),
-            serializeVotes(
-                {
-                    Apples: 7,
-                    Bananas: 3,
-                },
-                ['Apples', 'Bananas'],
-                commonPublicKey,
-            ),
-        ]);
-        const publishedDecryptionShares = [
-            createDecryptionSharesForTallies(
-                encryptedTallies,
-                voter1.privateKey,
-            ),
-            createDecryptionSharesForTallies(
-                encryptedTallies,
-                voter2.privateKey,
-            ),
-        ];
-
+    it('reports verified tallies only when the read model is verified', () => {
         expect(
-            verifyPublishedResults({
-                encryptedTallies,
-                publishedDecryptionShares,
-                resultTallies: ['14', '15'],
-                resultScores: [3.741657, 3.872983],
-                voterCount: 2,
+            hasVerifiedTallies({
+                verification: {
+                    status: 'verified',
+                },
             }),
-        ).toEqual({
-            computedScores: [3.741657, 3.872983],
-            computedTallies: ['14', '15'],
-            isVerified: true,
-            scoresMatch: true,
-            talliesMatch: true,
-        });
-    });
-
-    test('detects mismatched published tallies and scores', () => {
-        const voter1 = generateKeys(1, 2);
-        const voter2 = generateKeys(2, 2);
-        const commonPublicKey = combinePublicKeys([
-            voter1.publicKey,
-            voter2.publicKey,
-        ]);
-        const encryptedTallies = computeEncryptedTallies([
-            serializeVotes(
-                {
-                    Apples: 2,
-                    Bananas: 5,
-                },
-                ['Apples', 'Bananas'],
-                commonPublicKey,
-            ),
-            serializeVotes(
-                {
-                    Apples: 7,
-                    Bananas: 3,
-                },
-                ['Apples', 'Bananas'],
-                commonPublicKey,
-            ),
-        ]);
-        const publishedDecryptionShares = [
-            createDecryptionSharesForTallies(
-                encryptedTallies,
-                voter1.privateKey,
-            ),
-            createDecryptionSharesForTallies(
-                encryptedTallies,
-                voter2.privateKey,
-            ),
-        ];
-
+        ).toBe(true);
         expect(
-            verifyPublishedResults({
-                encryptedTallies,
-                publishedDecryptionShares,
-                resultTallies: ['15', '15'],
-                resultScores: [3.9, 3.872983],
-                voterCount: 2,
+            hasVerifiedTallies({
+                verification: {
+                    status: 'not-ready',
+                },
             }),
-        ).toEqual({
-            computedScores: [3.741657, 3.872983],
-            computedTallies: ['14', '15'],
-            isVerified: false,
-            scoresMatch: false,
-            talliesMatch: false,
-        });
+        ).toBe(false);
+        expect(hasVerifiedTallies(null)).toBe(false);
     });
 });

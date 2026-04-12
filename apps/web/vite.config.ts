@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,12 +9,19 @@ import { defineConfig } from 'vite';
 import { createDeploymentVersionPlugin } from './config/deploymentVersion';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
+const repoRootDir = path.resolve(rootDir, '..', '..');
+const requireFromRepoRoot = createRequire(
+    path.join(repoRootDir, 'package.json'),
+);
 
 const resolveFromRoot = (...segments: string[]): string =>
     path.resolve(rootDir, ...segments);
 
 const resolveFromSrc = (...segments: string[]): string =>
     resolveFromRoot('src', ...segments);
+
+const resolveTslibEntry = (): string =>
+    requireFromRepoRoot.resolve('tslib/tslib.es6.mjs');
 
 const getManualChunk = (id: string): string | undefined => {
     const normalizedId = id.replaceAll('\\', '/');
@@ -47,7 +55,6 @@ const getManualChunk = (id: string): string | undefined => {
         normalizedId.includes('/node_modules/@reduxjs/') ||
         normalizedId.includes('/node_modules/react-redux/') ||
         normalizedId.includes('/node_modules/redux/') ||
-        normalizedId.includes('/node_modules/redux-persist/') ||
         normalizedId.includes('/node_modules/immer/') ||
         normalizedId.includes('/node_modules/reselect/')
     ) {
@@ -65,6 +72,11 @@ export default defineConfig({
     plugins: [react(), tailwindcss(), createDeploymentVersionPlugin()],
     resolve: {
         alias: {
+            // Rolldown sometimes resolves third-party bare imports from the
+            // real .pnpm store path instead of the workspace package boundary.
+            // Pin tslib to the repo-root install so Netlify does not depend on
+            // hidden pnpm fallback links existing in its cached install tree.
+            tslib: resolveTslibEntry(),
             '@': resolveFromSrc(),
             app: resolveFromSrc('app'),
             components: resolveFromSrc('components'),

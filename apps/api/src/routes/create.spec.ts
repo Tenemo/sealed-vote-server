@@ -218,6 +218,21 @@ describe('POST /polls/create', () => {
         expect(response.statusCode).toBe(400);
     });
 
+    test('rejects unsupported protocol versions during request validation', async () => {
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/polls/create',
+            payload: {
+                choices: ['Dog', 'Cat'],
+                creatorToken: generateToken(),
+                pollName: getUniquePollName('Unsupported protocol version'),
+                protocolVersion: 'v2',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
+
     test('replays the same create request idempotently for the same creator token', async () => {
         const creatorToken = generateToken();
         const pollName = getUniquePollName('Idempotent create poll');

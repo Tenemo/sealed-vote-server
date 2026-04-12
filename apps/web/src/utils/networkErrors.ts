@@ -1,4 +1,3 @@
-import type { SerializedError } from '@reduxjs/toolkit';
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
 const connectionErrorStatuses = new Set(['FETCH_ERROR', 'TIMEOUT_ERROR']);
@@ -25,33 +24,52 @@ export const isConnectionError = (
 export const isConnectionErrorMessage = (message: string): boolean =>
     connectionErrorPattern.test(message);
 
-export const renderError = (
-    error: FetchBaseQueryError | SerializedError | undefined,
-): string => {
+export const renderError = (error: unknown): string => {
     if (!error) return 'An unknown error occurred.';
     if (isConnectionError(error)) {
         return connectionLostMessage;
     }
-    if ('data' in error) {
-        if (typeof error.data === 'string') return error.data;
-        if (error.data && typeof error.data === 'object') {
-            const data = error.data as Record<string, unknown>;
+
+    if (typeof error === 'object' && error !== null && 'data' in error) {
+        const dataField = (error as { data?: unknown }).data;
+
+        if (typeof dataField === 'string') return dataField;
+        if (dataField && typeof dataField === 'object') {
+            const data = dataField as Record<string, unknown>;
             if (typeof data.message === 'string') return data.message;
         }
     }
-    if ('error' in error && typeof error.error === 'string') {
-        if (isConnectionErrorMessage(error.error)) {
-            return connectionLostMessage;
-        }
 
-        return error.error;
+    if (typeof error === 'object' && error !== null && 'error' in error) {
+        const errorField = (error as { error?: unknown }).error;
+
+        if (typeof errorField === 'string') {
+            if (isConnectionErrorMessage(errorField)) {
+                return connectionLostMessage;
+            }
+
+            return errorField;
+        }
     }
-    if ('message' in error && typeof error.message === 'string') {
-        if (isConnectionErrorMessage(error.message)) {
+
+    if (typeof error === 'object' && error !== null && 'message' in error) {
+        const messageField = (error as { message?: unknown }).message;
+
+        if (typeof messageField === 'string') {
+            if (isConnectionErrorMessage(messageField)) {
+                return connectionLostMessage;
+            }
+
+            return messageField;
+        }
+    }
+
+    if (typeof error === 'string') {
+        if (isConnectionErrorMessage(error)) {
             return connectionLostMessage;
         }
 
-        return error.message;
+        return error;
     }
 
     return 'An unknown error occurred.';

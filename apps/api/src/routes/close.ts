@@ -1,18 +1,20 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
 import type {
-    ClosePollRequest as ClosePollRequestContract,
+    CloseVotingRequest as CloseVotingRequestContract,
     MessageResponse,
 } from '@sealed-vote/contracts';
-import { canClose } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { polls } from '../db/schema.js';
+import type { DatabaseTransaction } from '../db/client.js';
+import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
-import { countPollVoters } from '../utils/pollCounts.js';
+import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
+import { insertPollCeremonySession } from '../utils/pollCeremonySessions.js';
 import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
+import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
@@ -23,13 +25,13 @@ import {
     type PollIdParams,
 } from './schemas.js';
 
-const ClosePollBodySchema = Type.Object({
+const CloseVotingBodySchema = Type.Object({
     creatorToken: SecureTokenSchema,
 });
 
 const schema = {
     params: PollIdParamsSchema,
-    body: ClosePollBodySchema,
+    body: CloseVotingBodySchema,
     response: {
         200: MessageResponseSchema,
         400: MessageResponseSchema,
@@ -38,65 +40,108 @@ const schema = {
     },
 };
 
-type ClosePollBody = ClosePollRequestContract;
-export type ClosePollResponse = MessageResponse;
+type CloseVotingBody = CloseVotingRequestContract;
+export type CloseVotingResponse = MessageResponse;
 
-export const close = async (fastify: FastifyInstance): Promise<void> => {
+const validateParticipantDeviceReadiness = async (
+    client: DatabaseTransaction,
+    pollId: string,
+): Promise<number[]> => {
+    const participants = await client
+        .select({
+            publicKeyShare: publicKeyShares.publicKeyShare,
+            voterId: voters.id,
+            voterIndex: voters.voterIndex,
+        })
+        .from(voters)
+        .leftJoin(
+            publicKeyShares,
+            and(
+                eq(publicKeyShares.voterId, voters.id),
+                eq(publicKeyShares.pollId, voters.pollId),
+            ),
+        )
+        .where(eq(voters.pollId, pollId))
+        .orderBy(voters.voterIndex);
+
+    if (participants.length < minimumPollParticipantsToClose) {
+        throw createError(400, ERROR_MESSAGES.notEnoughParticipantsToClose);
+    }
+
+    const everyParticipantHasDeviceKeys = participants.every(
+        (participant) =>
+            parseParticipantDeviceRecord(participant.publicKeyShare) !== null,
+    );
+
+    if (!everyParticipantHasDeviceKeys) {
+        throw createError(400, ERROR_MESSAGES.participantDeviceKeysRequired);
+    }
+
+    return participants.map((participant) => participant.voterIndex);
+};
+
+export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
         '/polls/:pollId/close',
         { schema },
         async (
             req: FastifyRequest<{
                 Params: PollIdParams;
-                Body: ClosePollBody;
+                Body: CloseVotingBody;
             }>,
             reply: FastifyReply,
-        ): Promise<ClosePollResponse> => {
-            const { pollId } = req.params;
-            const { creatorToken } = req.body;
-
-            const response = await withTransaction(fastify, async (client) => {
-                const poll = await lockPollByIdForCreatorAction(client, pollId);
-                if (!poll) {
-                    throw createError(
-                        404,
-                        `Poll with ID ${pollId} does not exist.`,
+        ): Promise<CloseVotingResponse> => {
+            const response = await withTransaction(
+                fastify,
+                async (client): Promise<CloseVotingResponse> => {
+                    const poll = await lockPollByIdForCreatorAction(
+                        client,
+                        req.params.pollId,
                     );
-                }
 
-                if (poll.creatorTokenHash !== hashSecureToken(creatorToken)) {
-                    throw createError(403, ERROR_MESSAGES.invalidCreatorToken);
-                }
+                    if (!poll) {
+                        throw createError(
+                            404,
+                            `Poll with ID ${req.params.pollId} does not exist.`,
+                        );
+                    }
 
-                const voterCount = await countPollVoters(client, pollId);
+                    if (
+                        poll.creatorTokenHash !==
+                        hashSecureToken(req.body.creatorToken)
+                    ) {
+                        throw createError(
+                            403,
+                            ERROR_MESSAGES.invalidCreatorToken,
+                        );
+                    }
 
-                if (!poll.isOpen) {
-                    return { message: 'Poll closed successfully' };
-                }
+                    if (!poll.isOpen) {
+                        return { message: 'Voting closed successfully.' };
+                    }
 
-                if (
-                    !canClose({
-                        isOpen: poll.isOpen,
-                        commonPublicKey: null,
-                        voterCount,
-                        encryptedVoteCount: 0,
-                        encryptedTallyCount: 0,
-                        resultScoreCount: 0,
-                    })
-                ) {
-                    throw createError(
-                        400,
-                        ERROR_MESSAGES.notEnoughVotersToClose,
-                    );
-                }
+                    const activeParticipantIndices =
+                        await validateParticipantDeviceReadiness(
+                            client,
+                            req.params.pollId,
+                        );
 
-                await client
-                    .update(polls)
-                    .set({ isOpen: false })
-                    .where(eq(polls.id, pollId));
+                    await client
+                        .update(polls)
+                        .set({
+                            isOpen: false,
+                        })
+                        .where(eq(polls.id, req.params.pollId));
 
-                return { message: 'Poll closed successfully' };
-            });
+                    await insertPollCeremonySession({
+                        activeParticipantIndices,
+                        pollId: req.params.pollId,
+                        tx: client,
+                    });
+
+                    return { message: 'Voting closed successfully.' };
+                },
+            );
 
             void maybeDropTestResponseAfterCommit({
                 reply,

@@ -1,22 +1,19 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
 
 import {
+    closeVoting,
+    createPoll,
+    deletePolls,
+    expectSecuringVisible,
+    submitVote,
+    type CreatedPoll,
+} from './support/pollFlow';
+import { gotoInteractablePage } from './support/navigation.mts';
+import {
     closeParticipant,
     getProjectContextOptions,
     openProjectParticipant,
 } from './support/participants';
-import {
-    beginVote,
-    createPoll,
-    deletePolls,
-    expectResultsVisible,
-    joinPoll,
-    type CreatedPoll,
-} from './support/pollFlow';
-import {
-    gotoInteractablePage,
-    reloadInteractablePage,
-} from './support/navigation.mts';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -28,55 +25,6 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('resumes a persisted voting session after refresh', async ({
-    browser,
-    page,
-    request,
-}, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
-    const createdPolls: CreatedPoll[] = [];
-    const namespace = createTestNamespace(testInfo);
-    const creatorName = createVoterName('alice', namespace);
-    const participantName = createVoterName('bob', namespace);
-
-    attachErrorTracking(page, 'creator', tracker);
-
-    const createdPoll = await createPoll({
-        page,
-        pollName: createPollName('Refresh resume vote', namespace),
-    });
-    createdPolls.push(createdPoll);
-
-    const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'participant', tracker);
-
-    try {
-        await joinPoll({
-            page,
-            voterName: creatorName,
-        });
-        await joinPoll({
-            page: participant.page,
-            pollUrl: createdPoll.pollUrl,
-            voterName: participantName,
-        });
-
-        await reloadInteractablePage(participant.page);
-        await expect(
-            participant.page.getByText('Waiting for the vote to be started...'),
-        ).toBeVisible();
-
-        await beginVote(page);
-
-        await expectResultsVisible(page);
-        await expectResultsVisible(participant.page);
-        expectNoUnexpectedErrors(tracker);
-    } finally {
-        await closeParticipant(participant);
-        await deletePolls(request, createdPolls);
-    }
-});
-
 test('keeps creator controls after reopening the shared link in a new browser session', async ({
     browser,
     page,
@@ -85,8 +33,6 @@ test('keeps creator controls after reopening the shared link in a new browser se
     const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
-    const creatorName = createVoterName('alice', namespace);
-    const participantName = createVoterName('bob', namespace);
 
     attachErrorTracking(page, 'creator-initial', tracker);
 
@@ -96,20 +42,93 @@ test('keeps creator controls after reopening the shared link in a new browser se
     });
     createdPolls.push(createdPoll);
 
-    const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'participant', tracker);
     let restoredContext: BrowserContext | null = null;
 
     try {
-        await joinPoll({
+        restoredContext = await browser.newContext({
+            ...(getProjectContextOptions(testInfo) ?? {}),
+            storageState: await page.context().storageState(),
+        });
+        const restoredPage = await restoredContext.newPage();
+        attachErrorTracking(restoredPage, 'creator-restored', tracker);
+        await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
+        const nextStepPanel = restoredPage
+            .getByRole('heading', { name: /your next step/i })
+            .locator('xpath=..');
+
+        await expect(
+            restoredPage.getByRole('heading', { name: /your next step/i }),
+        ).toBeVisible();
+        await expect(
+            nextStepPanel.getByText(
+                'You still need to submit your own vote from this browser before you can close voting.',
+                {
+                    exact: true,
+                },
+            ),
+        ).toBeVisible();
+        await expectNoUnexpectedErrors(tracker);
+    } finally {
+        if (restoredContext) {
+            await restoredContext.close();
+        }
+        await deletePolls(request, createdPolls);
+    }
+});
+
+test('restores the securing state after refresh once voting is closed', async ({
+    browser,
+    browserName,
+    page,
+    request,
+}, testInfo) => {
+    test.skip(
+        browserName === 'webkit' && process.platform !== 'darwin',
+        'Non-macOS Playwright WebKit does not support the Ed25519 and X25519 WebCrypto key generation required for device-backed vote submission.',
+    );
+
+    const tracker = createUnexpectedErrorTracker();
+    const createdPolls: CreatedPoll[] = [];
+    const namespace = createTestNamespace(testInfo);
+    const creatorName = createVoterName('alice', namespace);
+    const participantOneName = createVoterName('bob', namespace);
+    const participantTwoName = createVoterName('cora', namespace);
+
+    attachErrorTracking(page, 'creator', tracker);
+
+    const createdPoll = await createPoll({
+        page,
+        pollName: createPollName('Voter resume vote', namespace),
+    });
+    createdPolls.push(createdPoll);
+
+    const participantOne = await openProjectParticipant(browser, testInfo);
+    const participantTwo = await openProjectParticipant(browser, testInfo);
+    let restoredContext: BrowserContext | null = null;
+
+    attachErrorTracking(participantOne.page, 'participant-one', tracker);
+    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
+
+    try {
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await joinPoll({
-            page: participant.page,
+        await submitVote({
+            page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
-            voterName: participantName,
+            scores: [6, 8],
+            voterName: participantOneName,
         });
+        await submitVote({
+            page: participantTwo.page,
+            pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
+            voterName: participantTwoName,
+        });
+
+        await closeVoting(page);
 
         restoredContext = await browser.newContext({
             ...(getProjectContextOptions(testInfo) ?? {}),
@@ -119,17 +138,14 @@ test('keeps creator controls after reopening the shared link in a new browser se
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
         await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
 
-        const beginVoteButton = restoredPage.getByRole('button', {
-            name: 'Begin vote',
-        });
-        await expect(beginVoteButton).toBeVisible();
-        await expect(beginVoteButton).toBeEnabled();
-        expectNoUnexpectedErrors(tracker);
+        await expectSecuringVisible(restoredPage);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         if (restoredContext) {
             await restoredContext.close();
         }
-        await closeParticipant(participant);
+        await closeParticipant(participantOne);
+        await closeParticipant(participantTwo);
         await deletePolls(request, createdPolls);
     }
 });

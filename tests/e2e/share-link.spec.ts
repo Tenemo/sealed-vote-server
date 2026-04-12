@@ -6,9 +6,9 @@ import {
 } from './support/participants';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
-    copyShareLink,
     createPoll,
     deletePolls,
+    submitVote,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -22,7 +22,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('keeps copied share links slug-based across platforms', async ({
+test('keeps slug-based poll links shareable across platforms', async ({
     page,
     playwright,
     request,
@@ -30,34 +30,38 @@ test('keeps copied share links slug-based across platforms', async ({
     const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
+    const pollName = createPollName('Share link vote', namespace);
     attachErrorTracking(page, 'creator', tracker);
 
     const createdPoll = await createPoll({
         page,
-        pollName: createPollName('Share link vote', namespace),
+        pollName,
     });
     createdPolls.push(createdPoll);
 
-    const copiedShareLink = await copyShareLink(page);
-    expect(copiedShareLink).toBe(createdPoll.pollUrl);
-    expect(copiedShareLink).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
+    expect(createdPoll.pollUrl).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
 
     const participant = await launchFirefoxParticipant({ playwright });
     attachErrorTracking(participant.page, 'firefox-participant', tracker);
 
     try {
-        await gotoInteractablePage(participant.page, copiedShareLink);
-        await participant.page
-            .getByLabel('Voter name')
-            .fill(createVoterName('bob', namespace));
-        await participant.page
-            .getByRole('button', { exact: true, name: 'Vote' })
-            .click();
-
+        await gotoInteractablePage(participant.page, createdPoll.pollUrl);
         await expect(
-            participant.page.getByText('Waiting for the vote to be started...'),
+            participant.page.getByRole('heading', { name: pollName }),
         ).toBeVisible();
-        expectNoUnexpectedErrors(tracker);
+        await expect(
+            participant.page.getByText(/Voting open/i),
+        ).toBeVisible();
+        await expect(
+            participant.page.getByRole('heading', { name: 'Your next step' }),
+        ).toBeVisible();
+
+        await submitVote({
+            page: participant.page,
+            scores: [8, 6],
+            voterName: createVoterName('bob', namespace),
+        });
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
         await deletePolls(request, createdPolls);

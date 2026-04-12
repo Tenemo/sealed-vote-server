@@ -7,12 +7,12 @@ import ChoiceAdding from './ChoiceAdding';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
+import PageSeo from '@/app/PageSeo';
 import { actionButtonClassName, pageTitleClassName } from '@/lib/uiClasses';
-import DocumentSeo from 'app/DocumentSeo';
 import { buildCreatePageSeo } from 'app/seo';
 import LoadingButton from 'components/LoadingButton';
 import { generateClientToken } from 'features/Polls/clientToken';
-import { saveCreatorSession } from 'features/Polls/creatorSessionStorage';
+import { saveCreatorSession } from 'features/Polls/pollSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
 
@@ -30,10 +30,8 @@ const PollCreationPage = (): React.JSX.Element => {
     const navigate = useNavigate();
     const pageTitleId = React.useId();
     const [createPoll, { isLoading, error }] = useCreatePollMutation();
-
     const [form, setForm] = useState<Form>(initialForm);
     const [creatorToken, setCreatorToken] = useState<string | null>(null);
-    const { pollName, choices } = form;
     const runtimeOrigin =
         typeof window === 'undefined' ? undefined : window.location.origin;
     const createPageSeo = React.useMemo(
@@ -53,24 +51,24 @@ const PollCreationPage = (): React.JSX.Element => {
 
     const onAddChoice = (choice: string): void => {
         setCreatorToken(null);
-        setForm((prev) => ({
-            ...prev,
-            choices: [...prev.choices, choice],
+        setForm((previousForm) => ({
+            ...previousForm,
+            choices: [...previousForm.choices, choice],
         }));
     };
 
     const onRemoveChoice = (choice: string): void => {
         setCreatorToken(null);
-        setForm((prev) => ({
-            ...prev,
-            choices: prev.choices.filter(
+        setForm((previousForm) => ({
+            ...previousForm,
+            choices: previousForm.choices.filter(
                 (currentChoice) => currentChoice !== choice,
             ),
         }));
     };
 
-    const normalizedPollName = normalizeTrimmedString(pollName);
-    const isFormValid = !!normalizedPollName && choices.length > 1;
+    const normalizedPollName = normalizeTrimmedString(form.pollName);
+    const isFormValid = !!normalizedPollName && form.choices.length > 1;
 
     const onCreatePoll = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -86,6 +84,7 @@ const PollCreationPage = (): React.JSX.Element => {
             pollName: normalizedPollName,
             choices: form.choices,
             creatorToken: nextCreatorToken,
+            protocolVersion: 'v1',
         })
             .unwrap()
             .then(({ creatorToken: confirmedCreatorToken, id, slug }) => {
@@ -101,16 +100,15 @@ const PollCreationPage = (): React.JSX.Element => {
 
     return (
         <>
-            <DocumentSeo metadata={createPageSeo} />
+            <PageSeo metadata={createPageSeo} />
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
                     <h1 className={pageTitleClassName} id={pageTitleId}>
                         Create a new vote
                     </h1>
                     <p className="page-lead mx-auto max-w-2xl">
-                        Set up a simple 1-10 score vote, add the options people
-                        can score, and share the generated link once everything
-                        looks right.
+                        Create a score vote, share the link, and let people
+                        submit before you close voting.
                     </p>
                 </div>
                 <form
@@ -122,24 +120,30 @@ const PollCreationPage = (): React.JSX.Element => {
                     <Panel className="space-y-6">
                         <OutlinedInputField
                             autoComplete="off"
-                            helperText={
-                                !pollName
-                                    ? 'What would you like to vote on?'
-                                    : undefined
-                            }
+                            helperText="What would you like to vote on?"
                             id="pollName"
                             label="Vote name"
                             maxLength={64}
                             name="pollName"
                             onChange={onFormChange}
                             required
-                            value={pollName}
+                            value={form.pollName}
                         />
                         <ChoiceAdding
                             choices={form.choices}
                             onAddChoice={onAddChoice}
                             onRemoveChoice={onRemoveChoice}
                         />
+                        <p className="field-note">
+                            The app derives the honest-majority reconstruction
+                            threshold automatically from the final submitted
+                            roster after voting closes.
+                        </p>
+                        <p className="field-note">
+                            This version uses token-only enrollment. The public
+                            roster is auditable, but the app does not claim
+                            strong identity binding or Sybil resistance.
+                        </p>
                     </Panel>
                     {error && (
                         <Alert announcement="assertive" variant="destructive">

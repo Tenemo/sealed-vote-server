@@ -19,6 +19,9 @@ const createPageDouble = (): NavigationTarget => ({
     waitForTimeout: async (_timeout: number) => undefined,
 });
 
+// These helper checks look a bit unusual because they test Playwright plumbing
+// rather than the app directly, but they pin the retry and timeout behavior
+// that keeps the browser matrix stable across transient navigation failures.
 test('gotoInteractablePage uses domcontentloaded with a short timeout', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble();

@@ -126,12 +126,32 @@ describe('PollCreation', () => {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
             pollName: 'Best fruit',
+            protocolVersion: 'v1',
         });
         expect(mockedCreatePoll).toHaveBeenNthCalledWith(2, {
             choices: ['Apples', 'Bananas'],
             creatorToken: 'creator-token-1',
             pollName: 'Best fruit',
+            protocolVersion: 'v1',
         });
+    });
+
+    it('explains that the threshold is derived automatically after close', () => {
+        render(
+            <HelmetProvider>
+                <MemoryRouter initialEntries={['/']}>
+                    <Routes>
+                        <Route element={<PollCreation />} path="/" />
+                    </Routes>
+                </MemoryRouter>
+            </HelmetProvider>,
+        );
+
+        expect(
+            screen.getByText(
+                /The app derives the honest-majority reconstruction threshold automatically from the final submitted roster after voting closes\./i,
+            ),
+        ).toBeInTheDocument();
     });
 
     it('renders create-page SEO metadata', () => {

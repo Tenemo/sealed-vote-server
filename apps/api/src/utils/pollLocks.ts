@@ -4,15 +4,7 @@ import type { DatabaseTransaction } from '../db/client.js';
 import { polls } from '../db/schema.js';
 
 type LockedPoll = {
-    id: string;
-    isOpen: boolean;
-    commonPublicKey: string | null;
-    encryptedTallies: typeof polls.$inferSelect.encryptedTallies;
-    resultTallies: typeof polls.$inferSelect.resultTallies;
-    resultScores: typeof polls.$inferSelect.resultScores;
-};
-
-type LockedCreatorPoll = {
+    createdAt: Date;
     id: string;
     isOpen: boolean;
     creatorTokenHash: string;
@@ -24,28 +16,7 @@ export const lockPollById = async (
 ): Promise<LockedPoll | undefined> => {
     const [poll] = await tx
         .select({
-            id: polls.id,
-            isOpen: polls.isOpen,
-            commonPublicKey: polls.commonPublicKey,
-            encryptedTallies: polls.encryptedTallies,
-            resultTallies: polls.resultTallies,
-            resultScores: polls.resultScores,
-        })
-        .from(polls)
-        .where(eq(polls.id, pollId))
-        .for('update');
-
-    return poll;
-};
-
-export type { LockedPoll };
-
-export const lockPollByIdForCreatorAction = async (
-    tx: DatabaseTransaction,
-    pollId: string,
-): Promise<LockedCreatorPoll | undefined> => {
-    const [poll] = await tx
-        .select({
+            createdAt: polls.createdAt,
             id: polls.id,
             isOpen: polls.isOpen,
             creatorTokenHash: polls.creatorTokenHash,
@@ -56,3 +27,7 @@ export const lockPollByIdForCreatorAction = async (
 
     return poll;
 };
+
+export type { LockedPoll };
+
+export const lockPollByIdForCreatorAction = lockPollById;

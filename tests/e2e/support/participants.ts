@@ -8,7 +8,7 @@ import type {
     PlaywrightWorkerArgs,
 } from '@playwright/test';
 
-import { mobileFirefoxAndroidContextOptions } from './profiles';
+import { mobileFirefoxAndroidContextOptions } from './profiles.ts';
 
 const browserContextOptionKeys = [
     'acceptDownloads',
@@ -43,9 +43,30 @@ const browserContextOptionKeys = [
 
 type ManagedParticipant = {
     browser?: Browser;
+    closeMode?: 'context' | 'page-only';
     context: BrowserContext;
+    closePromise?: Promise<void>;
+    isClosed: boolean;
     page: Page;
 };
+
+const createManagedParticipant = ({
+    browser,
+    closeMode,
+    context,
+    page,
+}: {
+    browser?: Browser;
+    closeMode?: ManagedParticipant['closeMode'];
+    context: BrowserContext;
+    page: Page;
+}): ManagedParticipant => ({
+    browser,
+    closeMode,
+    context,
+    isClosed: false,
+    page,
+});
 
 export const getProjectContextOptions = (
     testInfo: TestInfo,
@@ -81,10 +102,39 @@ export const openProjectParticipant = async (
     const context = await browser.newContext(getProjectContextOptions(testInfo));
     const page = await context.newPage();
 
-    return {
+    return createManagedParticipant({
+        closeMode:
+            testInfo.project.use.browserName === 'firefox'
+                ? 'page-only'
+                : 'context',
         context,
         page,
-    };
+    });
+};
+
+export const reopenProjectParticipant = async ({
+    browser,
+    storageState,
+    testInfo,
+}: {
+    browser: Browser;
+    storageState: BrowserContextOptions['storageState'];
+    testInfo: TestInfo;
+}): Promise<ManagedParticipant> => {
+    const context = await browser.newContext({
+        ...(getProjectContextOptions(testInfo) ?? {}),
+        storageState,
+    });
+    const page = await context.newPage();
+
+    return createManagedParticipant({
+        closeMode:
+            testInfo.project.use.browserName === 'firefox'
+                ? 'page-only'
+                : 'context',
+        context,
+        page,
+    });
 };
 
 export const launchFirefoxParticipant = async ({
@@ -101,21 +151,54 @@ export const launchFirefoxParticipant = async ({
     );
     const page = await context.newPage();
 
-    return {
+    return createManagedParticipant({
         browser,
         context,
         page,
-    };
+    });
 };
 
-export const closeParticipant = async ({
-    browser,
-    context,
-}: ManagedParticipant): Promise<void> => {
-    if (browser) {
-        await browser.close();
+export const closeParticipant = async (
+    participant: ManagedParticipant,
+): Promise<void> => {
+    if (participant.isClosed) {
         return;
     }
 
-    await context.close();
+    if (participant.closePromise) {
+        await participant.closePromise;
+        return;
+    }
+
+    participant.closePromise = (async () => {
+        if (participant.browser) {
+            if (participant.browser.isConnected()) {
+                await participant.browser.close();
+            }
+
+            return;
+        }
+
+        for (const openPage of participant.context.pages()) {
+            if (!openPage.isClosed()) {
+                await openPage.close({
+                    runBeforeUnload: false,
+                });
+            }
+        }
+
+        if (participant.closeMode === 'page-only') {
+            return;
+        }
+
+        await participant.context.close();
+    })();
+
+    try {
+        await participant.closePromise;
+    } finally {
+        participant.isClosed = true;
+    }
 };
+
+export type { ManagedParticipant };

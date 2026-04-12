@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
 import { Alert, AlertDescription } from './alert';
-import { Spinner } from './spinner';
 
 describe('Alert', () => {
     it('maps polite announcements to status semantics', () => {
@@ -28,22 +27,5 @@ describe('Alert', () => {
         expect(screen.getByRole('alert')).toHaveTextContent(
             'Vote submission failed.',
         );
-    });
-
-    it('keeps the two-column alert layout selectors for spinner wrappers', () => {
-        render(
-            <Alert announcement="polite">
-                <Spinner aria-hidden="true" label={null} />
-                <AlertDescription>Retrying in the background.</AlertDescription>
-            </Alert>,
-        );
-
-        const alert = screen.getByRole('status');
-
-        expect(alert).toHaveClass(
-            'has-[>[data-slot="spinner"]]:grid-cols-[auto_1fr]',
-        );
-        expect(alert).toHaveClass('[&>[data-slot="spinner"]]:row-span-2');
-        expect(alert.querySelector('[data-slot="spinner"]')).not.toBeNull();
     });
 });

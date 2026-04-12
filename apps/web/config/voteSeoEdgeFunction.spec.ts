@@ -17,6 +17,9 @@ vi.mock('./documentSeo.ts', () => ({
 }));
 
 describe('vote SEO edge function', () => {
+    // These tests focus on edge-runtime behavior rather than page rendering.
+    // They guard module-scope caching and safe HTML passthrough in the Netlify
+    // edge environment, which are both easy to break with refactors.
     beforeEach(() => {
         vi.resetModules();
         mockCreatePollSeoPayloadCache.mockReset();

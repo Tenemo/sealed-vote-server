@@ -23,6 +23,9 @@
         "lint:fix": "pnpm --workspace-root exec eslint packages/contracts --fix",
         "test": "echo \"No tests for contracts\""
     },
+    "dependencies": {
+        "threshold-elgamal": "catalog:"
+    },
     "devDependencies": {
         "rimraf": "catalog:",
         "typescript": "catalog:"

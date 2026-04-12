@@ -16,7 +16,7 @@
 
 ---
 
-[sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around homomorphic encryption. Voters score each choice from 1 to 10, and the system is designed so that individual votes remain hidden from everyone, including the server, while the final tally can still be computed.
+[sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around `threshold-elgamal`. It uses a public roster, an append-only bulletin-board-style log, and local verification so that voters can audit who is participating while keeping ballot contents confidential.
 
 https://github.com/user-attachments/assets/f4334c3c-1781-462c-9f0e-3e7ccda372f1
 
@@ -29,20 +29,20 @@ https://github.com/user-attachments/assets/f4334c3c-1781-462c-9f0e-3e7ccda372f1
 - `packages/testkit` shared backend and e2e test helpers
 - `tests/e2e` Playwright browser tests
 
-The frontend and backend both rely on [`threshold-elgamal`](https://www.npmjs.com/package/threshold-elgamal), a TypeScript cryptography library used for the encrypted voting flow.
+The frontend and backend both rely on [`threshold-elgamal`](https://www.npmjs.com/package/threshold-elgamal), a TypeScript cryptography library used for the board ceremony, threshold encryption workflow, and local verification.
 
 ## How it works
 
-1. A poll creator opens a poll and shares it with voters.
-2. Voters register and receive voter-specific tokens.
-3. Once registration closes, each voter generates a keypair and submits a public key share.
-4. After all shares are present, voters encrypt their scores locally and submit only ciphertexts.
-5. The backend combines encrypted votes into encrypted tallies.
-6. Voters submit decryption shares so the final aggregate result can be revealed without exposing individual ballots.
-7. Once the poll is complete, the backend publishes the raw plaintext tally products, the rounded geometric-mean scores, and the ordered decryption shares used to reveal them.
-8. The frontend verifies the published results locally before showing the final ranking.
+1. A poll creator opens a score vote and shares its slug-based URL.
+2. Voters join the waiting room with public names and receive voter-specific tokens.
+3. Once at least three participants are registered, the creator starts voting and the roster becomes fixed.
+4. The client signs and appends protocol payloads to the board log behind guided UI actions. The board is append-only and every message is classified as accepted, idempotent, or equivocation.
+5. The public read model derives ceremony phase, digests, manifest state, and verification status only from the ordered board entries.
+6. After voting closes, the app completes the DKG, encrypted ballot publication, ballot-close, decryption-share, and tally-publication flow automatically in the browser, then verifies the final result from the public board log.
 
-See [docs/voting.md](./docs/voting.md) for the protocol and phase model, and [docs/endpoints.md](./docs/endpoints.md) for the current API surface.
+This repository currently targets a hardened research prototype, not audited production voting software.
+
+See [docs/voting.md](./docs/voting.md) for the board ceremony model, and [docs/endpoints.md](./docs/endpoints.md) for the current API surface.
 
 ## Tech stack
 
@@ -54,11 +54,10 @@ See [docs/voting.md](./docs/voting.md) for the protocol and phase model, and [do
 
 Offline and reconnect recovery is a core feature of the app, not a best-effort extra.
 
-- In-progress voting workflow state is persisted in the browser through `redux-persist`, including the current poll snapshot, selected scores, creator token, confirmed voter session, and pending registration intent when a registration response is lost.
-- The persisted state is sanitized on completion so finished polls no longer keep sensitive material such as private keys, voter tokens, or selected scores.
-- In production, the custom service worker caches the app shell plus any poll payloads the browser has already fetched. That allows previously visited polls to reopen from cached data while the network is unavailable.
-- `RecoveryCoordinator` runs in the background after startup, on window focus, and when the browser comes back online. It resumes creator sessions, confirmed voter sessions, and pending voter registrations without requiring the user to restart the flow manually.
-- Recovery is safe because the backend routes are deliberately idempotent where needed. Poll creation, voter registration, poll close, public key share submission, vote submission, and decryption share submission can all be retried after a lost response without duplicating state or changing the result unexpectedly.
+- The browser persists only narrow local session state: creator tokens, voter tokens, voter indices, and poll references needed to reconnect to the same ceremony.
+- On reopen, the app refetches the public read model and board log from the API instead of restoring cached poll snapshots from a service worker.
+- Board message retransmissions are safe because the backend classifies identical unsigned payloads as idempotent, even when the signatures differ.
+- The current UI does not persist plaintext ballots or scores at rest.
 
 ## Local development
 
@@ -84,6 +83,13 @@ The default local setup serves:
 
 - the web app at `http://127.0.0.1:3000`
 - the API at `http://127.0.0.1:4000`
+
+### Running tests locally
+
+- Run the standard local browser suite with `pnpm e2e`.
+- Run the opt-in high-parallelism local suite with `pnpm e2e:turbo`.
+- `pnpm e2e:turbo` keeps CI unchanged, enables Playwright `fullyParallel`, and defaults to up to 24 local workers.
+- Set `PLAYWRIGHT_LOCAL_WORKERS` if you want a different default for turbo mode. Passing Playwright CLI flags such as `--workers=32` still overrides the config directly.
 
 ## Workspace documentation
 

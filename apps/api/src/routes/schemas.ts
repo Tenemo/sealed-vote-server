@@ -1,4 +1,30 @@
+import { protocolMessageTypes } from '@sealed-vote/protocol';
 import { Type, type Static } from '@sinclair/typebox';
+
+const ProtocolMessageTypeSchema = Type.Union(
+    protocolMessageTypes.map((messageType) => Type.Literal(messageType)),
+);
+
+const ProtocolPayloadSchema = Type.Object(
+    {
+        sessionId: Type.String({
+            minLength: 64,
+            maxLength: 64,
+            pattern: '^[A-Fa-f0-9]{64}$',
+        }),
+        manifestHash: Type.String({
+            minLength: 64,
+            maxLength: 64,
+            pattern: '^[A-Fa-f0-9]{64}$',
+        }),
+        phase: Type.Integer({ minimum: 0 }),
+        participantIndex: Type.Integer({ minimum: 1 }),
+        messageType: ProtocolMessageTypeSchema,
+    },
+    {
+        additionalProperties: true,
+    },
+);
 
 export const PollIdParamsSchema = Type.Object({
     pollId: Type.String({ format: 'uuid' }),
@@ -12,9 +38,36 @@ export const PollRefParamsSchema = Type.Object({
 
 export type PollRefParams = Static<typeof PollRefParamsSchema>;
 
-export const EncryptedMessageSchema = Type.Object({
-    c1: Type.String(),
-    c2: Type.String(),
+export const SignedPayloadSchema = Type.Object(
+    {
+        payload: ProtocolPayloadSchema,
+        signature: Type.String({
+            minLength: 128,
+            maxLength: 128,
+            pattern: '^(?:[A-Fa-f0-9]{2})+$',
+        }),
+    },
+    {
+        additionalProperties: false,
+    },
+);
+
+export const BoardMessageRecordSchema = Type.Object({
+    id: Type.String(),
+    createdAt: Type.String(),
+    phase: Type.Integer({ minimum: 0 }),
+    participantIndex: Type.Integer({ minimum: 1 }),
+    messageType: ProtocolMessageTypeSchema,
+    slotKey: Type.String(),
+    unsignedHash: Type.String(),
+    previousEntryHash: Type.Union([Type.String(), Type.Null()]),
+    entryHash: Type.String(),
+    classification: Type.Union([
+        Type.Literal('accepted'),
+        Type.Literal('idempotent'),
+        Type.Literal('equivocation'),
+    ]),
+    signedPayload: SignedPayloadSchema,
 });
 
 export const SecureTokenSchema = Type.String({

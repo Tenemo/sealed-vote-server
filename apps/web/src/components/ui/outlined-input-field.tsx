@@ -1,11 +1,5 @@
 import * as React from 'react';
 
-import {
-    Field,
-    FieldDescription,
-    FieldError,
-    FieldLabel,
-} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +15,40 @@ type OutlinedInputFieldProps = Omit<React.ComponentProps<'input'>, 'size'> & {
 const isInvalidInput = (
     ariaInvalid: React.AriaAttributes['aria-invalid'],
 ): boolean => ariaInvalid === true || ariaInvalid === 'true';
+
+const Field = ({
+    className,
+    ...props
+}: React.ComponentProps<'div'>): React.JSX.Element => (
+    <div
+        className={cn('flex w-full flex-col gap-2', className)}
+        data-slot="field"
+        {...props}
+    />
+);
+
+const FieldDescription = ({
+    className,
+    ...props
+}: React.ComponentProps<'p'>): React.JSX.Element => (
+    <p
+        className={cn('field-note', className)}
+        data-slot="field-description"
+        {...props}
+    />
+);
+
+const FieldError = ({
+    className,
+    ...props
+}: React.ComponentProps<'div'>): React.JSX.Element => (
+    <div
+        className={cn('text-sm font-normal text-destructive', className)}
+        data-slot="field-error"
+        role="alert"
+        {...props}
+    />
+);
 
 const OutlinedInputField = ({
     className,
@@ -47,10 +75,17 @@ const OutlinedInputField = ({
         .join(' ');
 
     return (
-        <Field className={cn('w-full', wrapperClassName)}>
-            <FieldLabel className={labelClassName} htmlFor={inputId}>
+        <Field className={cn('group w-full', wrapperClassName)}>
+            <label
+                className={cn(
+                    'flex items-center gap-2 text-sm leading-6 font-medium select-text group-has-[input:disabled]:cursor-not-allowed group-has-[input:disabled]:opacity-70',
+                    labelClassName,
+                )}
+                data-slot="field-label"
+                htmlFor={inputId}
+            >
                 {label}
-            </FieldLabel>
+            </label>
             <Input
                 {...props}
                 aria-describedby={describedBy || undefined}

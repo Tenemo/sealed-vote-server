@@ -1,6 +1,6 @@
 # API endpoints
 
-The backend routes live under `/api`. The request and response payloads below match the shared contracts in `packages/contracts`.
+The backend routes live under `/api`. The payloads below match the shared contracts in `packages/contracts`.
 
 ## Create poll
 
@@ -11,63 +11,80 @@ The backend routes live under `/api`. The request and response payloads below ma
 {
     "pollName": "Lunch vote",
     "creatorToken": "creator-token",
-    "choices": ["Pizza", "Sushi", "Pasta"]
+    "choices": ["Pizza", "Sushi", "Pasta"],
+    "protocolVersion": "v1"
 }
 ```
 
-- success response: `201 Created`
-
-```json
-{
-    "id": "poll-id",
-    "slug": "lunch-vote--3c4d",
-    "creatorToken": "creator-token"
-}
-```
-
-- failure responses:
-- `400` for invalid input such as blank trimmed names, fewer than two choices, duplicate choice names after trimming, or unexpected extra fields
 - notes:
-  - the participant cap is now server-owned; new polls default to `20` participants
+  - the hard participant cap is `51`
+  - the current validated target is `15`
+  - `protocolVersion` currently accepts only `v1`
 
 ## Fetch poll
 
 - `GET /api/polls/:pollRef`
 - `pollRef` accepts either the poll UUID or the canonical public slug
-- success response: `200 OK`
+- response highlights:
+  - public submitted roster
+  - manifest and manifest hash after close
+  - session id and human-readable session fingerprint after close
+  - derived poll phase
+  - honest-majority threshold summary
+  - board audit counts and per-phase digests
+  - ordered board entries with accepted, idempotent, or equivocation classification
+  - verification status and verified arithmetic-mean results when available
+
+Example response:
 
 ```json
 {
     "id": "poll-id",
     "slug": "lunch-vote--3c4d",
     "pollName": "Lunch vote",
-    "createdAt": "2026-04-04T12:00:00.000Z",
     "choices": ["Pizza", "Sushi", "Pasta"],
-    "voters": ["Alice", "Bob"],
-    "isOpen": false,
-    "publicKeyShareCount": 2,
-    "commonPublicKey": "combined-public-key",
-    "encryptedVoteCount": 2,
-    "encryptedTallies": [
-        { "c1": "7", "c2": "8" },
-        { "c1": "9", "c2": "10" },
-        { "c1": "11", "c2": "12" }
+    "voters": [
+        { "voterIndex": 1, "voterName": "Alice", "deviceReady": true },
+        { "voterIndex": 2, "voterName": "Bob", "deviceReady": true }
     ],
-    "decryptionShareCount": 2,
-    "publishedDecryptionShares": [
-        ["101", "102", "103"],
-        ["201", "202", "203"]
-    ],
-    "resultTallies": ["12", "19", "7"],
-    "resultScores": [3.464102, 4.358899, 2.645751]
+    "isOpen": true,
+    "phase": "open",
+    "manifest": null,
+    "manifestHash": null,
+    "sessionId": null,
+    "sessionFingerprint": null,
+    "submittedParticipantCount": 2,
+    "minimumCloseParticipantCount": 3,
+    "boardAudit": {
+        "acceptedCount": 0,
+        "duplicateCount": 0,
+        "equivocationCount": 0,
+        "ceremonyDigest": null,
+        "phaseDigests": []
+    },
+    "verification": {
+        "status": "not-ready",
+        "reason": "Voting is still open. The ceremony transcript will begin after the organizer closes the vote.",
+        "qualParticipantIndices": [],
+        "verifiedOptionTallies": []
+    },
+    "rosterEntries": [],
+    "thresholds": {
+        "reconstructionThreshold": null,
+        "minimumPublishedVoterCount": null,
+        "strictMajorityFloor": null,
+        "maxParticipants": 51,
+        "validationTarget": 15
+    },
+    "ceremony": {
+        "acceptedRegistrationCount": 0,
+        "acceptedEncryptedBallotCount": 0,
+        "acceptedDecryptionShareCount": 0,
+        "completeEncryptedBallotParticipantCount": 0,
+        "revealReady": false
+    }
 }
 ```
-
-- failure responses:
-- `404` when the poll does not exist
-- notes:
-  - `publishedDecryptionShares`, `resultTallies`, and `resultScores` are empty arrays until the poll reaches `complete`
-  - once complete, `publishedDecryptionShares` is ordered by voter index, each inner array is ordered by choice index, and `resultScores` are rounded to 6 fractional digits
 
 ## Register voter
 
@@ -76,32 +93,35 @@ The backend routes live under `/api`. The request and response payloads below ma
 
 ```json
 {
+    "authPublicKey": "spki-hex",
+    "transportPublicKey": "raw-public-key-hex",
+    "transportSuite": "X25519",
     "voterName": "Alice",
     "voterToken": "voter-token"
 }
 ```
 
-- success response: `201 Created`
+Optional creator-participant registration:
 
 ```json
 {
-    "message": "Voter registered successfully",
-    "voterIndex": 1,
+    "authPublicKey": "spki-hex",
+    "creatorToken": "creator-token",
+    "transportPublicKey": "raw-public-key-hex",
+    "transportSuite": "X25519",
     "voterName": "Alice",
-    "pollId": "poll-id",
     "voterToken": "voter-token"
 }
 ```
 
 - notes:
-  - `voterToken` is returned only once and is required for the secured phase endpoints below
-  - voter names are unique per poll
-- failure responses:
-- `400` for invalid poll id, empty voter name, closed poll, or max participants reached
-- `404` when the poll does not exist
-- `409` when `voterName` is already taken in that poll
+  - voter names are unique within a poll
+  - registration is token-only in this version; there is no strong identity binding
+  - the app uses this route when a participant submits their final pre-close vote
+  - registration closes permanently once the organizer closes voting
+  - the app stores the participant auth and transport public keys during submit so the post-close board ceremony can verify the frozen roster
 
-## Close poll
+## Close voting
 
 - `POST /api/polls/:pollId/close`
 - request body:
@@ -112,97 +132,84 @@ The backend routes live under `/api`. The request and response payloads below ma
 }
 ```
 
-- success response: `200 OK`
+- notes:
+  - the poll requires at least three submitted participants before it can be closed
+  - closing freezes the submitted roster
+  - the app derives the honest-majority reconstruction threshold from the frozen roster; the UI does not expose a threshold picker
 
-```json
-{
-    "message": "Poll closed successfully"
-}
+## List board messages
+
+- `GET /api/polls/:pollId/board/messages`
+- optional query string:
+
+```txt
+afterEntryHash=<entry-hash>
 ```
 
-- failure responses:
-- `400` for invalid poll id, already closed polls, or fewer than two registered voters
-- `403` for an invalid creator token
-- `404` when the poll does not exist
+- response:
+  - ordered board message records for the poll
+  - if `afterEntryHash` is provided, only entries after that hash are returned
+  - if `afterEntryHash` does not exist in the current board log, the route returns `400`
 
-## Submit public key share
+## Post board message
 
-- `POST /api/polls/:pollId/public-key-share`
+- `POST /api/polls/:pollId/board/messages`
 - request body:
 
 ```json
 {
-    "publicKeyShare": "public-key-share",
+    "voterToken": "voter-token",
+    "signedPayload": {
+        "payload": {
+            "sessionId": "session-id",
+            "manifestHash": "manifest-hash",
+            "phase": 0,
+            "participantIndex": 1,
+            "messageType": "registration",
+            "rosterHash": "roster-hash",
+            "authPublicKey": "spki-hex",
+            "transportPublicKey": "raw-public-key-hex"
+        },
+        "signature": "p1363-signature-hex"
+    }
+}
+```
+
+- notes:
+  - board messages are accepted only after voting is closed
+  - the normal product UI posts these payloads in the background; it does not expose a raw signed-payload form
+  - the authenticated voter token must match `signedPayload.payload.participantIndex`
+  - the payload must include a valid base protocol shape before signature checks or participant checks run
+  - registration payloads are verified against the embedded auth public key and the stored pre-close device record
+  - manifest-publication payloads are verified against the accepted registration roster without requiring a previously published manifest
+  - later payloads are verified against the accepted registration auth key and the accepted manifest publication
+  - exact retransmissions are stored and classified as idempotent
+  - conflicting payloads in the same canonical slot are stored and classified as equivocation
+
+## Recover session
+
+- `POST /api/polls/:pollId/recover-session`
+- request body:
+
+```json
+{
+    "creatorToken": "creator-token"
+}
+```
+
+or
+
+```json
+{
     "voterToken": "voter-token"
 }
 ```
 
-- success response: `201 Created`
-
-```json
-{
-    "message": "Public key share submitted successfully"
-}
-```
-
-- failure responses:
-- `400` for invalid poll id or wrong protocol phase
-- `403` for an invalid voter token
-- `404` when the poll does not exist
-- `409` when the same voter submits twice
-
-## Submit vote
-
-- `POST /api/polls/:pollId/vote`
-- request body:
-
-```json
-{
-    "voterToken": "voter-token",
-    "votes": [
-        { "c1": "ciphertext-1-a", "c2": "ciphertext-1-b" },
-        { "c1": "ciphertext-2-a", "c2": "ciphertext-2-b" }
-    ]
-}
-```
-
-- success response: `200 OK`
-
-```json
-"Vote submitted successfully"
-```
-
-- failure responses:
-- `400` for invalid poll id, wrong protocol phase, or vote vector length mismatch
-- `403` for an invalid voter token
-- `404` when the poll does not exist
-- `409` when the same voter submits twice
-
-## Submit decryption shares
-
-- `POST /api/polls/:pollId/decryption-shares`
-- request body:
-
-```json
-{
-    "voterToken": "voter-token",
-    "decryptionShares": ["share-1", "share-2"]
-}
-```
-
-- success response: `201 Created`
-
-```json
-{
-    "message": "Decryption shares submitted successfully."
-}
-```
-
-- failure responses:
-- `400` for invalid poll id, wrong protocol phase, or decryption share vector length mismatch
-- `403` for an invalid voter token
-- `404` when the poll does not exist
-- `409` when the same voter submits twice
+- response:
+  - poll id
+  - poll phase
+  - whether the poll is still open
+  - creator or voter session details, depending on the supplied token
 
 ## Delete poll
 
@@ -215,41 +222,7 @@ The backend routes live under `/api`. The request and response payloads below ma
 }
 ```
 
-- success response: `200 OK`
-
-```json
-{
-    "message": "Poll deleted successfully"
-}
-```
-
-- failure responses:
-- `400` for invalid poll id
-- `403` for an invalid creator token
-- `404` when the poll does not exist
-
 ## Health check
 
 - `GET /api/health-check`
-- success response: `200 OK`
-
-```json
-{
-    "service": "OK",
-    "database": "OK",
-    "commitSha": "abcdef1234567890"
-}
-```
-
-- degraded response: `503 Service Unavailable`
-
-```json
-{
-    "service": "OK",
-    "database": "Failed",
-    "commitSha": "abcdef1234567890"
-}
-```
-
-- notes:
-  - `commitSha` is `null` when the runtime does not expose a deployment commit SHA
+- returns service health, database health, and the deployment commit SHA when available

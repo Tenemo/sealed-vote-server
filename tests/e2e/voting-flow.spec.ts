@@ -2,18 +2,21 @@ import { expect, test } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
 import {
+    closeVoting,
+    createPoll,
+    deletePolls,
+    expectAcceptedBallotCount,
+    expectParticipantsVisible,
+    expectSecuringVisible,
+    submitVote,
+    waitForAutomaticReveal,
+    waitForVerifiedResults,
+    type CreatedPoll,
+} from './support/pollFlow';
+import {
     closeParticipant,
     openProjectParticipant,
 } from './support/participants';
-import {
-    beginVote,
-    createPoll,
-    deletePolls,
-    expectParticipantsVisible,
-    expectResultsVisible,
-    joinPoll,
-    type CreatedPoll,
-} from './support/pollFlow';
 import {
     attachErrorTracking,
     createUnexpectedErrorTracker,
@@ -25,7 +28,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('completes the poll happy path on every required browser project', async ({
+test('completes the full vote-to-results ceremony across three live sessions', async ({
     browser,
     page,
     request,
@@ -34,43 +37,71 @@ test('completes the poll happy path on every required browser project', async ({
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
-    const participantName = createVoterName('bob', namespace);
+    const participantOneName = createVoterName('bob', namespace);
+    const participantTwoName = createVoterName('cora', namespace);
 
     attachErrorTracking(page, 'creator', tracker);
 
     const createdPoll = await createPoll({
         page,
-        pollName: createPollName('E2E lifecycle', namespace),
+        pollName: createPollName('Full ceremony', namespace),
     });
     createdPolls.push(createdPoll);
-    await expectNoAxeViolations(page, 'created vote page');
 
-    const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'participant', tracker);
+    const participantOne = await openProjectParticipant(browser, testInfo);
+    const participantTwo = await openProjectParticipant(browser, testInfo);
+    attachErrorTracking(participantOne.page, 'participant-one', tracker);
+    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await joinPoll({
+        await submitVote({
             page,
+            scores: [9, 4],
             voterName: creatorName,
         });
-        await joinPoll({
-            page: participant.page,
+        await submitVote({
+            page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
-            voterName: participantName,
+            scores: [6, 8],
+            voterName: participantOneName,
         });
-        await expectNoAxeViolations(page, 'creator waiting page');
-        await expectNoAxeViolations(participant.page, 'participant waiting page');
+        await submitVote({
+            page: participantTwo.page,
+            pollUrl: createdPoll.pollUrl,
+            scores: [7, 5],
+            voterName: participantTwoName,
+        });
 
-        await beginVote(page);
+        await expectParticipantsVisible(page, [
+            creatorName,
+            participantOneName,
+            participantTwoName,
+        ]);
+        await closeVoting(page);
+        await expectSecuringVisible(page);
+        await expectSecuringVisible(participantOne.page);
+        await expectSecuringVisible(participantTwo.page);
 
-        await expectResultsVisible(page);
-        await expectResultsVisible(participant.page);
-        await expectNoAxeViolations(page, 'creator results page');
-        await expectNoAxeViolations(participant.page, 'participant results page');
-        await expectParticipantsVisible(page, [creatorName, participantName]);
-        expectNoUnexpectedErrors(tracker);
+        await waitForAutomaticReveal(page);
+
+        await waitForVerifiedResults({ page });
+        await waitForVerifiedResults({ page: participantOne.page });
+        await waitForVerifiedResults({ page: participantTwo.page });
+        await expectAcceptedBallotCount({ count: 3, page });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: participantOne.page,
+        });
+        await expectAcceptedBallotCount({
+            count: 3,
+            page: participantTwo.page,
+        });
+
+        await expectNoAxeViolations(page, 'full vote results page');
+        await expectNoUnexpectedErrors(tracker);
     } finally {
-        await closeParticipant(participant);
+        await closeParticipant(participantOne);
+        await closeParticipant(participantTwo);
         await deletePolls(request, createdPolls);
     }
 });

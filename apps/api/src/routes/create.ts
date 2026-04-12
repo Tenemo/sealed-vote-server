@@ -29,6 +29,7 @@ const CreatePollRequestSchema = Type.Object(
         choices: Type.Array(Type.String()),
         creatorToken: SecureTokenSchema,
         pollName: Type.String(),
+        protocolVersion: Type.Optional(Type.Literal('v1')),
     },
     {
         additionalProperties: false,
@@ -53,6 +54,7 @@ const schema = {
 type CreatePollRequest = CreatePollRequestContract;
 export type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
+const supportedProtocolVersion = 'v1' as const;
 
 const getExistingPollByCreatorTokenHash = async (
     fastify: FastifyInstance,
@@ -62,6 +64,7 @@ const getExistingPollByCreatorTokenHash = async (
           choices: string[];
           id: string;
           pollName: string;
+          protocolVersion: string;
           slug: string;
       }
     | undefined
@@ -72,6 +75,7 @@ const getExistingPollByCreatorTokenHash = async (
         columns: {
             id: true,
             pollName: true,
+            protocolVersion: true,
             slug: true,
         },
         with: {
@@ -89,6 +93,7 @@ const getExistingPollByCreatorTokenHash = async (
               choices: poll.choices.map(({ choiceName }) => choiceName),
               id: poll.id,
               pollName: poll.pollName,
+              protocolVersion: poll.protocolVersion,
               slug: poll.slug,
           }
         : undefined;
@@ -98,16 +103,20 @@ const assertMatchingCreateRequest = ({
     existingPoll,
     normalizedChoices,
     pollName,
+    protocolVersion,
 }: {
     existingPoll: {
         choices: string[];
         pollName: string;
+        protocolVersion: string;
     };
     normalizedChoices: string[];
     pollName: string;
+    protocolVersion: string;
 }): void => {
     if (
         existingPoll.pollName !== pollName ||
+        existingPoll.protocolVersion !== protocolVersion ||
         !areStringArraysEqual(existingPoll.choices, normalizedChoices)
     ) {
         throw createError(409, ERROR_MESSAGES.creatorTokenConflict);
@@ -125,6 +134,8 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             const { choices, creatorToken } = req.body;
             const pollName = normalizeTrimmedString(req.body.pollName);
             const normalizedChoices = normalizeTrimmedStrings(choices);
+            const protocolVersion =
+                req.body.protocolVersion ?? supportedProtocolVersion;
 
             if (!pollName) {
                 throw createError(400, 'Poll name is required.');
@@ -153,6 +164,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                     existingPoll,
                     normalizedChoices,
                     pollName,
+                    protocolVersion,
                 });
 
                 void reply.code(201);
@@ -180,6 +192,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                                 id: pollId,
                                 creatorTokenHash,
                                 pollName,
+                                protocolVersion,
                                 slug,
                             });
 
@@ -223,6 +236,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                                 existingPoll: conflictingPoll,
                                 normalizedChoices,
                                 pollName,
+                                protocolVersion,
                             });
 
                             void reply.code(201);

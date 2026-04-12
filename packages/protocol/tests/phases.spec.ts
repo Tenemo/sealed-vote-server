@@ -1,145 +1,43 @@
-import type { PollResponse } from '@sealed-vote/contracts';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import {
-    canClose,
-    canRegister,
-    canSubmitDecryptionShares,
-    canSubmitPublicKeyShare,
-    canVote,
-    derivePollPhase,
-    type PollPhaseState,
-    toPollPhaseState,
-} from '../src/phases';
+import { canRegister, derivePollPhase } from '../src/phases';
 
-const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
-    id: '11111111-1111-4111-8111-111111111111',
-    slug: 'test-poll--1111',
-    pollName: 'Test poll',
-    createdAt: new Date().toISOString(),
-    choices: ['Dog', 'Cat'],
-    voters: ['Alice', 'Bob'],
-    isOpen: true,
-    publicKeyShareCount: 0,
-    commonPublicKey: null,
-    encryptedVoteCount: 0,
-    encryptedTallies: [],
-    decryptionShareCount: 0,
-    publishedDecryptionShares: [],
-    resultTallies: [],
-    resultScores: [],
-    ...overrides,
-});
-
-describe('toPollPhaseState', () => {
-    test('extracts only the protocol phase fields from the poll response', () => {
-        expect(toPollPhaseState(createPoll())).toEqual<PollPhaseState>({
-            isOpen: true,
-            commonPublicKey: null,
-            voterCount: 2,
-            encryptedVoteCount: 0,
-            encryptedTallyCount: 0,
-            resultScoreCount: 0,
-        });
-    });
-});
-
-describe('derivePollPhase', () => {
-    test('returns registration for open polls', () => {
-        expect(derivePollPhase(createPoll())).toBe('registration');
+describe('phase helpers', () => {
+    it('defaults missing polls to the open phase', () => {
+        expect(derivePollPhase(undefined)).toBe('open');
+        expect(derivePollPhase(null)).toBe('open');
     });
 
-    test('returns key-generation for closed polls without a common key', () => {
-        expect(derivePollPhase(createPoll({ isOpen: false }))).toBe(
-            'key-generation',
-        );
-    });
-
-    test('returns voting when a common key exists and tallies are absent', () => {
+    it('returns the stored phase when a poll exists', () => {
         expect(
-            derivePollPhase(
-                createPoll({
-                    isOpen: false,
-                    commonPublicKey: '123',
-                }),
-            ),
-        ).toBe('voting');
-    });
-
-    test('returns tallying while all votes are present but tallies are not yet stored', () => {
+            derivePollPhase({
+                phase: 'securing',
+            }),
+        ).toBe('securing');
         expect(
-            derivePollPhase(
-                createPoll({
-                    isOpen: false,
-                    commonPublicKey: '123',
-                    encryptedVoteCount: 2,
-                }),
-            ),
-        ).toBe('tallying');
-    });
-
-    test('returns decryption when tallies exist and results are missing', () => {
-        expect(
-            derivePollPhase(
-                createPoll({
-                    isOpen: false,
-                    commonPublicKey: '123',
-                    encryptedTallies: [{ c1: '1', c2: '2' }],
-                }),
-            ),
-        ).toBe('decryption');
-    });
-
-    test('returns complete when results exist', () => {
-        expect(
-            derivePollPhase(
-                createPoll({
-                    isOpen: false,
-                    commonPublicKey: '123',
-                    resultScores: [42],
-                }),
-            ),
+            derivePollPhase({
+                phase: 'complete',
+            }),
         ).toBe('complete');
     });
 
-    test('accepts count-based state for server-side guards', () => {
+    it('permits joining only while the poll is open', () => {
         expect(
-            derivePollPhase({
-                isOpen: false,
-                commonPublicKey: '123',
-                voterCount: 3,
-                encryptedVoteCount: 3,
-                encryptedTallyCount: 0,
-                resultScoreCount: 0,
-            }),
-        ).toBe('tallying');
-    });
-});
-
-describe('guards', () => {
-    test('reflect the current poll phase', () => {
-        const registrationPoll = createPoll();
-        expect(canRegister(registrationPoll)).toBe(true);
-        expect(canClose(registrationPoll)).toBe(true);
-        expect(canSubmitPublicKeyShare(registrationPoll)).toBe(false);
-
-        const votingPoll = createPoll({
-            isOpen: false,
-            commonPublicKey: '123',
-        });
-        expect(canVote(votingPoll)).toBe(true);
-        expect(canSubmitDecryptionShares(votingPoll)).toBe(false);
-    });
-
-    test('does not allow close when fewer than two voters are present', () => {
-        expect(
-            canClose({
+            canRegister({
                 isOpen: true,
-                commonPublicKey: null,
-                voterCount: 1,
-                encryptedVoteCount: 0,
-                encryptedTallyCount: 0,
-                resultScoreCount: 0,
+                phase: 'open',
+            }),
+        ).toBe(true);
+        expect(
+            canRegister({
+                isOpen: false,
+                phase: 'open',
+            }),
+        ).toBe(false);
+        expect(
+            canRegister({
+                isOpen: true,
+                phase: 'securing',
             }),
         ).toBe(false);
     });

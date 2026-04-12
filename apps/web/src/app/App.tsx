@@ -63,7 +63,7 @@ const App = (): React.JSX.Element => {
     }, [clearMainContentFocusability]);
 
     return (
-        <div className="flex min-h-full flex-col">
+        <div className="app-shell flex min-h-[100dvh] flex-col">
             <a
                 className="skip-link"
                 href="#main-content"
@@ -81,7 +81,7 @@ const App = (): React.JSX.Element => {
                     id="main-content"
                     ref={mainContentReference}
                 >
-                    <div className="flex w-full max-w-4xl flex-1 flex-col">
+                    <div className="flex w-full max-w-[96rem] flex-1 flex-col">
                         <Suspense
                             fallback={
                                 <div className="flex min-h-[40vh] items-center justify-center">

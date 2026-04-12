@@ -1,12 +1,12 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-import { gotoInteractablePage } from './navigation.mts';
-
-const connectionToastMessage =
-    'The connection to the server was lost. Showing the latest available vote state and retrying in the background.';
+import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
+
+const escapeRegExp = (value: string): string =>
+    value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 type CreatePollResponse = {
     creatorToken: string;
@@ -20,6 +20,33 @@ export type CreatedPoll = {
     pollId: string;
     pollSlug: string;
     pollUrl: string;
+};
+
+const waitForAnyVisibleText = async ({
+    page,
+    texts,
+    timeout,
+}: {
+    page: Page;
+    texts: readonly string[];
+    timeout: number;
+}): Promise<void> => {
+    await expect
+        .poll(
+            async () => {
+                for (const text of texts) {
+                    if (await page.getByText(text, { exact: true }).first().isVisible()) {
+                        return text;
+                    }
+                }
+
+                return null;
+            },
+            {
+                timeout,
+            },
+        )
+        .not.toBeNull();
 };
 
 export const createPoll = async ({
@@ -61,56 +88,177 @@ export const createPoll = async ({
     };
 };
 
-export const joinPoll = async ({
+export const submitVote = async ({
     page,
     pollUrl,
+    scores = [8, 6],
     voterName,
+    choices = ['Apples', 'Bananas'],
 }: {
     page: Page;
     pollUrl?: string;
+    scores?: number[];
     voterName: string;
+    choices?: string[];
 }): Promise<void> => {
     if (pollUrl) {
         await gotoInteractablePage(page, pollUrl);
     }
 
-    await page.getByLabel('Voter name').fill(voterName);
-    await page.getByRole('button', { exact: true, name: 'Vote' }).click();
+    await page.getByLabel('Your public name').fill(voterName);
+
+    for (const [index, choice] of choices.entries()) {
+        const score = scores[index];
+        await page
+            .getByRole('button', {
+                name: `Score ${choice} as ${score}`,
+            })
+            .click();
+    }
+
+    await page.getByRole('button', { name: 'Submit vote' }).click();
     await expect(
-        page.getByText('Waiting for the vote to be started...'),
-    ).toBeVisible();
+        page.getByText('Vote stored on this device', { exact: true }),
+    ).toBeVisible({ timeout: 30_000 });
 };
 
-export const beginVote = async (page: Page): Promise<void> => {
-    const beginVoteButton = page.getByRole('button', { name: 'Begin vote' });
-    await expect(beginVoteButton).toBeEnabled({ timeout: 30_000 });
-    await beginVoteButton.click();
+export const registerParticipant = async (input: {
+    page: Page;
+    pollUrl?: string;
+    voterName: string;
+}): Promise<void> => {
+    await submitVote({
+        ...input,
+    });
 };
 
-export const expectResultsVisible = async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({
-        timeout: 120_000,
+export const closeVoting = async (page: Page): Promise<void> => {
+    const closeButton = page.getByRole('button', {
+        name: 'Close voting',
+    });
+
+    await expect(closeButton).toBeVisible({ timeout: 30_000 });
+    await expect(closeButton).toBeEnabled({ timeout: 30_000 });
+    await closeButton.click();
+    await waitForAnyVisibleText({
+        page,
+        texts: [
+            'Securing the election',
+            'Starting reveal',
+            'Revealing results',
+            'Verified results',
+        ],
+        timeout: 30_000,
+    });
+};
+
+export const waitForAutomaticReveal = async (page: Page): Promise<void> => {
+    await waitForAnyVisibleText({
+        page,
+        texts: [
+            'Closing the counted ballot set so the results can be opened.',
+            'Revealing results',
+            'Verified results',
+        ],
+        timeout: 90_000,
     });
     await expect(
+        page.getByRole('button', { name: 'Reveal results' }),
+    ).toHaveCount(0);
+};
+
+export const waitForVerifiedResults = async ({
+    page,
+    choices = ['Apples', 'Bananas'],
+}: {
+    page: Page;
+    choices?: string[];
+}): Promise<void> => {
+    await expect
+        .poll(
+            async () =>
+                await page
+                    .getByText('Verified results', { exact: true })
+                    .first()
+                    .isVisible(),
+            {
+                timeout: 90_000,
+            },
+        )
+        .toBe(true);
+    await expect(
+        page.getByText('Verified from the public board log.', {
+            exact: true,
+        }),
+    ).toBeVisible({ timeout: 90_000 });
+
+    for (const choice of choices) {
+        await expect(page.getByText(choice, { exact: true })).toBeVisible({
+            timeout: 90_000,
+        });
+    }
+};
+
+export const expectAcceptedBallotCount = async ({
+    choices = ['Apples', 'Bananas'],
+    count,
+    page,
+}: {
+    choices?: string[];
+    count: number;
+    page: Page;
+}): Promise<void> => {
+    const expectedText = `${count} accepted ballots`;
+
+    await expect(page.getByText(expectedText, { exact: true })).toHaveCount(
+        choices.length,
+    );
+};
+
+export const waitForCeremonyMetric = async ({
+    label,
+    page,
+    value,
+}: {
+    label: string;
+    page: Page;
+    value: string;
+}): Promise<void> => {
+    await expect(
+        page.getByText(label, { exact: true }).locator('xpath=..'),
+    ).toContainText(value, { timeout: 60_000 });
+};
+
+export const waitForBlockingParticipants = async ({
+    page,
+    participantNames,
+}: {
+    page: Page;
+    participantNames: readonly string[];
+}): Promise<void> => {
+    await expect(
         page.getByText(
-            'Public verification passed. The published tallies and scores match the encrypted tallies and published decryption shares.',
+            `Ceremony progress is waiting on ${participantNames.join(', ')}.`,
         ),
-    ).toBeVisible({ timeout: 120_000 });
+    ).toBeVisible({ timeout: 60_000 });
 };
 
 export const expectParticipantsVisible = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
-    const participantsRegion = page.getByRole('region', {
-        name: 'Participants',
+    await expect(
+        page.getByRole('heading', { name: 'Participants' }),
+    ).toBeVisible();
+    const participantsList = page.getByRole('list', {
+        name: 'Participants roster',
     });
-
-    await expect(participantsRegion).toBeVisible();
 
     for (const participantName of participantNames) {
         await expect(
-            participantsRegion.getByText(participantName, { exact: true }),
+            participantsList.getByText(
+                new RegExp(`^\\d+\\.\\s+${escapeRegExp(participantName)}$`),
+            ),
         ).toBeVisible();
     }
 };
@@ -119,48 +267,33 @@ export const expectParticipantsHidden = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
-    const participantsRegion = page.getByRole('region', {
-        name: 'Participants',
+    const participantsList = page.getByRole('list', {
+        name: 'Participants roster',
     });
 
     for (const participantName of participantNames) {
         await expect(
-            participantsRegion.getByText(participantName, { exact: true }),
+            participantsList.getByText(
+                new RegExp(`^\\d+\\.\\s+${escapeRegExp(participantName)}$`),
+            ),
         ).toHaveCount(0);
     }
 };
 
-export const expectConnectionToastVisible = async (
-    page: Page,
-): Promise<void> => {
-    await expect(page.locator('[data-slot="connection-toast"]')).toBeVisible({
-        timeout: 20_000,
+export const expectSecuringVisible = async (page: Page): Promise<void> => {
+    await expect(page.getByText('Securing the election')).toBeVisible({
+        timeout: 30_000,
     });
-    await expect(page.getByText(connectionToastMessage)).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Your next step' }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Audit and verification' }),
+    ).toBeVisible();
 };
 
-export const expectConnectionToastHidden = async (
-    page: Page,
-): Promise<void> => {
-    await expect(page.locator('[data-slot="connection-toast"]')).toBeHidden({
-        timeout: 20_000,
-    });
-};
-
-export const getShareLinkValue = async (page: Page): Promise<string> =>
-    await page.locator('input[readonly]').inputValue();
-
-export const copyShareLink = async (page: Page): Promise<string> => {
-    const origin = new URL(page.url()).origin;
-
-    await page
-        .context()
-        .grantPermissions(['clipboard-read', 'clipboard-write'], {
-            origin,
-        });
-    await page.getByRole('button', { name: 'Copy vote link' }).click();
-
-    return await page.evaluate(() => navigator.clipboard.readText());
+export const reloadPollPage = async (page: Page): Promise<void> => {
+    await reloadInteractablePage(page);
 };
 
 const deletePoll = async (

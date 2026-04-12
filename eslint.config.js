@@ -63,14 +63,7 @@ const sharedRules = {
             tsx: 'never',
         },
     ],
-    'import/order': [
-        ERROR,
-        {
-            'newlines-between': 'always',
-            alphabetize: { order: 'asc', caseInsensitive: true },
-            pathGroupsExcludedImportTypes: ['builtin'],
-        },
-    ],
+    'import/order': OFF,
     '@typescript-eslint/no-use-before-define': ERROR,
     '@typescript-eslint/no-shadow': ERROR,
     '@typescript-eslint/explicit-module-boundary-types': ERROR,

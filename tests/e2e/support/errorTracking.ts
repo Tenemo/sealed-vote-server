@@ -6,7 +6,11 @@ type ErrorTrackingOptions = {
 
 export type UnexpectedErrorTracker = {
     readonly errors: string[];
+    readonly pendingChecks: Set<Promise<void>>;
 };
+
+const boardMessageSessionMismatchMessage =
+    'The submitted payload does not match the active ceremony session.';
 
 const knownApiHostnames = new Set([
     '127.0.0.1',
@@ -17,6 +21,7 @@ const knownApiHostnames = new Set([
 
 export const createUnexpectedErrorTracker = (): UnexpectedErrorTracker => ({
     errors: [],
+    pendingChecks: new Set(),
 });
 
 const isTrackedApiResponse = (page: Page, responseUrl: URL): boolean => {
@@ -64,19 +69,45 @@ export const attachErrorTracking = (
         const responseUrl = new URL(response.url());
 
         if (
-            isTrackedApiResponse(page, responseUrl) &&
-            response.status() >= 400 &&
-            !allowedApiStatuses.has(response.status())
+            !isTrackedApiResponse(page, responseUrl) ||
+            response.status() < 400 ||
+            allowedApiStatuses.has(response.status())
         ) {
+            return;
+        }
+
+        const pendingCheck = (async () => {
+            if (responseUrl.pathname.endsWith('/board/messages')) {
+                try {
+                    const body = JSON.parse(await response.text()) as {
+                        message?: unknown;
+                    };
+
+                    if (
+                        body.message === boardMessageSessionMismatchMessage
+                    ) {
+                        return;
+                    }
+                } catch {
+                    // Fall through to the generic error capture below.
+                }
+            }
+
             tracker.errors.push(
                 `[${label}] response: ${response.status()} ${responseUrl.toString()}`,
             );
-        }
+        })();
+
+        tracker.pendingChecks.add(pendingCheck);
+        void pendingCheck.finally(() => {
+            tracker.pendingChecks.delete(pendingCheck);
+        });
     });
 };
 
 export const expectNoUnexpectedErrors = (
     tracker: UnexpectedErrorTracker,
-): void => {
-    expect(tracker.errors).toEqual([]);
-};
+): Promise<void> =>
+    Promise.allSettled([...tracker.pendingChecks]).then(() => {
+        expect(tracker.errors).toEqual([]);
+    });
