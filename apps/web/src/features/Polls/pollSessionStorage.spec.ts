@@ -64,6 +64,28 @@ describe('pollSessionStorage', () => {
 
             setItemSpy.mockRestore();
         });
+
+        it('treats blocked local storage as unavailable instead of throwing', () => {
+            const localStorageGetterSpy = vi
+                .spyOn(window, 'localStorage', 'get')
+                .mockImplementation(() => {
+                    throw new DOMException(
+                        'Blocked by browser policy',
+                        'SecurityError',
+                    );
+                });
+
+            expect(findCreatorSessionByPollId('poll-1')).toBeNull();
+            expect(() => {
+                saveCreatorSession({
+                    creatorToken: 'creator-token',
+                    pollId: 'poll-1',
+                    pollSlug: 'best-fruit--1111',
+                });
+            }).not.toThrow();
+
+            localStorageGetterSpy.mockRestore();
+        });
     });
 
     describe('voter sessions', () => {
@@ -166,6 +188,30 @@ describe('pollSessionStorage', () => {
             }).not.toThrow();
 
             setItemSpy.mockRestore();
+        });
+
+        it('treats blocked local storage as unavailable instead of throwing', () => {
+            const localStorageGetterSpy = vi
+                .spyOn(window, 'localStorage', 'get')
+                .mockImplementation(() => {
+                    throw new DOMException(
+                        'Blocked by browser policy',
+                        'SecurityError',
+                    );
+                });
+
+            expect(findVoterSessionByPollId('poll-1')).toBeNull();
+            expect(() => {
+                saveVoterSession({
+                    pollId: 'poll-1',
+                    pollSlug: 'best-fruit--1111',
+                    voterIndex: 2,
+                    voterName: 'Alice',
+                    voterToken: 'voter-token',
+                });
+            }).not.toThrow();
+
+            localStorageGetterSpy.mockRestore();
         });
     });
 });

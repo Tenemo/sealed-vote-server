@@ -15,10 +15,9 @@ import {
     type RestartCeremonyRequest,
 } from '@sealed-vote/contracts';
 
-const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-const apiBaseUrl = configuredApiBaseUrl
-    ? configuredApiBaseUrl.replace(/\/+$/, '')
-    : '/';
+import { normalizePollApiBaseUrl } from './pollApiBaseUrl';
+
+const apiBaseUrl = normalizePollApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 export const pollsApi = createApi({
     reducerPath: 'polls',

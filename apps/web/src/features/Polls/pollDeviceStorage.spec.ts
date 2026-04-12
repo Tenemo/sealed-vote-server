@@ -8,6 +8,7 @@ import {
     prunePendingPayloadsForSession,
     savePendingPayloadIfAbsent,
     savePollDeviceState,
+    type StoredPollDeviceState,
 } from './pollDeviceStorage';
 
 const createSignedPayload = (signatureSeed: string): SignedPayload =>
@@ -129,5 +130,41 @@ describe('pollDeviceStorage', () => {
         expect(findPollDeviceStateByPollId('poll-1')?.storedBallotScores).toBe(
             null,
         );
+    });
+
+    it('treats blocked local storage as unavailable instead of throwing', () => {
+        const localStorageGetterSpy = vi
+            .spyOn(window, 'localStorage', 'get')
+            .mockImplementation(() => {
+                throw new DOMException(
+                    'Blocked by browser policy',
+                    'SecurityError',
+                );
+            });
+
+        const storedState = {
+            authPrivateKeyPkcs8: 'auth-private-key',
+            authPublicKey: 'auth-public-key',
+            dkgBlindingSeed: 'dkg-blinding-seed',
+            dkgSecretSeed: 'dkg-secret-seed',
+            isCreatorParticipant: false,
+            pendingPayloads: {},
+            pollId: 'poll-1',
+            pollSlug: 'best-fruit--1111',
+            storedBallotScores: [8, 6],
+            transportPrivateKeyPkcs8: 'transport-private-key',
+            transportPublicKey: 'transport-public-key',
+            transportSuite: 'X25519',
+            voterIndex: 1,
+            voterName: 'Alice',
+            voterToken: 'token-1',
+        } satisfies StoredPollDeviceState;
+
+        expect(findPollDeviceStateByPollId('poll-1')).toBeNull();
+        expect(() => {
+            savePollDeviceState(storedState);
+        }).not.toThrow();
+
+        localStorageGetterSpy.mockRestore();
     });
 });

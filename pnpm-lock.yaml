@@ -250,6 +250,9 @@ importers:
       threshold-elgamal:
         specifier: 'catalog:'
         version: 1.0.0-beta.7
+      tslib:
+        specifier: ^2.8.1
+        version: 2.8.1
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0

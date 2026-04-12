@@ -6,6 +6,8 @@ import {
     type SignedPayload,
 } from 'threshold-elgamal';
 
+import { canUseLocalStorage } from './storageAvailability';
+
 type StoredPollDeviceState = {
     authPrivateKeyPkcs8: string;
     authPublicKey: string;
@@ -55,9 +57,6 @@ const hexToBytes = (hexValue: string): Uint8Array => {
 
     return bytes;
 };
-
-const canUseLocalStorage = (): boolean =>
-    typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
 const isTransportSuite = (value: unknown): value is 'X25519' =>
     value === 'X25519';

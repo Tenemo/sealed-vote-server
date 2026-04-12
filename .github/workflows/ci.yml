@@ -181,6 +181,8 @@ jobs:
                 project:
                     - name: chromium-desktop
                       slug: chromium-desktop
+                      # Each worker drives multiple live participant sessions,
+                      # so 2 workers are faster and more stable than 4 in CI.
                       ci_workers: '2'
                     - name: firefox-desktop
                       slug: firefox-desktop

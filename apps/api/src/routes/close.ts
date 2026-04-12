@@ -48,7 +48,7 @@ const validateParticipantDeviceReadiness = async (
     client: DatabaseTransaction,
     pollId: string,
 ): Promise<void> => {
-    const submittedParticipants = await client
+    const participants = await client
         .select({
             publicKeyShare: publicKeyShares.publicKeyShare,
             voterId: voters.id,
@@ -63,7 +63,7 @@ const validateParticipantDeviceReadiness = async (
         )
         .where(eq(voters.pollId, pollId));
 
-    const everyParticipantHasDeviceKeys = submittedParticipants.every(
+    const everyParticipantHasDeviceKeys = participants.every(
         (participant) =>
             parseParticipantDeviceRecord(participant.publicKeyShare) !== null,
     );
