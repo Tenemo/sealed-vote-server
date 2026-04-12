@@ -42,8 +42,8 @@ export const SignedPayloadSchema = Type.Object(
     {
         payload: ProtocolPayloadSchema,
         signature: Type.String({
-            minLength: 2,
-            maxLength: 8192,
+            minLength: 128,
+            maxLength: 128,
             pattern: '^(?:[A-Fa-f0-9]{2})+$',
         }),
     },

@@ -229,6 +229,27 @@ describe('automaticActionState', () => {
         ).toBe(false);
     });
 
+    it('rejects an action when the device transport suite no longer matches the active roster entry', () => {
+        expect(
+            isPreparedAutomaticActionCurrent({
+                action: createAction(),
+                deviceState: createDeviceState(),
+                poll: createPoll({
+                    rosterEntries: [
+                        {
+                            authPublicKey: 'auth-4',
+                            participantIndex: 3,
+                            transportPublicKey: 'transport-4',
+                            transportSuite: 'P-256' as never,
+                            voterName: 'Dora',
+                        },
+                    ] as PollResponse['rosterEntries'],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toBe(false);
+    });
+
     it('reads the local ceremony state from the current poll roster', () => {
         expect(
             getLocalCeremonyState({

@@ -19,7 +19,8 @@ const findRosterEntryForDevice = ({
         poll.rosterEntries.find(
             (entry) =>
                 entry.authPublicKey === deviceState.authPublicKey &&
-                entry.transportPublicKey === deviceState.transportPublicKey,
+                entry.transportPublicKey === deviceState.transportPublicKey &&
+                entry.transportSuite === deviceState.transportSuite,
         ) ?? null
     );
 };

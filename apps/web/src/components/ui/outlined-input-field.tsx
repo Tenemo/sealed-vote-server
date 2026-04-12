@@ -75,10 +75,10 @@ const OutlinedInputField = ({
         .join(' ');
 
     return (
-        <Field className={cn('w-full', wrapperClassName)}>
+        <Field className={cn('group w-full', wrapperClassName)}>
             <label
                 className={cn(
-                    'flex items-center gap-2 text-sm leading-6 font-medium select-text',
+                    'flex items-center gap-2 text-sm leading-6 font-medium select-text group-has-[input:disabled]:cursor-not-allowed group-has-[input:disabled]:opacity-70',
                     labelClassName,
                 )}
                 data-slot="field-label"

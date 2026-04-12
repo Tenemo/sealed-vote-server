@@ -342,7 +342,7 @@ describe('Board messages endpoint', () => {
                             rosterHash: fixedRosterHash,
                             transportPublicKey: 'deadbeef',
                         },
-                        signature: '00',
+                        signature: '0'.repeat(128),
                     },
                 },
             });
