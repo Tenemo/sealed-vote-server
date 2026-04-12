@@ -84,6 +84,13 @@ The default local setup serves:
 - the web app at `http://127.0.0.1:3000`
 - the API at `http://127.0.0.1:4000`
 
+### Running tests locally
+
+- Run the standard local browser suite with `pnpm e2e`.
+- Run the opt-in high-parallelism local suite with `pnpm e2e:turbo`.
+- `pnpm e2e:turbo` keeps CI unchanged, enables Playwright `fullyParallel`, and defaults to up to 24 local workers.
+- Set `PLAYWRIGHT_LOCAL_WORKERS` if you want a different default for turbo mode. Passing Playwright CLI flags such as `--workers=32` still overrides the config directly.
+
 ## Workspace documentation
 
 - [apps/api/README.md](./apps/api/README.md) for API workspace

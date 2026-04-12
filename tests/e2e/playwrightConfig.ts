@@ -32,12 +32,15 @@ const webkitUnsupportedModernCryptoSpecs =
           ];
 
 const isCi = Boolean(process.env.CI);
+const isLocalTurbo = process.env.PLAYWRIGHT_LOCAL_TURBO === 'true';
 const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
 const shouldUseBuiltServers =
     process.env.PLAYWRIGHT_USE_BUILT_SERVERS === 'true';
 const localWorkers = Math.max(2, Math.min(availableParallelism(), 6));
+const localTurboWorkers = Math.max(2, Math.min(availableParallelism(), 24));
 
 const parseWorkerCount = (
+    label: string,
     rawValue: string | undefined,
     fallback: number,
 ): number => {
@@ -53,7 +56,7 @@ const parseWorkerCount = (
         parsedValue < 1
     ) {
         throw new Error(
-            `Invalid PLAYWRIGHT_CI_WORKERS value "${rawValue}". Expected a positive integer.`,
+            `Invalid ${label} value "${rawValue}". Expected a positive integer.`,
         );
     }
 
@@ -171,6 +174,10 @@ const projects: Project[] = [
 const getCommonConfig = (
     baseURL: string,
     outputDir: string,
+    options?: {
+        fullyParallel?: boolean;
+        workers?: number;
+    },
 ): PlaywrightTestConfig => ({
     testDir: './tests/e2e',
     timeout: 180_000,
@@ -178,7 +185,7 @@ const getCommonConfig = (
         timeout: 20_000,
     },
     forbidOnly: isCi,
-    fullyParallel: false,
+    fullyParallel: options?.fullyParallel ?? false,
     outputDir,
     reporter: reporters,
     retries: isCi ? 1 : 0,
@@ -188,14 +195,35 @@ const getCommonConfig = (
         trace: isCi ? ('retain-on-failure' as const) : ('off' as const),
         video: isCi ? ('retain-on-failure' as const) : ('off' as const),
     },
-    workers: isCi
-        ? parseWorkerCount(process.env.PLAYWRIGHT_CI_WORKERS, 4)
-        : localWorkers,
+    workers:
+        options?.workers ??
+        (isCi
+            ? parseWorkerCount(
+                  'PLAYWRIGHT_CI_WORKERS',
+                  process.env.PLAYWRIGHT_CI_WORKERS,
+                  4,
+              )
+            : localWorkers),
     projects,
 });
 
 export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
-    ...getCommonConfig(localWebBaseUrl, 'test-results/playwright'),
+    ...getCommonConfig(
+        localWebBaseUrl,
+        isLocalTurbo
+            ? 'test-results/playwright-turbo'
+            : 'test-results/playwright',
+        isLocalTurbo
+            ? {
+                  fullyParallel: true,
+                  workers: parseWorkerCount(
+                      'PLAYWRIGHT_LOCAL_WORKERS',
+                      process.env.PLAYWRIGHT_LOCAL_WORKERS,
+                      localTurboWorkers,
+                  ),
+              }
+            : undefined,
+    ),
     webServer: shouldUseBuiltServers
         ? [
               {
