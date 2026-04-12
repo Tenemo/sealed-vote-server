@@ -181,7 +181,7 @@ jobs:
                 project:
                     - name: chromium-desktop
                       slug: chromium-desktop
-                      ci_workers: '4'
+                      ci_workers: '2'
                     - name: firefox-desktop
                       slug: firefox-desktop
                       ci_workers: '2'
