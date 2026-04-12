@@ -1,5 +1,5 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root as ReactRoot } from 'react-dom/client';
 import { HelmetProvider } from 'react-helmet-async';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
@@ -21,7 +21,17 @@ export const Root = (): React.JSX.Element => (
     </React.StrictMode>
 );
 
-const container = document.getElementById('root');
-const root = createRoot(container!);
+type RootContainer = HTMLElement & {
+    __sealedVoteRoot?: ReactRoot;
+};
+
+const container = document.getElementById('root') as RootContainer | null;
+
+if (!container) {
+    throw new Error('The app root container is missing.');
+}
+
+const root = container.__sealedVoteRoot ?? createRoot(container);
+container.__sealedVoteRoot = root;
 
 root.render(<Root />);
