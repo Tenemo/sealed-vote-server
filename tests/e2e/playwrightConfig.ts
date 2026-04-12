@@ -16,14 +16,14 @@ const chromiumOnlySpecs = [
     '**/share-link.spec.ts',
 ];
 
-// The main e2e matrix runs WebKit on Linux, where device-backed vote submission
-// still hits NotSupportedError for the Ed25519 and X25519 WebCrypto key
-// generation that the app requires. We probe Apple-platform WebKit separately
-// on macOS, so only non-macOS WebKit runs need these exclusions here.
-const webkitUnsupportedDeviceKeySetupSpecs =
+// The main e2e matrix runs WebKit on Linux, where Ed25519 and X25519 WebCrypto
+// support still lags the latest Apple WebKit stack. We probe that support on
+// macOS separately, so only non-macOS WebKit runs need these exclusions here.
+const webkitUnsupportedModernCryptoSpecs =
     process.platform === 'darwin'
         ? []
         : [
+              '**/browser-crypto-compat.spec.ts',
               '**/ceremony-persistence.spec.ts',
               '**/ceremony-rescue.spec.ts',
               '**/multi-participant-counting.spec.ts',
@@ -151,7 +151,7 @@ const projects: Project[] = [
         name: 'webkit-desktop',
         testIgnore: [
             ...chromiumOnlySpecs,
-            ...webkitUnsupportedDeviceKeySetupSpecs,
+            ...webkitUnsupportedModernCryptoSpecs,
         ],
         use: {
             ...devices['Desktop Safari'],

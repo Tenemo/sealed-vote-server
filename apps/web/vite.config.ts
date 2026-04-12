@@ -15,12 +15,6 @@ const resolveFromRoot = (...segments: string[]): string =>
 const resolveFromSrc = (...segments: string[]): string =>
     resolveFromRoot('src', ...segments);
 
-const tslibEntryPath = resolveFromRoot(
-    'node_modules',
-    'tslib',
-    'tslib.es6.mjs',
-);
-
 const getManualChunk = (id: string): string | undefined => {
     const normalizedId = id.replaceAll('\\', '/');
 
@@ -75,13 +69,9 @@ export default defineConfig({
             components: resolveFromSrc('components'),
             features: resolveFromSrc('features'),
             fonts: resolveFromSrc('fonts'),
-            tslib: tslibEntryPath,
             typings: resolveFromSrc('typings'),
             utils: resolveFromSrc('utils'),
         },
-        // Keep transitive tslib imports pinned to the app install so filtered
-        // CI builds do not depend on pnpm virtual-store layout details.
-        dedupe: ['tslib'],
     },
     server: {
         host: '0.0.0.0',

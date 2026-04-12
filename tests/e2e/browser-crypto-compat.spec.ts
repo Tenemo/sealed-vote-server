@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const secureProbeUrl = 'https://compat.sealed.vote/';
+const nonMacOsWebKitCryptoSkipReason =
+    'Non-macOS Playwright WebKit does not expose the latest Apple WebKit WebCrypto support for Ed25519 and X25519. Run these checks on macOS.';
 
 const openSecureProbePage = async (page: Page): Promise<void> => {
     await page.route(secureProbeUrl, async (route) => {
@@ -15,6 +17,9 @@ const openSecureProbePage = async (page: Page): Promise<void> => {
         waitUntil: 'domcontentloaded',
     });
 };
+
+const shouldSkipModernWebKitCryptoProbe = (browserName: string): boolean =>
+    browserName === 'webkit' && process.platform !== 'darwin';
 
 test.beforeEach(async ({ page }) => {
     await openSecureProbePage(page);
@@ -33,8 +38,14 @@ test('provides subtle crypto in a secure context', async ({ page }) => {
 });
 
 test('supports Ed25519 generation, export, import, signing, and verification', async ({
+    browserName,
     page,
 }) => {
+    test.skip(
+        shouldSkipModernWebKitCryptoProbe(browserName),
+        nonMacOsWebKitCryptoSkipReason,
+    );
+
     const result = await page.evaluate(async () => {
         const message = new TextEncoder().encode(
             'sealed-vote-browser-crypto-ed25519',
@@ -93,8 +104,14 @@ test('supports Ed25519 generation, export, import, signing, and verification', a
 });
 
 test('supports X25519 generation, export, import, and shared-secret derivation', async ({
+    browserName,
     page,
 }) => {
+    test.skip(
+        shouldSkipModernWebKitCryptoProbe(browserName),
+        nonMacOsWebKitCryptoSkipReason,
+    );
+
     const result = await page.evaluate(async () => {
         const algorithm = { name: 'X25519' } as const;
         const [alice, bob] = await Promise.all([
