@@ -22,6 +22,33 @@ export type CreatedPoll = {
     pollUrl: string;
 };
 
+const waitForAnyVisibleText = async ({
+    page,
+    texts,
+    timeout,
+}: {
+    page: Page;
+    texts: readonly string[];
+    timeout: number;
+}): Promise<void> => {
+    await expect
+        .poll(
+            async () => {
+                for (const text of texts) {
+                    if (await page.getByText(text, { exact: true }).first().isVisible()) {
+                        return text;
+                    }
+                }
+
+                return null;
+            },
+            {
+                timeout,
+            },
+        )
+        .not.toBeNull();
+};
+
 export const createPoll = async ({
     page,
     pollName,
@@ -113,24 +140,28 @@ export const closeVoting = async (page: Page): Promise<void> => {
     await expect(closeButton).toBeVisible({ timeout: 30_000 });
     await expect(closeButton).toBeEnabled({ timeout: 30_000 });
     await closeButton.click();
-    await expect(
-        page
-            .getByText('Securing the election')
-            .or(page.getByText('Starting reveal'))
-            .or(page.getByText('Revealing results'))
-            .or(page.getByText('Verified results')),
-    ).toBeVisible({ timeout: 30_000 });
+    await waitForAnyVisibleText({
+        page,
+        texts: [
+            'Securing the election',
+            'Starting reveal',
+            'Revealing results',
+            'Verified results',
+        ],
+        timeout: 30_000,
+    });
 };
 
 export const waitForAutomaticReveal = async (page: Page): Promise<void> => {
-    await expect(
-        page
-            .getByText(
-                'Closing the counted ballot set so the results can be opened.',
-            )
-            .or(page.getByText('Revealing results'))
-            .or(page.getByText('Verified results')),
-    ).toBeVisible({ timeout: 90_000 });
+    await waitForAnyVisibleText({
+        page,
+        texts: [
+            'Closing the counted ballot set so the results can be opened.',
+            'Revealing results',
+            'Verified results',
+        ],
+        timeout: 90_000,
+    });
     await expect(
         page.getByRole('button', { name: 'Reveal results' }),
     ).toHaveCount(0);

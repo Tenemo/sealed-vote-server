@@ -11,6 +11,9 @@ import {
     type PollRefParams,
 } from './schemas.js';
 
+const nonNegativeIntegerSchema = Type.Integer({ minimum: 0 });
+const positiveIntegerSchema = Type.Integer({ minimum: 1 });
+
 const PollRosterParticipantSchema = Type.Object({
     ceremonyState: Type.Union([
         Type.Literal('active'),
@@ -35,7 +38,7 @@ const ElectionManifestSchema = Type.Object({
     rosterHash: Type.String(),
 });
 
-const PollResponseSchema = Type.Object({
+export const PollResponseSchema = Type.Object({
     id: Type.String(),
     slug: Type.String(),
     pollName: Type.String(),
@@ -55,26 +58,26 @@ const PollResponseSchema = Type.Object({
         Type.Literal('complete'),
         Type.Literal('aborted'),
     ]),
-    submittedParticipantCount: Type.Number(),
-    minimumCloseParticipantCount: Type.Number(),
+    submittedParticipantCount: nonNegativeIntegerSchema,
+    minimumCloseParticipantCount: positiveIntegerSchema,
     ceremony: Type.Object({
-        acceptedDecryptionShareCount: Type.Number(),
-        acceptedEncryptedBallotCount: Type.Number(),
-        acceptedRegistrationCount: Type.Number(),
-        activeParticipantCount: Type.Number(),
+        acceptedDecryptionShareCount: nonNegativeIntegerSchema,
+        acceptedEncryptedBallotCount: nonNegativeIntegerSchema,
+        acceptedRegistrationCount: nonNegativeIntegerSchema,
+        activeParticipantCount: nonNegativeIntegerSchema,
         blockingParticipantIndices: Type.Array(Type.Integer({ minimum: 1 })),
-        completeEncryptedBallotParticipantCount: Type.Number(),
+        completeEncryptedBallotParticipantCount: nonNegativeIntegerSchema,
         revealReady: Type.Boolean(),
-        restartCount: Type.Number(),
+        restartCount: nonNegativeIntegerSchema,
     }),
     boardAudit: Type.Object({
-        acceptedCount: Type.Number(),
-        duplicateCount: Type.Number(),
-        equivocationCount: Type.Number(),
+        acceptedCount: nonNegativeIntegerSchema,
+        duplicateCount: nonNegativeIntegerSchema,
+        equivocationCount: nonNegativeIntegerSchema,
         ceremonyDigest: Type.Union([Type.String(), Type.Null()]),
         phaseDigests: Type.Array(
             Type.Object({
-                phase: Type.Number(),
+                phase: nonNegativeIntegerSchema,
                 digest: Type.String(),
             }),
         ),
@@ -86,23 +89,29 @@ const PollResponseSchema = Type.Object({
             Type.Literal('invalid'),
         ]),
         reason: Type.Union([Type.String(), Type.Null()]),
-        qualParticipantIndices: Type.Array(Type.Number()),
+        qualParticipantIndices: Type.Array(positiveIntegerSchema),
         verifiedOptionTallies: Type.Array(
             Type.Object({
-                optionIndex: Type.Number(),
+                optionIndex: positiveIntegerSchema,
                 tally: Type.String(),
                 mean: Type.Number(),
-                acceptedBallotCount: Type.Number(),
+                acceptedBallotCount: nonNegativeIntegerSchema,
             }),
         ),
     }),
     boardEntries: Type.Array(BoardMessageRecordSchema),
     rosterEntries: Type.Array(PollRosterEntrySchema),
     thresholds: Type.Object({
-        reconstructionThreshold: Type.Union([Type.Number(), Type.Null()]),
-        minimumPublishedVoterCount: Type.Union([Type.Number(), Type.Null()]),
-        maxParticipants: Type.Number(),
-        validationTarget: Type.Number(),
+        reconstructionThreshold: Type.Union([
+            positiveIntegerSchema,
+            Type.Null(),
+        ]),
+        minimumPublishedVoterCount: Type.Union([
+            positiveIntegerSchema,
+            Type.Null(),
+        ]),
+        maxParticipants: positiveIntegerSchema,
+        validationTarget: positiveIntegerSchema,
     }),
 });
 

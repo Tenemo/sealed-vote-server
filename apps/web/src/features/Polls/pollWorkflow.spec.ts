@@ -54,6 +54,22 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     ...overrides,
 });
 
+const createClosedPoll = (
+    overrides: Partial<PollResponse> = {},
+): PollResponse =>
+    createPoll({
+        isOpen: false,
+        manifest: {
+            optionList: ['Apples', 'Bananas'],
+            rosterHash: 'a'.repeat(64),
+        },
+        manifestHash: 'b'.repeat(64),
+        phase: 'securing',
+        sessionId: 'c'.repeat(64),
+        submittedParticipantCount: 3,
+        ...overrides,
+    });
+
 const createDeviceState = (
     overrides: Partial<StoredPollDeviceState> = {},
 ): StoredPollDeviceState => ({
@@ -101,6 +117,23 @@ describe('pollWorkflow', () => {
         ).toMatchObject({
             canSubmitVote: true,
             currentStep: 'anonymous-ready-to-vote',
+        });
+    });
+
+    it('shows the submitting state while voter registration is in flight', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: null,
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: true,
+                poll: createPoll(),
+                voterSession: null,
+            }),
+        ).toMatchObject({
+            canSubmitVote: false,
+            currentStep: 'submitting-vote',
         });
     });
 
@@ -153,6 +186,35 @@ describe('pollWorkflow', () => {
         });
     });
 
+    it('does not count mismatched local ballot scores as a recoverable local vote', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState({
+                    storedBallotScores: [8],
+                }),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    voters: [
+                        {
+                            ceremonyState: 'active',
+                            deviceReady: true,
+                            voterIndex: 1,
+                            voterName: 'Alice',
+                        },
+                    ],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            currentStep: 'vote-stored-waiting-for-close',
+            hasLocalVote: false,
+            hasSubmittedVote: true,
+        });
+    });
+
     it('moves to securing-auto when post-close background work is available', () => {
         expect(
             derivePollWorkflow({
@@ -161,17 +223,7 @@ describe('pollWorkflow', () => {
                 hasAutomaticCeremonyAction: true,
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
-                poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
-                    phase: 'securing',
-                    sessionId: 'c'.repeat(64),
-                    submittedParticipantCount: 3,
-                }),
+                poll: createClosedPoll(),
                 voterSession: createVoterSession(),
             }),
         ).toMatchObject({
@@ -187,17 +239,7 @@ describe('pollWorkflow', () => {
                 hasAutomaticCeremonyAction: false,
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
-                poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
-                    phase: 'securing',
-                    sessionId: 'c'.repeat(64),
-                    submittedParticipantCount: 3,
-                }),
+                poll: createClosedPoll(),
                 voterSession: createVoterSession(),
             }),
         ).toMatchObject({
@@ -214,17 +256,7 @@ describe('pollWorkflow', () => {
                 hasAutomaticCeremonyAction: false,
                 hasAutomationFailure: true,
                 isSubmittingVote: false,
-                poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
-                    phase: 'securing',
-                    sessionId: 'c'.repeat(64),
-                    submittedParticipantCount: 3,
-                }),
+                poll: createClosedPoll(),
                 voterSession: createVoterSession(),
             }),
         ).toMatchObject({
@@ -241,17 +273,7 @@ describe('pollWorkflow', () => {
                 hasAutomaticCeremonyAction: false,
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
-                poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
-                    phase: 'securing',
-                    sessionId: 'c'.repeat(64),
-                    submittedParticipantCount: 3,
-                }),
+                poll: createClosedPoll(),
                 voterSession: createVoterSession(),
             }),
         ).toMatchObject({
@@ -271,15 +293,8 @@ describe('pollWorkflow', () => {
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
                 poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
+                    ...createClosedPoll(),
                     phase: 'ready-to-reveal',
-                    sessionId: 'c'.repeat(64),
-                    submittedParticipantCount: 3,
                     ceremony: {
                         acceptedDecryptionShareCount: 0,
                         acceptedEncryptedBallotCount: 6,
@@ -313,16 +328,8 @@ describe('pollWorkflow', () => {
                 hasAutomaticCeremonyAction: false,
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
-                poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
+                poll: createClosedPoll({
                     phase: 'ready-to-reveal',
-                    sessionId: 'c'.repeat(64),
-                    submittedParticipantCount: 3,
                 }),
                 voterSession: createVoterSession(),
             }),
@@ -332,6 +339,70 @@ describe('pollWorkflow', () => {
         });
     });
 
+    it.each([
+        {
+            canRetryAutomation: true,
+            currentStep: 'automation-retry-required',
+            hasAutomaticCeremonyAction: false,
+            hasAutomationFailure: true,
+            phase: 'ready-to-reveal' as const,
+            testName:
+                'requires a retry when automation fails before reveal begins',
+        },
+        {
+            canRetryAutomation: false,
+            currentStep: 'revealing-auto',
+            hasAutomaticCeremonyAction: true,
+            hasAutomationFailure: false,
+            phase: 'revealing' as const,
+            testName:
+                'keeps automatic reveal work moving once the reveal is underway',
+        },
+        {
+            canRetryAutomation: false,
+            currentStep: 'revealing-waiting',
+            hasAutomaticCeremonyAction: false,
+            hasAutomationFailure: false,
+            phase: 'revealing' as const,
+            testName:
+                'waits during reveal when there is no automatic work to publish',
+        },
+        {
+            canRetryAutomation: true,
+            currentStep: 'automation-retry-required',
+            hasAutomaticCeremonyAction: false,
+            hasAutomationFailure: true,
+            phase: 'revealing' as const,
+            testName: 'surfaces reveal automation failures for retry',
+        },
+    ])(
+        '$testName',
+        ({
+            canRetryAutomation,
+            currentStep,
+            hasAutomaticCeremonyAction,
+            hasAutomationFailure,
+            phase,
+        }) => {
+            expect(
+                derivePollWorkflow({
+                    creatorSessionPollId: null,
+                    deviceState: createDeviceState(),
+                    hasAutomaticCeremonyAction,
+                    hasAutomationFailure,
+                    isSubmittingVote: false,
+                    poll: createClosedPoll({
+                        phase,
+                    }),
+                    voterSession: createVoterSession(),
+                }),
+            ).toMatchObject({
+                canRetryAutomation,
+                currentStep,
+            });
+        },
+    );
+
     it('shows skipped when the organizer continues without this participant', () => {
         expect(
             derivePollWorkflow({
@@ -340,15 +411,7 @@ describe('pollWorkflow', () => {
                 hasAutomaticCeremonyAction: false,
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
-                poll: createPoll({
-                    isOpen: false,
-                    manifest: {
-                        optionList: ['Apples', 'Bananas'],
-                        rosterHash: 'a'.repeat(64),
-                    },
-                    manifestHash: 'b'.repeat(64),
-                    phase: 'securing',
-                    sessionId: 'c'.repeat(64),
+                poll: createClosedPoll({
                     submittedParticipantCount: 4,
                     voters: [
                         {

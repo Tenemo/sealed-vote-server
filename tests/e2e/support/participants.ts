@@ -87,6 +87,27 @@ export const openProjectParticipant = async (
     };
 };
 
+export const reopenProjectParticipant = async ({
+    browser,
+    storageState,
+    testInfo,
+}: {
+    browser: Browser;
+    storageState: BrowserContextOptions['storageState'];
+    testInfo: TestInfo;
+}): Promise<ManagedParticipant> => {
+    const context = await browser.newContext({
+        ...(getProjectContextOptions(testInfo) ?? {}),
+        storageState,
+    });
+    const page = await context.newPage();
+
+    return {
+        context,
+        page,
+    };
+};
+
 export const launchFirefoxParticipant = async ({
     playwright,
     mobile = false,
