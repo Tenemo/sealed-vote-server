@@ -9,6 +9,10 @@ import { mutedBodyClassName, pageTitleClassName } from '@/lib/uiClasses';
 import LoadingButton from 'components/LoadingButton/LoadingButton';
 import NotFound from 'components/NotFound/NotFound';
 import {
+    getLocalCeremonyState,
+    isPreparedAutomaticActionCurrent,
+} from 'features/Polls/Poll/automaticActionState';
+import {
     findCreatorSessionByPollId,
     findCreatorSessionByPollSlug,
     findVoterSessionByPollId,
@@ -250,6 +254,31 @@ const PollPage = (): React.JSX.Element => {
         );
     }, [poll]);
 
+    const localCeremonyState = React.useMemo(
+        () =>
+            getLocalCeremonyState({
+                poll,
+                voterSession,
+            }),
+        [poll, voterSession],
+    );
+
+    const currentAutomaticAction = React.useMemo(
+        () =>
+            isPreparedAutomaticActionCurrent({
+                action: automaticAction,
+                deviceState,
+                poll,
+                voterSession,
+            })
+                ? automaticAction
+                : null,
+        [automaticAction, deviceState, poll, voterSession],
+    );
+
+    const currentAutomaticActionDescription =
+        currentAutomaticAction !== null ? automaticActionDescription : null;
+
     React.useEffect(() => {
         if (!poll) {
             return;
@@ -290,13 +319,6 @@ const PollPage = (): React.JSX.Element => {
         let cancelled = false;
 
         const resolveAction = async (): Promise<void> => {
-            const localCeremonyState = voterSession
-                ? (poll?.voters.find(
-                      (participant) =>
-                          participant.voterIndex === voterSession.voterIndex,
-                  )?.ceremonyState ?? null)
-                : null;
-
             if (!poll || poll.phase === 'open' || poll.phase === 'complete') {
                 if (cancelled) {
                     return;
@@ -319,6 +341,19 @@ const PollPage = (): React.JSX.Element => {
                 setAutomationError(null);
                 setIsResolvingAutomaticAction(false);
                 return;
+            }
+
+            if (
+                automaticAction !== null &&
+                !isPreparedAutomaticActionCurrent({
+                    action: automaticAction,
+                    deviceState,
+                    poll,
+                    voterSession,
+                })
+            ) {
+                setAutomaticAction(null);
+                setAutomaticActionDescription(null);
             }
 
             if (activeActionSlotKey) {
@@ -367,9 +402,11 @@ const PollPage = (): React.JSX.Element => {
         };
     }, [
         activeActionSlotKey,
+        automaticAction,
         automaticResolutionAttempt,
         creatorSession,
         deviceState,
+        localCeremonyState,
         poll,
         voterSession,
     ]);
@@ -379,13 +416,6 @@ const PollPage = (): React.JSX.Element => {
             return;
         }
 
-        const localCeremonyState = voterSession
-            ? (poll.voters.find(
-                  (participant) =>
-                      participant.voterIndex === voterSession.voterIndex,
-              )?.ceremonyState ?? null)
-            : null;
-
         if (
             deviceState.storedBallotScores !== null &&
             (poll.phase === 'complete' ||
@@ -394,11 +424,21 @@ const PollPage = (): React.JSX.Element => {
         ) {
             clearStoredBallotScores(poll.id);
         }
-    }, [deviceState, poll, voterSession]);
+    }, [deviceState, localCeremonyState, poll]);
 
     const submitPreparedAction = React.useCallback(
         async (action: PreparedCeremonyAction): Promise<void> => {
-            if (!poll || !voterSession) {
+            if (
+                !poll ||
+                !deviceState ||
+                !voterSession ||
+                !isPreparedAutomaticActionCurrent({
+                    action,
+                    deviceState,
+                    poll,
+                    voterSession,
+                })
+            ) {
                 return;
             }
 
@@ -428,38 +468,31 @@ const PollPage = (): React.JSX.Element => {
                 setActiveActionSlotKey(null);
             }
         },
-        [poll, postBoardMessage, refetch, voterSession],
+        [deviceState, poll, postBoardMessage, refetch, voterSession],
     );
 
     React.useEffect(() => {
-        const isSkippedLocally = voterSession
-            ? poll?.voters.find(
-                  (participant) =>
-                      participant.voterIndex === voterSession.voterIndex,
-              )?.ceremonyState === 'skipped'
-            : false;
-
         if (
             !poll ||
-            isSkippedLocally ||
+            localCeremonyState === 'skipped' ||
             (poll.phase !== 'securing' &&
                 poll.phase !== 'ready-to-reveal' &&
                 poll.phase !== 'revealing') ||
-            !automaticAction ||
+            !currentAutomaticAction ||
             !!activeActionSlotKey ||
             !!automationError
         ) {
             return;
         }
 
-        void submitPreparedAction(automaticAction);
+        void submitPreparedAction(currentAutomaticAction);
     }, [
         activeActionSlotKey,
-        automaticAction,
         automationError,
+        currentAutomaticAction,
+        localCeremonyState,
         poll,
         submitPreparedAction,
-        voterSession,
     ]);
 
     if (
@@ -498,7 +531,7 @@ const PollPage = (): React.JSX.Element => {
     const workflow = derivePollWorkflow({
         creatorSessionPollId: creatorSession?.pollId ?? null,
         deviceState,
-        hasAutomaticCeremonyAction: automaticAction !== null,
+        hasAutomaticCeremonyAction: currentAutomaticAction !== null,
         hasAutomationFailure: automationError !== null,
         isSubmittingVote: registerState.isLoading,
         poll,
@@ -701,7 +734,7 @@ const PollPage = (): React.JSX.Element => {
                   : workflow.currentStep === 'creator-can-close'
                     ? 'Everyone who submitted before you close will be included. Everyone else stays out.'
                     : workflow.currentStep === 'securing-auto'
-                      ? (automaticActionDescription ??
+                      ? (currentAutomaticActionDescription ??
                         'Securing the election in the background.')
                       : workflow.currentStep === 'automation-retry-required'
                         ? (automationError ??
@@ -711,7 +744,7 @@ const PollPage = (): React.JSX.Element => {
                           : workflow.currentStep === 'skipped'
                             ? 'The organizer continued without this device. Your locally stored vote was not counted for this closed vote.'
                             : workflow.currentStep === 'revealing-auto'
-                              ? (automaticActionDescription ??
+                              ? (currentAutomaticActionDescription ??
                                 'Starting the reveal and publishing decryption material in the background.')
                               : workflow.currentStep === 'revealing-waiting'
                                 ? 'Waiting for threshold decryption shares and final tally publication.'

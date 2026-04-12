@@ -14,6 +14,7 @@ import {
 import {
     closeParticipant,
     openProjectParticipant,
+    reopenProjectParticipant,
 } from './support/participants';
 import {
     attachErrorTracking,
@@ -50,7 +51,7 @@ test('the organizer can continue without a missing participant and finish with t
 
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
-    const missingParticipant = await openProjectParticipant(browser, testInfo);
+    let missingParticipant = await openProjectParticipant(browser, testInfo);
 
     attachErrorTracking(participantOne.page, 'participant-one', tracker);
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
@@ -85,7 +86,9 @@ test('the organizer can continue without a missing participant and finish with t
             voterName: missingParticipantName,
         });
 
-        await missingParticipant.page.close();
+        const missingParticipantStorageState =
+            await missingParticipant.context.storageState();
+        await closeParticipant(missingParticipant);
         await closeVoting(page);
         await waitForBlockingParticipants({
             page,
@@ -127,21 +130,24 @@ test('the organizer can continue without a missing participant and finish with t
             page: participantTwo.page,
         });
 
-        const reopenedMissingPage = await missingParticipant.context.newPage();
+        missingParticipant = await reopenProjectParticipant({
+            browser,
+            storageState: missingParticipantStorageState,
+            testInfo,
+        });
         attachErrorTracking(
-            reopenedMissingPage,
+            missingParticipant.page,
             'missing-participant-reopened',
             tracker,
         );
-        await gotoInteractablePage(reopenedMissingPage, createdPoll.pollUrl);
+        await gotoInteractablePage(missingParticipant.page, createdPoll.pollUrl);
         await expect(
-            reopenedMissingPage.getByText(
+            missingParticipant.page.getByText(
                 'The organizer continued without this device. Your locally stored vote was not counted for this closed vote.',
             ).first(),
         ).toBeVisible({ timeout: 30_000 });
 
         expectNoUnexpectedErrors(tracker);
-        await reopenedMissingPage.close();
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);
