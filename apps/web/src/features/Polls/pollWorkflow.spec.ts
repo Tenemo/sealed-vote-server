@@ -157,6 +157,36 @@ describe('pollWorkflow', () => {
         });
     });
 
+    it.each([
+        {
+            creatorSessionPollId: null,
+            testName:
+                'blocks anonymous re-registration when a stale voter session has lost its device state',
+        },
+        {
+            creatorSessionPollId: 'poll-1',
+            testName:
+                'blocks the creator from re-entering the open flow when their voter device state is missing',
+        },
+    ])('$testName', ({ creatorSessionPollId }) => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId,
+                deviceState: null,
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll(),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canSubmitVote: false,
+            currentStep: 'local-vote-missing',
+            hasLocalVote: false,
+            missingLocalState: true,
+        });
+    });
+
     it('enables close only for the creator participant once at least three votes are submitted', () => {
         expect(
             derivePollWorkflow({

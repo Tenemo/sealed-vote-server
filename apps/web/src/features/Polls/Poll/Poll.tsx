@@ -719,7 +719,7 @@ const PollPage = (): React.JSX.Element => {
                                   ? 'The ceremony is moving without any action needed from this browser.'
                                   : workflow.currentStep ===
                                       'local-vote-missing'
-                                    ? 'This browser no longer has the local vote and device state required to continue after close.'
+                                    ? 'This browser no longer has the local vote and device state required to continue in this vote.'
                                     : workflow.currentStep === 'complete'
                                       ? 'Every result shown below was replayed and verified from the public board log.'
                                       : 'The ceremony could not be verified from the public board log.';

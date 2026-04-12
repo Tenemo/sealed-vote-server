@@ -1,3 +1,4 @@
+import { FormatRegistry } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -14,6 +15,12 @@ import {
 import { PollResponseSchema, type PollResponse } from './fetch';
 
 const clonePoll = (poll: PollResponse): PollResponse => structuredClone(poll);
+const uuidPattern =
+    /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+if (!FormatRegistry.Has('uuid')) {
+    FormatRegistry.Set('uuid', (value) => uuidPattern.test(value));
+}
 
 describe('GET /polls/:pollRef', () => {
     let fastify: FastifyInstance;
@@ -51,6 +58,13 @@ describe('GET /polls/:pollRef', () => {
                 description: string;
                 poll: PollResponse;
             }[] = [
+                {
+                    description: 'non-uuid poll ids',
+                    poll: {
+                        ...clonePoll(poll),
+                        id: 'not-a-uuid',
+                    },
+                },
                 {
                     description: 'fractional submitted participant counts',
                     poll: {

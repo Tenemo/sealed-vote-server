@@ -39,7 +39,7 @@ const ElectionManifestSchema = Type.Object({
 });
 
 export const PollResponseSchema = Type.Object({
-    id: Type.String(),
+    id: Type.String({ format: 'uuid' }),
     slug: Type.String(),
     pollName: Type.String(),
     createdAt: Type.String(),

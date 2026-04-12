@@ -79,6 +79,19 @@ export const derivePollWorkflow = ({
         deviceState?.isCreatorParticipant === true;
 
     if (poll.phase === 'open') {
+        if (missingLocalState) {
+            return {
+                canCloseVoting: false,
+                canRetryAutomation: false,
+                canSubmitVote: false,
+                currentStep: 'local-vote-missing',
+                hasLocalVote: false,
+                hasSubmittedVote,
+                isCreator,
+                missingLocalState: true,
+            };
+        }
+
         if (!localParticipant) {
             return {
                 canCloseVoting: false,

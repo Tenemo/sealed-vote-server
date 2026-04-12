@@ -1,4 +1,4 @@
-const hexToBytes = (hexValue: string): Uint8Array => {
+const hexToBytes = (hexValue: string): Uint8Array<ArrayBuffer> => {
     const normalized = hexValue.trim();
 
     if (normalized.length === 0 || normalized.length % 2 !== 0) {
@@ -9,7 +9,7 @@ const hexToBytes = (hexValue: string): Uint8Array => {
         throw new TypeError('Expected a valid hex string.');
     }
 
-    const bytes = new Uint8Array(normalized.length / 2);
+    const bytes = new Uint8Array(new ArrayBuffer(normalized.length / 2));
 
     for (let index = 0; index < normalized.length; index += 2) {
         const parsedByte = Number.parseInt(
@@ -27,15 +27,16 @@ const hexToBytes = (hexValue: string): Uint8Array => {
     return bytes;
 };
 
-const toArrayBuffer = (hexValue: string): ArrayBuffer => {
-    const bytes = hexToBytes(hexValue);
-    return bytes.buffer as ArrayBuffer;
-};
+const toWebCryptoBytes = (
+    bytes: Uint8Array,
+): Uint8Array<ArrayBuffer> | ArrayBuffer => {
+    if (bytes.buffer instanceof ArrayBuffer) {
+        return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
 
-const copyBytesToArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
-    const buffer = new ArrayBuffer(bytes.byteLength);
-    new Uint8Array(buffer).set(bytes);
-    return buffer;
+    const copiedBytes = new Uint8Array(new ArrayBuffer(bytes.byteLength));
+    copiedBytes.set(bytes);
+    return copiedBytes;
 };
 
 export const importAuthPublicKey = async (
@@ -43,7 +44,7 @@ export const importAuthPublicKey = async (
 ): Promise<CryptoKey> =>
     await crypto.subtle.importKey(
         'spki',
-        toArrayBuffer(authPublicKey),
+        hexToBytes(authPublicKey),
         {
             name: 'Ed25519',
         },
@@ -63,6 +64,6 @@ export const verifyAuthSignature = async ({
     await crypto.subtle.verify(
         'Ed25519',
         publicKey,
-        toArrayBuffer(signature),
-        copyBytesToArrayBuffer(payloadBytes),
+        hexToBytes(signature),
+        toWebCryptoBytes(payloadBytes),
     );
