@@ -9,6 +9,9 @@ const bytesToHex = (bytes: ArrayBuffer | Uint8Array): string =>
         .join('');
 
 describe('authKeys', () => {
+    // This suite is intentionally byte-level. The API verifier operates on raw
+    // payload slices, so these checks protect cryptographic edge cases that can
+    // look strange from an application-level testing perspective.
     test('imports a valid exported auth public key', async () => {
         const keyPair = await generateAuthKeyPair();
         const exportedPublicKey = await exportAuthPublicKey(keyPair.publicKey);

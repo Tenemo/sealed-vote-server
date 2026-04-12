@@ -45,6 +45,9 @@ describe('vote social image Netlify function', () => {
         mockResolveSeoApiBaseUrl.mockClear();
     });
 
+    // This resolution check is a deployment guardrail. The function bundle runs
+    // from a different root than the web app, so this test catches workspace
+    // packaging regressions before Netlify does.
     test('can resolve the PNG renderer dependency from the workspace root', () => {
         expect(() =>
             requireFromWorkspaceRoot.resolve('@resvg/resvg-js'),

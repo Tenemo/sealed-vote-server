@@ -25,6 +25,9 @@ test.beforeEach(async ({ page }) => {
     await openSecureProbePage(page);
 });
 
+// This probe intentionally exercises browser APIs directly. It exists to catch
+// runtime and CI image regressions where WebCrypto support changes underneath
+// the app's device-backed voting flow.
 test('provides subtle crypto in a secure context', async ({ page }) => {
     const result = await page.evaluate(() => ({
         hasSubtleCrypto: Boolean(globalThis.crypto?.subtle),
