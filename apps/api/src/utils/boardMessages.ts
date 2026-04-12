@@ -52,6 +52,9 @@ const sortBoardRows = (rows: readonly BoardMessageRow[]): BoardMessageRow[] =>
     });
 
 type ClassifiedBoardMessages = {
+    // Accepted payloads stay in board order so callers can reason about the
+    // public log chronologically. Transcript digests are derived separately
+    // from protocol-sorted payloads.
     acceptedPayloads: SignedPayload[];
     boardAudit: {
         acceptedCount: number;
@@ -83,20 +86,40 @@ const toBoardMessageRecord = (
     signedPayload: row.signedPayload,
 });
 
+const buildSlotRowClassifications = (
+    slotRows: readonly BoardMessageRow[],
+): Map<string, BoardMessageRecord['classification']> => {
+    const classifications = new Map<
+        string,
+        BoardMessageRecord['classification']
+    >();
+    const distinctUnsignedHashCount = new Set(
+        slotRows.map((entry) => entry.unsignedHash),
+    ).size;
+
+    if (distinctUnsignedHashCount > 1) {
+        for (const row of slotRows) {
+            classifications.set(row.id, 'equivocation');
+        }
+
+        return classifications;
+    }
+
+    for (const [index, row] of slotRows.entries()) {
+        classifications.set(row.id, index === 0 ? 'accepted' : 'idempotent');
+    }
+
+    return classifications;
+};
+
 const classifySlotRows = (
     slotRows: readonly BoardMessageRow[],
     rowId: string,
 ): BoardMessageRecord['classification'] => {
-    const sortedSlotRows = sortBoardRows(slotRows);
-    const distinctUnsignedHashCount = new Set(
-        sortedSlotRows.map((entry) => entry.unsignedHash),
-    ).size;
-
-    if (distinctUnsignedHashCount > 1) {
-        return 'equivocation';
-    }
-
-    return sortedSlotRows[0]?.id === rowId ? 'accepted' : 'idempotent';
+    return (
+        buildSlotRowClassifications(sortBoardRows(slotRows)).get(rowId) ??
+        'idempotent'
+    );
 };
 
 const computePhaseDigests = async (
@@ -141,14 +164,26 @@ export const classifyBoardMessages = async (
         rowsBySlot.set(row.slotKey, existing);
     }
 
+    const rowClassifications = new Map<
+        string,
+        BoardMessageRecord['classification']
+    >();
+
+    for (const slotRows of rowsBySlot.values()) {
+        const slotClassifications = buildSlotRowClassifications(slotRows);
+
+        for (const [rowId, classification] of slotClassifications) {
+            rowClassifications.set(rowId, classification);
+        }
+    }
+
     const records: BoardMessageRecord[] = [];
     const acceptedRows: BoardMessageRow[] = [];
     let duplicateCount = 0;
     let equivocationCount = 0;
 
     for (const row of sortedRows) {
-        const slotRows = rowsBySlot.get(row.slotKey) ?? [];
-        const classification = classifySlotRows(slotRows, row.id);
+        const classification = rowClassifications.get(row.id) ?? 'idempotent';
 
         if (classification === 'accepted') {
             acceptedRows.push(row);
@@ -176,7 +211,7 @@ export const classifyBoardMessages = async (
     }
 
     const acceptedPayloads = acceptedRows.map((row) => row.signedPayload);
-    const orderedPayloads = sortProtocolPayloads(
+    const protocolOrderedPayloads = sortProtocolPayloads(
         acceptedPayloads.map((payload) => payload.payload),
     );
     const phaseDigests = await computePhaseDigests(acceptedPayloads);
@@ -190,7 +225,7 @@ export const classifyBoardMessages = async (
             ceremonyDigest:
                 equivocationCount > 0
                     ? null
-                    : await hashProtocolTranscript(orderedPayloads),
+                    : await hashProtocolTranscript(protocolOrderedPayloads),
             phaseDigests: equivocationCount > 0 ? [] : phaseDigests,
         },
         records,

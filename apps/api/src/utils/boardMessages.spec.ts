@@ -238,4 +238,44 @@ describe('boardMessages', () => {
         expect(accepted.classification).toBe('accepted');
         expect(duplicate.classification).toBe('idempotent');
     });
+
+    test('keeps accepted payloads in board order when that differs from protocol order', async () => {
+        const participantOneKeys = await createRegistrationKeyMaterial();
+        const participantTwoKeys = await createRegistrationKeyMaterial();
+        const participantTwoPayload = await createSignedRegistrationPayload({
+            keyMaterial: participantTwoKeys,
+            participantIndex: 2,
+            rosterHash: '8'.repeat(64),
+            signature: '22',
+        });
+        const participantOnePayload = await createSignedRegistrationPayload({
+            keyMaterial: participantOneKeys,
+            participantIndex: 1,
+            rosterHash: '9'.repeat(64),
+            signature: '33',
+        });
+        const participantTwoRow = createBoardMessageRow({
+            createdAt: new Date('2026-04-12T00:00:00.000Z'),
+            id: 'row-4',
+            signedPayload: participantTwoPayload,
+        });
+        const participantOneRow = createBoardMessageRow({
+            createdAt: new Date('2026-04-12T00:00:01.000Z'),
+            id: 'row-5',
+            previousEntryHash: participantTwoRow.entryHash,
+            signedPayload: participantOnePayload,
+        });
+
+        const classified = await classifyBoardMessages([
+            participantOneRow,
+            participantTwoRow,
+        ]);
+
+        expect(
+            classified.acceptedPayloads.map(
+                (payload) => payload.payload.participantIndex,
+            ),
+        ).toEqual([2, 1]);
+        expect(classified.boardAudit.ceremonyDigest).toMatch(/^[a-f0-9]{64}$/i);
+    });
 });
