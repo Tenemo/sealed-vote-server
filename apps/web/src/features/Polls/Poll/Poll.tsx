@@ -30,6 +30,10 @@ import {
     findPollDeviceStateByPollSlug,
     savePollDeviceState,
 } from 'features/Polls/pollDeviceStorage';
+import {
+    getPollRefreshInterval,
+    steadyStatePollingIntervalMs,
+} from 'features/Polls/pollRefreshInterval';
 import { derivePollWorkflow } from 'features/Polls/pollWorkflow';
 import {
     useCloseVotingMutation,
@@ -194,6 +198,9 @@ const PollPage = (): React.JSX.Element => {
         string | null
     >(null);
     const [copyNotice, setCopyNotice] = React.useState<string | null>(null);
+    const [pollingIntervalMs, setPollingIntervalMs] = React.useState(
+        steadyStatePollingIntervalMs,
+    );
 
     if (!pollSlug) {
         throw new Error('Poll slug missing.');
@@ -206,7 +213,7 @@ const PollPage = (): React.JSX.Element => {
         isLoading,
         refetch,
     } = useGetPollQuery(pollSlug, {
-        pollingInterval: 5_000,
+        pollingInterval: pollingIntervalMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
     });
@@ -253,6 +260,16 @@ const PollPage = (): React.JSX.Element => {
             currentScores.length === poll.choices.length
                 ? currentScores
                 : createEmptyScores(poll.choices.length),
+        );
+    }, [poll]);
+
+    React.useEffect(() => {
+        const nextPollingInterval = getPollRefreshInterval(poll);
+
+        setPollingIntervalMs((currentPollingInterval) =>
+            currentPollingInterval === nextPollingInterval
+                ? currentPollingInterval
+                : nextPollingInterval,
         );
     }, [poll]);
 

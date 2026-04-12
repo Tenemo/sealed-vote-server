@@ -164,7 +164,7 @@ jobs:
                   if-no-files-found: error
 
     e2e-matrix:
-        name: e2e (${{ matrix.engine.name }})
+        name: e2e (${{ matrix.project.name }})
         needs: e2e-prepare
         runs-on: ubuntu-latest
         container:
@@ -178,16 +178,19 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                engine:
-                    - name: chromium
-                      slug: chromium
-                      projects: --project chromium-desktop
-                    - name: firefox
-                      slug: firefox
-                      projects: --project firefox-desktop --project mobile-firefox-android
-                    - name: webkit
-                      slug: webkit
-                      projects: --project webkit-desktop
+                project:
+                    - name: chromium-desktop
+                      slug: chromium-desktop
+                      ci_workers: '4'
+                    - name: firefox-desktop
+                      slug: firefox-desktop
+                      ci_workers: '2'
+                    - name: mobile-firefox-android
+                      slug: mobile-firefox-android
+                      ci_workers: '2'
+                    - name: webkit-desktop
+                      slug: webkit-desktop
+                      ci_workers: '2'
 
         services:
             postgres:
@@ -209,7 +212,7 @@ jobs:
             HOME: /root
             NODE_ENV: test
             PLAYWRIGHT_BLOB_REPORT: 'true'
-            PLAYWRIGHT_CI_WORKERS: '4'
+            PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
 
         steps:
             - uses: actions/checkout@v6
@@ -235,13 +238,13 @@ jobs:
                   path: .
 
             - name: run browser e2e
-              run: pnpm e2e:ci:test -- ${{ matrix.engine.projects }}
+              run: pnpm e2e:ci:test -- --project ${{ matrix.project.name }}
 
             - name: upload Playwright blob report
               if: always()
               uses: actions/upload-artifact@v7
               with:
-                  name: playwright-blob-report-${{ matrix.engine.slug }}
+                  name: playwright-blob-report-${{ matrix.project.slug }}
                   path: blob-report
                   if-no-files-found: ignore
 
@@ -249,7 +252,7 @@ jobs:
               if: failure()
               uses: actions/upload-artifact@v7
               with:
-                  name: playwright-test-results-${{ matrix.engine.slug }}
+                  name: playwright-test-results-${{ matrix.project.slug }}
                   path: test-results
                   if-no-files-found: ignore
 

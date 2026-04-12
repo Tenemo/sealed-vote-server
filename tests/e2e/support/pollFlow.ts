@@ -208,6 +208,34 @@ export const expectAcceptedBallotCount = async ({
     );
 };
 
+export const waitForCeremonyMetric = async ({
+    label,
+    page,
+    value,
+}: {
+    label: string;
+    page: Page;
+    value: string;
+}): Promise<void> => {
+    await expect(
+        page.getByText(label, { exact: true }).locator('xpath=..'),
+    ).toContainText(value, { timeout: 60_000 });
+};
+
+export const waitForBlockingParticipants = async ({
+    page,
+    participantNames,
+}: {
+    page: Page;
+    participantNames: readonly string[];
+}): Promise<void> => {
+    await expect(
+        page.getByText(
+            `Ceremony progress is waiting on ${participantNames.join(', ')}.`,
+        ),
+    ).toBeVisible({ timeout: 60_000 });
+};
+
 export const expectParticipantsVisible = async (
     page: Page,
     participantNames: readonly string[],

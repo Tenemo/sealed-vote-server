@@ -7,6 +7,8 @@ import {
     deletePolls,
     expectAcceptedBallotCount,
     submitVote,
+    waitForBlockingParticipants,
+    waitForCeremonyMetric,
     waitForVerifiedResults,
     type CreatedPoll,
 } from './support/pollFlow';
@@ -25,20 +27,6 @@ import {
     createTestNamespace,
     createVoterName,
 } from './support/testData';
-
-const waitForCeremonyMetric = async ({
-    label,
-    page,
-    value,
-}: {
-    label: string;
-    page: Page;
-    value: string;
-}): Promise<void> => {
-    await expect(
-        page.getByText(label, { exact: true }).locator('xpath=..'),
-    ).toContainText(value, { timeout: 60_000 });
-};
 
 const continueWithoutMissingParticipants = async (
     page: Page,
@@ -135,6 +123,11 @@ test('automatically resumes a stored vote after a participant closes the browser
         });
         attachErrorTracking(participantOne.page, 'participant-one-restored', tracker);
         await gotoInteractablePage(participantOne.page, createdPoll.pollUrl);
+        await waitForCeremonyMetric({
+            label: 'Board registrations',
+            page,
+            value: '4/4',
+        });
 
         await waitForVerifiedResults({ page });
         await waitForVerifiedResults({ page: participantOne.page });
@@ -351,8 +344,20 @@ test('lets the organizer rescue multiple missing participants and finish with th
         await closeParticipant(missingParticipantOne);
         await closeParticipant(missingParticipantTwo);
         await closeVoting(page);
+        await waitForBlockingParticipants({
+            page,
+            participantNames: [
+                missingParticipantOneName,
+                missingParticipantTwoName,
+            ],
+        });
 
         await continueWithoutMissingParticipants(page);
+        await waitForCeremonyMetric({
+            label: 'Board registrations',
+            page,
+            value: '3/3',
+        });
 
         await waitForVerifiedResults({ page });
         await waitForVerifiedResults({ page: participantOne.page });
@@ -446,11 +451,29 @@ test('supports repeated organizer rescues at different securing steps', async ({
 
         await closeParticipant(missingParticipant);
         await closeVoting(page);
+        await waitForBlockingParticipants({
+            page,
+            participantNames: [missingParticipantName],
+        });
 
         await continueWithoutMissingParticipants(page);
+        await waitForCeremonyMetric({
+            label: 'Board registrations',
+            page,
+            value: '4/4',
+        });
         await closeParticipant(participantThree);
+        await waitForBlockingParticipants({
+            page,
+            participantNames: [participantThreeName],
+        });
 
         await continueWithoutMissingParticipants(page);
+        await waitForCeremonyMetric({
+            label: 'Board registrations',
+            page,
+            value: '3/3',
+        });
 
         await waitForVerifiedResults({ page });
         await waitForVerifiedResults({ page: participantOne.page });

@@ -6,6 +6,8 @@ import {
     deletePolls,
     expectAcceptedBallotCount,
     submitVote,
+    waitForBlockingParticipants,
+    waitForCeremonyMetric,
     waitForVerifiedResults,
     type CreatedPoll,
 } from './support/pollFlow';
@@ -85,6 +87,10 @@ test('the organizer can continue without a missing participant and finish with t
 
         await missingParticipant.page.close();
         await closeVoting(page);
+        await waitForBlockingParticipants({
+            page,
+            participantNames: [missingParticipantName],
+        });
 
         const continueButton = page.getByRole('button', {
             name: 'Continue without missing participants',
@@ -101,6 +107,11 @@ test('the organizer can continue without a missing participant and finish with t
         });
         await continueButton.click();
         expect((await restartResponsePromise).ok()).toBeTruthy();
+        await waitForCeremonyMetric({
+            label: 'Board registrations',
+            page,
+            value: '3/3',
+        });
 
         await waitForVerifiedResults({ page });
         await waitForVerifiedResults({ page: participantOne.page });
