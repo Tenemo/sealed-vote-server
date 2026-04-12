@@ -25,6 +25,7 @@ import {
     fetchPoll,
     postBoardMessage,
     registerVoter,
+    restartPollCeremony,
 } from '../testUtils';
 
 type RegisteredParticipant = {
@@ -41,6 +42,7 @@ const fixedRosterHash = '3'.repeat(64);
 
 const createClosedPollWithParticipants = async (
     fastify: FastifyInstance,
+    participantNames: readonly string[] = ['Alice', 'Bob', 'Carla'],
 ): Promise<{
     creatorToken: string;
     participants: RegisteredParticipant[];
@@ -48,7 +50,7 @@ const createClosedPollWithParticipants = async (
 }> => {
     const { pollId, creatorToken } = await createPoll(fastify);
     const participants = await Promise.all(
-        ['Alice', 'Bob', 'Carla'].map(async (participantName) => {
+        participantNames.map(async (participantName) => {
             const registrationResult = await registerVoter(
                 fastify,
                 pollId,
@@ -136,9 +138,20 @@ describe('Board messages endpoint', () => {
                 );
             }
 
+            const poll = await fetchPoll(fastify, pollId);
+
+            if (!poll.manifest || !poll.manifestHash || !poll.sessionId) {
+                throw new Error(
+                    'Expected the closed poll to expose a manifest, manifest hash, and session id.',
+                );
+            }
+
             const signedPayload = await createSignedRegistrationPayload({
                 authKeyPair: participant.authKeyPair,
+                manifestHash: poll.manifestHash,
                 participantIndex: participant.voterIndex,
+                rosterHash: poll.manifest.rosterHash,
+                sessionId: poll.sessionId,
                 transportKeyPair: participant.transportKeyPair,
             });
             const firstPost = await postBoardMessage(fastify, pollId, {
@@ -168,13 +181,13 @@ describe('Board messages endpoint', () => {
             ).toEqual(['accepted', 'idempotent']);
             assertionCount += 2;
 
-            const poll = await fetchPoll(fastify, pollId);
-            expect(poll.phase).toBe('securing');
-            expect(poll.boardAudit.acceptedCount).toBe(1);
-            expect(poll.boardAudit.duplicateCount).toBe(1);
-            expect(poll.boardAudit.equivocationCount).toBe(0);
-            expect(poll.boardAudit.ceremonyDigest).not.toBeNull();
-            expect(poll.boardEntries).toHaveLength(2);
+            const pollAfterPosts = await fetchPoll(fastify, pollId);
+            expect(pollAfterPosts.phase).toBe('securing');
+            expect(pollAfterPosts.boardAudit.acceptedCount).toBe(1);
+            expect(pollAfterPosts.boardAudit.duplicateCount).toBe(1);
+            expect(pollAfterPosts.boardAudit.equivocationCount).toBe(0);
+            expect(pollAfterPosts.boardAudit.ceremonyDigest).not.toBeNull();
+            expect(pollAfterPosts.boardEntries).toHaveLength(2);
             assertionCount += 6;
         } finally {
             const deleteResult = await deletePoll(
@@ -188,7 +201,7 @@ describe('Board messages endpoint', () => {
         }
     });
 
-    test('flags conflicting registration payloads in the same slot as equivocation', async () => {
+    test('rejects conflicting registration payloads that do not match the active ceremony session', async () => {
         const { pollId, creatorToken, participants } =
             await createClosedPollWithParticipants(fastify);
         const participant = participants[0];
@@ -201,16 +214,32 @@ describe('Board messages endpoint', () => {
                 );
             }
 
+            const pollBeforeConflict = await fetchPoll(fastify, pollId);
+
+            if (
+                !pollBeforeConflict.manifest ||
+                !pollBeforeConflict.manifestHash ||
+                !pollBeforeConflict.sessionId
+            ) {
+                throw new Error(
+                    'Expected the closed poll to expose a manifest, manifest hash, and session id.',
+                );
+            }
+
             const firstPayload = await createSignedRegistrationPayload({
                 authKeyPair: participant.authKeyPair,
+                manifestHash: pollBeforeConflict.manifestHash,
                 participantIndex: participant.voterIndex,
-                rosterHash: fixedRosterHash,
+                rosterHash: pollBeforeConflict.manifest.rosterHash,
+                sessionId: pollBeforeConflict.sessionId,
                 transportKeyPair: participant.transportKeyPair,
             });
             const conflictingPayload = await createSignedRegistrationPayload({
                 authKeyPair: participant.authKeyPair,
+                manifestHash: pollBeforeConflict.manifestHash,
                 participantIndex: participant.voterIndex,
                 rosterHash: '4'.repeat(64),
+                sessionId: pollBeforeConflict.sessionId,
                 transportKeyPair: participant.transportKeyPair,
             });
 
@@ -224,26 +253,29 @@ describe('Board messages endpoint', () => {
             });
 
             expect(firstPost.success).toBe(true);
-            expect(conflictingPost.success).toBe(true);
-            if (!firstPost.success || !conflictingPost.success) {
-                throw new Error('Expected board messages to be accepted.');
+            expect(conflictingPost.success).toBe(false);
+            if (!firstPost.success || conflictingPost.success) {
+                throw new Error(
+                    'Expected the valid registration to be accepted and the conflicting one to be rejected.',
+                );
             }
             assertionCount += 2;
 
             expect(firstPost.record.classification).toBe('accepted');
-            expect(conflictingPost.record.classification).toBe('equivocation');
+            expect(conflictingPost.message).toBe(
+                ERROR_MESSAGES.boardMessageSessionMismatch,
+            );
             assertionCount += 2;
 
             const poll = (await fetchPoll(fastify, pollId)) as PollResponse;
-            expect(poll.boardAudit.acceptedCount).toBe(0);
+            expect(poll.boardAudit.acceptedCount).toBe(1);
             expect(poll.boardAudit.duplicateCount).toBe(0);
-            expect(poll.boardAudit.equivocationCount).toBe(2);
-            expect(poll.boardAudit.ceremonyDigest).toBeNull();
-            expect(poll.boardAudit.phaseDigests).toEqual([]);
+            expect(poll.boardAudit.equivocationCount).toBe(0);
+            expect(poll.boardAudit.ceremonyDigest).not.toBeNull();
             expect(
                 poll.boardEntries.map((entry) => entry.classification),
-            ).toEqual(['equivocation', 'equivocation']);
-            assertionCount += 6;
+            ).toEqual(['accepted']);
+            assertionCount += 5;
         } finally {
             const deleteResult = await deletePoll(
                 fastify,
@@ -419,6 +451,203 @@ describe('Board messages endpoint', () => {
                 'manifest has not been published',
             );
             assertionCount += 4;
+        } finally {
+            const deleteResult = await deletePoll(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(deleteResult.success).toBe(true);
+            assertionCount += 1;
+            expect(assertionCount).toBeGreaterThan(0);
+        }
+    });
+
+    test('rejects board messages from a participant skipped by a ceremony restart', async () => {
+        const { pollId, creatorToken, participants } =
+            await createClosedPollWithParticipants(fastify, [
+                'Alice',
+                'Bob',
+                'Carla',
+                'Dora',
+            ]);
+        let assertionCount = 0;
+
+        try {
+            const pollBeforeRestart = await fetchPoll(fastify, pollId);
+
+            if (
+                !pollBeforeRestart.manifest ||
+                !pollBeforeRestart.manifestHash ||
+                !pollBeforeRestart.sessionId
+            ) {
+                throw new Error(
+                    'Expected the closed poll to expose a manifest, manifest hash, and session id.',
+                );
+            }
+
+            for (const participant of participants.slice(0, 3)) {
+                const registrationPayload =
+                    await createSignedRegistrationPayload({
+                        authKeyPair: participant.authKeyPair,
+                        manifestHash: pollBeforeRestart.manifestHash,
+                        participantIndex: participant.voterIndex,
+                        rosterHash: pollBeforeRestart.manifest.rosterHash,
+                        sessionId: pollBeforeRestart.sessionId,
+                        transportKeyPair: participant.transportKeyPair,
+                    });
+                const registrationPost = await postBoardMessage(
+                    fastify,
+                    pollId,
+                    {
+                        voterToken: participant.voterToken,
+                        signedPayload: registrationPayload,
+                    },
+                );
+
+                expect(registrationPost.success).toBe(true);
+                assertionCount += 1;
+            }
+
+            const restartResult = await restartPollCeremony(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(restartResult.success).toBe(true);
+            assertionCount += 1;
+
+            const pollAfterRestart = await fetchPoll(fastify, pollId);
+            const skippedParticipant = participants[3];
+
+            if (
+                !skippedParticipant ||
+                !pollAfterRestart.manifest ||
+                !pollAfterRestart.manifestHash ||
+                !pollAfterRestart.sessionId
+            ) {
+                throw new Error(
+                    'Expected the restarted poll and skipped participant to exist.',
+                );
+            }
+
+            const skippedPayload = await createSignedRegistrationPayload({
+                authKeyPair: skippedParticipant.authKeyPair,
+                manifestHash: pollAfterRestart.manifestHash,
+                participantIndex: skippedParticipant.voterIndex,
+                rosterHash: pollAfterRestart.manifest.rosterHash,
+                sessionId: pollAfterRestart.sessionId,
+                transportKeyPair: skippedParticipant.transportKeyPair,
+            });
+            const skippedResponse = await fastify.inject({
+                method: 'POST',
+                url: POLL_ROUTES.boardMessages(pollId),
+                payload: {
+                    voterToken: skippedParticipant.voterToken,
+                    signedPayload: skippedPayload,
+                },
+            });
+
+            expect(skippedResponse.statusCode).toBe(403);
+            expect(JSON.parse(skippedResponse.body)).toEqual({
+                message: ERROR_MESSAGES.boardMessageSkippedParticipant,
+            });
+            assertionCount += 2;
+        } finally {
+            const deleteResult = await deletePoll(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(deleteResult.success).toBe(true);
+            assertionCount += 1;
+            expect(assertionCount).toBeGreaterThan(0);
+        }
+    });
+
+    test('rejects payloads from a superseded ceremony session after restart', async () => {
+        const { pollId, creatorToken, participants } =
+            await createClosedPollWithParticipants(fastify, [
+                'Alice',
+                'Bob',
+                'Carla',
+                'Dora',
+            ]);
+        let assertionCount = 0;
+
+        try {
+            const pollBeforeRestart = await fetchPoll(fastify, pollId);
+
+            if (
+                !pollBeforeRestart.manifest ||
+                !pollBeforeRestart.manifestHash ||
+                !pollBeforeRestart.sessionId
+            ) {
+                throw new Error(
+                    'Expected the closed poll to expose a manifest, manifest hash, and session id.',
+                );
+            }
+
+            for (const participant of participants.slice(0, 3)) {
+                const registrationPayload =
+                    await createSignedRegistrationPayload({
+                        authKeyPair: participant.authKeyPair,
+                        manifestHash: pollBeforeRestart.manifestHash,
+                        participantIndex: participant.voterIndex,
+                        rosterHash: pollBeforeRestart.manifest.rosterHash,
+                        sessionId: pollBeforeRestart.sessionId,
+                        transportKeyPair: participant.transportKeyPair,
+                    });
+                const registrationPost = await postBoardMessage(
+                    fastify,
+                    pollId,
+                    {
+                        voterToken: participant.voterToken,
+                        signedPayload: registrationPayload,
+                    },
+                );
+
+                expect(registrationPost.success).toBe(true);
+                assertionCount += 1;
+            }
+
+            const restartResult = await restartPollCeremony(
+                fastify,
+                pollId,
+                creatorToken,
+            );
+            expect(restartResult.success).toBe(true);
+            assertionCount += 1;
+
+            const activeParticipant = participants[0];
+            if (!activeParticipant) {
+                throw new Error(
+                    'Expected at least one active participant after restart.',
+                );
+            }
+
+            const stalePayload = await createSignedRegistrationPayload({
+                authKeyPair: activeParticipant.authKeyPair,
+                manifestHash: pollBeforeRestart.manifestHash,
+                participantIndex: activeParticipant.voterIndex,
+                rosterHash: pollBeforeRestart.manifest.rosterHash,
+                sessionId: pollBeforeRestart.sessionId,
+                transportKeyPair: activeParticipant.transportKeyPair,
+            });
+            const staleResponse = await fastify.inject({
+                method: 'POST',
+                url: POLL_ROUTES.boardMessages(pollId),
+                payload: {
+                    voterToken: activeParticipant.voterToken,
+                    signedPayload: stalePayload,
+                },
+            });
+
+            expect(staleResponse.statusCode).toBe(400);
+            expect(JSON.parse(staleResponse.body)).toEqual({
+                message: ERROR_MESSAGES.boardMessageSessionMismatch,
+            });
+            assertionCount += 2;
         } finally {
             const deleteResult = await deletePoll(
                 fastify,

@@ -17,6 +17,7 @@ const chromiumOnlySpecs = [
 ];
 
 const webkitUnsupportedCeremonySpecs = [
+    '**/ceremony-rescue.spec.ts',
     '**/multi-participant-counting.spec.ts',
     '**/refresh-resume.spec.ts',
     '**/setup-phase.spec.ts',

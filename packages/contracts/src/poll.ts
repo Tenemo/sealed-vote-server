@@ -16,6 +16,7 @@ export type CreatePollResponse = {
 };
 
 export type PollRosterParticipant = {
+    ceremonyState: 'active' | 'blocking' | 'skipped';
     deviceReady: boolean;
     voterIndex: number;
     voterName: string;
@@ -64,8 +65,11 @@ export type PollCeremonySummary = {
     acceptedDecryptionShareCount: number;
     acceptedEncryptedBallotCount: number;
     acceptedRegistrationCount: number;
+    activeParticipantCount: number;
+    blockingParticipantIndices: number[];
     completeEncryptedBallotParticipantCount: number;
     revealReady: boolean;
+    restartCount: number;
 };
 
 export type PollResponse = {
@@ -114,6 +118,10 @@ export type RegisterVoterResponse = {
 };
 
 export type CloseVotingRequest = {
+    creatorToken: string;
+};
+
+export type RestartCeremonyRequest = {
     creatorToken: string;
 };
 

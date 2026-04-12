@@ -54,6 +54,9 @@ describe('POST /polls/:pollId/close', () => {
         expect(poll.phase).toBe('securing');
         expect(poll.thresholds.reconstructionThreshold).toBe(2);
         expect(poll.thresholds.minimumPublishedVoterCount).toBe(2);
+        expect(poll.ceremony.activeParticipantCount).toBe(3);
+        expect(poll.ceremony.restartCount).toBe(0);
+        expect(poll.ceremony.blockingParticipantIndices).toEqual([1, 2, 3]);
 
         await deletePoll(fastify, pollId, creatorToken);
     });

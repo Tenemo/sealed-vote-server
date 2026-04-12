@@ -1,16 +1,12 @@
 import { isUuid, type PollResponse } from '@sealed-vote/contracts';
+import { sortProtocolPayloads } from '@sealed-vote/protocol';
 import { eq } from 'drizzle-orm';
 import {
-    createElectionManifest,
-    deriveSessionId,
-    hashElectionManifest,
-    hashRosterEntries,
+    hashProtocolTranscript,
     majorityThreshold,
     type BallotClosePayload,
     type BallotSubmissionPayload,
     type DecryptionSharePayload,
-    type EncodedAuthPublicKey,
-    type EncodedTransportPublicKey,
     type ElectionManifest,
     type ManifestPublicationPayload,
     type RegistrationPayload,
@@ -26,6 +22,7 @@ import { polls } from '../db/schema.js';
 import { classifyBoardMessages, getBoardMessageRows } from './boardMessages.js';
 import { normalizeDatabaseTimestamp } from './db.js';
 import { parseParticipantDeviceRecord } from './participantDevices.js';
+import { derivePollCeremonySession } from './pollCeremonySessions.js';
 import {
     maxPollParticipants,
     minimumPollParticipantsToClose,
@@ -90,6 +87,205 @@ const countCompleteBallotParticipants = ({
     return [...ballotsByParticipant.values()].filter(
         (optionIndices) => optionIndices.size === optionCount,
     ).length;
+};
+
+const filterAcceptedPayloadsBySession = ({
+    acceptedPayloads,
+    sessionId,
+}: {
+    acceptedPayloads: readonly SignedPayload[];
+    sessionId: string | null;
+}): SignedPayload[] =>
+    sessionId
+        ? acceptedPayloads.filter(
+              (payload) => payload.payload.sessionId === sessionId,
+          )
+        : [];
+
+const filterBoardRecordsBySession = ({
+    records,
+    sessionId,
+}: {
+    records: PollResponse['boardEntries'];
+    sessionId: string | null;
+}): PollResponse['boardEntries'] =>
+    sessionId
+        ? records.filter(
+              (record) => record.signedPayload.payload.sessionId === sessionId,
+          )
+        : [];
+
+const findMissingParticipantsByMessageType = ({
+    activeParticipants,
+    acceptedPayloads,
+    messageType,
+}: {
+    activeParticipants: readonly {
+        assignedParticipantIndex: number;
+        originalParticipantIndex: number;
+    }[];
+    acceptedPayloads: readonly SignedPayload[];
+    messageType: SignedPayload['payload']['messageType'];
+}): number[] => {
+    const acceptedParticipants = new Set(
+        acceptedPayloads
+            .filter((payload) => isSignedPayloadOfType(payload, messageType))
+            .map((payload) => payload.payload.participantIndex),
+    );
+
+    return activeParticipants
+        .filter(
+            (participant) =>
+                !acceptedParticipants.has(participant.assignedParticipantIndex),
+        )
+        .map((participant) => participant.originalParticipantIndex);
+};
+
+const findMissingEncryptedShareDealers = ({
+    activeParticipants,
+    acceptedPayloads,
+}: {
+    activeParticipants: readonly {
+        assignedParticipantIndex: number;
+        originalParticipantIndex: number;
+    }[];
+    acceptedPayloads: readonly SignedPayload[];
+}): number[] => {
+    const expectedRecipientCount = activeParticipants.length - 1;
+    const recipientsByDealer = new Map<number, Set<number>>();
+
+    for (const payload of acceptedPayloads) {
+        if (!isSignedPayloadOfType(payload, 'encrypted-dual-share')) {
+            continue;
+        }
+
+        const recipients =
+            recipientsByDealer.get(payload.payload.participantIndex) ??
+            new Set<number>();
+        recipients.add(payload.payload.recipientIndex);
+        recipientsByDealer.set(payload.payload.participantIndex, recipients);
+    }
+
+    return activeParticipants
+        .filter(
+            (participant) =>
+                (recipientsByDealer.get(participant.assignedParticipantIndex)
+                    ?.size ?? 0) < expectedRecipientCount,
+        )
+        .map((participant) => participant.originalParticipantIndex);
+};
+
+const findBlockingParticipantIndices = ({
+    acceptedPayloads,
+    activeParticipants,
+    optionCount,
+}: {
+    acceptedPayloads: readonly SignedPayload[];
+    activeParticipants: readonly {
+        assignedParticipantIndex: number;
+        originalParticipantIndex: number;
+    }[];
+    optionCount: number;
+}): number[] => {
+    const missingRegistrations = findMissingParticipantsByMessageType({
+        activeParticipants,
+        acceptedPayloads,
+        messageType: 'registration',
+    });
+
+    if (missingRegistrations.length > 0) {
+        return missingRegistrations;
+    }
+
+    const manifestPublished = acceptedPayloads.some((payload) =>
+        isSignedPayloadOfType(payload, 'manifest-publication'),
+    );
+
+    if (!manifestPublished) {
+        return [];
+    }
+
+    const missingManifestAcceptances = findMissingParticipantsByMessageType({
+        activeParticipants,
+        acceptedPayloads,
+        messageType: 'manifest-acceptance',
+    });
+
+    if (missingManifestAcceptances.length > 0) {
+        return missingManifestAcceptances;
+    }
+
+    const missingPedersenCommitments = findMissingParticipantsByMessageType({
+        activeParticipants,
+        acceptedPayloads,
+        messageType: 'pedersen-commitment',
+    });
+
+    if (missingPedersenCommitments.length > 0) {
+        return missingPedersenCommitments;
+    }
+
+    const missingEncryptedShareDealers = findMissingEncryptedShareDealers({
+        activeParticipants,
+        acceptedPayloads,
+    });
+
+    if (missingEncryptedShareDealers.length > 0) {
+        return missingEncryptedShareDealers;
+    }
+
+    const missingFeldmanCommitments = findMissingParticipantsByMessageType({
+        activeParticipants,
+        acceptedPayloads,
+        messageType: 'feldman-commitment',
+    });
+
+    if (missingFeldmanCommitments.length > 0) {
+        return missingFeldmanCommitments;
+    }
+
+    const missingKeyConfirmations = findMissingParticipantsByMessageType({
+        activeParticipants,
+        acceptedPayloads,
+        messageType: 'key-derivation-confirmation',
+    });
+
+    if (missingKeyConfirmations.length > 0) {
+        return missingKeyConfirmations;
+    }
+
+    const completeBallotParticipants = new Set(
+        Array.from(
+            acceptedPayloads
+                .filter((payload) =>
+                    isSignedPayloadOfType(payload, 'ballot-submission'),
+                )
+                .reduce((ballotsByParticipant, payload) => {
+                    const optionIndices =
+                        ballotsByParticipant.get(
+                            payload.payload.participantIndex,
+                        ) ?? new Set<number>();
+                    optionIndices.add(payload.payload.optionIndex);
+                    ballotsByParticipant.set(
+                        payload.payload.participantIndex,
+                        optionIndices,
+                    );
+                    return ballotsByParticipant;
+                }, new Map<number, Set<number>>())
+                .entries(),
+        )
+            .filter(([, optionIndices]) => optionIndices.size === optionCount)
+            .map(([participantIndex]) => participantIndex),
+    );
+
+    return activeParticipants
+        .filter(
+            (participant) =>
+                !completeBallotParticipants.has(
+                    participant.assignedParticipantIndex,
+                ),
+        )
+        .map((participant) => participant.originalParticipantIndex);
 };
 
 const buildThresholdSummary = ({
@@ -166,12 +362,12 @@ const buildVerificationSummary = async ({
     acceptedPayloads,
     manifest,
     sessionId,
-    submittedParticipantCount,
+    participantCount,
 }: {
     acceptedPayloads: readonly SignedPayload[];
     manifest: ElectionManifest | null;
     sessionId: string | null;
-    submittedParticipantCount: number;
+    participantCount: number;
 }): Promise<{
     dkgCompleted: boolean;
     qualParticipantIndices: readonly number[];
@@ -278,8 +474,7 @@ const buildVerificationSummary = async ({
             qualParticipantIndices: verifiedDkg.qual,
             verification: buildNotReadyVerification(
                 verifiedDkg.qual,
-                completeEncryptedBallotParticipantCount ===
-                    submittedParticipantCount
+                completeEncryptedBallotParticipantCount === participantCount
                     ? 'All encrypted ballots are accepted. Waiting for the automatic reveal to start.'
                     : 'Encrypted ballots are still accumulating.',
             ),
@@ -419,6 +614,12 @@ const getPollRow = async (
               voterIndex: number;
               voterName: string;
           }[];
+          pollCeremonySessions: {
+              activeParticipantIndices: number[];
+              createdAt: Date;
+              id: string;
+              sequence: number;
+          }[];
       })
     | undefined
 > =>
@@ -458,6 +659,16 @@ const getPollRow = async (
                     },
                 },
             },
+            pollCeremonySessions: {
+                columns: {
+                    activeParticipantIndices: true,
+                    createdAt: true,
+                    id: true,
+                    sequence: true,
+                },
+                orderBy: (fields, { asc: ascending }) =>
+                    ascending(fields.sequence),
+            },
         },
     });
 
@@ -474,65 +685,40 @@ export const getPollFetchReadModel = async (
     const rows = await getBoardMessageRows(db, poll.id);
     const classifiedBoard = await classifyBoardMessages(rows);
     const participantCount = poll.voters.length;
+    const ceremonySession = await derivePollCeremonySession({
+        choices: poll.choices.map(({ choiceName }) => choiceName),
+        isOpen: poll.isOpen,
+        participants: poll.voters,
+        persistedSessions: poll.pollCeremonySessions,
+        pollCreatedAt: poll.createdAt,
+        pollId: poll.id,
+    });
+    const activeParticipantCount = ceremonySession.activeParticipantCount;
+    const participantDeviceReadinessByIndex = new Map(
+        poll.voters.map((participant) => [
+            participant.voterIndex,
+            parseParticipantDeviceRecord(
+                participant.publicKeyShares[0]?.publicKeyShare,
+            ) !== null,
+        ]),
+    );
     const thresholds = buildThresholdSummary({
         isOpen: poll.isOpen,
-        participantCount,
+        participantCount: activeParticipantCount,
     });
-    const rosterEntries = poll.voters
-        .map((participant) => {
-            const deviceRecord = parseParticipantDeviceRecord(
-                participant.publicKeyShares[0]?.publicKeyShare,
-            );
+    const manifest = ceremonySession.manifest;
+    const manifestHash = ceremonySession.manifestHash;
+    const sessionId = ceremonySession.sessionId;
+    const rosterEntries = ceremonySession.rosterEntries;
 
-            if (!deviceRecord) {
-                return null;
-            }
-
-            return {
-                authPublicKey: deviceRecord.authPublicKey,
-                participantIndex: participant.voterIndex,
-                transportPublicKey: deviceRecord.transportPublicKey,
-                transportSuite: deviceRecord.transportSuite,
-                voterName: participant.voterName,
-            } satisfies PollResponse['rosterEntries'][number];
-        })
-        .filter(
-            (entry): entry is PollResponse['rosterEntries'][number] =>
-                entry !== null,
-        );
-
-    const rosterHash =
-        !poll.isOpen && rosterEntries.length === participantCount
-            ? await hashRosterEntries(
-                  rosterEntries.map((entry) => ({
-                      authPublicKey:
-                          entry.authPublicKey as EncodedAuthPublicKey,
-                      participantIndex: entry.participantIndex,
-                      transportPublicKey:
-                          entry.transportPublicKey as EncodedTransportPublicKey,
-                  })),
-              )
-            : null;
-
-    const manifest =
-        rosterHash && !poll.isOpen
-            ? createElectionManifest({
-                  rosterHash,
-                  optionList: poll.choices.map(({ choiceName }) => choiceName),
-              })
-            : null;
-    const manifestHash = manifest ? await hashElectionManifest(manifest) : null;
-    const sessionId =
-        manifest && manifestHash && rosterHash
-            ? await deriveSessionId(
-                  manifestHash,
-                  rosterHash,
-                  poll.id,
-                  normalizeDatabaseTimestamp(poll.createdAt),
-              )
-            : null;
-
-    const acceptedPayloads = classifiedBoard.acceptedPayloads;
+    const acceptedPayloads = filterAcceptedPayloadsBySession({
+        acceptedPayloads: classifiedBoard.acceptedPayloads,
+        sessionId,
+    });
+    const currentSessionRecords = filterBoardRecordsBySession({
+        records: classifiedBoard.records,
+        sessionId,
+    });
     const acceptedRegistrationCount = countAcceptedMessages(
         acceptedPayloads,
         'registration',
@@ -557,17 +743,44 @@ export const getPollFetchReadModel = async (
     const revealReady =
         !poll.isOpen &&
         reconstructionThreshold !== null &&
-        completeEncryptedBallotParticipantCount === participantCount &&
+        completeEncryptedBallotParticipantCount === activeParticipantCount &&
         !hasBallotClose;
+    const blockingParticipantIndices =
+        !poll.isOpen && !hasBallotClose
+            ? findBlockingParticipantIndices({
+                  acceptedPayloads,
+                  activeParticipants: ceremonySession.activeParticipants.map(
+                      ({
+                          assignedParticipantIndex,
+                          originalParticipantIndex,
+                      }) => ({
+                          assignedParticipantIndex,
+                          originalParticipantIndex,
+                      }),
+                  ),
+                  optionCount: poll.choices.length,
+              })
+            : [];
 
     const verificationSummary = await buildVerificationSummary({
         acceptedPayloads,
         manifest,
         sessionId,
-        submittedParticipantCount: participantCount,
+        participantCount: activeParticipantCount,
     });
-    const sessionFingerprint = classifiedBoard.boardAudit.ceremonyDigest
-        ? formatSessionFingerprint(classifiedBoard.boardAudit.ceremonyDigest)
+    const hasCurrentSessionEquivocation = currentSessionRecords.some(
+        (record) => record.classification === 'equivocation',
+    );
+    const currentSessionDigest =
+        hasCurrentSessionEquivocation || acceptedPayloads.length === 0
+            ? null
+            : await hashProtocolTranscript(
+                  sortProtocolPayloads(
+                      acceptedPayloads.map((payload) => payload.payload),
+                  ),
+              );
+    const sessionFingerprint = currentSessionDigest
+        ? formatSessionFingerprint(currentSessionDigest)
         : sessionId
           ? formatSessionFingerprint(sessionId)
           : null;
@@ -579,15 +792,19 @@ export const getPollFetchReadModel = async (
         createdAt: normalizeDatabaseTimestamp(poll.createdAt),
         isOpen: poll.isOpen,
         choices: poll.choices.map(({ choiceName }) => choiceName),
-        voters: poll.voters.map(
-            ({ publicKeyShares, voterIndex, voterName }) => ({
-                deviceReady: !!parseParticipantDeviceRecord(
-                    publicKeyShares[0]?.publicKeyShare,
-                ),
+        voters: poll.voters.map(({ voterIndex, voterName }) => ({
+            ceremonyState: ceremonySession.skippedParticipantIndices.includes(
                 voterIndex,
-                voterName,
-            }),
-        ),
+            )
+                ? 'skipped'
+                : blockingParticipantIndices.includes(voterIndex)
+                  ? 'blocking'
+                  : 'active',
+            deviceReady:
+                participantDeviceReadinessByIndex.get(voterIndex) ?? false,
+            voterIndex,
+            voterName,
+        })),
         manifest,
         manifestHash,
         sessionId,
@@ -604,8 +821,11 @@ export const getPollFetchReadModel = async (
             acceptedDecryptionShareCount,
             acceptedEncryptedBallotCount,
             acceptedRegistrationCount,
+            activeParticipantCount,
+            blockingParticipantIndices,
             completeEncryptedBallotParticipantCount,
             revealReady,
+            restartCount: ceremonySession.restartCount,
         },
         boardAudit: classifiedBoard.boardAudit,
         verification: verificationSummary.verification,

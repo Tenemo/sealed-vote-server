@@ -4,6 +4,7 @@ import type { DatabaseTransaction } from '../db/client.js';
 import { polls } from '../db/schema.js';
 
 type LockedPoll = {
+    createdAt: Date;
     id: string;
     isOpen: boolean;
     creatorTokenHash: string;
@@ -15,6 +16,7 @@ export const lockPollById = async (
 ): Promise<LockedPoll | undefined> => {
     const [poll] = await tx
         .select({
+            createdAt: polls.createdAt,
             id: polls.id,
             isOpen: polls.isOpen,
             creatorTokenHash: polls.creatorTokenHash,

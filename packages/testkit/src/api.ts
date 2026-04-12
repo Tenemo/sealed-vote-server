@@ -195,3 +195,24 @@ export const closePoll = async (
     const responseBody = JSON.parse(response.body) as MessageResponse;
     return { success: false, message: responseBody.message };
 };
+
+export const restartPollCeremony = async (
+    fastify: FastifyInstance,
+    pollId: string,
+    creatorToken: string,
+): Promise<{ success: boolean; message?: string }> => {
+    const response = await fastify.inject({
+        method: 'POST',
+        url: POLL_ROUTES.restartCeremony(pollId),
+        payload: {
+            creatorToken,
+        },
+    });
+
+    if (response.statusCode === 200) {
+        return { success: true };
+    }
+
+    const responseBody = JSON.parse(response.body) as MessageResponse;
+    return { success: false, message: responseBody.message };
+};

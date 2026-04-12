@@ -39,7 +39,20 @@
     html {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        background:
+            radial-gradient(
+                circle at top,
+                hsl(0 0% 11% / 0.7),
+                transparent 32rem
+            ),
+            linear-gradient(
+                180deg,
+                hsl(0 0% 7.5%),
+                var(--color-background) 18rem
+            );
         background-color: var(--color-background);
+        background-repeat: no-repeat;
+        background-size: cover;
         min-height: 100%;
         scrollbar-gutter: stable;
     }
@@ -56,21 +69,7 @@
 
     body {
         @apply text-foreground font-sans;
-        background:
-            radial-gradient(
-                circle at top,
-                hsl(0 0% 11% / 0.7),
-                transparent 32rem
-            ),
-            linear-gradient(
-                180deg,
-                hsl(0 0% 7.5%),
-                var(--color-background) 18rem
-            );
-        background-attachment: fixed;
-        background-color: var(--color-background);
-        background-repeat: no-repeat;
-        background-size: cover;
+        background: transparent;
         display: flex;
         flex-direction: column;
         line-height: 1.5;

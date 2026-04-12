@@ -26,16 +26,19 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     choices: ['Apples', 'Bananas'],
     voters: [
         {
+            ceremonyState: 'active',
             deviceReady: true,
             voterIndex: 1,
             voterName: 'Alice',
         },
         {
+            ceremonyState: 'active',
             deviceReady: true,
             voterIndex: 2,
             voterName: 'Bob',
         },
         {
+            ceremonyState: 'active',
             deviceReady: true,
             voterIndex: 3,
             voterName: 'Cora',
@@ -55,8 +58,11 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
         acceptedDecryptionShareCount: 0,
         acceptedEncryptedBallotCount: 0,
         acceptedRegistrationCount: 0,
+        activeParticipantCount: 3,
+        blockingParticipantIndices: [],
         completeEncryptedBallotParticipantCount: 0,
         revealReady: false,
+        restartCount: 0,
     },
     boardAudit: {
         acceptedCount: 0,
@@ -254,8 +260,11 @@ describe('pollBoardActions', () => {
                         acceptedDecryptionShareCount: 0,
                         acceptedEncryptedBallotCount: 2,
                         acceptedRegistrationCount: 3,
+                        activeParticipantCount: 3,
+                        blockingParticipantIndices: [3],
                         completeEncryptedBallotParticipantCount: 1,
                         revealReady: false,
+                        restartCount: 0,
                     },
                 }),
                 voterSession: createVoterSession(),
@@ -305,9 +314,35 @@ describe('pollBoardActions', () => {
                     acceptedDecryptionShareCount: 0,
                     acceptedEncryptedBallotCount: 6,
                     acceptedRegistrationCount: 3,
+                    activeParticipantCount: 3,
+                    blockingParticipantIndices: [],
                     completeEncryptedBallotParticipantCount: 3,
                     revealReady: true,
+                    restartCount: 0,
                 },
+                rosterEntries: [
+                    {
+                        authPublicKey: deviceState.authPublicKey,
+                        participantIndex: 1,
+                        transportPublicKey: deviceState.transportPublicKey,
+                        transportSuite: 'X25519',
+                        voterName: deviceState.voterName,
+                    },
+                    {
+                        authPublicKey: 'auth-2',
+                        participantIndex: 2,
+                        transportPublicKey: 'transport-2',
+                        transportSuite: 'X25519',
+                        voterName: 'Bob',
+                    },
+                    {
+                        authPublicKey: 'auth-3',
+                        participantIndex: 3,
+                        transportPublicKey: 'transport-3',
+                        transportSuite: 'X25519',
+                        voterName: 'Cora',
+                    },
+                ],
             }),
             voterSession: createVoterSession({
                 voterIndex: 1,
@@ -371,5 +406,136 @@ describe('pollBoardActions', () => {
                 ],
             }),
         ).toBeNull();
+    });
+
+    it('stops automation for a participant skipped from the active ceremony', async () => {
+        await expect(
+            resolveAutomaticCeremonyAction({
+                creatorSession: null,
+                deviceState: createDeviceState(),
+                poll: createPoll({
+                    voters: [
+                        {
+                            ceremonyState: 'active',
+                            deviceReady: true,
+                            voterIndex: 1,
+                            voterName: 'Alice',
+                        },
+                        {
+                            ceremonyState: 'skipped',
+                            deviceReady: true,
+                            voterIndex: 2,
+                            voterName: 'Bob',
+                        },
+                        {
+                            ceremonyState: 'active',
+                            deviceReady: true,
+                            voterIndex: 3,
+                            voterName: 'Cora',
+                        },
+                    ],
+                    rosterEntries: [
+                        {
+                            authPublicKey: 'auth-1',
+                            participantIndex: 1,
+                            transportPublicKey: 'transport-1',
+                            transportSuite: 'X25519',
+                            voterName: 'Alice',
+                        },
+                        {
+                            authPublicKey: 'auth-3',
+                            participantIndex: 2,
+                            transportPublicKey: 'transport-3',
+                            transportSuite: 'X25519',
+                            voterName: 'Cora',
+                        },
+                    ],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).resolves.toBeNull();
+    });
+
+    it('uses the dense active-session participant index after a ceremony restart', async () => {
+        const deviceState = await createValidDeviceState({
+            isCreatorParticipant: false,
+            voterIndex: 4,
+            voterName: 'Dora',
+            voterToken: 'token-4',
+        });
+        const action = await resolveAutomaticCeremonyAction({
+            creatorSession: null,
+            deviceState,
+            poll: createPoll({
+                submittedParticipantCount: 4,
+                voters: [
+                    {
+                        ceremonyState: 'active',
+                        deviceReady: true,
+                        voterIndex: 1,
+                        voterName: 'Alice',
+                    },
+                    {
+                        ceremonyState: 'active',
+                        deviceReady: true,
+                        voterIndex: 2,
+                        voterName: 'Bob',
+                    },
+                    {
+                        ceremonyState: 'skipped',
+                        deviceReady: true,
+                        voterIndex: 3,
+                        voterName: 'Cora',
+                    },
+                    {
+                        ceremonyState: 'active',
+                        deviceReady: true,
+                        voterIndex: 4,
+                        voterName: 'Dora',
+                    },
+                ],
+                ceremony: {
+                    acceptedDecryptionShareCount: 0,
+                    acceptedEncryptedBallotCount: 0,
+                    acceptedRegistrationCount: 0,
+                    activeParticipantCount: 3,
+                    blockingParticipantIndices: [],
+                    completeEncryptedBallotParticipantCount: 0,
+                    revealReady: false,
+                    restartCount: 1,
+                },
+                rosterEntries: [
+                    {
+                        authPublicKey: 'auth-1',
+                        participantIndex: 1,
+                        transportPublicKey: 'transport-1',
+                        transportSuite: 'X25519',
+                        voterName: 'Alice',
+                    },
+                    {
+                        authPublicKey: 'auth-2',
+                        participantIndex: 2,
+                        transportPublicKey: 'transport-2',
+                        transportSuite: 'X25519',
+                        voterName: 'Bob',
+                    },
+                    {
+                        authPublicKey: deviceState.authPublicKey,
+                        participantIndex: 3,
+                        transportPublicKey: deviceState.transportPublicKey,
+                        transportSuite: 'X25519',
+                        voterName: 'Dora',
+                    },
+                ],
+            }),
+            voterSession: createVoterSession({
+                voterIndex: 4,
+                voterName: 'Dora',
+                voterToken: 'token-4',
+            }),
+        });
+
+        expect(action?.kind).toBe('publish-registration');
+        expect(action?.signedPayload.payload.participantIndex).toBe(3);
     });
 });

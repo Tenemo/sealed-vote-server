@@ -18,6 +18,12 @@ export const ERROR_MESSAGES = {
         'Voter token was already used for a different voter name.',
     participantDeviceKeysRequired:
         'Every submitted participant must keep the same device keys for the ceremony.',
+    ceremonyRestartUnavailable:
+        'The ceremony can only be restarted while the election is still being secured.',
+    ceremonyRestartNoBlockers:
+        'There are no currently blocking participants to skip.',
+    ceremonyRestartMinimumParticipants:
+        'At least 3 active participants are required to continue the ceremony.',
     maxParticipantsReached:
         'Poll has reached its maximum number of participants.',
     recoverSessionTokenRequired: 'Exactly one recovery token must be provided.',
@@ -33,4 +39,8 @@ export const ERROR_MESSAGES = {
         'The submitted payload does not match the authenticated participant.',
     boardMessageCreatorOnly:
         'This payload can only be posted with the creator token.',
+    boardMessageSkippedParticipant:
+        'This participant is no longer part of the active ceremony.',
+    boardMessageSessionMismatch:
+        'The submitted payload does not match the active ceremony session.',
 } as const;

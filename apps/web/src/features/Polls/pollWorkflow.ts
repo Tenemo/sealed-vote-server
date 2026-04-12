@@ -15,6 +15,7 @@ export type ViewerWorkflowState =
     | 'revealing-auto'
     | 'revealing-waiting'
     | 'waiting-for-results'
+    | 'skipped'
     | 'local-vote-missing'
     | 'complete'
     | 'aborted';
@@ -65,36 +66,16 @@ export const derivePollWorkflow = ({
         Array.isArray(storedBallotScores) &&
         storedBallotScores.length === poll.choices.length;
     const missingLocalState = !!voterSession && !localParticipant;
+    const localCeremonyState = voterSession
+        ? (poll.voters.find(
+              (participant) =>
+                  participant.voterIndex === voterSession.voterIndex,
+          )?.ceremonyState ?? null)
+        : null;
     const creatorHasLocalParticipant =
         isCreator &&
         localParticipant &&
         deviceState?.isCreatorParticipant === true;
-
-    if (poll.phase === 'aborted') {
-        return {
-            canCloseVoting: false,
-            canRetryAutomation: false,
-            canSubmitVote: false,
-            currentStep: 'aborted',
-            hasLocalVote,
-            hasSubmittedVote,
-            isCreator,
-            missingLocalState: false,
-        };
-    }
-
-    if (poll.phase === 'complete') {
-        return {
-            canCloseVoting: false,
-            canRetryAutomation: false,
-            canSubmitVote: false,
-            currentStep: 'complete',
-            hasLocalVote,
-            hasSubmittedVote,
-            isCreator,
-            missingLocalState: false,
-        };
-    }
 
     if (poll.phase === 'open') {
         if (!localParticipant) {
@@ -127,6 +108,45 @@ export const derivePollWorkflow = ({
                     poll.minimumCloseParticipantCount
                     ? 'creator-can-close'
                     : 'vote-stored-waiting-for-close',
+            hasLocalVote,
+            hasSubmittedVote,
+            isCreator,
+            missingLocalState: false,
+        };
+    }
+
+    if (localCeremonyState === 'skipped') {
+        return {
+            canCloseVoting: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
+            currentStep: 'skipped',
+            hasLocalVote,
+            hasSubmittedVote,
+            isCreator,
+            missingLocalState: false,
+        };
+    }
+
+    if (poll.phase === 'aborted') {
+        return {
+            canCloseVoting: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
+            currentStep: 'aborted',
+            hasLocalVote,
+            hasSubmittedVote,
+            isCreator,
+            missingLocalState: false,
+        };
+    }
+
+    if (poll.phase === 'complete') {
+        return {
+            canCloseVoting: false,
+            canRetryAutomation: false,
+            canSubmitVote: false,
+            currentStep: 'complete',
             hasLocalVote,
             hasSubmittedVote,
             isCreator,

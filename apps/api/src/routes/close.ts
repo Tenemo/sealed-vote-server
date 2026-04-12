@@ -12,6 +12,7 @@ import type { DatabaseTransaction } from '../db/client.js';
 import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
 import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
+import { insertPollCeremonySession } from '../utils/pollCeremonySessions.js';
 import { countPollVoters } from '../utils/pollCounts.js';
 import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
 import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
@@ -129,12 +130,30 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
                         req.params.pollId,
                     );
 
+                    const submittedVoters = await client.query.voters.findMany({
+                        where: (fields, { eq: isEqual }) =>
+                            isEqual(fields.pollId, req.params.pollId),
+                        columns: {
+                            voterIndex: true,
+                        },
+                        orderBy: (fields, { asc: ascending }) =>
+                            ascending(fields.voterIndex),
+                    });
+
                     await client
                         .update(polls)
                         .set({
                             isOpen: false,
                         })
                         .where(eq(polls.id, req.params.pollId));
+
+                    await insertPollCeremonySession({
+                        activeParticipantIndices: submittedVoters.map(
+                            (participant) => participant.voterIndex,
+                        ),
+                        pollId: req.params.pollId,
+                        tx: client,
+                    });
 
                     return { message: 'Voting closed successfully.' };
                 },

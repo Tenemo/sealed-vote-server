@@ -12,6 +12,7 @@ import {
     type RecoverSessionResponse,
     type RegisterVoterRequest,
     type RegisterVoterResponse,
+    type RestartCeremonyRequest,
 } from '@sealed-vote/contracts';
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -83,6 +84,19 @@ export const pollsApi = createApi({
                 { type: 'Poll', id: pollId },
             ],
         }),
+        restartCeremony: build.mutation<
+            void,
+            { pollId: string; restartData: RestartCeremonyRequest }
+        >({
+            query: ({ pollId, restartData }) => ({
+                url: POLL_ROUTES.restartCeremony(pollId),
+                method: 'POST',
+                body: restartData,
+            }),
+            invalidatesTags: (_result, _error, { pollId }) => [
+                { type: 'Poll', id: pollId },
+            ],
+        }),
         getBoardMessages: build.query<
             BoardMessagesResponse,
             { pollId: string; afterEntryHash?: string }
@@ -123,4 +137,5 @@ export const {
     useRecoverSessionMutation,
     useCloseVotingMutation,
     useRegisterVoterMutation,
+    useRestartCeremonyMutation,
 } = pollsApi;

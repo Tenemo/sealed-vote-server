@@ -19,6 +19,7 @@ import { fetch } from './routes/fetch.js';
 import { healthCheck } from './routes/health-check.js';
 import { recoverSession } from './routes/recoverSession.js';
 import { register } from './routes/register.js';
+import { restartCeremony } from './routes/restartCeremony.js';
 
 config();
 
@@ -179,6 +180,7 @@ export const buildServer = async (
     await fastify.register(register, { prefix: '/api' });
     await fastify.register(recoverSession, { prefix: '/api' });
     await fastify.register(closeVoting, { prefix: '/api' });
+    await fastify.register(restartCeremony, { prefix: '/api' });
     await fastify.register(boardMessageRoutes, { prefix: '/api' });
     return fastify;
 };

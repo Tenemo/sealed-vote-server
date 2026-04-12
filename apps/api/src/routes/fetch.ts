@@ -12,6 +12,11 @@ import {
 } from './schemas.js';
 
 const PollRosterParticipantSchema = Type.Object({
+    ceremonyState: Type.Union([
+        Type.Literal('active'),
+        Type.Literal('blocking'),
+        Type.Literal('skipped'),
+    ]),
     deviceReady: Type.Boolean(),
     voterIndex: Type.Integer({ minimum: 1 }),
     voterName: Type.String(),
@@ -56,8 +61,11 @@ const PollResponseSchema = Type.Object({
         acceptedDecryptionShareCount: Type.Number(),
         acceptedEncryptedBallotCount: Type.Number(),
         acceptedRegistrationCount: Type.Number(),
+        activeParticipantCount: Type.Number(),
+        blockingParticipantIndices: Type.Array(Type.Integer({ minimum: 1 })),
         completeEncryptedBallotParticipantCount: Type.Number(),
         revealReady: Type.Boolean(),
+        restartCount: Type.Number(),
     }),
     boardAudit: Type.Object({
         acceptedCount: Type.Number(),

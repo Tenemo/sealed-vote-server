@@ -23,6 +23,7 @@ import {
     type PreparedCeremonyAction,
 } from 'features/Polls/pollBoardActions';
 import {
+    clearStoredBallotScores,
     createPendingPollDeviceState,
     createPollDeviceState,
     findPollDeviceStateByPollId,
@@ -35,6 +36,7 @@ import {
     useGetPollQuery,
     usePostBoardMessageMutation,
     useRegisterVoterMutation,
+    useRestartCeremonyMutation,
 } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
 
@@ -73,6 +75,7 @@ const countAcceptedMessages = (poll: PollData, messageType: string): number =>
     poll.boardEntries.filter(
         (entry: PollBoardEntry) =>
             entry.classification === 'accepted' &&
+            entry.signedPayload.payload.sessionId === poll.sessionId &&
             entry.messageType === messageType,
     ).length;
 
@@ -170,6 +173,7 @@ const PollPage = (): React.JSX.Element => {
     const { pollSlug } = useParams();
     const [registerVoter, registerState] = useRegisterVoterMutation();
     const [closeVoting, closeState] = useCloseVotingMutation();
+    const [restartCeremony, restartState] = useRestartCeremonyMutation();
     const [postBoardMessage] = usePostBoardMessageMutation();
     const [voterName, setVoterName] = React.useState('');
     const [draftScores, setDraftScores] = React.useState<(number | null)[]>([]);
@@ -270,7 +274,26 @@ const PollPage = (): React.JSX.Element => {
         let cancelled = false;
 
         const resolveAction = async (): Promise<void> => {
+            const localCeremonyState = voterSession
+                ? (poll?.voters.find(
+                      (participant) =>
+                          participant.voterIndex === voterSession.voterIndex,
+                  )?.ceremonyState ?? null)
+                : null;
+
             if (!poll || poll.phase === 'open' || poll.phase === 'complete') {
+                if (cancelled) {
+                    return;
+                }
+
+                setAutomaticAction(null);
+                setAutomaticActionDescription(null);
+                setAutomationError(null);
+                setIsResolvingAutomaticAction(false);
+                return;
+            }
+
+            if (localCeremonyState === 'skipped') {
                 if (cancelled) {
                     return;
                 }
@@ -335,6 +358,28 @@ const PollPage = (): React.JSX.Element => {
         voterSession,
     ]);
 
+    React.useEffect(() => {
+        if (!poll || !deviceState) {
+            return;
+        }
+
+        const localCeremonyState = voterSession
+            ? (poll.voters.find(
+                  (participant) =>
+                      participant.voterIndex === voterSession.voterIndex,
+              )?.ceremonyState ?? null)
+            : null;
+
+        if (
+            deviceState.storedBallotScores !== null &&
+            (poll.phase === 'complete' ||
+                poll.phase === 'aborted' ||
+                localCeremonyState === 'skipped')
+        ) {
+            clearStoredBallotScores(poll.id);
+        }
+    }, [deviceState, poll, voterSession]);
+
     const submitPreparedAction = React.useCallback(
         async (action: PreparedCeremonyAction): Promise<void> => {
             if (!poll || !voterSession) {
@@ -372,8 +417,16 @@ const PollPage = (): React.JSX.Element => {
     );
 
     React.useEffect(() => {
+        const isSkippedLocally = voterSession
+            ? poll?.voters.find(
+                  (participant) =>
+                      participant.voterIndex === voterSession.voterIndex,
+              )?.ceremonyState === 'skipped'
+            : false;
+
         if (
             !poll ||
+            isSkippedLocally ||
             (poll.phase !== 'securing' &&
                 poll.phase !== 'ready-to-reveal' &&
                 poll.phase !== 'revealing') ||
@@ -391,6 +444,7 @@ const PollPage = (): React.JSX.Element => {
         automationError,
         poll,
         submitPreparedAction,
+        voterSession,
     ]);
 
     if (
@@ -454,6 +508,15 @@ const PollPage = (): React.JSX.Element => {
     const canCopyShareUrl =
         typeof navigator !== 'undefined' &&
         typeof navigator.clipboard?.writeText === 'function';
+    const blockingParticipants = poll.voters.filter((participant) =>
+        poll.ceremony.blockingParticipantIndices.includes(
+            participant.voterIndex,
+        ),
+    );
+    const canRestartCeremony =
+        poll.phase === 'securing' &&
+        poll.ceremony.activeParticipantCount - blockingParticipants.length >=
+            poll.minimumCloseParticipantCount;
 
     const onScoreChange = (choiceIndex: number, score: number): void => {
         setDraftScores((currentScores) =>
@@ -569,6 +632,48 @@ const PollPage = (): React.JSX.Element => {
         }
     };
 
+    const onRestartCeremony = async (): Promise<void> => {
+        if (
+            !creatorSession ||
+            poll.phase !== 'securing' ||
+            blockingParticipants.length === 0 ||
+            !canRestartCeremony
+        ) {
+            return;
+        }
+
+        const blockedNames = blockingParticipants
+            .map((participant) => participant.voterName)
+            .join(', ');
+        const confirmed =
+            typeof window === 'undefined' ||
+            window.confirm(
+                `Continue without ${blockedNames}? Their locally stored votes will not be counted for this closed vote.`,
+            );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setLocalError(null);
+        setLocalNotice(null);
+
+        try {
+            await restartCeremony({
+                pollId: poll.id,
+                restartData: {
+                    creatorToken: creatorSession.creatorToken,
+                },
+            }).unwrap();
+            setLocalNotice(
+                `Continuing without ${blockedNames}. Those votes will not be counted unless those devices had already finished the active ceremony session.`,
+            );
+            await refetch();
+        } catch (restartError) {
+            setLocalError(renderError(restartError));
+        }
+    };
+
     const primaryExplanation =
         workflow.currentStep === 'anonymous-ready-to-vote'
             ? 'Score every option from 1 to 10, submit once, and come back after the organizer closes voting.'
@@ -588,18 +693,25 @@ const PollPage = (): React.JSX.Element => {
                           'Automatic ceremony progress needs a retry from this browser.')
                         : workflow.currentStep === 'securing-waiting'
                           ? 'Waiting for the rest of the group to finish the secure setup and encrypted ballot publication.'
-                          : workflow.currentStep === 'revealing-auto'
-                            ? (automaticActionDescription ??
-                              'Starting the reveal and publishing decryption material in the background.')
-                            : workflow.currentStep === 'revealing-waiting'
-                              ? 'Waiting for threshold decryption shares and final tally publication.'
-                              : workflow.currentStep === 'waiting-for-results'
-                                ? 'The ceremony is moving without any action needed from this browser.'
-                                : workflow.currentStep === 'local-vote-missing'
-                                  ? 'This browser no longer has the local vote and device state required to continue after close.'
-                                  : workflow.currentStep === 'complete'
-                                    ? 'Every result shown below was replayed and verified from the public board log.'
-                                    : 'The ceremony could not be verified from the public board log.';
+                          : workflow.currentStep === 'skipped'
+                            ? 'The organizer continued without this device. Your locally stored vote was not counted for this closed vote.'
+                            : workflow.currentStep === 'revealing-auto'
+                              ? (automaticActionDescription ??
+                                'Starting the reveal and publishing decryption material in the background.')
+                              : workflow.currentStep === 'revealing-waiting'
+                                ? 'Waiting for threshold decryption shares and final tally publication.'
+                                : workflow.currentStep === 'waiting-for-results'
+                                  ? 'The ceremony is moving without any action needed from this browser.'
+                                  : workflow.currentStep ===
+                                      'local-vote-missing'
+                                    ? 'This browser no longer has the local vote and device state required to continue after close.'
+                                    : workflow.currentStep === 'complete'
+                                      ? 'Every result shown below was replayed and verified from the public board log.'
+                                      : 'The ceremony could not be verified from the public board log.';
+    const nextStepExplanation =
+        workflow.currentStep === 'skipped'
+            ? 'No further action is required on this device.'
+            : primaryExplanation;
 
     return (
         <section className="mx-auto w-full max-w-[96rem] space-y-6">
@@ -699,9 +811,65 @@ const PollPage = (): React.JSX.Element => {
                                 Your next step
                             </h2>
                             <p className={mutedBodyClassName}>
-                                {primaryExplanation}
+                                {nextStepExplanation}
                             </p>
                         </div>
+
+                        {creatorSession?.pollId === poll.id &&
+                        poll.phase === 'securing' &&
+                        blockingParticipants.length > 0 ? (
+                            <Alert announcement="polite" variant="info">
+                                <AlertDescription>
+                                    <div className="space-y-3">
+                                        <p>
+                                            Ceremony progress is waiting on{' '}
+                                            {blockingParticipants
+                                                .map(
+                                                    (participant) =>
+                                                        participant.voterName,
+                                                )
+                                                .join(', ')}
+                                            . If you continue without them, any
+                                            votes still trapped on those devices
+                                            will be skipped for this closed
+                                            vote.
+                                        </p>
+                                        {!canRestartCeremony ? (
+                                            <p className="text-sm text-secondary">
+                                                A rescue becomes available only
+                                                once removing the currently
+                                                blocking devices would still
+                                                leave at least{' '}
+                                                {
+                                                    poll.minimumCloseParticipantCount
+                                                }{' '}
+                                                active participants in the
+                                                ceremony.
+                                            </p>
+                                        ) : null}
+                                        {canRestartCeremony ? (
+                                            <div className="flex flex-wrap justify-end gap-3">
+                                                <LoadingButton
+                                                    className="w-full sm:w-auto"
+                                                    loading={
+                                                        restartState.isLoading
+                                                    }
+                                                    loadingLabel="Continuing ceremony"
+                                                    onClick={() => {
+                                                        void onRestartCeremony();
+                                                    }}
+                                                    size="lg"
+                                                    variant="outline"
+                                                >
+                                                    Continue without missing
+                                                    participants
+                                                </LoadingButton>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </AlertDescription>
+                            </Alert>
+                        ) : null}
 
                         {poll.phase === 'open' && !localParticipant ? (
                             <form
@@ -876,7 +1044,7 @@ const PollPage = (): React.JSX.Element => {
                                     <Spinner className="size-5" label={null} />
                                 ) : null}
                                 <p className="text-sm text-secondary">
-                                    {primaryExplanation}
+                                    {nextStepExplanation}
                                 </p>
                             </div>
                         )}
@@ -1009,11 +1177,19 @@ const PollPage = (): React.JSX.Element => {
                             </div>
                             <div className="flex items-center justify-between gap-4">
                                 <span className="text-secondary">
+                                    Active ceremony roster
+                                </span>
+                                <span>
+                                    {poll.ceremony.activeParticipantCount}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
                                     Board registrations
                                 </span>
                                 <span>
                                     {acceptedRegistrations}/
-                                    {poll.submittedParticipantCount}
+                                    {poll.ceremony.activeParticipantCount}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
@@ -1022,7 +1198,7 @@ const PollPage = (): React.JSX.Element => {
                                 </span>
                                 <span>
                                     {acceptedManifestAcceptances}/
-                                    {poll.submittedParticipantCount}
+                                    {poll.ceremony.activeParticipantCount}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
@@ -1031,7 +1207,7 @@ const PollPage = (): React.JSX.Element => {
                                 </span>
                                 <span>
                                     {acceptedKeyConfirmations}/
-                                    {poll.submittedParticipantCount}
+                                    {poll.ceremony.activeParticipantCount}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
@@ -1043,7 +1219,7 @@ const PollPage = (): React.JSX.Element => {
                                         poll.ceremony
                                             .completeEncryptedBallotParticipantCount
                                     }
-                                    /{poll.submittedParticipantCount}
+                                    /{poll.ceremony.activeParticipantCount}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
@@ -1059,6 +1235,12 @@ const PollPage = (): React.JSX.Element => {
                                     Reveal status
                                 </span>
                                 <span>{formatRevealStatus(poll)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-secondary">
+                                    Ceremony restarts
+                                </span>
+                                <span>{poll.ceremony.restartCount}</span>
                             </div>
                         </div>
                     </Panel>
@@ -1090,6 +1272,13 @@ const PollPage = (): React.JSX.Element => {
                                         {participant.deviceReady
                                             ? 'Device keys submitted'
                                             : 'Device keys pending'}
+                                        {participant.ceremonyState ===
+                                        'blocking'
+                                            ? ' | currently blocking the active ceremony'
+                                            : participant.ceremonyState ===
+                                                'skipped'
+                                              ? ' | skipped from the active ceremony'
+                                              : ''}
                                     </div>
                                 </li>
                             ))}

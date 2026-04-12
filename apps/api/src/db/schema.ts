@@ -125,6 +125,37 @@ export const boardMessages = pgTable(
     ],
 );
 
+export const pollCeremonySessions = pgTable(
+    'poll_ceremony_sessions',
+    {
+        id: uuid('id')
+            .primaryKey()
+            .default(sql`gen_random_uuid()`),
+        pollId: uuid('poll_id').notNull(),
+        sequence: integer('sequence').notNull(),
+        activeParticipantIndices: jsonb('active_participant_indices')
+            .$type<number[]>()
+            .notNull(),
+        createdAt: timestamp('created_at', {
+            mode: 'date',
+            withTimezone: false,
+        })
+            .notNull()
+            .defaultNow(),
+    },
+    (table) => [
+        foreignKey({
+            columns: [table.pollId],
+            foreignColumns: [polls.id],
+            name: 'fk_poll_ceremony_sessions_poll_id',
+        }).onDelete('cascade'),
+        unique('unique_poll_ceremony_session_sequence').on(
+            table.pollId,
+            table.sequence,
+        ),
+    ],
+);
+
 export const publicKeyShares = pgTable(
     'public_key_shares',
     {
@@ -157,6 +188,7 @@ export const pollsRelations = relations(polls, ({ many }) => ({
     choices: many(choices),
     voters: many(voters),
     boardMessages: many(boardMessages),
+    pollCeremonySessions: many(pollCeremonySessions),
     publicKeyShares: many(publicKeyShares),
 }));
 
@@ -182,6 +214,16 @@ export const boardMessagesRelations = relations(boardMessages, ({ one }) => ({
     }),
 }));
 
+export const pollCeremonySessionsRelations = relations(
+    pollCeremonySessions,
+    ({ one }) => ({
+        poll: one(polls, {
+            fields: [pollCeremonySessions.pollId],
+            references: [polls.id],
+        }),
+    }),
+);
+
 export const publicKeySharesRelations = relations(
     publicKeyShares,
     ({ one }) => ({
@@ -205,6 +247,8 @@ export const schema = {
     votersRelations,
     boardMessages,
     boardMessagesRelations,
+    pollCeremonySessions,
+    pollCeremonySessionsRelations,
     publicKeyShares,
     publicKeySharesRelations,
 };

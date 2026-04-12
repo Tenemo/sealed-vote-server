@@ -33,6 +33,7 @@ import {
 } from '../utils/boardMessages.js';
 import { withTransaction } from '../utils/db.js';
 import { lockPollById } from '../utils/pollLocks.js';
+import { derivePollCeremonySession } from '../utils/pollCeremonySessions.js';
 import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
 import { authenticateVoter } from '../utils/voterAuth.js';
 
@@ -196,6 +197,38 @@ const findAcceptedRegistrationPayload = ({
     }
 
     return null;
+};
+
+const filterAcceptedPayloadsBySession = ({
+    acceptedPayloads,
+    sessionId,
+}: {
+    acceptedPayloads: readonly SignedPayload[];
+    sessionId: string;
+}): SignedPayload[] =>
+    acceptedPayloads.filter(
+        (payload) => payload.payload.sessionId === sessionId,
+    );
+
+const assertPayloadMatchesActiveCeremonySession = ({
+    manifestHash,
+    rosterHash,
+    sessionId,
+    signedPayload,
+}: {
+    manifestHash: string;
+    rosterHash: string;
+    sessionId: string;
+    signedPayload: SignedPayload;
+}): void => {
+    if (
+        signedPayload.payload.sessionId !== sessionId ||
+        signedPayload.payload.manifestHash !== manifestHash ||
+        (isRegistrationPayload(signedPayload) &&
+            signedPayload.payload.rosterHash !== rosterHash)
+    ) {
+        throw createError(400, ERROR_MESSAGES.boardMessageSessionMismatch);
+    }
 };
 
 const verifyPayloadSignature = async ({
@@ -501,10 +534,82 @@ export const boardMessageRoutes = async (
                     poll.id,
                     req.body.voterToken,
                 );
+                const pollChoices = await tx.query.choices.findMany({
+                    where: (fields, { eq: isEqual }) =>
+                        isEqual(fields.pollId, poll.id),
+                    columns: {
+                        choiceName: true,
+                    },
+                    orderBy: (fields, { asc: ascending }) =>
+                        ascending(fields.choiceIndex),
+                });
+                const pollParticipants = await tx.query.voters.findMany({
+                    where: (fields, { eq: isEqual }) =>
+                        isEqual(fields.pollId, poll.id),
+                    columns: {
+                        id: true,
+                        voterIndex: true,
+                        voterName: true,
+                    },
+                    orderBy: (fields, { asc: ascending }) =>
+                        ascending(fields.voterIndex),
+                    with: {
+                        publicKeyShares: {
+                            columns: {
+                                publicKeyShare: true,
+                            },
+                        },
+                    },
+                });
+                const pollCeremonySessions =
+                    await tx.query.pollCeremonySessions.findMany({
+                        where: (fields, { eq: isEqual }) =>
+                            isEqual(fields.pollId, poll.id),
+                        columns: {
+                            activeParticipantIndices: true,
+                            createdAt: true,
+                            id: true,
+                            sequence: true,
+                        },
+                        orderBy: (fields, { asc: ascending }) =>
+                            ascending(fields.sequence),
+                    });
+                const ceremonySession = await derivePollCeremonySession({
+                    choices: pollChoices.map(({ choiceName }) => choiceName),
+                    isOpen: poll.isOpen,
+                    participants: pollParticipants,
+                    persistedSessions: pollCeremonySessions,
+                    pollCreatedAt: poll.createdAt,
+                    pollId: poll.id,
+                });
+                const authenticatedCeremonyParticipant =
+                    ceremonySession.activeParticipants.find(
+                        (participant) =>
+                            participant.originalParticipantIndex ===
+                            authenticatedVoter.voterIndex,
+                    );
+
+                if (!authenticatedCeremonyParticipant) {
+                    throw createError(
+                        403,
+                        ERROR_MESSAGES.boardMessageSkippedParticipant,
+                    );
+                }
+
+                if (
+                    !ceremonySession.manifest ||
+                    !ceremonySession.manifestHash ||
+                    !ceremonySession.sessionId
+                ) {
+                    throw createError(
+                        400,
+                        ERROR_MESSAGES.boardMessageSessionMismatch,
+                    );
+                }
 
                 if (
                     signedPayload.payload.participantIndex !==
-                    authenticatedVoter.voterIndex
+                    authenticatedCeremonyParticipant.assignedParticipantIndex
                 ) {
                     throw createError(
                         403,
@@ -512,13 +617,24 @@ export const boardMessageRoutes = async (
                     );
                 }
 
+                assertPayloadMatchesActiveCeremonySession({
+                    manifestHash: ceremonySession.manifestHash,
+                    rosterHash: ceremonySession.manifest.rosterHash,
+                    sessionId: ceremonySession.sessionId,
+                    signedPayload,
+                });
+
                 const classifiedBoard = isRegistrationPayload(signedPayload)
                     ? null
                     : await classifyBoardMessages(
                           await getBoardMessageRows(tx, poll.id),
                       );
-                const acceptedPayloads =
-                    classifiedBoard?.acceptedPayloads ?? [];
+                const acceptedPayloads = classifiedBoard
+                    ? filterAcceptedPayloadsBySession({
+                          acceptedPayloads: classifiedBoard.acceptedPayloads,
+                          sessionId: ceremonySession.sessionId,
+                      })
+                    : [];
 
                 if (isRegistrationPayload(signedPayload)) {
                     await verifyPayloadSignature({
@@ -548,29 +664,13 @@ export const boardMessageRoutes = async (
                 }
 
                 if (isManifestPublicationPayload(signedPayload)) {
-                    const pollChoices = await tx.query.choices.findMany({
-                        where: (fields, { eq: isEqual }) =>
-                            isEqual(fields.pollId, poll.id),
-                        columns: {
-                            choiceName: true,
-                        },
-                        orderBy: (fields, { asc: ascending }) =>
-                            ascending(fields.choiceIndex),
-                    });
-                    const submittedVoters = await tx.query.voters.findMany({
-                        where: (fields, { eq: isEqual }) =>
-                            isEqual(fields.pollId, poll.id),
-                        columns: {
-                            id: true,
-                        },
-                    });
-
                     await verifyManifestPublicationPayload({
                         acceptedPayloads,
                         choiceNames: pollChoices.map(
                             ({ choiceName }) => choiceName,
                         ),
-                        participantCount: submittedVoters.length,
+                        participantCount:
+                            ceremonySession.activeParticipantCount,
                         signedPayload,
                     });
                 } else {

@@ -24,8 +24,11 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
         acceptedDecryptionShareCount: 0,
         acceptedEncryptedBallotCount: 0,
         acceptedRegistrationCount: 0,
+        activeParticipantCount: 0,
+        blockingParticipantIndices: [],
         completeEncryptedBallotParticipantCount: 0,
         revealReady: false,
+        restartCount: 0,
     },
     boardAudit: {
         acceptedCount: 0,
@@ -135,6 +138,7 @@ describe('pollWorkflow', () => {
                     submittedParticipantCount: 3,
                     voters: [
                         {
+                            ceremonyState: 'active',
                             deviceReady: true,
                             voterIndex: 1,
                             voterName: 'Alice',
@@ -280,8 +284,11 @@ describe('pollWorkflow', () => {
                         acceptedDecryptionShareCount: 0,
                         acceptedEncryptedBallotCount: 6,
                         acceptedRegistrationCount: 3,
+                        activeParticipantCount: 3,
+                        blockingParticipantIndices: [],
                         completeEncryptedBallotParticipantCount: 3,
                         revealReady: true,
+                        restartCount: 0,
                     },
                     thresholds: {
                         reconstructionThreshold: 2,
@@ -325,6 +332,42 @@ describe('pollWorkflow', () => {
         });
     });
 
+    it('shows skipped when the organizer continues without this participant', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    manifest: {
+                        optionList: ['Apples', 'Bananas'],
+                        rosterHash: 'a'.repeat(64),
+                    },
+                    manifestHash: 'b'.repeat(64),
+                    phase: 'securing',
+                    sessionId: 'c'.repeat(64),
+                    submittedParticipantCount: 4,
+                    voters: [
+                        {
+                            ceremonyState: 'skipped',
+                            deviceReady: true,
+                            voterIndex: 1,
+                            voterName: 'Alice',
+                        },
+                    ],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canRetryAutomation: false,
+            currentStep: 'skipped',
+            missingLocalState: false,
+        });
+    });
+
     it('shows the complete state even when a stale session no longer has local device state', () => {
         expect(
             derivePollWorkflow({
@@ -341,6 +384,34 @@ describe('pollWorkflow', () => {
             }),
         ).toMatchObject({
             currentStep: 'complete',
+            missingLocalState: false,
+        });
+    });
+
+    it('keeps showing skipped after the ceremony completes for that device', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    phase: 'complete',
+                    voters: [
+                        {
+                            ceremonyState: 'skipped',
+                            deviceReady: true,
+                            voterIndex: 1,
+                            voterName: 'Alice',
+                        },
+                    ],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            currentStep: 'skipped',
             missingLocalState: false,
         });
     });

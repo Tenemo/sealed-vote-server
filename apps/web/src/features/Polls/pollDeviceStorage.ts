@@ -336,6 +336,30 @@ export const savePendingPayloadIfAbsent = ({
     return nextState?.pendingPayloads[slotKey] ?? null;
 };
 
+export const prunePendingPayloadsForSession = ({
+    pollId,
+    sessionId,
+}: {
+    pollId: string;
+    sessionId: string;
+}): StoredPollDeviceState | null =>
+    updatePollDeviceState(pollId, (currentState) => ({
+        ...currentState,
+        pendingPayloads: Object.fromEntries(
+            Object.entries(currentState.pendingPayloads).filter(
+                ([, payload]) => payload.payload.sessionId === sessionId,
+            ),
+        ),
+    }));
+
+export const clearStoredBallotScores = (
+    pollId: string,
+): StoredPollDeviceState | null =>
+    updatePollDeviceState(pollId, (currentState) => ({
+        ...currentState,
+        storedBallotScores: null,
+    }));
+
 export const findPollDeviceStateByPollId = (
     pollId: string,
 ): StoredPollDeviceState | null => readStoredStates()[pollId] ?? null;

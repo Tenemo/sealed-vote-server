@@ -8,6 +8,8 @@ export const POLL_ROUTES = {
     recoverSession: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/recover-session`,
     close: (pollId: string): string => `${API_PREFIX}/polls/${pollId}/close`,
+    restartCeremony: (pollId: string): string =>
+        `${API_PREFIX}/polls/${pollId}/restart-ceremony`,
     boardMessages: (pollId: string): string =>
         `${API_PREFIX}/polls/${pollId}/board/messages`,
     remove: (pollId: string): string => `${API_PREFIX}/polls/${pollId}`,
