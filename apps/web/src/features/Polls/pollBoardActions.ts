@@ -1,9 +1,9 @@
 import type { PollResponse } from '@sealed-vote/contracts';
-import { sortProtocolPayloads } from '@sealed-vote/protocol';
 import {
     combineDecryptionShares,
     createBallotClosePayload,
     createBallotSubmissionPayload,
+    createDecryptionShare,
     createDLEQProof,
     createDecryptionSharePayload,
     createDisjunctiveProof,
@@ -16,7 +16,6 @@ import {
     createRegistrationPayload,
     createSchnorrProof,
     createTallyPublicationPayload,
-    createVerifiedDecryptionShare,
     decodePedersenShareEnvelope,
     decryptEnvelope,
     deriveJointPublicKey,
@@ -659,7 +658,7 @@ const deriveLocalAcceptedShareContributions = async ({
         },
     ];
 
-    for (const dealerIndex of verifiedDkg.qual) {
+    for (const dealerIndex of verifiedDkg.qualifiedParticipantIndices) {
         if (dealerIndex === participantIndex) {
             continue;
         }
@@ -759,7 +758,7 @@ const buildVerifiedBallotsForReveal = async ({
     }
 
     const countedSet = new Set(
-        ballotClosePayload.payload.includedParticipantIndices,
+        ballotClosePayload.payload.countedParticipantIndices,
     );
     const countedBallotPayloads = getAcceptedBallotPayloads(poll).filter(
         (payload) => countedSet.has(payload.payload.participantIndex),
@@ -767,7 +766,7 @@ const buildVerifiedBallotsForReveal = async ({
 
     return await verifyBallotSubmissionPayloadsByOption({
         ballotPayloads: countedBallotPayloads,
-        publicKey: verifiedDkg.derivedPublicKey,
+        publicKey: verifiedDkg.jointPublicKey,
         manifest,
         sessionId,
     });
@@ -876,7 +875,7 @@ const createRevealBallotCloseActionInternal = async ({
                 manifestHash,
                 participantIndex:
                     localCeremonyParticipant.assignedParticipantIndex,
-                includedParticipantIndices: participantIndices,
+                countedParticipantIndices: participantIndices,
             }),
         deviceState,
         kind: 'publish-ballot-close',
@@ -1195,12 +1194,11 @@ export const resolveAutomaticCeremonyAction = async ({
                             payload.payload.messageType !==
                             'key-derivation-confirmation',
                     );
-                const qualHash = await hashProtocolTranscript(
-                    sortProtocolPayloads(
-                        dkgTranscriptWithoutConfirmations.map(
-                            (payload) => payload.payload,
-                        ),
+                const dkgTranscriptHash = await hashProtocolTranscript(
+                    dkgTranscriptWithoutConfirmations.map(
+                        (payload) => payload.payload,
                     ),
+                    RISTRETTO_GROUP.byteLength,
                 );
                 const feldmanCommitments = acceptedPayloads
                     .filter((payload) =>
@@ -1218,7 +1216,7 @@ export const resolveAutomaticCeremonyAction = async ({
                         sessionId,
                         manifestHash,
                         participantIndex,
-                        qualHash,
+                        dkgTranscriptHash,
                         publicKey: deriveJointPublicKey(
                             feldmanCommitments,
                             RISTRETTO_GROUP,
@@ -1265,7 +1263,7 @@ export const resolveAutomaticCeremonyAction = async ({
                     });
                     const ciphertext = encryptAdditiveWithRandomness(
                         vote,
-                        verifiedDkg.derivedPublicKey,
+                        verifiedDkg.jointPublicKey,
                         randomness,
                         10n,
                     );
@@ -1282,7 +1280,7 @@ export const resolveAutomaticCeremonyAction = async ({
                         vote,
                         randomness,
                         ciphertext,
-                        verifiedDkg.derivedPublicKey,
+                        verifiedDkg.jointPublicKey,
                         scoreVotingDomain(),
                         RISTRETTO_GROUP,
                         context,
@@ -1330,7 +1328,7 @@ export const resolveAutomaticCeremonyAction = async ({
     }
 
     if (
-        !ballotClosePayload.payload.includedParticipantIndices.includes(
+        !ballotClosePayload.payload.countedParticipantIndices.includes(
             participantIndex,
         )
     ) {
@@ -1349,7 +1347,7 @@ export const resolveAutomaticCeremonyAction = async ({
     const selectedDecryptionParticipantIndices =
         selectCanonicalParticipantIndices({
             participantIndices:
-                ballotClosePayload.payload.includedParticipantIndices,
+                ballotClosePayload.payload.countedParticipantIndices,
             threshold:
                 poll.thresholds.minimumPublishedVoterCount ??
                 majorityThreshold(poll.ceremony.activeParticipantCount),
@@ -1384,8 +1382,25 @@ export const resolveAutomaticCeremonyAction = async ({
 
             return await getOrCreatePreparedAction({
                 buildSignedPayload: async () => {
-                    const verifiedShare = createVerifiedDecryptionShare(
-                        optionBallots.aggregate,
+                    if (optionBallots.aggregate.transcriptHash.trim() === '') {
+                        throw new Error(
+                            'Verified aggregate ciphertext requires a non-empty transcript hash.',
+                        );
+                    }
+
+                    if (
+                        !Number.isInteger(
+                            optionBallots.aggregate.ballotCount,
+                        ) ||
+                        optionBallots.aggregate.ballotCount < 1
+                    ) {
+                        throw new Error(
+                            'Verified aggregate ciphertext requires at least one accepted ballot.',
+                        );
+                    }
+
+                    const decryptionShare = createDecryptionShare(
+                        optionBallots.aggregate.ciphertext,
                         finalShare,
                     );
                     const statement: DLEQStatement = {
@@ -1395,7 +1410,7 @@ export const resolveAutomaticCeremonyAction = async ({
                             RISTRETTO_GROUP,
                         ),
                         ciphertext: optionBallots.aggregate.ciphertext,
-                        decryptionShare: verifiedShare.value,
+                        decryptionShare: decryptionShare.value,
                     };
                     const context: ProofContext = {
                         protocolVersion: SHIPPED_PROTOCOL_VERSION,
@@ -1420,7 +1435,7 @@ export const resolveAutomaticCeremonyAction = async ({
                         optionIndex: optionBallots.optionIndex,
                         transcriptHash: optionBallots.aggregate.transcriptHash,
                         ballotCount: optionBallots.aggregate.ballotCount,
-                        decryptionShare: verifiedShare.value,
+                        decryptionShare: decryptionShare.value,
                         proof,
                     });
                 },

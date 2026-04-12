@@ -131,7 +131,7 @@ describe('pollSessionStorage', () => {
 
         it('filters out malformed stored sessions while preserving valid ones', () => {
             window.localStorage.setItem(
-                'sealed-vote.voter-sessions.v1',
+                'sealed-vote.voter-sessions.v2',
                 JSON.stringify({
                     'poll-1': {
                         pollId: 'poll-1',
@@ -168,6 +168,22 @@ describe('pollSessionStorage', () => {
             expect(findVoterSessionByPollId('poll-3')).toBeNull();
             expect(findVoterSessionByPollSlug('broken--2222')).toBeNull();
             expect(findVoterSessionByPollSlug('mismatch--3333')).toBeNull();
+        });
+
+        it('ignores reserved object keys when hydrating stored sessions', () => {
+            window.localStorage.setItem(
+                'sealed-vote.voter-sessions.v2',
+                `{"__proto__":{"pollId":"__proto__","pollSlug":"poisoned","voterIndex":9,"voterName":"Mallory","voterToken":"poison"},"poll-1":{"pollId":"poll-1","pollSlug":"best-fruit--1111","voterIndex":2,"voterName":"Alice","voterToken":"voter-token"}}`,
+            );
+
+            expect(findVoterSessionByPollId('__proto__')).toBeNull();
+            expect(findVoterSessionByPollId('poll-1')).toEqual({
+                pollId: 'poll-1',
+                pollSlug: 'best-fruit--1111',
+                voterIndex: 2,
+                voterName: 'Alice',
+                voterToken: 'voter-token',
+            });
         });
 
         it('ignores storage write failures instead of throwing', () => {

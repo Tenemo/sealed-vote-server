@@ -27,7 +27,7 @@ const createSignedPayload = (
             : {
                   checkpointPhase: 0,
                   checkpointTranscriptHash: '6'.repeat(64),
-                  qualParticipantIndices: [1, 2, 3],
+                  qualifiedParticipantIndices: [1, 2, 3],
               }),
     } as SignedPayload['payload'],
     signature: '7'.repeat(128),

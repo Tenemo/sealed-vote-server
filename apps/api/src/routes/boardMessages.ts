@@ -101,13 +101,11 @@ const protocolMessageTypes: readonly ProtocolMessageType[] = [
     'complaint',
     'complaint-resolution',
     'feldman-commitment',
-    'feldman-share-reveal',
     'key-derivation-confirmation',
     'ballot-submission',
     'ballot-close',
     'decryption-share',
     'tally-publication',
-    'ceremony-restart',
 ];
 const protocolMessageTypeSet = new Set<string>(protocolMessageTypes);
 

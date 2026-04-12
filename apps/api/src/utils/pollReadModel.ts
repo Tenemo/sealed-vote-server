@@ -12,8 +12,8 @@ import {
     type RegistrationPayload,
     type SignedPayload,
     type TallyPublicationPayload,
+    tryVerifyElectionCeremony,
     verifyDKGTranscript,
-    verifyElectionCeremonyDetailedResult,
 } from 'threshold-elgamal';
 
 import type { Database, DatabaseTransaction } from '../db/client.js';
@@ -471,9 +471,9 @@ const buildVerificationSummary = async ({
 
         return {
             dkgCompleted: true,
-            qualParticipantIndices: verifiedDkg.qual,
+            qualParticipantIndices: verifiedDkg.qualifiedParticipantIndices,
             verification: buildNotReadyVerification(
-                verifiedDkg.qual,
+                verifiedDkg.qualifiedParticipantIndices,
                 completeEncryptedBallotParticipantCount === participantCount
                     ? 'All encrypted ballots are accepted. Waiting for the automatic reveal to start.'
                     : 'Encrypted ballots are still accumulating.',
@@ -488,9 +488,9 @@ const buildVerificationSummary = async ({
     if (decryptionSharePayloads.length === 0) {
         return {
             dkgCompleted: true,
-            qualParticipantIndices: verifiedDkg.qual,
+            qualParticipantIndices: verifiedDkg.qualifiedParticipantIndices,
             verification: buildNotReadyVerification(
-                verifiedDkg.qual,
+                verifiedDkg.qualifiedParticipantIndices,
                 'Reveal has started. Waiting for threshold decryption shares.',
             ),
         };
@@ -503,9 +503,9 @@ const buildVerificationSummary = async ({
     if (tallyPublications.length === 0) {
         return {
             dkgCompleted: true,
-            qualParticipantIndices: verifiedDkg.qual,
+            qualParticipantIndices: verifiedDkg.qualifiedParticipantIndices,
             verification: buildNotReadyVerification(
-                verifiedDkg.qual,
+                verifiedDkg.qualifiedParticipantIndices,
                 'Decryption shares are arriving. Waiting for final tally publication.',
             ),
         };
@@ -514,9 +514,9 @@ const buildVerificationSummary = async ({
     if (tallyPublications.length < manifest.optionList.length) {
         return {
             dkgCompleted: true,
-            qualParticipantIndices: verifiedDkg.qual,
+            qualParticipantIndices: verifiedDkg.qualifiedParticipantIndices,
             verification: buildNotReadyVerification(
-                verifiedDkg.qual,
+                verifiedDkg.qualifiedParticipantIndices,
                 'Final tally publication is still in progress.',
             ),
         };
@@ -526,7 +526,7 @@ const buildVerificationSummary = async ({
         isSignedPayloadOfType(payload, 'ballot-submission'),
     ) as readonly SignedPayload<BallotSubmissionPayload>[];
 
-    const verificationResult = await verifyElectionCeremonyDetailedResult({
+    const verificationResult = await tryVerifyElectionCeremony({
         manifest,
         sessionId,
         dkgTranscript,
@@ -539,9 +539,9 @@ const buildVerificationSummary = async ({
     if (!verificationResult.ok) {
         return {
             dkgCompleted: true,
-            qualParticipantIndices: verifiedDkg.qual,
+            qualParticipantIndices: verifiedDkg.qualifiedParticipantIndices,
             verification: buildInvalidVerification(
-                verifiedDkg.qual,
+                verifiedDkg.qualifiedParticipantIndices,
                 verificationResult.error.reason,
             ),
         };
@@ -555,11 +555,13 @@ const buildVerificationSummary = async ({
 
     return {
         dkgCompleted: true,
-        qualParticipantIndices: verificationResult.verified.qual,
+        qualParticipantIndices:
+            verificationResult.verified.qualifiedParticipantIndices,
         verification: buildVerifiedVerification({
             acceptedCounts,
             tallies: verificationResult.verified.perOptionTallies,
-            qualParticipantIndices: verificationResult.verified.qual,
+            qualParticipantIndices:
+                verificationResult.verified.qualifiedParticipantIndices,
         }),
     };
 };

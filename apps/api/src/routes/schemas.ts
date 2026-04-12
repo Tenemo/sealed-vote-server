@@ -10,13 +10,11 @@ const ProtocolMessageTypeSchema = Type.Union([
     Type.Literal('complaint'),
     Type.Literal('complaint-resolution'),
     Type.Literal('feldman-commitment'),
-    Type.Literal('feldman-share-reveal'),
     Type.Literal('key-derivation-confirmation'),
     Type.Literal('ballot-submission'),
     Type.Literal('ballot-close'),
     Type.Literal('decryption-share'),
     Type.Literal('tally-publication'),
-    Type.Literal('ceremony-restart'),
 ]);
 
 const ProtocolPayloadSchema = Type.Object(

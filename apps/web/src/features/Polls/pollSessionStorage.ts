@@ -36,25 +36,35 @@ export type StoredVoterSession = {
     voterToken: string;
 };
 
-const creatorSessionsStorageKey = 'sealed-vote.creator-sessions.v1';
-const voterSessionsStorageKey = 'sealed-vote.voter-sessions.v1';
+const creatorSessionsStorageKey = 'sealed-vote.creator-sessions.v2';
+const voterSessionsStorageKey = 'sealed-vote.voter-sessions.v2';
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.length > 0;
+
+const reservedStorageKeys = new Set(['__proto__', 'constructor', 'prototype']);
+
+const isSafeStorageKey = (value: string): boolean =>
+    !reservedStorageKeys.has(value);
+
+const createStoredSessions = <
+    TSession extends StoredPollSession,
+>(): StoredSessions<TSession> =>
+    Object.create(null) as StoredSessions<TSession>;
 
 const readStoredSessions = <TSession extends StoredPollSession>({
     isStoredSession,
     storageKey,
 }: PollSessionStorageOptions<TSession>): StoredSessions<TSession> => {
     if (!canUseLocalStorage()) {
-        return {};
+        return createStoredSessions();
     }
 
     try {
         const rawValue = window.localStorage.getItem(storageKey);
 
         if (!rawValue) {
-            return {};
+            return createStoredSessions();
         }
 
         const parsedValue = JSON.parse(rawValue);
@@ -64,17 +74,24 @@ const readStoredSessions = <TSession extends StoredPollSession>({
             parsedValue === null ||
             Array.isArray(parsedValue)
         ) {
-            return {};
+            return createStoredSessions();
         }
 
-        return Object.fromEntries(
-            Object.entries(parsedValue).filter(
-                ([pollId, session]) =>
-                    isStoredSession(session) && session.pollId === pollId,
-            ),
-        ) as StoredSessions<TSession>;
+        const sessions = createStoredSessions<TSession>();
+
+        for (const [pollId, session] of Object.entries(parsedValue)) {
+            if (
+                isSafeStorageKey(pollId) &&
+                isStoredSession(session) &&
+                session.pollId === pollId
+            ) {
+                sessions[pollId] = session;
+            }
+        }
+
+        return sessions;
     } catch {
-        return {};
+        return createStoredSessions();
     }
 };
 
@@ -102,11 +119,19 @@ const createPollSessionStorage = <TSession extends StoredPollSession>(
     options: PollSessionStorageOptions<TSession>,
 ): PollSessionStorage<TSession> => ({
     saveSession: (session: TSession): void => {
+        if (!isSafeStorageKey(session.pollId)) {
+            return;
+        }
+
         const sessions = readStoredSessions(options);
         sessions[session.pollId] = session;
         writeStoredSessions(options.storageKey, sessions);
     },
     removeSession: (pollId: string): void => {
+        if (!isSafeStorageKey(pollId)) {
+            return;
+        }
+
         const sessions = readStoredSessions(options);
 
         if (!sessions[pollId]) {

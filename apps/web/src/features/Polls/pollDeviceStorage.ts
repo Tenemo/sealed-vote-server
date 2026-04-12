@@ -39,7 +39,7 @@ type PendingPollDeviceState = Pick<
 
 type StoredPollDeviceStates = Record<string, StoredPollDeviceState>;
 
-const storageKey = 'sealed-vote.poll-device-state.v1';
+const storageKey = 'sealed-vote.poll-device-state.v2';
 
 const bytesToHex = (bytes: Uint8Array): string =>
     Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');

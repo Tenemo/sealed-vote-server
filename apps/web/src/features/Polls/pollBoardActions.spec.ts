@@ -354,7 +354,7 @@ describe('pollBoardActions', () => {
         expect(action?.kind).toBe('publish-ballot-close');
         expect(
             action?.signedPayload.payload.messageType === 'ballot-close'
-                ? action.signedPayload.payload.includedParticipantIndices
+                ? action.signedPayload.payload.countedParticipantIndices
                 : null,
         ).toEqual([1, 2, 3]);
     });

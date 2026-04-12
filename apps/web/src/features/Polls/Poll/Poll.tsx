@@ -110,8 +110,8 @@ const formatBoardEntryTitle = (
         return `${baseTitle} for participant ${payload.recipientIndex}`;
     }
 
-    if (Array.isArray(payload.includedParticipantIndices)) {
-        return `${baseTitle} counting ${payload.includedParticipantIndices.length} participants`;
+    if (Array.isArray(payload.countedParticipantIndices)) {
+        return `${baseTitle} counting ${payload.countedParticipantIndices.length} participants`;
     }
 
     return baseTitle;

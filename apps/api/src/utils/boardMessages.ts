@@ -87,15 +87,16 @@ const classifySlotRows = (
     slotRows: readonly BoardMessageRow[],
     rowId: string,
 ): BoardMessageRecord['classification'] => {
+    const sortedSlotRows = sortBoardRows(slotRows);
     const distinctUnsignedHashCount = new Set(
-        slotRows.map((entry) => entry.unsignedHash),
+        sortedSlotRows.map((entry) => entry.unsignedHash),
     ).size;
 
     if (distinctUnsignedHashCount > 1) {
         return 'equivocation';
     }
 
-    return slotRows[0]?.id === rowId ? 'accepted' : 'idempotent';
+    return sortedSlotRows[0]?.id === rowId ? 'accepted' : 'idempotent';
 };
 
 const computePhaseDigests = async (
@@ -200,10 +201,7 @@ export const classifyBoardMessageRow = (
     row: BoardMessageRow,
     slotRows: readonly BoardMessageRow[],
 ): BoardMessageRecord =>
-    toBoardMessageRecord(
-        row,
-        classifySlotRows(sortBoardRows(slotRows), row.id),
-    );
+    toBoardMessageRecord(row, classifySlotRows(slotRows, row.id));
 
 export const getBoardMessageRows = async (
     db: ReadOnlyDatabase,

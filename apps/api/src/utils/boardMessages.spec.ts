@@ -10,6 +10,7 @@ import {
 
 import {
     boardMessageSlotKey,
+    classifyBoardMessageRow,
     classifyBoardMessages,
     nextEntryHash,
     unsignedPayloadHash,
@@ -198,5 +199,43 @@ describe('boardMessages', () => {
             ceremonyDigest: null,
             phaseDigests: [],
         });
+    });
+
+    test('classifies a slot row by the earliest row even when slot rows are unsorted', async () => {
+        const keyMaterial = await createRegistrationKeyMaterial();
+        const firstPayload = await createSignedRegistrationPayload({
+            keyMaterial,
+            participantIndex: 1,
+            rosterHash: '7'.repeat(64),
+            signature: 'ff',
+        });
+        const duplicatePayload = await createSignedRegistrationPayload({
+            keyMaterial,
+            participantIndex: 1,
+            rosterHash: '7'.repeat(64),
+            signature: '11',
+        });
+        const firstRow = createBoardMessageRow({
+            id: 'row-1',
+            signedPayload: firstPayload,
+        });
+        const duplicateRow = createBoardMessageRow({
+            createdAt: new Date('2026-04-12T00:00:01.000Z'),
+            id: 'row-2',
+            previousEntryHash: firstRow.entryHash,
+            signedPayload: duplicatePayload,
+        });
+
+        const accepted = classifyBoardMessageRow(firstRow, [
+            duplicateRow,
+            firstRow,
+        ]);
+        const duplicate = classifyBoardMessageRow(duplicateRow, [
+            duplicateRow,
+            firstRow,
+        ]);
+
+        expect(accepted.classification).toBe('accepted');
+        expect(duplicate.classification).toBe('idempotent');
     });
 });
