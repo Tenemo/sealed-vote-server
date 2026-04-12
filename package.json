@@ -66,6 +66,7 @@
         ]
     },
     "dependencies": {
-        "@resvg/resvg-js": "^2.6.2"
+        "@resvg/resvg-js": "^2.6.2",
+        "tslib": "^2.8.1"
     }
 }
