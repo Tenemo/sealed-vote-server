@@ -140,7 +140,7 @@ test('automatically resumes a stored vote after a participant closes the browser
             page: participantOne.page,
         });
 
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);
@@ -258,7 +258,7 @@ test('automatically republishes a stored vote after a participant rejoins during
             value: '1',
         });
 
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);
@@ -374,7 +374,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
             value: '3',
         });
 
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);
@@ -486,7 +486,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
             value: '2',
         });
 
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);

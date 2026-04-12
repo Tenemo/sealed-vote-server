@@ -100,7 +100,7 @@ test('completes one real ceremony across chromium, desktop firefox, and mobile f
             count: 3,
             page: firefoxMobile.page,
         });
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(firefoxDesktop);
         await closeParticipant(firefoxMobile);

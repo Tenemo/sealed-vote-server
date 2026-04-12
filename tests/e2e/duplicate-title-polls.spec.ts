@@ -72,7 +72,7 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
         await expectParticipantsVisible(page, [firstPollVoterName]);
         await expectParticipantsHidden(page, [secondPollVoterName]);
         await expectParticipantsHidden(participant.page, [firstPollVoterName]);
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
         await deletePolls(request, createdPolls);

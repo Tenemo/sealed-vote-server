@@ -45,7 +45,7 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expectNoAxeViolations(page, 'mobile home page');
-    expectNoUnexpectedErrors(tracker);
+    await expectNoUnexpectedErrors(tracker);
 });
 
 test('keeps the poll page usable at 320 pixels wide before voting closes', async ({
@@ -84,7 +84,7 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
         await expectNoAxeViolations(page, 'mobile poll page');
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await deletePolls(request, createdPolls);
     }

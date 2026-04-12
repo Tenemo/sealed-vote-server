@@ -61,7 +61,7 @@ test('keeps slug-based poll links shareable across platforms', async ({
             scores: [8, 6],
             voterName: createVoterName('bob', namespace),
         });
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
         await deletePolls(request, createdPolls);

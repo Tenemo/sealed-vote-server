@@ -4,7 +4,10 @@ import {
     type BoardMessageRequest as BoardMessageRequestContract,
     type BoardMessagesResponse as BoardMessagesResponseContract,
 } from '@sealed-vote/contracts';
-import { canonicalUnsignedPayloadBytes } from '@sealed-vote/protocol';
+import {
+    canonicalUnsignedPayloadBytes,
+    isProtocolMessageType,
+} from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -13,7 +16,6 @@ import {
     hashRosterEntries,
     validateElectionManifest,
     type ManifestPublicationPayload,
-    type ProtocolMessageType,
     type RegistrationPayload,
     type SignedPayload,
 } from 'threshold-elgamal';
@@ -91,32 +93,12 @@ type BoardMessagesQuery = {
 };
 
 const HEX_64_PATTERN = /^[A-Fa-f0-9]{64}$/;
-const protocolMessageTypes: readonly ProtocolMessageType[] = [
-    'manifest-publication',
-    'registration',
-    'manifest-acceptance',
-    'phase-checkpoint',
-    'pedersen-commitment',
-    'encrypted-dual-share',
-    'complaint',
-    'complaint-resolution',
-    'feldman-commitment',
-    'key-derivation-confirmation',
-    'ballot-submission',
-    'ballot-close',
-    'decryption-share',
-    'tally-publication',
-];
-const protocolMessageTypeSet = new Set<string>(protocolMessageTypes);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const isHex64 = (value: unknown): value is string =>
     typeof value === 'string' && HEX_64_PATTERN.test(value);
-
-const isProtocolMessageType = (value: unknown): value is ProtocolMessageType =>
-    typeof value === 'string' && protocolMessageTypeSet.has(value);
 
 const validateBoardPayloadShape = (
     signedPayload: BoardMessageRequest['signedPayload'],

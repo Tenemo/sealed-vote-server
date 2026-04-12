@@ -98,7 +98,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         });
 
         await expectNoAxeViolations(page, 'full vote results page');
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);

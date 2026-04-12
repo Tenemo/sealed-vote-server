@@ -114,7 +114,7 @@ test('counts every honest ballot when four participants complete the ceremony', 
             count: 4,
             page: participantThree.page,
         });
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);

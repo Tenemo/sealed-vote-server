@@ -1,21 +1,9 @@
+import { protocolMessageTypes } from '@sealed-vote/protocol';
 import { Type, type Static } from '@sinclair/typebox';
 
-const ProtocolMessageTypeSchema = Type.Union([
-    Type.Literal('manifest-publication'),
-    Type.Literal('registration'),
-    Type.Literal('manifest-acceptance'),
-    Type.Literal('phase-checkpoint'),
-    Type.Literal('pedersen-commitment'),
-    Type.Literal('encrypted-dual-share'),
-    Type.Literal('complaint'),
-    Type.Literal('complaint-resolution'),
-    Type.Literal('feldman-commitment'),
-    Type.Literal('key-derivation-confirmation'),
-    Type.Literal('ballot-submission'),
-    Type.Literal('ballot-close'),
-    Type.Literal('decryption-share'),
-    Type.Literal('tally-publication'),
-]);
+const ProtocolMessageTypeSchema = Type.Union(
+    protocolMessageTypes.map((messageType) => Type.Literal(messageType)),
+);
 
 const ProtocolPayloadSchema = Type.Object(
     {

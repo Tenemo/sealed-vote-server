@@ -79,7 +79,7 @@ test('secures the frozen roster automatically across three live sessions', async
         await expectSecuringVisible(participantTwo.page);
 
         await waitForAutomaticReveal(page);
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);

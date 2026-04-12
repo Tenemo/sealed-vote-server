@@ -174,11 +174,18 @@ export const waitForVerifiedResults = async ({
     page: Page;
     choices?: string[];
 }): Promise<void> => {
-    await expect(
-        page.getByText('Verified results', { exact: true }),
-    ).toBeVisible({
-        timeout: 90_000,
-    });
+    await expect
+        .poll(
+            async () =>
+                await page
+                    .getByText('Verified results', { exact: true })
+                    .first()
+                    .isVisible(),
+            {
+                timeout: 90_000,
+            },
+        )
+        .toBe(true);
     await expect(
         page.getByText('Verified from the public board log.', {
             exact: true,

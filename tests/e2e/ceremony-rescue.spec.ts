@@ -147,7 +147,7 @@ test('the organizer can continue without a missing participant and finish with t
             ).first(),
         ).toBeVisible({ timeout: 30_000 });
 
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);

@@ -41,6 +41,7 @@ import { derivePollWorkflow } from 'features/Polls/pollWorkflow';
 import {
     useCloseVotingMutation,
     useGetPollQuery,
+    useLazyGetPollQuery,
     usePostBoardMessageMutation,
     useRegisterVoterMutation,
     useRestartCeremonyMutation,
@@ -49,6 +50,8 @@ import { renderError } from 'utils/networkErrors';
 
 const minimumScore = 1;
 const maximumScore = 10;
+const boardConfirmationDelayMs = 250;
+const boardConfirmationMaxAttempts = 6;
 const scoreOptions = Array.from(
     { length: maximumScore - minimumScore + 1 },
     (_value, offset) => minimumScore + offset,
@@ -56,6 +59,36 @@ const scoreOptions = Array.from(
 
 type PollData = NonNullable<ReturnType<typeof useGetPollQuery>['data']>;
 type PollBoardEntry = PollData['boardEntries'][number];
+
+const isSamePreparedAction = (
+    left: PreparedCeremonyAction | null,
+    right: PreparedCeremonyAction,
+): boolean =>
+    !!left &&
+    left.kind === right.kind &&
+    left.slotKey === right.slotKey &&
+    left.signedPayload.signature === right.signedPayload.signature;
+
+const findBoardEntryForPreparedAction = ({
+    action,
+    poll,
+}: {
+    action: PreparedCeremonyAction | null;
+    poll: PollData | undefined;
+}): PollBoardEntry | null => {
+    if (!action || !poll) {
+        return null;
+    }
+
+    return (
+        poll.boardEntries.find(
+            (entry: PollBoardEntry) =>
+                entry.slotKey === action.slotKey &&
+                entry.signedPayload.signature ===
+                    action.signedPayload.signature,
+        ) ?? null
+    );
+};
 
 const phaseLabel = (phase: string): string =>
     (
@@ -181,6 +214,7 @@ const PollPage = (): React.JSX.Element => {
     const [registerVoter, registerState] = useRegisterVoterMutation();
     const [closeVoting, closeState] = useCloseVotingMutation();
     const [restartCeremony, restartState] = useRestartCeremonyMutation();
+    const [fetchLatestPoll] = useLazyGetPollQuery();
     const [postBoardMessage] = usePostBoardMessageMutation();
     const [voterName, setVoterName] = React.useState('');
     const [draftScores, setDraftScores] = React.useState<(number | null)[]>([]);
@@ -193,6 +227,10 @@ const PollPage = (): React.JSX.Element => {
         React.useState<PreparedCeremonyAction | null>(null);
     const [automaticActionDescription, setAutomaticActionDescription] =
         React.useState<string | null>(null);
+    const [
+        awaitingBoardConfirmationAction,
+        setAwaitingBoardConfirmationAction,
+    ] = React.useState<PreparedCeremonyAction | null>(null);
     const [isResolvingAutomaticAction, setIsResolvingAutomaticAction] =
         React.useState(false);
     const [automaticResolutionAttempt, setAutomaticResolutionAttempt] =
@@ -280,6 +318,29 @@ const PollPage = (): React.JSX.Element => {
         currentAutomaticAction !== null ? automaticActionDescription : null;
 
     React.useEffect(() => {
+        if (!awaitingBoardConfirmationAction) {
+            return;
+        }
+
+        if (
+            poll?.phase === 'aborted' ||
+            poll?.phase === 'complete' ||
+            !isPreparedAutomaticActionCurrent({
+                action: awaitingBoardConfirmationAction,
+                deviceState,
+                poll,
+                voterSession,
+            }) ||
+            findBoardEntryForPreparedAction({
+                action: awaitingBoardConfirmationAction,
+                poll,
+            }) !== null
+        ) {
+            setAwaitingBoardConfirmationAction(null);
+        }
+    }, [awaitingBoardConfirmationAction, deviceState, poll, voterSession]);
+
+    React.useEffect(() => {
         if (!poll) {
             return;
         }
@@ -360,6 +421,29 @@ const PollPage = (): React.JSX.Element => {
                 return;
             }
 
+            if (
+                isPreparedAutomaticActionCurrent({
+                    action: awaitingBoardConfirmationAction,
+                    deviceState,
+                    poll,
+                    voterSession,
+                }) &&
+                findBoardEntryForPreparedAction({
+                    action: awaitingBoardConfirmationAction,
+                    poll,
+                }) === null
+            ) {
+                setAutomaticAction(awaitingBoardConfirmationAction);
+                setAutomaticActionDescription(
+                    describeAutomaticCeremonyAction(
+                        awaitingBoardConfirmationAction,
+                    ),
+                );
+                setAutomationError(null);
+                setIsResolvingAutomaticAction(false);
+                return;
+            }
+
             setIsResolvingAutomaticAction(true);
 
             try {
@@ -404,6 +488,7 @@ const PollPage = (): React.JSX.Element => {
         activeActionSlotKey,
         automaticAction,
         automaticResolutionAttempt,
+        awaitingBoardConfirmationAction,
         creatorSession,
         deviceState,
         localCeremonyState,
@@ -432,6 +517,8 @@ const PollPage = (): React.JSX.Element => {
                 !poll ||
                 !deviceState ||
                 !voterSession ||
+                closeState.isLoading ||
+                restartState.isLoading ||
                 !isPreparedAutomaticActionCurrent({
                     action,
                     deviceState,
@@ -450,25 +537,182 @@ const PollPage = (): React.JSX.Element => {
             setActiveActionSlotKey(action.slotKey);
 
             try {
+                const latestPoll = await fetchLatestPoll(poll.slug).unwrap();
+                const latestDeviceState =
+                    findPollDeviceStateByPollId(latestPoll.id) ??
+                    findPollDeviceStateByPollSlug(latestPoll.slug);
+                const latestVoterSession =
+                    findVoterSessionByPollId(latestPoll.id) ??
+                    findVoterSessionByPollSlug(latestPoll.slug);
+
+                if (
+                    !latestDeviceState ||
+                    !latestVoterSession ||
+                    !isPreparedAutomaticActionCurrent({
+                        action,
+                        deviceState: latestDeviceState,
+                        poll: latestPoll,
+                        voterSession: latestVoterSession,
+                    })
+                ) {
+                    await refetch();
+                    return;
+                }
+
+                const latestAction = await resolveAutomaticCeremonyAction({
+                    creatorSession:
+                        findCreatorSessionByPollId(latestPoll.id) ??
+                        findCreatorSessionByPollSlug(latestPoll.slug),
+                    deviceState: latestDeviceState,
+                    poll: latestPoll,
+                    voterSession: latestVoterSession,
+                });
+
+                if (!latestAction) {
+                    await refetch();
+                    return;
+                }
+
+                const submissionPoll = await fetchLatestPoll(
+                    poll.slug,
+                ).unwrap();
+                const submissionDeviceState =
+                    findPollDeviceStateByPollId(submissionPoll.id) ??
+                    findPollDeviceStateByPollSlug(submissionPoll.slug);
+                const submissionVoterSession =
+                    findVoterSessionByPollId(submissionPoll.id) ??
+                    findVoterSessionByPollSlug(submissionPoll.slug);
+
+                if (
+                    !submissionDeviceState ||
+                    !submissionVoterSession ||
+                    !isPreparedAutomaticActionCurrent({
+                        action: latestAction,
+                        deviceState: submissionDeviceState,
+                        poll: submissionPoll,
+                        voterSession: submissionVoterSession,
+                    })
+                ) {
+                    await refetch();
+                    return;
+                }
+
+                const actionToSubmit = latestAction;
+
+                if (actionToSubmit.slotKey !== action.slotKey) {
+                    setActiveActionSlotKey(actionToSubmit.slotKey);
+                }
+
                 await postBoardMessage({
-                    pollId: poll.id,
+                    pollId: submissionPoll.id,
                     boardMessage: {
-                        signedPayload: action.signedPayload,
-                        voterToken: voterSession.voterToken,
+                        signedPayload: actionToSubmit.signedPayload,
+                        voterToken: submissionVoterSession.voterToken,
                     },
                 }).unwrap();
+                setAwaitingBoardConfirmationAction(actionToSubmit);
 
                 // Keep the saved payload until poll state confirms the slot was
                 // accepted. Clearing it here can regenerate a fresh randomized
                 // proof for the same slot while the refetch is still catching up.
-                await refetch();
+                let refreshedPoll = submissionPoll;
+                let refreshedDeviceState: typeof submissionDeviceState | null =
+                    submissionDeviceState;
+                let refreshedVoterSession:
+                    | typeof submissionVoterSession
+                    | null = submissionVoterSession;
+                let refreshedBoardEntry: PollBoardEntry | null = null;
+                let actionStillCurrent = true;
+
+                for (
+                    let attempt = 0;
+                    attempt < boardConfirmationMaxAttempts;
+                    attempt += 1
+                ) {
+                    refreshedPoll = await fetchLatestPoll(poll.slug).unwrap();
+                    refreshedDeviceState =
+                        findPollDeviceStateByPollId(refreshedPoll.id) ??
+                        findPollDeviceStateByPollSlug(refreshedPoll.slug);
+                    refreshedVoterSession =
+                        findVoterSessionByPollId(refreshedPoll.id) ??
+                        findVoterSessionByPollSlug(refreshedPoll.slug);
+                    actionStillCurrent =
+                        !!refreshedDeviceState && !!refreshedVoterSession
+                            ? isPreparedAutomaticActionCurrent({
+                                  action: actionToSubmit,
+                                  deviceState: refreshedDeviceState,
+                                  poll: refreshedPoll,
+                                  voterSession: refreshedVoterSession,
+                              })
+                            : false;
+                    refreshedBoardEntry = findBoardEntryForPreparedAction({
+                        action: actionToSubmit,
+                        poll: refreshedPoll,
+                    });
+
+                    if (
+                        refreshedBoardEntry ||
+                        refreshedPoll.phase === 'aborted' ||
+                        refreshedPoll.phase === 'complete' ||
+                        !actionStillCurrent
+                    ) {
+                        break;
+                    }
+
+                    await new Promise<void>((resolve) => {
+                        setTimeout(resolve, boardConfirmationDelayMs);
+                    });
+                }
+
+                if (
+                    refreshedBoardEntry ||
+                    refreshedPoll.phase === 'aborted' ||
+                    refreshedPoll.phase === 'complete' ||
+                    !actionStillCurrent
+                ) {
+                    setAwaitingBoardConfirmationAction(null);
+                }
+
+                if (
+                    refreshedBoardEntry &&
+                    refreshedPoll.phase !== 'aborted' &&
+                    refreshedPoll.phase !== 'complete' &&
+                    refreshedDeviceState &&
+                    refreshedVoterSession
+                ) {
+                    const nextAction = await resolveAutomaticCeremonyAction({
+                        creatorSession:
+                            findCreatorSessionByPollId(refreshedPoll.id) ??
+                            findCreatorSessionByPollSlug(refreshedPoll.slug),
+                        deviceState: refreshedDeviceState,
+                        poll: refreshedPoll,
+                        voterSession: refreshedVoterSession,
+                    });
+
+                    if (
+                        nextAction &&
+                        !isSamePreparedAction(nextAction, actionToSubmit)
+                    ) {
+                        await submitPreparedAction(nextAction);
+                        return;
+                    }
+                }
             } catch (submissionError) {
                 setAutomationError(renderError(submissionError));
             } finally {
                 setActiveActionSlotKey(null);
             }
         },
-        [deviceState, poll, postBoardMessage, refetch, voterSession],
+        [
+            closeState.isLoading,
+            deviceState,
+            fetchLatestPoll,
+            poll,
+            postBoardMessage,
+            refetch,
+            restartState.isLoading,
+            voterSession,
+        ],
     );
 
     React.useEffect(() => {
@@ -479,6 +723,12 @@ const PollPage = (): React.JSX.Element => {
                 poll.phase !== 'ready-to-reveal' &&
                 poll.phase !== 'revealing') ||
             !currentAutomaticAction ||
+            closeState.isLoading ||
+            restartState.isLoading ||
+            isSamePreparedAction(
+                awaitingBoardConfirmationAction,
+                currentAutomaticAction,
+            ) ||
             !!activeActionSlotKey ||
             !!automationError
         ) {
@@ -488,10 +738,13 @@ const PollPage = (): React.JSX.Element => {
         void submitPreparedAction(currentAutomaticAction);
     }, [
         activeActionSlotKey,
+        awaitingBoardConfirmationAction,
         automationError,
+        closeState.isLoading,
         currentAutomaticAction,
         localCeremonyState,
         poll,
+        restartState.isLoading,
         submitPreparedAction,
     ]);
 

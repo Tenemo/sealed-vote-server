@@ -67,7 +67,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
                 },
             ),
         ).toBeVisible();
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         if (restoredContext) {
             await restoredContext.close();
@@ -139,7 +139,7 @@ test('restores the securing state after refresh once voting is closed', async ({
         await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
 
         await expectSecuringVisible(restoredPage);
-        expectNoUnexpectedErrors(tracker);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         if (restoredContext) {
             await restoredContext.close();

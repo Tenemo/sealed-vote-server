@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest';
+import { sortProtocolPayloads } from '@sealed-vote/protocol';
 import {
     exportAuthPublicKey,
     exportTransportPublicKey,
     generateAuthKeyPair,
     generateTransportKeyPair,
+    hashProtocolTranscript,
     type RegistrationPayload,
     type SignedPayload,
 } from 'threshold-elgamal';
@@ -140,7 +142,63 @@ describe('boardMessages', () => {
         expect(classified.boardAudit.phaseDigests).toEqual([
             {
                 phase: 0,
-                digest: expect.stringMatching(/^[a-f0-9]{64}$/i),
+                digest: await hashProtocolTranscript(
+                    sortProtocolPayloads([firstPayload.payload]),
+                ),
+            },
+        ]);
+    });
+
+    test('breaks identical timestamps by row id so the earliest id is accepted', async () => {
+        const keyMaterial = await createRegistrationKeyMaterial();
+        const lexicallyFirstPayload = await createSignedRegistrationPayload({
+            keyMaterial,
+            participantIndex: 1,
+            rosterHash: 'a'.repeat(64),
+            signature: '12',
+        });
+        const lexicallyLaterPayload = await createSignedRegistrationPayload({
+            keyMaterial,
+            participantIndex: 1,
+            rosterHash: 'a'.repeat(64),
+            signature: '34',
+        });
+        const lexicallyLaterRow = createBoardMessageRow({
+            id: 'row-b',
+            signedPayload: lexicallyLaterPayload,
+        });
+        const lexicallyFirstRow = createBoardMessageRow({
+            id: 'row-a',
+            signedPayload: lexicallyFirstPayload,
+        });
+
+        const classified = await classifyBoardMessages([
+            lexicallyLaterRow,
+            lexicallyFirstRow,
+        ]);
+
+        expect(classified.acceptedPayloads).toEqual([lexicallyFirstPayload]);
+        expect(classified.records).toMatchObject([
+            {
+                id: 'row-a',
+                classification: 'accepted',
+            },
+            {
+                id: 'row-b',
+                classification: 'idempotent',
+            },
+        ]);
+        expect(classified.boardAudit).toMatchObject({
+            acceptedCount: 1,
+            duplicateCount: 1,
+            equivocationCount: 0,
+        });
+        expect(classified.boardAudit.phaseDigests).toEqual([
+            {
+                phase: 0,
+                digest: await hashProtocolTranscript(
+                    sortProtocolPayloads([lexicallyFirstPayload.payload]),
+                ),
             },
         ]);
     });
