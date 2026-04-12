@@ -49,30 +49,28 @@ const createClosedPollWithParticipants = async (
     pollId: string;
 }> => {
     const { pollId, creatorToken } = await createPoll(fastify);
-    const participants = await Promise.all(
-        participantNames.map(async (participantName) => {
-            const registrationResult = await registerVoter(
-                fastify,
-                pollId,
-                participantName,
-            );
+    const participants: RegisteredParticipant[] = [];
 
-            expect(registrationResult.success).toBe(true);
-            if (!registrationResult.success) {
-                throw new Error(
-                    registrationResult.message ?? 'Expected success.',
-                );
-            }
+    for (const participantName of participantNames) {
+        const registrationResult = await registerVoter(
+            fastify,
+            pollId,
+            participantName,
+        );
 
-            return {
-                authKeyPair: registrationResult.authKeyPair,
-                transportKeyPair: registrationResult.transportKeyPair,
-                voterIndex: registrationResult.voterIndex,
-                voterName: registrationResult.voterName,
-                voterToken: registrationResult.voterToken,
-            };
-        }),
-    );
+        expect(registrationResult.success).toBe(true);
+        if (!registrationResult.success) {
+            throw new Error(registrationResult.message ?? 'Expected success.');
+        }
+
+        participants.push({
+            authKeyPair: registrationResult.authKeyPair,
+            transportKeyPair: registrationResult.transportKeyPair,
+            voterIndex: registrationResult.voterIndex,
+            voterName: registrationResult.voterName,
+            voterToken: registrationResult.voterToken,
+        });
+    }
 
     const closeResult = await closePoll(fastify, pollId, creatorToken);
     expect(closeResult.success).toBe(true);
