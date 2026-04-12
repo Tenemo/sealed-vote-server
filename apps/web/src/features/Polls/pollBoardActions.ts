@@ -351,17 +351,6 @@ const wasResolutionAborted = (
     shouldAbort: ShouldAbortResolution | undefined,
 ): boolean => shouldAbort?.() ?? false;
 
-const clearPendingPayload = (pollId: string, slotKey: string): void => {
-    updatePollDeviceState(pollId, (currentState) => ({
-        ...currentState,
-        pendingPayloads: Object.fromEntries(
-            Object.entries(currentState.pendingPayloads).filter(
-                ([currentSlotKey]) => currentSlotKey !== slotKey,
-            ),
-        ),
-    }));
-};
-
 const getOrCreatePreparedAction = async ({
     buildSignedPayload,
     deviceState,
@@ -1602,16 +1591,6 @@ export const describeAutomaticCeremonyAction = (
         default:
             return null;
     }
-};
-
-export const clearCommittedPendingPayload = ({
-    pollId,
-    slotKey,
-}: {
-    pollId: string;
-    slotKey: string;
-}): void => {
-    clearPendingPayload(pollId, slotKey);
 };
 
 export type { PreparedCeremonyAction };

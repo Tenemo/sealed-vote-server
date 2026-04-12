@@ -17,7 +17,6 @@ import {
 } from 'features/Polls/pollSessionStorage';
 import { generateClientToken } from 'features/Polls/clientToken';
 import {
-    clearCommittedPendingPayload,
     describeAutomaticCeremonyAction,
     resolveAutomaticCeremonyAction,
     type PreparedCeremonyAction,
@@ -419,10 +418,9 @@ const PollPage = (): React.JSX.Element => {
                     },
                 }).unwrap();
 
-                clearCommittedPendingPayload({
-                    pollId: poll.id,
-                    slotKey: action.slotKey,
-                });
+                // Keep the saved payload until poll state confirms the slot was
+                // accepted. Clearing it here can regenerate a fresh randomized
+                // proof for the same slot while the refetch is still catching up.
                 await refetch();
             } catch (submissionError) {
                 setAutomationError(renderError(submissionError));

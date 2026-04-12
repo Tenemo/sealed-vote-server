@@ -19,6 +19,7 @@
     "include": [
         "netlify/**/*.ts",
         "playwright.config.ts",
+        "playwright.compat.config.ts",
         "playwright.production.config.ts",
         "tests/e2e/**/*.ts",
         "tests/e2e/**/*.mts"

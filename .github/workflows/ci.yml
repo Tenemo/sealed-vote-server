@@ -122,6 +122,47 @@ jobs:
             - name: run build
               run: pnpm build
 
+    browser-compat-webkit:
+        name: browser-compat (macOS WebKit)
+        runs-on: macos-latest
+        timeout-minutes: 20
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: install Playwright WebKit
+              run: pnpm exec playwright install webkit
+
+            - name: run WebKit browser compatibility probe
+              run: >-
+                  pnpm exec playwright test
+                  --config playwright.compat.config.ts
+                  --project webkit-desktop
+                  --project mobile-webkit-iphone
+                  --project mobile-webkit-ipad
+
+            - name: upload browser compatibility results
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: playwright-browser-compat-results
+                  path: test-results/browser-compat
+                  if-no-files-found: ignore
+
     e2e-prepare:
         name: e2e-prepare
         runs-on: ubuntu-latest

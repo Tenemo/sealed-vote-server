@@ -83,8 +83,8 @@ test('restores the securing state after refresh once voting is closed', async ({
     request,
 }, testInfo) => {
     test.skip(
-        browserName === 'webkit',
-        'Playwright WebKit does not support the Ed25519 and X25519 WebCrypto key generation required for device-backed vote submission.',
+        browserName === 'webkit' && process.platform !== 'darwin',
+        'Non-macOS Playwright WebKit does not support the Ed25519 and X25519 WebCrypto key generation required for device-backed vote submission.',
     );
 
     const tracker = createUnexpectedErrorTracker();

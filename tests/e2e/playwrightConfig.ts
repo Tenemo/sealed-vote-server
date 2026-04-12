@@ -16,15 +16,20 @@ const chromiumOnlySpecs = [
     '**/share-link.spec.ts',
 ];
 
-// Playwright WebKit still throws NotSupportedError for the Ed25519 and X25519
-// WebCrypto key generation that device-backed vote submission requires.
-const webkitUnsupportedDeviceKeySetupSpecs = [
-    '**/ceremony-persistence.spec.ts',
-    '**/ceremony-rescue.spec.ts',
-    '**/multi-participant-counting.spec.ts',
-    '**/setup-phase.spec.ts',
-    '**/voting-flow.spec.ts',
-];
+// The main e2e matrix runs WebKit on Linux, where device-backed vote submission
+// still hits NotSupportedError for the Ed25519 and X25519 WebCrypto key
+// generation that the app requires. We probe Apple-platform WebKit separately
+// on macOS, so only non-macOS WebKit runs need these exclusions here.
+const webkitUnsupportedDeviceKeySetupSpecs =
+    process.platform === 'darwin'
+        ? []
+        : [
+              '**/ceremony-persistence.spec.ts',
+              '**/ceremony-rescue.spec.ts',
+              '**/multi-participant-counting.spec.ts',
+              '**/setup-phase.spec.ts',
+              '**/voting-flow.spec.ts',
+          ];
 
 const isCi = Boolean(process.env.CI);
 const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
