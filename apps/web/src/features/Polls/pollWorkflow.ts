@@ -65,6 +65,7 @@ export const derivePollWorkflow = ({
         localParticipant &&
         Array.isArray(storedBallotScores) &&
         storedBallotScores.length === poll.choices.length;
+    const missingRecoverableLocalVote = localParticipant && !hasLocalVote;
     const missingLocalState = !!voterSession && !localParticipant;
     const localCeremonyState = voterSession
         ? (poll.voters.find(
@@ -92,6 +93,19 @@ export const derivePollWorkflow = ({
                 hasSubmittedVote: false,
                 isCreator,
                 missingLocalState: false,
+            };
+        }
+
+        if (missingRecoverableLocalVote) {
+            return {
+                canCloseVoting: false,
+                canRetryAutomation: false,
+                canSubmitVote: false,
+                currentStep: 'local-vote-missing',
+                hasLocalVote: false,
+                hasSubmittedVote,
+                isCreator,
+                missingLocalState: true,
             };
         }
 

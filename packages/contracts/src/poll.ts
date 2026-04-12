@@ -6,7 +6,7 @@ export type CreatePollRequest = {
     choices: string[];
     creatorToken: string;
     pollName: string;
-    protocolVersion?: string;
+    protocolVersion?: 'v1';
 };
 
 export type CreatePollResponse = {

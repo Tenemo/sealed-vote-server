@@ -13,7 +13,6 @@ import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
 import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
 import { insertPollCeremonySession } from '../utils/pollCeremonySessions.js';
-import { countPollVoters } from '../utils/pollCounts.js';
 import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
 import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
@@ -47,11 +46,12 @@ export type CloseVotingResponse = MessageResponse;
 const validateParticipantDeviceReadiness = async (
     client: DatabaseTransaction,
     pollId: string,
-): Promise<void> => {
+): Promise<number[]> => {
     const participants = await client
         .select({
             publicKeyShare: publicKeyShares.publicKeyShare,
             voterId: voters.id,
+            voterIndex: voters.voterIndex,
         })
         .from(voters)
         .leftJoin(
@@ -61,7 +61,12 @@ const validateParticipantDeviceReadiness = async (
                 eq(publicKeyShares.pollId, voters.pollId),
             ),
         )
-        .where(eq(voters.pollId, pollId));
+        .where(eq(voters.pollId, pollId))
+        .orderBy(voters.voterIndex);
+
+    if (participants.length < minimumPollParticipantsToClose) {
+        throw createError(400, ERROR_MESSAGES.notEnoughParticipantsToClose);
+    }
 
     const everyParticipantHasDeviceKeys = participants.every(
         (participant) =>
@@ -71,6 +76,8 @@ const validateParticipantDeviceReadiness = async (
     if (!everyParticipantHasDeviceKeys) {
         throw createError(400, ERROR_MESSAGES.participantDeviceKeysRequired);
     }
+
+    return participants.map((participant) => participant.voterIndex);
 };
 
 export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
@@ -113,32 +120,11 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
                         return { message: 'Voting closed successfully.' };
                     }
 
-                    const participantCount = await countPollVoters(
-                        client,
-                        req.params.pollId,
-                    );
-
-                    if (participantCount < minimumPollParticipantsToClose) {
-                        throw createError(
-                            400,
-                            ERROR_MESSAGES.notEnoughParticipantsToClose,
+                    const activeParticipantIndices =
+                        await validateParticipantDeviceReadiness(
+                            client,
+                            req.params.pollId,
                         );
-                    }
-
-                    await validateParticipantDeviceReadiness(
-                        client,
-                        req.params.pollId,
-                    );
-
-                    const submittedVoters = await client.query.voters.findMany({
-                        where: (fields, { eq: isEqual }) =>
-                            isEqual(fields.pollId, req.params.pollId),
-                        columns: {
-                            voterIndex: true,
-                        },
-                        orderBy: (fields, { asc: ascending }) =>
-                            ascending(fields.voterIndex),
-                    });
 
                     await client
                         .update(polls)
@@ -148,9 +134,7 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
                         .where(eq(polls.id, req.params.pollId));
 
                     await insertPollCeremonySession({
-                        activeParticipantIndices: submittedVoters.map(
-                            (participant) => participant.voterIndex,
-                        ),
+                        activeParticipantIndices,
                         pollId: req.params.pollId,
                         tx: client,
                     });

@@ -29,7 +29,7 @@ const CreatePollRequestSchema = Type.Object(
         choices: Type.Array(Type.String()),
         creatorToken: SecureTokenSchema,
         pollName: Type.String(),
-        protocolVersion: Type.Optional(Type.String({ minLength: 1 })),
+        protocolVersion: Type.Optional(Type.Literal('v1')),
     },
     {
         additionalProperties: false,
@@ -54,6 +54,7 @@ const schema = {
 type CreatePollRequest = CreatePollRequestContract;
 export type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
+const supportedProtocolVersion = 'v1' as const;
 
 const getExistingPollByCreatorTokenHash = async (
     fastify: FastifyInstance,
@@ -133,9 +134,8 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
             const { choices, creatorToken } = req.body;
             const pollName = normalizeTrimmedString(req.body.pollName);
             const normalizedChoices = normalizeTrimmedStrings(choices);
-            const protocolVersion = normalizeTrimmedString(
-                req.body.protocolVersion ?? 'v1',
-            );
+            const protocolVersion =
+                req.body.protocolVersion ?? supportedProtocolVersion;
 
             if (!pollName) {
                 throw createError(400, 'Poll name is required.');
@@ -151,13 +151,6 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
 
             if (hasDuplicateStrings(normalizedChoices)) {
                 throw createError(400, 'Choice names must be unique.');
-            }
-
-            if (protocolVersion !== 'v1') {
-                throw createError(
-                    400,
-                    'Only protocol version "v1" is supported.',
-                );
             }
 
             const creatorTokenHash = hashSecureToken(creatorToken);

@@ -15,6 +15,9 @@ const resolveFromRoot = (...segments: string[]): string =>
 const resolveFromSrc = (...segments: string[]): string =>
     resolveFromRoot('src', ...segments);
 
+const resolveFromNodeModules = (...segments: string[]): string =>
+    resolveFromRoot('node_modules', ...segments);
+
 const getManualChunk = (id: string): string | undefined => {
     const normalizedId = id.replaceAll('\\', '/');
 
@@ -69,6 +72,9 @@ export default defineConfig({
             components: resolveFromSrc('components'),
             features: resolveFromSrc('features'),
             fonts: resolveFromSrc('fonts'),
+            // Netlify's Linux Rolldown build can miss pnpm's nested tslib link
+            // in transitive packages like react-remove-scroll.
+            tslib: resolveFromNodeModules('tslib', 'tslib.es6.mjs'),
             typings: resolveFromSrc('typings'),
             utils: resolveFromSrc('utils'),
         },

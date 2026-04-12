@@ -186,7 +186,7 @@ describe('pollWorkflow', () => {
         });
     });
 
-    it('does not count mismatched local ballot scores as a recoverable local vote', () => {
+    it('flags a participant whose local ballot scores are no longer recoverable', () => {
         expect(
             derivePollWorkflow({
                 creatorSessionPollId: null,
@@ -209,9 +209,43 @@ describe('pollWorkflow', () => {
                 voterSession: createVoterSession(),
             }),
         ).toMatchObject({
-            currentStep: 'vote-stored-waiting-for-close',
+            currentStep: 'local-vote-missing',
             hasLocalVote: false,
             hasSubmittedVote: true,
+            missingLocalState: true,
+        });
+    });
+
+    it('does not allow the creator to close while their local ballot scores are missing', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: 'poll-1',
+                deviceState: createDeviceState({
+                    isCreatorParticipant: true,
+                    storedBallotScores: null,
+                }),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    submittedParticipantCount: 3,
+                    voters: [
+                        {
+                            ceremonyState: 'active',
+                            deviceReady: true,
+                            voterIndex: 1,
+                            voterName: 'Alice',
+                        },
+                    ],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            canCloseVoting: false,
+            currentStep: 'local-vote-missing',
+            hasLocalVote: false,
+            hasSubmittedVote: true,
+            missingLocalState: true,
         });
     });
 

@@ -986,7 +986,8 @@ const PollPage = (): React.JSX.Element => {
                                     </LoadingButton>
                                 </div>
                             </form>
-                        ) : poll.phase === 'open' ? (
+                        ) : poll.phase === 'open' &&
+                          workflow.currentStep !== 'local-vote-missing' ? (
                             <div className="space-y-4">
                                 <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4">
                                     <div className="text-base font-semibold">
