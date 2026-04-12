@@ -12,7 +12,7 @@ import {
 } from 'threshold-elgamal';
 
 import { buildServer } from '../buildServer';
-import { publicKeyShares } from '../db/schema';
+import { publicKeyShares } from '../db/schema.js';
 import {
     createPoll,
     deletePoll,

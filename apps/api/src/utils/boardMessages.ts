@@ -89,23 +89,24 @@ const toBoardMessageRecord = (
 const buildSlotRowClassifications = (
     slotRows: readonly BoardMessageRow[],
 ): Map<string, BoardMessageRecord['classification']> => {
+    const sortedSlotRows = sortBoardRows(slotRows);
     const classifications = new Map<
         string,
         BoardMessageRecord['classification']
     >();
     const distinctUnsignedHashCount = new Set(
-        slotRows.map((entry) => entry.unsignedHash),
+        sortedSlotRows.map((entry) => entry.unsignedHash),
     ).size;
 
     if (distinctUnsignedHashCount > 1) {
-        for (const row of slotRows) {
+        for (const row of sortedSlotRows) {
             classifications.set(row.id, 'equivocation');
         }
 
         return classifications;
     }
 
-    for (const [index, row] of slotRows.entries()) {
+    for (const [index, row] of sortedSlotRows.entries()) {
         classifications.set(row.id, index === 0 ? 'accepted' : 'idempotent');
     }
 
@@ -116,10 +117,7 @@ const classifySlotRows = (
     slotRows: readonly BoardMessageRow[],
     rowId: string,
 ): BoardMessageRecord['classification'] => {
-    return (
-        buildSlotRowClassifications(sortBoardRows(slotRows)).get(rowId) ??
-        'idempotent'
-    );
+    return buildSlotRowClassifications(slotRows).get(rowId) ?? 'idempotent';
 };
 
 const computePhaseDigests = async (
