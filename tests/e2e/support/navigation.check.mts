@@ -14,9 +14,9 @@ type NavigationOptions = {
 };
 
 const createPageDouble = (): NavigationTarget => ({
-    goto: async (_url: string, _options?: NavigationOptions) => undefined,
-    reload: async (_options?: NavigationOptions) => undefined,
-    waitForTimeout: async (_timeout: number) => undefined,
+    goto: async () => undefined,
+    reload: async () => undefined,
+    waitForTimeout: async () => undefined,
 });
 
 // These helper checks look a bit unusual because they test Playwright plumbing

@@ -27,7 +27,7 @@ jobs:
               with:
                   node-version-file: '.nvmrc'
 
-            - name: wait for the deployed commit
+            - name: wait for stable production readiness
               run: >-
                   node --experimental-strip-types tests/e2e/scripts/wait-for-production-deploy.mts
                   --commit ${{ github.sha }}
@@ -35,6 +35,8 @@ jobs:
                   --api https://api.sealed.vote
                   --timeout-ms 1800000
                   --interval-ms 15000
+                  --request-timeout-ms 10000
+                  --required-stable-checks 2
 
             - name: verify production seo previews
               shell: bash
