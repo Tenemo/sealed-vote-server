@@ -76,7 +76,7 @@ test('closeParticipant skips context.close for page-only participants', async ()
     assert.equal(participantDouble.contextCloseCalls, 0);
 });
 
-test('openProjectParticipant closes Firefox participants at the context level', async () => {
+test('openProjectParticipant closes project participants at the context level', async () => {
     const pageDouble = {};
     const contextDouble = {
         newPage: async () => pageDouble,
@@ -101,7 +101,7 @@ test('openProjectParticipant closes Firefox participants at the context level', 
     assert.equal(participant.closeMode, 'context');
 });
 
-test('reopenProjectParticipant closes Firefox participants at the context level', async () => {
+test('reopenProjectParticipant closes restored project participants at the context level', async () => {
     const pageDouble = {};
     const contextDouble = {
         newPage: async () => pageDouble,
