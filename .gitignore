@@ -25,6 +25,7 @@ debug.log
 sh.exe.stackdump
 temp/
 temp.*
+tmp/
 
 # Environment
 .env

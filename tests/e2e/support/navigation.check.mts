@@ -22,7 +22,7 @@ const createPageDouble = (): NavigationTarget => ({
 // These helper checks look a bit unusual because they test Playwright plumbing
 // rather than the app directly, but they pin the retry and timeout behavior
 // that keeps the browser matrix stable across transient navigation failures.
-test('gotoInteractablePage uses domcontentloaded with a short timeout', async () => {
+test('gotoInteractablePage waits for commit with a short timeout', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble();
     page.goto = async (_url: string, options?: NavigationOptions) => {
@@ -34,7 +34,7 @@ test('gotoInteractablePage uses domcontentloaded with a short timeout', async ()
     assert.deepEqual(calls, [
         {
             timeout: 15_000,
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'commit',
         },
     ]);
 });
@@ -64,11 +64,11 @@ test('gotoInteractablePage retries transient Firefox navigation errors once', as
     assert.deepEqual(gotoCalls, [
         {
             timeout: 15_000,
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'commit',
         },
         {
             timeout: 15_000,
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'commit',
         },
     ]);
 });
@@ -101,7 +101,7 @@ test('reloadInteractablePage uses the same navigation policy', async () => {
     assert.deepEqual(calls, [
         {
             timeout: 15_000,
-            waitUntil: 'domcontentloaded',
+            waitUntil: 'commit',
         },
     ]);
 });

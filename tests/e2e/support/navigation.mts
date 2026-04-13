@@ -18,7 +18,11 @@ export type NavigationTarget = {
     waitForTimeout: (timeout: number) => Promise<void>;
 };
 
-const navigationReadyState = 'domcontentloaded' as const;
+// Production artifacts showed pages rendering successfully while Playwright was
+// still waiting for a stricter navigation milestone. Keep generic navigation at
+// the first committed response, then let each caller wait for the specific UI it
+// needs before interacting.
+const navigationReadyState = 'commit' as const;
 const navigationTimeoutMs = 15_000;
 const navigationRetryDelayMs = 1_000;
 const transientNavigationErrorPatterns = [
