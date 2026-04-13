@@ -1,6 +1,6 @@
 {
     "name": "@sealed-vote/web",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "private": true,
     "author": "Piotr Piech <piotr@piech.dev>",
     "license": "AGPL-3.0-only",

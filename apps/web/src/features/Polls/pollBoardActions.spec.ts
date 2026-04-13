@@ -456,6 +456,41 @@ describe('pollBoardActions', () => {
         ).resolves.toBeNull();
     });
 
+    it('stops automation when the active roster entry no longer matches the device transport suite', async () => {
+        await expect(
+            resolveAutomaticCeremonyAction({
+                creatorSession: null,
+                deviceState: createDeviceState(),
+                poll: createPoll({
+                    rosterEntries: [
+                        {
+                            authPublicKey: 'auth-1',
+                            participantIndex: 1,
+                            transportPublicKey: 'transport-1',
+                            transportSuite: 'X25519',
+                            voterName: 'Alice',
+                        },
+                        {
+                            authPublicKey: 'auth-2',
+                            participantIndex: 2,
+                            transportPublicKey: 'transport-2',
+                            transportSuite: 'P-256' as never,
+                            voterName: 'Bob',
+                        },
+                        {
+                            authPublicKey: 'auth-3',
+                            participantIndex: 3,
+                            transportPublicKey: 'transport-3',
+                            transportSuite: 'X25519',
+                            voterName: 'Cora',
+                        },
+                    ] as PollResponse['rosterEntries'],
+                }),
+                voterSession: createVoterSession(),
+            }),
+        ).resolves.toBeNull();
+    });
+
     it('uses the dense active-session participant index after a ceremony restart', async () => {
         const deviceState = await createValidDeviceState({
             isCreatorParticipant: false,

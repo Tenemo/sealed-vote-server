@@ -103,10 +103,7 @@ export const openProjectParticipant = async (
     const page = await context.newPage();
 
     return createManagedParticipant({
-        closeMode:
-            testInfo.project.use.browserName === 'firefox'
-                ? 'page-only'
-                : 'context',
+        closeMode: 'context',
         context,
         page,
     });
@@ -128,10 +125,7 @@ export const reopenProjectParticipant = async ({
     const page = await context.newPage();
 
     return createManagedParticipant({
-        closeMode:
-            testInfo.project.use.browserName === 'firefox'
-                ? 'page-only'
-                : 'context',
+        closeMode: 'context',
         context,
         page,
     });
