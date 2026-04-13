@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
     createSyntheticVotePath,
+    formatReadinessStatus,
     isReadinessStatusSuccessful,
     waitForProductionDeploy,
 } from '../scripts/wait-for-production-deploy.mts';
@@ -100,6 +101,47 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
             expectedCommitSha,
         ),
         false,
+    );
+});
+
+test('formatReadinessStatus reports unreachable, missing, and unknown HTML marker states', () => {
+    assert.match(
+        formatReadinessStatus(
+            createReadinessStatus({
+                homepage: createHtmlStatus({
+                    contentType: null,
+                    ok: false,
+                    statusCode: null,
+                }),
+            }),
+        ),
+        /homepage: status=unreachable, contentType=missing, markers=unreachable/u,
+    );
+
+    assert.match(
+        formatReadinessStatus(
+            createReadinessStatus({
+                votePage: createHtmlStatus({
+                    missingSnippetLabel: 'vote page canonical',
+                    ok: false,
+                    statusCode: 200,
+                }),
+            }),
+        ),
+        /vote page: status=200, contentType=text\/html; charset=utf-8, markers=missing vote page canonical/u,
+    );
+
+    assert.match(
+        formatReadinessStatus(
+            createReadinessStatus({
+                homepage: createHtmlStatus({
+                    contentType: 'application\/json',
+                    ok: false,
+                    statusCode: 503,
+                }),
+            }),
+        ),
+        /homepage: status=503, contentType=application\/json, markers=unknown/u,
     );
 });
 

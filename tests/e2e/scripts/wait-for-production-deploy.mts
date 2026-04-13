@@ -426,9 +426,14 @@ const formatJsonStatus = (label: string, status: JsonProbeStatus): string =>
 
 const formatHtmlStatus = (label: string, status: HtmlProbeStatus): string => {
     const contentType = status.contentType ?? 'missing';
-    const markerStatus = status.missingSnippetLabel
-        ? `missing ${status.missingSnippetLabel}`
-        : 'markers=ok';
+    const markerStatus =
+        status.statusCode == null
+            ? 'markers=unreachable'
+            : status.missingSnippetLabel
+              ? `markers=missing ${status.missingSnippetLabel}`
+              : status.ok
+                ? 'markers=ok'
+                : 'markers=unknown';
 
     return `${label}: status=${status.statusCode ?? 'unreachable'}, contentType=${contentType}, ${markerStatus}`;
 };
