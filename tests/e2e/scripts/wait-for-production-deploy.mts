@@ -1,27 +1,68 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 type WaitOptions = {
     apiBaseUrl: string;
     expectedCommitSha: string;
     intervalMs: number;
+    requestTimeoutMs: number;
+    requiredStableChecks: number;
     timeoutMs: number;
     webBaseUrl: string;
 };
 
-type DeploymentStatus = {
+type JsonProbeStatus = {
     commitSha: string | null;
     ok: boolean;
     statusCode: number | null;
     url: string;
 };
 
+type HtmlProbeStatus = {
+    contentType: string | null;
+    missingSnippetLabel: string | null;
+    ok: boolean;
+    statusCode: number | null;
+    url: string;
+};
+
+type ReadinessStatus = {
+    apiHealth: JsonProbeStatus;
+    homepage: HtmlProbeStatus;
+    votePage: HtmlProbeStatus;
+    webVersion: JsonProbeStatus;
+};
+
+type WaitDependencies = {
+    loadReadinessStatus?: (options: WaitOptions) => Promise<ReadinessStatus>;
+    log?: (message: string) => void;
+    now?: () => number;
+    sleep?: (delayMs: number) => Promise<void>;
+};
+
+type HtmlProbeExpectation = {
+    label: string;
+    snippet: string;
+};
+
 const commitShaPattern = /^[0-9a-f]{7,40}$/i;
 const defaultIntervalMs = 15_000;
+const defaultRequestTimeoutMs = 10_000;
+const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 30 * 60 * 1000;
+const syntheticVoteSlugPrefix = 'production-readiness-';
+const homepageExpectedTitle =
+    '<title>sealed.vote | 1-10 score voting app</title>';
+const homepageExpectedSiteName =
+    '<meta property="og:site_name" content="sealed.vote" />';
+const now = (): number => Date.now();
+const currentFilePath = fileURLToPath(import.meta.url);
 
 const fail = (message: string): never => {
     throw new Error(message);
 };
 
-const normalizeAbsoluteUrl = (rawUrl: string, label: string): string => {
+export const normalizeAbsoluteUrl = (rawUrl: string, label: string): string => {
     let parsedUrl: URL;
 
     try {
@@ -30,17 +71,14 @@ const normalizeAbsoluteUrl = (rawUrl: string, label: string): string => {
         return fail(`${label} must be a valid absolute URL.`);
     }
 
-    if (
-        parsedUrl.protocol !== 'http:' &&
-        parsedUrl.protocol !== 'https:'
-    ) {
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
         return fail(`${label} must use the http or https protocol.`);
     }
 
     return parsedUrl.origin;
 };
 
-const normalizeCommitSha = (rawCommitSha: string): string => {
+export const normalizeCommitSha = (rawCommitSha: string): string => {
     const normalizedCommitSha = rawCommitSha.trim().toLowerCase();
 
     if (!commitShaPattern.test(normalizedCommitSha)) {
@@ -52,7 +90,7 @@ const normalizeCommitSha = (rawCommitSha: string): string => {
     return normalizedCommitSha;
 };
 
-const parsePositiveInteger = (
+export const parsePositiveInteger = (
     rawValue: string | undefined,
     fallback: number,
     label: string,
@@ -72,6 +110,54 @@ const parsePositiveInteger = (
     }
 
     return parsedValue;
+};
+
+export const createSyntheticVotePath = (expectedCommitSha: string): string => {
+    const normalizedCommitSha = normalizeCommitSha(expectedCommitSha);
+    const readableCommitSha = normalizedCommitSha.slice(0, 12);
+    return `/votes/${syntheticVoteSlugPrefix}${readableCommitSha}`;
+};
+
+const createHtmlProbeExpectations = (
+    webBaseUrl: string,
+    expectedCommitSha: string,
+): {
+    homepage: HtmlProbeExpectation[];
+    votePage: HtmlProbeExpectation[];
+} => {
+    const syntheticVotePath = createSyntheticVotePath(expectedCommitSha);
+    const syntheticVoteCanonicalUrl = new URL(
+        syntheticVotePath,
+        webBaseUrl,
+    ).toString();
+
+    return {
+        homepage: [
+            {
+                label: 'homepage title',
+                snippet: homepageExpectedTitle,
+            },
+            {
+                label: 'homepage og site name',
+                snippet: homepageExpectedSiteName,
+            },
+        ],
+        votePage: [
+            {
+                label: 'vote page canonical',
+                snippet: `<link data-rh="true" rel="canonical" href="${syntheticVoteCanonicalUrl}"`,
+            },
+            {
+                label: 'vote page robots',
+                snippet:
+                    '<meta data-rh="true" name="robots" content="noindex, nofollow, noarchive, max-image-preview:large" />',
+            },
+            {
+                label: 'vote page title',
+                snippet: '<title data-rh="true">Vote | sealed.vote</title>',
+            },
+        ],
+    };
 };
 
 const parseArgs = (): WaitOptions => {
@@ -102,35 +188,58 @@ const parseArgs = (): WaitOptions => {
         fail('Missing required --api argument.');
     }
 
+    const apiBaseUrl = normalizeAbsoluteUrl(rawApiBaseUrl!, '--api');
+    const expectedCommitSha = normalizeCommitSha(rawExpectedCommitSha!);
+    const webBaseUrl = normalizeAbsoluteUrl(rawWebBaseUrl!, '--web');
+
     return {
-        apiBaseUrl: normalizeAbsoluteUrl(rawApiBaseUrl!, '--api'),
-        expectedCommitSha: normalizeCommitSha(rawExpectedCommitSha!),
+        apiBaseUrl,
+        expectedCommitSha,
         intervalMs: parsePositiveInteger(
             getArgValue('--interval-ms'),
             defaultIntervalMs,
             '--interval-ms',
+        ),
+        requestTimeoutMs: parsePositiveInteger(
+            getArgValue('--request-timeout-ms'),
+            defaultRequestTimeoutMs,
+            '--request-timeout-ms',
+        ),
+        requiredStableChecks: parsePositiveInteger(
+            getArgValue('--required-stable-checks'),
+            defaultRequiredStableChecks,
+            '--required-stable-checks',
         ),
         timeoutMs: parsePositiveInteger(
             getArgValue('--timeout-ms'),
             defaultTimeoutMs,
             '--timeout-ms',
         ),
-        webBaseUrl: normalizeAbsoluteUrl(rawWebBaseUrl!, '--web'),
+        webBaseUrl,
     };
+};
+
+const createNoStoreUrl = (baseUrl: string, endpointPath: string): URL => {
+    const url = new URL(endpointPath, baseUrl);
+    url.searchParams.set('t', `${now()}`);
+    return url;
 };
 
 const getJsonResponse = async (
     url: URL,
+    requestTimeoutMs: number,
 ): Promise<{ body: unknown; statusCode: number }> => {
     const response = await fetch(url, {
         headers: {
             accept: 'application/json',
             'cache-control': 'no-store',
+            pragma: 'no-cache',
         },
         cache: 'no-store',
+        signal: AbortSignal.timeout(requestTimeoutMs),
     });
     const statusCode = response.status;
-    let body: unknown = null;
+    let body: unknown;
 
     try {
         body = await response.json();
@@ -138,13 +247,35 @@ const getJsonResponse = async (
         body = null;
     }
 
+    return { body, statusCode };
+};
+
+const getHtmlResponse = async (
+    url: URL,
+    requestTimeoutMs: number,
+): Promise<{
+    body: string;
+    contentType: string | null;
+    statusCode: number;
+}> => {
+    const response = await fetch(url, {
+        headers: {
+            accept: 'text/html,application/xhtml+xml',
+            'cache-control': 'no-store',
+            pragma: 'no-cache',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(requestTimeoutMs),
+    });
+
     return {
-        body,
-        statusCode,
+        body: await response.text(),
+        contentType: response.headers.get('content-type'),
+        statusCode: response.status,
     };
 };
 
-const readCommitSha = (body: unknown): string | null => {
+export const readCommitSha = (body: unknown): string | null => {
     if (typeof body !== 'object' || body === null) {
         return null;
     }
@@ -156,18 +287,23 @@ const readCommitSha = (body: unknown): string | null => {
     }
 
     const normalizedCommitSha = commitSha.trim().toLowerCase();
-    return commitShaPattern.test(normalizedCommitSha) ? normalizedCommitSha : null;
+    return commitShaPattern.test(normalizedCommitSha)
+        ? normalizedCommitSha
+        : null;
 };
 
-const loadDeploymentStatus = async (
+const loadJsonProbeStatus = async (
     baseUrl: string,
     endpointPath: string,
-): Promise<DeploymentStatus> => {
-    const url = new URL(endpointPath, baseUrl);
-    url.searchParams.set('t', `${Date.now()}`);
+    requestTimeoutMs: number,
+): Promise<JsonProbeStatus> => {
+    const url = createNoStoreUrl(baseUrl, endpointPath);
 
     try {
-        const { body, statusCode } = await getJsonResponse(url);
+        const { body, statusCode } = await getJsonResponse(
+            url,
+            requestTimeoutMs,
+        );
 
         return {
             commitSha: readCommitSha(body),
@@ -185,57 +321,189 @@ const loadDeploymentStatus = async (
     }
 };
 
+const loadHtmlProbeStatus = async (
+    baseUrl: string,
+    endpointPath: string,
+    requestTimeoutMs: number,
+    expectations: HtmlProbeExpectation[],
+): Promise<HtmlProbeStatus> => {
+    const url = createNoStoreUrl(baseUrl, endpointPath);
+
+    try {
+        const { body, contentType, statusCode } = await getHtmlResponse(
+            url,
+            requestTimeoutMs,
+        );
+        const missingExpectation =
+            expectations.find(({ snippet }) => !body.includes(snippet)) ?? null;
+        const isHtmlResponse = (contentType || '').includes('text/html');
+
+        return {
+            contentType,
+            missingSnippetLabel: missingExpectation?.label ?? null,
+            ok:
+                statusCode >= 200 &&
+                statusCode < 300 &&
+                isHtmlResponse &&
+                missingExpectation === null,
+            statusCode,
+            url: url.toString(),
+        };
+    } catch {
+        return {
+            contentType: null,
+            missingSnippetLabel: null,
+            ok: false,
+            statusCode: null,
+            url: url.toString(),
+        };
+    }
+};
+
+export const loadReadinessStatus = async (
+    options: WaitOptions,
+): Promise<ReadinessStatus> => {
+    const expectations = createHtmlProbeExpectations(
+        options.webBaseUrl,
+        options.expectedCommitSha,
+    );
+    const syntheticVotePath = createSyntheticVotePath(
+        options.expectedCommitSha,
+    );
+
+    const [webVersion, apiHealth, homepage, votePage] = await Promise.all([
+        loadJsonProbeStatus(
+            options.webBaseUrl,
+            '/version.json',
+            options.requestTimeoutMs,
+        ),
+        loadJsonProbeStatus(
+            options.apiBaseUrl,
+            '/api/health-check',
+            options.requestTimeoutMs,
+        ),
+        loadHtmlProbeStatus(
+            options.webBaseUrl,
+            '/',
+            options.requestTimeoutMs,
+            expectations.homepage,
+        ),
+        loadHtmlProbeStatus(
+            options.webBaseUrl,
+            syntheticVotePath,
+            options.requestTimeoutMs,
+            expectations.votePage,
+        ),
+    ]);
+
+    return {
+        apiHealth,
+        homepage,
+        votePage,
+        webVersion,
+    };
+};
+
+export const isReadinessStatusSuccessful = (
+    status: ReadinessStatus,
+    expectedCommitSha: string,
+): boolean =>
+    status.webVersion.ok &&
+    status.apiHealth.ok &&
+    status.homepage.ok &&
+    status.votePage.ok &&
+    status.webVersion.commitSha === expectedCommitSha &&
+    status.apiHealth.commitSha === expectedCommitSha;
+
 const sleep = async (delayMs: number): Promise<void> => {
     await new Promise((resolve) => {
         setTimeout(resolve, delayMs);
     });
 };
 
-const formatStatus = (label: string, status: DeploymentStatus): string =>
+const formatJsonStatus = (label: string, status: JsonProbeStatus): string =>
     `${label}: status=${status.statusCode ?? 'unreachable'}, commitSha=${status.commitSha ?? 'missing'}`;
 
-const waitForProductionDeploy = async (): Promise<void> => {
-    const {
-        apiBaseUrl,
-        expectedCommitSha,
-        intervalMs,
-        timeoutMs,
-        webBaseUrl,
-    } = parseArgs();
-    const deadline = Date.now() + timeoutMs;
+const formatHtmlStatus = (label: string, status: HtmlProbeStatus): string => {
+    const contentType = status.contentType ?? 'missing';
+    const markerStatus =
+        status.statusCode == null
+            ? 'markers=unreachable'
+            : status.missingSnippetLabel
+              ? `markers=missing ${status.missingSnippetLabel}`
+              : status.ok
+                ? 'markers=ok'
+                : 'markers=unknown';
 
-    while (Date.now() <= deadline) {
-        const [webStatus, apiStatus] = await Promise.all([
-            loadDeploymentStatus(webBaseUrl, '/version.json'),
-            loadDeploymentStatus(apiBaseUrl, '/api/health-check'),
-        ]);
+    return `${label}: status=${status.statusCode ?? 'unreachable'}, contentType=${contentType}, ${markerStatus}`;
+};
 
-        if (
-            webStatus.ok &&
-            apiStatus.ok &&
-            webStatus.commitSha === expectedCommitSha &&
-            apiStatus.commitSha === expectedCommitSha
-        ) {
-            console.log(
-                `Production frontend and API are serving commit ${expectedCommitSha}.`,
-            );
-            return;
-        }
+export const formatReadinessStatus = (status: ReadinessStatus): string =>
+    [
+        formatJsonStatus('web version', status.webVersion),
+        formatJsonStatus('api health', status.apiHealth),
+        formatHtmlStatus('homepage', status.homepage),
+        formatHtmlStatus('vote page', status.votePage),
+    ].join(' ');
 
-        console.log(
-            [
-                `Waiting for production deploy ${expectedCommitSha}.`,
-                formatStatus('web', webStatus),
-                formatStatus('api', apiStatus),
-            ].join(' '),
+export const waitForProductionDeploy = async (
+    options: WaitOptions,
+    dependencies: WaitDependencies = {},
+): Promise<void> => {
+    const loadStatus = dependencies.loadReadinessStatus ?? loadReadinessStatus;
+    const log = dependencies.log ?? console.log;
+    const resolveNow = dependencies.now ?? now;
+    const wait = dependencies.sleep ?? sleep;
+    const deadline = resolveNow() + options.timeoutMs;
+    let stableChecks = 0;
+
+    while (resolveNow() <= deadline) {
+        const readinessStatus = await loadStatus(options);
+        const isSuccessful = isReadinessStatusSuccessful(
+            readinessStatus,
+            options.expectedCommitSha,
         );
 
-        await sleep(intervalMs);
+        if (isSuccessful) {
+            stableChecks += 1;
+            log(
+                `Production readiness check ${stableChecks}/${options.requiredStableChecks} succeeded. ${formatReadinessStatus(readinessStatus)}`,
+            );
+
+            if (stableChecks >= options.requiredStableChecks) {
+                log(
+                    `Production frontend and API are stably serving commit ${options.expectedCommitSha}.`,
+                );
+                return;
+            }
+        } else {
+            stableChecks = 0;
+            log(
+                [
+                    `Waiting for stable production deploy ${options.expectedCommitSha}.`,
+                    formatReadinessStatus(readinessStatus),
+                ].join(' '),
+            );
+        }
+
+        await wait(options.intervalMs);
     }
 
     fail(
-        `Timed out waiting for production frontend ${webBaseUrl} and API ${apiBaseUrl} to serve commit ${expectedCommitSha}.`,
+        `Timed out waiting for production frontend ${options.webBaseUrl} and API ${options.apiBaseUrl} to stably serve commit ${options.expectedCommitSha}.`,
     );
 };
 
-await waitForProductionDeploy();
+const shouldRunAsCli = (): boolean => {
+    const rawEntryPoint = process.argv[1];
+
+    if (!rawEntryPoint) {
+        return false;
+    }
+
+    return path.resolve(rawEntryPoint) === currentFilePath;
+};
+
+if (shouldRunAsCli()) {
+    await waitForProductionDeploy(parseArgs());
+}
