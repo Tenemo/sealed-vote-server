@@ -257,17 +257,39 @@ const waitForPollSeoPayload = async ({
     pollSlug: string;
     signal?: AbortSignal;
 }): Promise<SeoPollPayload | null> => {
+    const lookupAbortController = new AbortController();
+    const abortLookup = (): void => {
+        if (!lookupAbortController.signal.aborted) {
+            lookupAbortController.abort();
+        }
+    };
+    const handleSignalAbort = (): void => {
+        abortLookup();
+    };
+
+    if (signal?.aborted) {
+        abortLookup();
+    } else {
+        signal?.addEventListener('abort', handleSignalAbort, {
+            once: true,
+        });
+    }
+
     const pendingPayload = fetchPollSeoPayload({
         apiBaseUrl,
         cache,
         fetchImpl,
         now,
         pollSlug,
-        signal,
+        signal: lookupAbortController.signal,
     }).catch(() => null);
 
     if (pollPayloadLookupTimeoutMs < 1) {
-        return pendingPayload;
+        try {
+            return await pendingPayload;
+        } finally {
+            signal?.removeEventListener('abort', handleSignalAbort);
+        }
     }
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -277,6 +299,7 @@ const waitForPollSeoPayload = async ({
             pendingPayload,
             new Promise<SeoPollPayload | null>((resolve) => {
                 timeoutId = setTimeout(() => {
+                    abortLookup();
                     resolve(null);
                 }, pollPayloadLookupTimeoutMs);
             }),
@@ -285,6 +308,8 @@ const waitForPollSeoPayload = async ({
         if (timeoutId !== undefined) {
             clearTimeout(timeoutId);
         }
+
+        signal?.removeEventListener('abort', handleSignalAbort);
     }
 };
 

@@ -261,15 +261,18 @@ describe('resolveDocumentSeoMetadata', () => {
     });
 
     test('falls back when a crawler poll lookup never resolves before the timeout', async () => {
+        let lookupSignal: AbortSignal | undefined;
+
         const metadata = await resolveDocumentSeoMetadata({
             apiBaseUrl: 'https://api.sealed.vote',
-            fetchImpl: vi.fn(
-                async () =>
-                    await new Promise<Response>(() => {
-                        // Keep the lookup pending to emulate a stuck edge-side
-                        // fetch without relying on AbortSignal support.
-                    }),
-            ),
+            fetchImpl: vi.fn(async (_input, init) => {
+                lookupSignal = init?.signal;
+
+                return await new Promise<Response>(() => {
+                    // Keep the lookup pending to emulate a stuck edge-side
+                    // fetch without relying on AbortSignal support.
+                });
+            }),
             pollPayloadLookupTimeoutMs: 1,
             requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
             requestUserAgent:
@@ -278,6 +281,7 @@ describe('resolveDocumentSeoMetadata', () => {
 
         expect(metadata.title).toBe('Vote | sealed.vote');
         expect(metadata.description).toBe('Score options from 1 to 10.');
+        expect(lookupSignal?.aborted).toBe(true);
     });
 
     test('caches open vote SEO payloads for a short interval', async () => {
