@@ -7,6 +7,7 @@ import {
     renderDocumentHtml,
     resolveDocumentSeoMetadata,
     resolveSeoApiBaseUrl,
+    shouldFetchPollSeoPayloadForRequest,
 } from './documentSeo';
 
 const baseHtml = `<!doctype html>
@@ -66,6 +67,28 @@ describe('extractVoteSlugFromPathname', () => {
 
     test('returns null for malformed encoded vote slugs', () => {
         expect(extractVoteSlugFromPathname('/votes/%E0%A4%A.png')).toBeNull();
+    });
+});
+
+describe('shouldFetchPollSeoPayloadForRequest', () => {
+    test('keeps dynamic poll metadata enabled when the request user-agent is unknown', () => {
+        expect(shouldFetchPollSeoPayloadForRequest()).toBe(true);
+    });
+
+    test('skips poll metadata lookups for normal browser user-agents', () => {
+        expect(
+            shouldFetchPollSeoPayloadForRequest(
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+            ),
+        ).toBe(false);
+    });
+
+    test('keeps poll metadata lookups for crawler user-agents', () => {
+        expect(
+            shouldFetchPollSeoPayloadForRequest(
+                'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+            ),
+        ).toBe(true);
     });
 });
 
@@ -200,6 +223,61 @@ describe('resolveDocumentSeoMetadata', () => {
             'Create votes, collect responses, and reveal results.',
         );
         expect(metadata.canonicalUrl).toBe('https://sealed.vote/missing');
+    });
+
+    test('skips poll lookups for normal browser navigations and returns generic vote metadata', async () => {
+        const fetchImpl = vi.fn(async () =>
+            Response.json({
+                pollName: 'Budget & roadmap',
+            }),
+        );
+
+        const metadata = await resolveDocumentSeoMetadata({
+            apiBaseUrl: 'https://api.sealed.vote',
+            fetchImpl,
+            requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            requestUserAgent:
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        });
+
+        expect(metadata.title).toBe('Vote | sealed.vote');
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    test('still enriches vote metadata for crawler requests', async () => {
+        const metadata = await resolveDocumentSeoMetadata({
+            apiBaseUrl: 'https://api.sealed.vote',
+            fetchImpl: vi.fn(async () =>
+                Response.json({
+                    pollName: 'Budget & roadmap',
+                }),
+            ),
+            requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            requestUserAgent:
+                'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+        });
+
+        expect(metadata.title).toBe('Budget & roadmap');
+    });
+
+    test('falls back when a crawler poll lookup never resolves before the timeout', async () => {
+        const metadata = await resolveDocumentSeoMetadata({
+            apiBaseUrl: 'https://api.sealed.vote',
+            fetchImpl: vi.fn(
+                async () =>
+                    await new Promise<Response>(() => {
+                        // Keep the lookup pending to emulate a stuck edge-side
+                        // fetch without relying on AbortSignal support.
+                    }),
+            ),
+            pollPayloadLookupTimeoutMs: 1,
+            requestUrl: new URL('https://sealed.vote/votes/budget-roadmap'),
+            requestUserAgent:
+                'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+        });
+
+        expect(metadata.title).toBe('Vote | sealed.vote');
+        expect(metadata.description).toBe('Score options from 1 to 10.');
     });
 
     test('caches open vote SEO payloads for a short interval', async () => {

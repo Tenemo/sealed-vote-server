@@ -8,6 +8,9 @@ import {
 } from './seoMetadata.mts';
 
 const defaultSeoApiBaseUrl = 'https://api.sealed.vote';
+const defaultPollSeoPayloadLookupTimeoutMs = 1_500;
+const seoCrawlerUserAgentPattern =
+    /bot|crawler|spider|facebookexternalhit|slackbot|discordbot|twitterbot|linkedinbot|whatsapp|telegrambot|googlebot|bingbot|duckduckbot|applebot|embedly|quora link preview|pinterest|skypeuripreview/i;
 
 type FetchLike = typeof fetch;
 type SeoPollPayload = {
@@ -29,6 +32,22 @@ const completedPollSeoCacheTtlMs = 60 * 1000;
 const maxPollSeoCacheEntries = 128;
 
 export const createPollSeoPayloadCache = (): PollSeoPayloadCache => new Map();
+
+export const shouldFetchPollSeoPayloadForRequest = (
+    requestUserAgent?: string | null,
+): boolean => {
+    if (requestUserAgent === undefined) {
+        return true;
+    }
+
+    const normalizedUserAgent = requestUserAgent?.trim();
+
+    if (!normalizedUserAgent) {
+        return false;
+    }
+
+    return seoCrawlerUserAgentPattern.test(normalizedUserAgent);
+};
 
 export const resolveSeoApiBaseUrl = (rawBaseUrl?: string | null): string => {
     const trimmedBaseUrl = rawBaseUrl?.trim();
@@ -221,6 +240,54 @@ const fetchPollSeoPayload = async ({
     }
 };
 
+const waitForPollSeoPayload = async ({
+    apiBaseUrl,
+    cache,
+    fetchImpl = fetch,
+    now,
+    pollPayloadLookupTimeoutMs = defaultPollSeoPayloadLookupTimeoutMs,
+    pollSlug,
+    signal,
+}: {
+    apiBaseUrl: string;
+    cache?: PollSeoPayloadCache;
+    fetchImpl?: FetchLike;
+    now?: () => number;
+    pollPayloadLookupTimeoutMs?: number;
+    pollSlug: string;
+    signal?: AbortSignal;
+}): Promise<SeoPollPayload | null> => {
+    const pendingPayload = fetchPollSeoPayload({
+        apiBaseUrl,
+        cache,
+        fetchImpl,
+        now,
+        pollSlug,
+        signal,
+    }).catch(() => null);
+
+    if (pollPayloadLookupTimeoutMs < 1) {
+        return pendingPayload;
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            pendingPayload,
+            new Promise<SeoPollPayload | null>((resolve) => {
+                timeoutId = setTimeout(() => {
+                    resolve(null);
+                }, pollPayloadLookupTimeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutId !== undefined) {
+            clearTimeout(timeoutId);
+        }
+    }
+};
+
 export const fetchPollTitle = async ({
     apiBaseUrl,
     cache,
@@ -252,14 +319,18 @@ export const resolveDocumentSeoMetadata = async ({
     apiBaseUrl = defaultSeoApiBaseUrl,
     fetchImpl,
     now,
+    pollPayloadLookupTimeoutMs,
     pollPayloadCache,
+    requestUserAgent,
     requestUrl,
     signal,
 }: {
     apiBaseUrl?: string;
     fetchImpl?: FetchLike;
     now?: () => number;
+    pollPayloadLookupTimeoutMs?: number;
     pollPayloadCache?: PollSeoPayloadCache;
+    requestUserAgent?: string | null;
     requestUrl: URL;
     signal?: AbortSignal;
 }): Promise<SeoMetadata> => {
@@ -279,14 +350,19 @@ export const resolveDocumentSeoMetadata = async ({
         });
     }
 
-    const pollPayload = await fetchPollSeoPayload({
-        apiBaseUrl,
-        cache: pollPayloadCache,
-        fetchImpl,
-        now,
-        pollSlug,
-        signal,
-    });
+    // Only crawlers need poll-specific metadata before the SPA hydrates. Human
+    // browsers should not block the vote page document on an extra API fetch.
+    const pollPayload = shouldFetchPollSeoPayloadForRequest(requestUserAgent)
+        ? await waitForPollSeoPayload({
+              apiBaseUrl,
+              cache: pollPayloadCache,
+              fetchImpl,
+              now,
+              pollPayloadLookupTimeoutMs,
+              pollSlug,
+              signal,
+          })
+        : null;
 
     return buildVotePageSeo({
         origin: requestUrl.origin,
@@ -302,7 +378,9 @@ export const renderDocumentHtml = async ({
     baseHtml,
     fetchImpl,
     now,
+    pollPayloadLookupTimeoutMs,
     pollPayloadCache,
+    requestUserAgent,
     requestUrl,
     signal,
 }: {
@@ -310,7 +388,9 @@ export const renderDocumentHtml = async ({
     baseHtml: string;
     fetchImpl?: FetchLike;
     now?: () => number;
+    pollPayloadLookupTimeoutMs?: number;
     pollPayloadCache?: PollSeoPayloadCache;
+    requestUserAgent?: string | null;
     requestUrl: URL;
     signal?: AbortSignal;
 }): Promise<string> => {
@@ -318,7 +398,9 @@ export const renderDocumentHtml = async ({
         apiBaseUrl,
         fetchImpl,
         now,
+        pollPayloadLookupTimeoutMs,
         pollPayloadCache,
+        requestUserAgent,
         requestUrl,
         signal,
     });

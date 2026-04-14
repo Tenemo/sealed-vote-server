@@ -35,6 +35,18 @@ const normalizeForwardedProtocol = (value: string | null): 'http' | 'https' => {
     return 'http';
 };
 
+const readRequestHeader = (
+    value: string | string[] | undefined,
+): string | null => {
+    if (!value) {
+        return null;
+    }
+
+    const normalizedValue = Array.isArray(value) ? value[0] : value;
+
+    return normalizedValue?.trim() || null;
+};
+
 const trustedSeoPublicOrigin = (() => {
     const rawOrigin = process.env.SEO_PUBLIC_ORIGIN?.trim();
 
@@ -231,6 +243,9 @@ const start = async (): Promise<void> => {
                 const html = await renderDocumentHtml({
                     apiBaseUrl: seoApiBaseUrl,
                     baseHtml,
+                    requestUserAgent: readRequestHeader(
+                        request.headers['user-agent'],
+                    ),
                     requestUrl,
                     signal: AbortSignal.timeout(5000),
                 });
