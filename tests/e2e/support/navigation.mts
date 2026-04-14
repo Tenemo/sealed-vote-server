@@ -23,12 +23,36 @@ export type NavigationTarget = {
 // the first committed response, then let each caller wait for the specific UI it
 // needs before interacting.
 const navigationReadyState = 'commit' as const;
-const navigationTimeoutMs = 15_000;
+const defaultNavigationTimeoutMs = 15_000;
 const navigationRetryDelayMs = 1_000;
 const transientNavigationErrorPatterns = [
     /NS_ERROR_ABORT/u,
     /NS_ERROR_NET_TIMEOUT/u,
 ] as const;
+
+export const resolveNavigationTimeoutMs = (
+    rawTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS,
+): number => {
+    const normalizedTimeout = rawTimeout?.trim();
+
+    if (!normalizedTimeout) {
+        return defaultNavigationTimeoutMs;
+    }
+
+    const parsedTimeout = Number(normalizedTimeout);
+
+    if (
+        !Number.isFinite(parsedTimeout) ||
+        !Number.isInteger(parsedTimeout) ||
+        parsedTimeout < 1
+    ) {
+        throw new Error(
+            'PLAYWRIGHT_NAVIGATION_TIMEOUT_MS must be a positive integer.',
+        );
+    }
+
+    return parsedTimeout;
+};
 
 const isTransientNavigationError = (error: unknown): boolean =>
     error instanceof Error &&
@@ -56,6 +80,8 @@ export const gotoInteractablePage = async (
     page: NavigationTarget,
     url: string,
 ): Promise<void> => {
+    const navigationTimeoutMs = resolveNavigationTimeoutMs();
+
     await retryTransientNavigation(async () => {
         await page.goto(url, {
             timeout: navigationTimeoutMs,
@@ -67,6 +93,8 @@ export const gotoInteractablePage = async (
 export const reloadInteractablePage = async (
     page: NavigationTarget,
 ): Promise<void> => {
+    const navigationTimeoutMs = resolveNavigationTimeoutMs();
+
     await retryTransientNavigation(async () => {
         await page.reload({
             timeout: navigationTimeoutMs,

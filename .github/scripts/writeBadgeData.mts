@@ -36,7 +36,7 @@ const coverageSummaryPaths = [
     ),
 ];
 
-const readJsonFile = async <T>(filePath: string): Promise<T> =>
+const readJsonFile = async <T,>(filePath: string): Promise<T> =>
     JSON.parse(await fs.readFile(filePath, 'utf8')) as T;
 
 const createBadgePayload = (

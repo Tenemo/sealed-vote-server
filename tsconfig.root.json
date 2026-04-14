@@ -17,6 +17,8 @@
         "forceConsistentCasingInFileNames": true
     },
     "include": [
+        ".github/**/*.ts",
+        ".github/**/*.mts",
         "netlify/**/*.ts",
         "playwright.config.ts",
         "playwright.compat.config.ts",
