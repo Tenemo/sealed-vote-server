@@ -68,6 +68,7 @@ jobs:
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_BLOB_REPORT: 'true'
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
+            PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
 
         steps:
             - uses: actions/checkout@v6

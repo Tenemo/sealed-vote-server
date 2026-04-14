@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
     gotoInteractablePage,
     reloadInteractablePage,
+    resolveNavigationTimeoutMs,
     type NavigationTarget,
 } from './navigation.mts';
 
@@ -34,6 +35,38 @@ test('gotoInteractablePage waits for commit with a short timeout', async () => {
     assert.deepEqual(calls, [
         {
             timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
+test('gotoInteractablePage allows an explicit navigation-timeout override', async () => {
+    const calls: NavigationOptions[] = [];
+    const page = createPageDouble();
+    const previousTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+
+    page.goto = async (_url: string, options?: NavigationOptions) => {
+        calls.push(options as NavigationOptions);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '45000';
+
+    try {
+        await gotoInteractablePage(
+            page,
+            'https://sealed.vote/votes/example--1234',
+        );
+    } finally {
+        if (previousTimeout === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = previousTimeout;
+        }
+    }
+
+    assert.deepEqual(calls, [
+        {
+            timeout: 45_000,
             waitUntil: 'commit',
         },
     ]);
@@ -104,4 +137,15 @@ test('reloadInteractablePage uses the same navigation policy', async () => {
             waitUntil: 'commit',
         },
     ]);
+});
+
+test('resolveNavigationTimeoutMs rejects invalid overrides', () => {
+    assert.throws(
+        () => resolveNavigationTimeoutMs('not-a-number'),
+        /PLAYWRIGHT_NAVIGATION_TIMEOUT_MS must be a positive integer./u,
+    );
+    assert.throws(
+        () => resolveNavigationTimeoutMs('0'),
+        /PLAYWRIGHT_NAVIGATION_TIMEOUT_MS must be a positive integer./u,
+    );
 });
