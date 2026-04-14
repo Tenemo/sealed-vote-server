@@ -53,12 +53,17 @@ export const createPoll = async ({
     page,
     pollName,
     choices = ['Apples', 'Bananas'],
+    skipInitialNavigation = false,
 }: {
     page: Page;
     pollName: string;
     choices?: string[];
+    skipInitialNavigation?: boolean;
 }): Promise<CreatedPoll> => {
-    await gotoInteractablePage(page, '/');
+    if (!skipInitialNavigation) {
+        await gotoInteractablePage(page, '/');
+    }
+
     await page.getByLabel('Vote name').fill(pollName);
 
     for (const choice of choices) {

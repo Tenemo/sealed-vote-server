@@ -7,7 +7,7 @@ import {
     type ReporterDescription,
 } from '@playwright/test';
 
-import { mobileFirefoxAndroidContextOptions } from './support/profiles';
+import { mobileFirefoxAndroidContextOptions } from './support/profiles.ts';
 
 const chromiumOnlySpecs = [
     '**/duplicate-title-polls.spec.ts',

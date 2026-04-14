@@ -25,4 +25,11 @@ try {
 const args = getForwardedCliArgs();
 
 runPnpmSync(['build']);
-runPnpmSync(['exec', 'playwright', 'test', ...args]);
+runPnpmSync([
+    'exec',
+    'playwright',
+    'test',
+    '--config',
+    'tests/e2e/playwright.local.config.ts',
+    ...args,
+]);
