@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 
 type ErrorTrackingOptions = {
     allowedApiStatuses?: number[];
+    allowedConsoleErrors?: RegExp[];
 };
 
 export type UnexpectedErrorTracker = {
@@ -54,9 +55,13 @@ export const attachErrorTracking = (
     options: ErrorTrackingOptions = {},
 ): void => {
     const allowedApiStatuses = new Set(options.allowedApiStatuses ?? []);
+    const allowedConsoleErrors = options.allowedConsoleErrors ?? [];
 
     page.on('console', (message) => {
-        if (message.type() === 'error') {
+        if (
+            message.type() === 'error' &&
+            !allowedConsoleErrors.some((pattern) => pattern.test(message.text()))
+        ) {
             tracker.errors.push(`[${label}] console: ${message.text()}`);
         }
     });

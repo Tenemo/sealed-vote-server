@@ -88,7 +88,7 @@ The default local setup serves:
 
 - Run the standard local browser suite with `pnpm e2e`.
 - Run the opt-in high-parallelism local suite with `pnpm e2e:turbo`.
-- `pnpm e2e:turbo` keeps CI unchanged, enables Playwright `fullyParallel`, and defaults to up to 24 local workers.
+- `pnpm e2e:turbo` keeps CI unchanged, enables Playwright `fullyParallel`, and defaults to up to 8 local workers.
 - Set `PLAYWRIGHT_LOCAL_WORKERS` if you want a different default for turbo mode. Passing Playwright CLI flags such as `--workers=32` still overrides the config directly.
 
 ## Workspace documentation

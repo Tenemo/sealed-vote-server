@@ -14,6 +14,13 @@ type CreatePollResponse = {
     slug: string;
 };
 
+export type ExpectedVerifiedResult = {
+    acceptedBallotCount: number;
+    choice: string;
+    displayedMean: string;
+    tally: string;
+};
+
 export type CreatedPoll = {
     apiBaseUrl: string;
     creatorToken: string;
@@ -21,6 +28,12 @@ export type CreatedPoll = {
     pollSlug: string;
     pollUrl: string;
 };
+
+const getResultCard = (page: Page, choice: string) =>
+    page
+        .getByText(choice, { exact: true })
+        .first()
+        .locator('xpath=ancestor::div[3]');
 
 const waitForAnyVisibleText = async ({
     page,
@@ -127,6 +140,39 @@ export const submitVote = async ({
     ).toBeVisible({ timeout: 30_000 });
 };
 
+export const createExpectedVerifiedResults = ({
+    choices,
+    scorecards,
+}: {
+    choices: readonly string[];
+    scorecards: readonly (readonly number[])[];
+}): ExpectedVerifiedResult[] => {
+    if (scorecards.length === 0) {
+        throw new Error('Expected at least one scorecard.');
+    }
+
+    return choices.map((choice, choiceIndex) => {
+        const tally = scorecards.reduce((sum, scorecard) => {
+            const score = scorecard[choiceIndex];
+
+            if (!Number.isInteger(score)) {
+                throw new Error(
+                    `Missing or invalid score for choice index ${choiceIndex}.`,
+                );
+            }
+
+            return sum + score;
+        }, 0);
+
+        return {
+            acceptedBallotCount: scorecards.length,
+            choice,
+            displayedMean: (tally / scorecards.length).toFixed(2),
+            tally: String(tally),
+        };
+    });
+};
+
 export const registerParticipant = async (input: {
     page: Page;
     pollUrl?: string;
@@ -173,9 +219,11 @@ export const waitForAutomaticReveal = async (page: Page): Promise<void> => {
 };
 
 export const waitForVerifiedResults = async ({
+    expectedResults,
     page,
     choices = ['Apples', 'Bananas'],
 }: {
+    expectedResults?: readonly ExpectedVerifiedResult[];
     page: Page;
     choices?: string[];
 }): Promise<void> => {
@@ -197,10 +245,36 @@ export const waitForVerifiedResults = async ({
         }),
     ).toBeVisible({ timeout: 90_000 });
 
-    for (const choice of choices) {
-        await expect(page.getByText(choice, { exact: true })).toBeVisible({
+    const resultsToAssert =
+        expectedResults ??
+        choices.map((choice) => ({
+            acceptedBallotCount: 0,
+            choice,
+            displayedMean: '',
+            tally: '',
+        }));
+
+    for (const result of resultsToAssert) {
+        const resultCard = getResultCard(page, result.choice);
+
+        await expect(resultCard).toContainText(result.choice, {
             timeout: 90_000,
         });
+
+        if (expectedResults) {
+            await expect(resultCard).toContainText(
+                `${result.acceptedBallotCount} accepted ballots`,
+                {
+                    timeout: 90_000,
+                },
+            );
+            await expect(resultCard).toContainText(result.displayedMean, {
+                timeout: 90_000,
+            });
+            await expect(resultCard).toContainText(`Tally ${result.tally}`, {
+                timeout: 90_000,
+            });
+        }
     }
 };
 

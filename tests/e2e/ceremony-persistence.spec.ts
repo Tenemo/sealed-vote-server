@@ -3,9 +3,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     closeVoting,
+    createExpectedVerifiedResults,
     createPoll,
     deletePolls,
-    expectAcceptedBallotCount,
     submitVote,
     waitForBlockingParticipants,
     waitForCeremonyMetric,
@@ -63,6 +63,15 @@ test('automatically resumes a stored vote after a participant closes the browser
     const participantOneName = createVoterName('bob', namespace);
     const participantTwoName = createVoterName('cora', namespace);
     const participantThreeName = createVoterName('dylan', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+            [10, 3],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -129,15 +138,18 @@ test('automatically resumes a stored vote after a participant closes the browser
             value: '4/4',
         });
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: participantOne.page });
-        await waitForVerifiedResults({ page: participantTwo.page });
-        await waitForVerifiedResults({ page: participantThree.page });
-
-        await expectAcceptedBallotCount({ count: 4, page });
-        await expectAcceptedBallotCount({
-            count: 4,
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantOne.page,
+        });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantTwo.page,
+        });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantThree.page,
         });
 
         await expectNoUnexpectedErrors(tracker);
@@ -164,6 +176,15 @@ test('automatically republishes a stored vote after a participant rejoins during
     const participantTwoName = createVoterName('cora', namespace);
     const participantThreeName = createVoterName('dylan', namespace);
     const missingParticipantName = createVoterName('eve', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+            [8, 9],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -176,7 +197,7 @@ test('automatically republishes a stored vote after a participant rejoins during
     let participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
     const participantThree = await openProjectParticipant(browser, testInfo);
-    const missingParticipant = await openProjectParticipant(browser, testInfo);
+    let missingParticipant = await openProjectParticipant(browser, testInfo);
 
     attachErrorTracking(participantOne.page, 'participant-one', tracker);
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
@@ -214,6 +235,8 @@ test('automatically republishes a stored vote after a participant rejoins during
             voterName: missingParticipantName,
         });
 
+        const missingParticipantStorageState =
+            await missingParticipant.context.storageState();
         await closeParticipant(missingParticipant);
         await closeVoting(page);
 
@@ -242,21 +265,41 @@ test('automatically republishes a stored vote after a participant rejoins during
         attachErrorTracking(participantOne.page, 'participant-one-restored', tracker);
         await gotoInteractablePage(participantOne.page, createdPoll.pollUrl);
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: participantOne.page });
-        await waitForVerifiedResults({ page: participantTwo.page });
-        await waitForVerifiedResults({ page: participantThree.page });
-
-        await expectAcceptedBallotCount({ count: 4, page });
-        await expectAcceptedBallotCount({
-            count: 4,
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantOne.page,
+        });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantTwo.page,
+        });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantThree.page,
         });
         await waitForCeremonyMetric({
             label: 'Ceremony restarts',
             page,
             value: '1',
         });
+
+        missingParticipant = await reopenProjectParticipant({
+            browser,
+            storageState: missingParticipantStorageState,
+            testInfo,
+        });
+        attachErrorTracking(
+            missingParticipant.page,
+            'missing-participant-reopened',
+            tracker,
+        );
+        await gotoInteractablePage(missingParticipant.page, createdPoll.pollUrl);
+        await expect(
+            missingParticipant.page.getByText(
+                'The organizer continued without this device. Your locally stored vote was not counted for this closed vote.',
+            ).first(),
+        ).toBeVisible({ timeout: 30_000 });
 
         await expectNoUnexpectedErrors(tracker);
     } finally {
@@ -283,6 +326,14 @@ test('lets the organizer rescue multiple missing participants and finish with th
     const participantTwoName = createVoterName('cora', namespace);
     const missingParticipantOneName = createVoterName('dylan', namespace);
     const missingParticipantTwoName = createVoterName('eve', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -359,14 +410,14 @@ test('lets the organizer rescue multiple missing participants and finish with th
             value: '3/3',
         });
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: participantOne.page });
-        await waitForVerifiedResults({ page: participantTwo.page });
-
-        await expectAcceptedBallotCount({ count: 3, page });
-        await expectAcceptedBallotCount({
-            count: 3,
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantOne.page,
+        });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantTwo.page,
         });
         await waitForCeremonyMetric({
             label: 'Active ceremony roster',
@@ -399,6 +450,14 @@ test('supports repeated organizer rescues at different securing steps', async ({
     const participantTwoName = createVoterName('cora', namespace);
     const participantThreeName = createVoterName('dylan', namespace);
     const missingParticipantName = createVoterName('eve', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -475,11 +534,15 @@ test('supports repeated organizer rescues at different securing steps', async ({
             value: '3/3',
         });
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: participantOne.page });
-        await waitForVerifiedResults({ page: participantTwo.page });
-
-        await expectAcceptedBallotCount({ count: 3, page });
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantOne.page,
+        });
+        await waitForVerifiedResults({
+            expectedResults,
+            page: participantTwo.page,
+        });
         await waitForCeremonyMetric({
             label: 'Ceremony restarts',
             page,

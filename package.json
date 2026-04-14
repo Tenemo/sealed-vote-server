@@ -18,7 +18,7 @@
         "e2e": "node --experimental-strip-types tests/e2e/scripts/run-e2e.mts",
         "e2e:compat": "node --experimental-strip-types tests/e2e/scripts/run-e2e-compat.mts",
         "e2e:turbo": "node --experimental-strip-types tests/e2e/scripts/run-e2e-turbo.mts",
-        "e2e:ci:build": "turbo run build --force --filter=@sealed-vote/contracts --filter=@sealed-vote/protocol --filter=@sealed-vote/api --filter=@sealed-vote/web",
+        "e2e:ci:build": "node --experimental-strip-types tests/e2e/scripts/run-e2e-ci-build.mts",
         "e2e:ci:serve:api": "node --experimental-strip-types tests/e2e/scripts/run-e2e-ci-api.mts",
         "e2e:ci:test": "node --experimental-strip-types tests/e2e/scripts/run-e2e-ci.mts",
         "e2e:ci:serve:web": "node --experimental-strip-types tests/e2e/scripts/run-e2e-ci-web.mts",

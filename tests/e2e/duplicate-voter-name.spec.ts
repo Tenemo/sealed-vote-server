@@ -51,6 +51,9 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     const participant = await openProjectParticipant(browser, testInfo);
     attachErrorTracking(participant.page, 'page-2', tracker, {
         allowedApiStatuses: [409],
+        allowedConsoleErrors: [
+            /Failed to load resource: the server responded with a status of 409/u,
+        ],
     });
 
     try {
@@ -91,6 +94,7 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
                 exact: true,
             }),
         ).toBeVisible({ timeout: 30_000 });
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);
         await deletePolls(request, createdPolls);

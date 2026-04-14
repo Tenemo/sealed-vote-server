@@ -3,11 +3,12 @@ import { expect, test } from '@playwright/test';
 import { expectNoAxeViolations } from './support/a11y';
 import {
     closeVoting,
+    createExpectedVerifiedResults,
     createPoll,
     deletePolls,
-    expectAcceptedBallotCount,
     expectParticipantsVisible,
     expectSecuringVisible,
+    reloadPollPage,
     submitVote,
     waitForAutomaticReveal,
     waitForVerifiedResults,
@@ -39,6 +40,14 @@ test('completes the full vote-to-results ceremony across three live sessions', a
     const creatorName = createVoterName('alice', namespace);
     const participantOneName = createVoterName('bob', namespace);
     const participantTwoName = createVoterName('cora', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -78,22 +87,22 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             participantTwoName,
         ]);
         await closeVoting(page);
+        await reloadPollPage(page);
+        await reloadPollPage(participantOne.page);
+        await reloadPollPage(participantTwo.page);
         await expectSecuringVisible(page);
         await expectSecuringVisible(participantOne.page);
         await expectSecuringVisible(participantTwo.page);
 
         await waitForAutomaticReveal(page);
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: participantOne.page });
-        await waitForVerifiedResults({ page: participantTwo.page });
-        await expectAcceptedBallotCount({ count: 3, page });
-        await expectAcceptedBallotCount({
-            count: 3,
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantOne.page,
         });
-        await expectAcceptedBallotCount({
-            count: 3,
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantTwo.page,
         });
 

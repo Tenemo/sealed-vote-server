@@ -2,9 +2,9 @@ import { test } from '@playwright/test';
 
 import {
     closeVoting,
+    createExpectedVerifiedResults,
     createPoll,
     deletePolls,
-    expectAcceptedBallotCount,
     expectParticipantsVisible,
     expectSecuringVisible,
     submitVote,
@@ -38,6 +38,14 @@ test('completes one real ceremony across chromium, desktop firefox, and mobile f
     const creatorName = createVoterName('alice', namespace);
     const firefoxDesktopName = createVoterName('bob', namespace);
     const firefoxMobileName = createVoterName('cora', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -88,16 +96,13 @@ test('completes one real ceremony across chromium, desktop firefox, and mobile f
 
         await waitForAutomaticReveal(page);
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: firefoxDesktop.page });
-        await waitForVerifiedResults({ page: firefoxMobile.page });
-        await expectAcceptedBallotCount({ count: 3, page });
-        await expectAcceptedBallotCount({
-            count: 3,
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
             page: firefoxDesktop.page,
         });
-        await expectAcceptedBallotCount({
-            count: 3,
+        await waitForVerifiedResults({
+            expectedResults,
             page: firefoxMobile.page,
         });
         await expectNoUnexpectedErrors(tracker);
