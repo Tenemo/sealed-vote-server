@@ -20,6 +20,8 @@
         ".github/**/*.ts",
         ".github/**/*.mts",
         "netlify/**/*.ts",
+        "tests/config/**/*.ts",
+        "tests/config/**/*.mts",
         "tests/e2e/**/*.ts",
         "tests/e2e/**/*.mts"
     ]

@@ -30,6 +30,6 @@ runPnpmSync([
     'playwright',
     'test',
     '--config',
-    'tests/e2e/playwright.local.config.ts',
+    'tests/config/playwright.local.config.mts',
     ...args,
 ]);

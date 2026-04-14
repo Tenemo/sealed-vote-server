@@ -149,8 +149,7 @@ jobs:
 
             - name: run WebKit browser compatibility probe
               run: >-
-                  pnpm exec playwright test
-                  --config playwright.compat.config.ts
+                  pnpm e2e:compat --
                   --project webkit-desktop
                   --project mobile-webkit-iphone
                   --project mobile-webkit-ipad
