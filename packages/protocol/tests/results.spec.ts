@@ -32,14 +32,20 @@ describe('result helpers', () => {
         expect(
             hasVerifiedTallies({
                 verification: {
+                    reason: null,
+                    qualParticipantIndices: [],
                     status: 'verified',
+                    verifiedOptionTallies: [],
                 },
             }),
         ).toBe(true);
         expect(
             hasVerifiedTallies({
                 verification: {
+                    reason: null,
+                    qualParticipantIndices: [],
                     status: 'not-ready',
+                    verifiedOptionTallies: [],
                 },
             }),
         ).toBe(false);

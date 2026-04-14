@@ -37,9 +37,8 @@ const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
 const shouldUseBuiltServers =
     process.env.PLAYWRIGHT_USE_BUILT_SERVERS === 'true';
 const localWorkers = Math.max(2, Math.min(availableParallelism(), 6));
-// Very high local worker counts make Firefox context teardown unstable on
-// large machines. Keep turbo aggressive, but below the level that causes
-// protocol-level flake in the default local run.
+// Keep the turbo profile faster than the default local run without pushing
+// Firefox ceremony flows into scheduler starvation on high-core machines.
 const localTurboWorkers = Math.max(2, Math.min(availableParallelism(), 8));
 
 const parseWorkerCount = (
