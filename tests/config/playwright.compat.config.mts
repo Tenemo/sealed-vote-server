@@ -1,11 +1,17 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig, devices } from '@playwright/test';
 
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDirectory, '..', '..');
+
 export default defineConfig({
-    testDir: './tests/e2e',
+    testDir: path.resolve(repoRoot, 'tests', 'e2e'),
     testMatch: '**/browser-crypto-compat.spec.ts',
     timeout: 30_000,
     fullyParallel: true,
-    outputDir: 'test-results/browser-compat',
+    outputDir: path.resolve(repoRoot, 'test-results/browser-compat'),
     reporter: process.env.CI ? 'dot' : 'list',
     use: {
         screenshot: 'only-on-failure',

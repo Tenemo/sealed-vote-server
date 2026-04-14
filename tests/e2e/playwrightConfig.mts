@@ -1,4 +1,6 @@
+import path from 'node:path';
 import { availableParallelism } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import {
     devices,
@@ -7,7 +9,7 @@ import {
     type ReporterDescription,
 } from '@playwright/test';
 
-import { mobileFirefoxAndroidContextOptions } from './support/profiles';
+import { mobileFirefoxAndroidContextOptions } from './support/profiles.mts';
 
 const chromiumOnlySpecs = [
     '**/duplicate-title-polls.spec.ts',
@@ -36,6 +38,8 @@ const isLocalTurbo = process.env.PLAYWRIGHT_LOCAL_TURBO === 'true';
 const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
 const shouldUseBuiltServers =
     process.env.PLAYWRIGHT_USE_BUILT_SERVERS === 'true';
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDirectory, '..', '..');
 const localWorkers = Math.max(2, Math.min(availableParallelism(), 6));
 // Keep the turbo profile faster than the default local run without pushing
 // Firefox ceremony flows into scheduler starvation on high-core machines.
@@ -66,7 +70,7 @@ const parseWorkerCount = (
 };
 
 const reporters: ReporterDescription[] | 'list' = shouldUseBlobReporter
-    ? [['dot'], ['blob', { outputDir: 'blob-report' }]]
+    ? [['dot'], ['blob', { outputDir: path.resolve(repoRoot, 'blob-report') }]]
     : isCi
       ? [['dot'], ['github'], ['html', { open: 'never' }]]
       : 'list';
@@ -181,14 +185,14 @@ const getCommonConfig = (
         workers?: number;
     },
 ): PlaywrightTestConfig => ({
-    testDir: './tests/e2e',
+    testDir: currentDirectory,
     timeout: 180_000,
     expect: {
         timeout: 20_000,
     },
     forbidOnly: isCi,
     fullyParallel: options?.fullyParallel ?? false,
-    outputDir,
+    outputDir: path.resolve(repoRoot, outputDir),
     reporter: reporters,
     retries: isCi ? 1 : 0,
     use: {

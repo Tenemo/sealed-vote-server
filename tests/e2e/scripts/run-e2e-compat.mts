@@ -5,6 +5,6 @@ runPnpmSync([
     'playwright',
     'test',
     '--config',
-    'tests/config/playwright.production.config.mts',
+    'tests/config/playwright.compat.config.mts',
     ...getForwardedCliArgs(),
 ]);

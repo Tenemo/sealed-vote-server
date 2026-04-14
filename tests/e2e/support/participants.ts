@@ -8,7 +8,7 @@ import type {
     PlaywrightWorkerArgs,
 } from '@playwright/test';
 
-import { mobileFirefoxAndroidContextOptions } from './profiles.ts';
+import { mobileFirefoxAndroidContextOptions } from './profiles.mts';
 
 const browserContextOptionKeys = [
     'acceptDownloads',

@@ -16,4 +16,11 @@ try {
     process.exit(1);
 }
 
-runPnpmSync(['exec', 'playwright', 'test', ...getForwardedCliArgs()]);
+runPnpmSync([
+    'exec',
+    'playwright',
+    'test',
+    '--config',
+    'tests/config/playwright.local.config.mts',
+    ...getForwardedCliArgs(),
+]);
