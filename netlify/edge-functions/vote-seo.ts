@@ -42,6 +42,7 @@ export default async (
             apiBaseUrl: seoApiBaseUrl,
             baseHtml: html,
             pollPayloadCache,
+            requestUserAgent: request.headers.get('user-agent'),
             requestUrl: new URL(request.url),
             signal: AbortSignal.timeout(5000),
         });

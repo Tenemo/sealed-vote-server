@@ -54,6 +54,7 @@ describe('vote SEO edge function', () => {
             apiBaseUrl: 'https://api.sealed.vote',
             baseHtml: originalHtml,
             pollPayloadCache: expect.any(Map),
+            requestUserAgent: null,
             requestUrl: new URL('https://sealed.vote/'),
             signal: expect.any(AbortSignal),
         });
