@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
     closeParticipant,
-    launchFirefoxParticipant,
+    openProjectParticipant,
 } from './support/participants';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
@@ -23,8 +23,8 @@ import {
 } from './support/testData';
 
 test('keeps slug-based poll links shareable across platforms', async ({
+    browser,
     page,
-    playwright,
     request,
 }, testInfo) => {
     const tracker = createUnexpectedErrorTracker();
@@ -41,17 +41,15 @@ test('keeps slug-based poll links shareable across platforms', async ({
 
     expect(createdPoll.pollUrl).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
 
-    const participant = await launchFirefoxParticipant({ playwright });
-    attachErrorTracking(participant.page, 'firefox-participant', tracker);
+    const participant = await openProjectParticipant(browser, testInfo);
+    attachErrorTracking(participant.page, 'participant', tracker);
 
     try {
         await gotoInteractablePage(participant.page, createdPoll.pollUrl);
         await expect(
             participant.page.getByRole('heading', { name: pollName }),
         ).toBeVisible();
-        await expect(
-            participant.page.getByText(/Voting open/i),
-        ).toBeVisible();
+        await expect(participant.page.getByText(/Voting open/i)).toBeVisible();
         await expect(
             participant.page.getByRole('heading', { name: 'Your next step' }),
         ).toBeVisible();
