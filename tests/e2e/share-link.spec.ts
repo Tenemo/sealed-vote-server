@@ -22,7 +22,7 @@ import {
     createVoterName,
 } from './support/testData';
 
-test('keeps slug-based poll links shareable across platforms', async ({
+test('keeps slug-based poll links shareable in a separate participant context', async ({
     browser,
     page,
     request,
