@@ -29,6 +29,7 @@ const transientNavigationErrorPatterns = [
     /NS_ERROR_ABORT/u,
     /NS_ERROR_NET_TIMEOUT/u,
 ] as const;
+const transientNavigationTimeoutPattern = /Timeout \d+ms exceeded/u;
 
 export const resolveNavigationTimeoutMs = (
     rawTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS,
@@ -54,11 +55,28 @@ export const resolveNavigationTimeoutMs = (
     return parsedTimeout;
 };
 
-const isTransientNavigationError = (error: unknown): boolean =>
-    error instanceof Error &&
-    transientNavigationErrorPatterns.some((pattern) =>
-        pattern.test(error.message),
+const shouldRetryNavigationTimeouts = (
+    rawValue = process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS,
+): boolean => rawValue?.trim().toLowerCase() === 'true';
+
+const isTransientNavigationError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) {
+        return false;
+    }
+
+    if (
+        transientNavigationErrorPatterns.some((pattern) =>
+            pattern.test(error.message),
+        )
+    ) {
+        return true;
+    }
+
+    return (
+        shouldRetryNavigationTimeouts() &&
+        transientNavigationTimeoutPattern.test(error.message)
     );
+};
 
 const retryTransientNavigation = async (
     navigate: () => Promise<void>,

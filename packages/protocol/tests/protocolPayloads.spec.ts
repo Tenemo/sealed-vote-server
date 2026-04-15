@@ -15,14 +15,14 @@ const createRegistrationPayload = (
     overrides: Partial<ProtocolPayload> = {},
 ): ProtocolPayload =>
     ({
-        authPublicKey: 'auth-public-key',
+        authPublicKey: 'auth-public-key' as never,
         manifestHash: 'a'.repeat(64),
         messageType: 'registration',
         participantIndex: 1,
         phase: 0,
         rosterHash: 'b'.repeat(64),
         sessionId: 'c'.repeat(64),
-        transportPublicKey: 'transport-public-key',
+        transportPublicKey: 'transport-public-key' as never,
         ...overrides,
     }) as ProtocolPayload;
 
@@ -37,31 +37,33 @@ const createBallotPayload = ({
         ciphertext: {
             c1: `c1-${participantIndex}-${optionIndex}`,
             c2: `c2-${participantIndex}-${optionIndex}`,
-        },
+        } as never,
         manifestHash: 'a'.repeat(64),
         messageType: 'ballot-submission',
         optionIndex,
         participantIndex,
         phase: 5,
-        proof: [],
+        proof: {
+            branches: [],
+        } as never,
         sessionId: 'c'.repeat(64),
     }) as ProtocolPayload;
 
 describe('protocol payload helpers', () => {
     test('canonicalUnsignedPayloadBytes is stable across object key ordering', () => {
         const leftPayload = createRegistrationPayload({
-            authPublicKey: 'auth-public-key-left',
-            transportPublicKey: 'transport-public-key-left',
+            authPublicKey: 'auth-public-key-left' as never,
+            transportPublicKey: 'transport-public-key-left' as never,
         });
         const rightPayload = {
-            transportPublicKey: 'transport-public-key-left',
+            transportPublicKey: 'transport-public-key-left' as never,
             sessionId: 'c'.repeat(64),
             rosterHash: 'b'.repeat(64),
             phase: 0,
             participantIndex: 1,
             messageType: 'registration',
             manifestHash: 'a'.repeat(64),
-            authPublicKey: 'auth-public-key-left',
+            authPublicKey: 'auth-public-key-left' as never,
         } as ProtocolPayload;
 
         expect(decodeBytes(canonicalUnsignedPayloadBytes(leftPayload))).toBe(

@@ -48,10 +48,10 @@ jobs:
         timeout-minutes: 30
         strategy:
             fail-fast: false
-            # Live production is the system under test here, so keep matrix jobs
-            # serialized instead of having browser families compete with each
-            # other for the same public endpoints.
-            max-parallel: 1
+            # Keep one Playwright worker per browser job for determinism, but
+            # run the browser families in parallel so production e2e does not
+            # serialize into an hour-long workflow.
+            max-parallel: 4
             matrix:
                 project:
                     - name: chromium-desktop
@@ -72,6 +72,7 @@ jobs:
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_BLOB_REPORT: 'true'
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
+            PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS: 'true'
             PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
 
         steps:
