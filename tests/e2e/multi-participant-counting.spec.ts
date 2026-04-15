@@ -5,8 +5,8 @@ import {
     createExpectedVerifiedResults,
     createPoll,
     deletePolls,
+    expectPostCloseVisible,
     expectParticipantsVisible,
-    expectSecuringVisible,
     submitVote,
     waitForAutomaticReveal,
     waitForVerifiedResults,
@@ -98,10 +98,10 @@ test('counts every honest ballot when four participants complete the ceremony', 
         ]);
         await closeVoting(page);
 
-        await expectSecuringVisible(page);
-        await expectSecuringVisible(participantOne.page);
-        await expectSecuringVisible(participantTwo.page);
-        await expectSecuringVisible(participantThree.page);
+        await expectPostCloseVisible(page);
+        await expectPostCloseVisible(participantOne.page);
+        await expectPostCloseVisible(participantTwo.page);
+        await expectPostCloseVisible(participantThree.page);
 
         await waitForAutomaticReveal(page);
 

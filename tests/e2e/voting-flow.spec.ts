@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
 
 import { expectNoAxeViolations } from './support/a11y';
 import {
@@ -6,8 +6,8 @@ import {
     createExpectedVerifiedResults,
     createPoll,
     deletePolls,
+    expectPostCloseVisible,
     expectParticipantsVisible,
-    expectSecuringVisible,
     reloadPollPage,
     submitVote,
     waitForAutomaticReveal,
@@ -90,9 +90,9 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         await reloadPollPage(page);
         await reloadPollPage(participantOne.page);
         await reloadPollPage(participantTwo.page);
-        await expectSecuringVisible(page);
-        await expectSecuringVisible(participantOne.page);
-        await expectSecuringVisible(participantTwo.page);
+        await expectPostCloseVisible(page);
+        await expectPostCloseVisible(participantOne.page);
+        await expectPostCloseVisible(participantTwo.page);
 
         await waitForAutomaticReveal(page);
 
