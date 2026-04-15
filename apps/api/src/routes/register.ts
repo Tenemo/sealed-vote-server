@@ -4,14 +4,13 @@ import type {
     RegisterVoterResponse as RegisterVoterResponseContract,
 } from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
-import { eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import type { DatabaseTransaction } from '../db/client.js';
 import { publicKeyShares, voters } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
-import { countPollVoters } from '../utils/pollCounts.js';
 import { maxPollParticipants } from '../utils/pollLimits.js';
 import { lockPollById } from '../utils/pollLocks.js';
 import {
@@ -67,6 +66,18 @@ type ExistingRegistration = {
     }[];
     voterIndex: number;
     voterName: string;
+};
+
+const countPollVoters = async (
+    tx: DatabaseTransaction,
+    pollId: string,
+): Promise<number> => {
+    const [row] = await tx
+        .select({ count: count() })
+        .from(voters)
+        .where(eq(voters.pollId, pollId));
+
+    return row?.count ?? 0;
 };
 
 const getExistingRegistration = async ({

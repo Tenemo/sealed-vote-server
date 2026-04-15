@@ -10,7 +10,7 @@ import { Panel } from '@/components/ui/panel';
 import PageSeo from '@/app/PageSeo';
 import { actionButtonClassName, pageTitleClassName } from '@/lib/uiClasses';
 import { buildCreatePageSeo } from 'app/seo';
-import LoadingButton from 'components/LoadingButton';
+import LoadingButton from 'components/LoadingButton/LoadingButton';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { saveCreatorSession } from 'features/Polls/pollSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';

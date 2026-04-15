@@ -13,7 +13,7 @@ import { polls, publicKeyShares, voters } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
 import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
 import { insertPollCeremonySession } from '../utils/pollCeremonySessions.js';
-import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
@@ -94,10 +94,7 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
             const response = await withTransaction(
                 fastify,
                 async (client): Promise<CloseVotingResponse> => {
-                    const poll = await lockPollByIdForCreatorAction(
-                        client,
-                        req.params.pollId,
-                    );
+                    const poll = await lockPollById(client, req.params.pollId);
 
                     if (!poll) {
                         throw createError(

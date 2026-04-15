@@ -1,26 +1,6 @@
-import {
-    assertSafeE2EEnv,
-    getForwardedCliArgs,
-    runPnpmSync,
-} from './shared.mts';
+import { runLocalE2E } from './shared.mts';
 
-process.env.NODE_ENV = 'test';
-process.env.PLAYWRIGHT_USE_BUILT_SERVERS = 'true';
-
-try {
-    assertSafeE2EEnv();
-} catch (error) {
-    console.error(
-        error instanceof Error ? error.message : 'Unsafe e2e environment.',
-    );
-    process.exit(1);
-}
-
-runPnpmSync([
-    'exec',
-    'playwright',
-    'test',
-    '--config',
-    'tests/config/playwright.local.config.mts',
-    ...getForwardedCliArgs(),
-]);
+runLocalE2E({
+    build: false,
+    useBuiltServers: true,
+});

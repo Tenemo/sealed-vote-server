@@ -1,8 +1,12 @@
+import {
+    createPoll,
+    deletePoll,
+    getUniquePollName,
+} from '@sealed-vote/testkit';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
-import { createPoll, deletePoll, getUniquePollName } from '../testUtils';
 
 import {
     assignPollSlugs,

@@ -313,33 +313,6 @@ const waitForPollSeoPayload = async ({
     }
 };
 
-export const fetchPollTitle = async ({
-    apiBaseUrl,
-    cache,
-    fetchImpl = fetch,
-    now,
-    pollSlug,
-    signal,
-}: {
-    apiBaseUrl: string;
-    cache?: PollSeoPayloadCache;
-    fetchImpl?: FetchLike;
-    now?: () => number;
-    pollSlug: string;
-    signal?: AbortSignal;
-}): Promise<string | null> => {
-    const payload = await fetchPollSeoPayload({
-        apiBaseUrl,
-        cache,
-        fetchImpl,
-        now,
-        pollSlug,
-        signal,
-    });
-
-    return payload?.pollName ?? null;
-};
-
 export const resolveDocumentSeoMetadata = async ({
     apiBaseUrl = defaultSeoApiBaseUrl,
     fetchImpl,

@@ -6,6 +6,16 @@ import {
     type PollResponse,
 } from '@sealed-vote/contracts';
 import {
+    closePoll,
+    createPoll,
+    deletePoll,
+    fetchBoardMessages,
+    fetchPoll,
+    postBoardMessage,
+    registerVoter,
+    restartPollCeremony,
+} from '@sealed-vote/testkit';
+import {
     createRegistrationPayload,
     createManifestPublicationPayload,
     exportAuthPublicKey,
@@ -17,16 +27,6 @@ import {
 import type { FastifyInstance } from 'fastify';
 
 import { buildServer } from '../buildServer';
-import {
-    closePoll,
-    createPoll,
-    deletePoll,
-    fetchBoardMessages,
-    fetchPoll,
-    postBoardMessage,
-    registerVoter,
-    restartPollCeremony,
-} from '../testUtils';
 
 type RegisteredParticipant = {
     authKeyPair: CryptoKeyPair;

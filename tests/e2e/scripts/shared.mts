@@ -124,6 +124,57 @@ export const getForwardedCliArgs = (): string[] => {
     return args;
 };
 
+export const runLocalE2E = ({
+    build = true,
+    turbo = false,
+    useBuiltServers = true,
+}: {
+    build?: boolean;
+    turbo?: boolean;
+    useBuiltServers?: boolean;
+} = {}): void => {
+    process.env.NODE_ENV = 'test';
+
+    if (turbo) {
+        process.env.PLAYWRIGHT_LOCAL_TURBO = 'true';
+    } else {
+        delete process.env.PLAYWRIGHT_LOCAL_TURBO;
+    }
+
+    if (useBuiltServers) {
+        process.env.PLAYWRIGHT_USE_BUILT_SERVERS = 'true';
+    } else {
+        delete process.env.PLAYWRIGHT_USE_BUILT_SERVERS;
+    }
+
+    process.env.VITE_API_BASE_URL =
+        process.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:4000';
+
+    try {
+        assertSafeE2EEnv();
+    } catch (error) {
+        console.error(
+            error instanceof Error
+                ? error.message
+                : 'Unsafe e2e environment.',
+        );
+        process.exit(1);
+    }
+
+    if (build) {
+        runPnpmSync(['build']);
+    }
+
+    runPnpmSync([
+        'exec',
+        'playwright',
+        'test',
+        '--config',
+        'tests/config/playwright.local.config.mts',
+        ...getForwardedCliArgs(),
+    ]);
+};
+
 export const spawnPnpm = (args: string[]): ChildProcess => {
     const [command, commandPrefix] = getPnpmCommand();
 

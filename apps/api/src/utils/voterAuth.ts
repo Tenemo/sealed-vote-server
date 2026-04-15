@@ -15,9 +15,6 @@ type AuthenticatedVoter = {
 
 export type { AuthenticatedVoter };
 
-export const generateSecureToken = (): string =>
-    crypto.randomBytes(32).toString('hex');
-
 export const hashSecureToken = (value: string): string =>
     crypto.createHash('sha256').update(value).digest('hex');
 
@@ -75,29 +72,3 @@ export const authenticateVoterReadOnly = async (
 
     return voter;
 };
-
-export const findVoterByTokenReadOnly = async (
-    tx: Database | DatabaseTransaction,
-    pollId: string,
-    voterToken: string,
-): Promise<AuthenticatedVoter | undefined> => {
-    const voterTokenHash = hashSecureToken(voterToken);
-    const [voter] = await tx
-        .select({
-            id: voters.id,
-            voterName: voters.voterName,
-            voterIndex: voters.voterIndex,
-        })
-        .from(voters)
-        .where(
-            and(
-                eq(voters.pollId, pollId),
-                eq(voters.voterTokenHash, voterTokenHash),
-            ),
-        );
-
-    return voter;
-};
-
-export const isSecureToken = (value: string): boolean =>
-    typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);

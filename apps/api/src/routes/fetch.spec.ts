@@ -1,16 +1,16 @@
 import { FormatRegistry } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-
-import { buildServer } from '../buildServer';
 import {
     closePoll,
     createPoll,
     deletePoll,
     fetchPoll,
     registerVoter,
-} from '../testUtils';
+} from '@sealed-vote/testkit';
+import type { FastifyInstance } from 'fastify';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
+import { buildServer } from '../buildServer';
 
 import { PollResponseSchema, type PollResponse } from './fetch';
 

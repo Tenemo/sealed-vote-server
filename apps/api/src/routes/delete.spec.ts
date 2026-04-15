@@ -1,9 +1,9 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { createPoll, deletePoll } from '@sealed-vote/testkit';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
-import { createPoll, deletePoll } from '../testUtils';
 
 describe('DELETE /polls/:pollId', () => {
     let fastify: FastifyInstance;
