@@ -2,10 +2,8 @@ import type {
     Browser,
     BrowserContext,
     BrowserContextOptions,
-    BrowserType,
     Page,
     TestInfo,
-    PlaywrightWorkerArgs,
 } from '@playwright/test';
 
 import { mobileFirefoxAndroidContextOptions } from './profiles.mts';
@@ -99,7 +97,9 @@ export const openProjectParticipant = async (
     browser: Browser,
     testInfo: TestInfo,
 ): Promise<ManagedParticipant> => {
-    const context = await browser.newContext(getProjectContextOptions(testInfo));
+    const context = await browser.newContext(
+        getProjectContextOptions(testInfo),
+    );
     const page = await context.newPage();
 
     return createManagedParticipant({
@@ -126,27 +126,6 @@ export const reopenProjectParticipant = async ({
 
     return createManagedParticipant({
         closeMode: 'context',
-        context,
-        page,
-    });
-};
-
-export const launchFirefoxParticipant = async ({
-    playwright,
-    mobile = false,
-}: {
-    playwright: PlaywrightWorkerArgs['playwright'];
-    mobile?: boolean;
-}): Promise<ManagedParticipant> => {
-    const browserType: BrowserType = playwright.firefox;
-    const browser = await browserType.launch();
-    const context = await browser.newContext(
-        mobile ? mobileFirefoxAndroidContextOptions : undefined,
-    );
-    const page = await context.newPage();
-
-    return createManagedParticipant({
-        browser,
         context,
         page,
     });

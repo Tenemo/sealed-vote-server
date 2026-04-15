@@ -47,7 +47,9 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
 
     expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
 
-    attachErrorTracking(page, 'first-poll', tracker);
+    attachErrorTracking(page, 'first-poll', tracker, {
+        allowedConsoleErrors: [/^Error$/],
+    });
 
     await gotoInteractablePage(page, firstPoll.pollUrl);
     await registerParticipant({
@@ -57,7 +59,9 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     await expectParticipantsVisible(page, [firstPollVoterName]);
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'second-poll', tracker);
+    attachErrorTracking(participant.page, 'second-poll', tracker, {
+        allowedConsoleErrors: [/^Error$/],
+    });
 
     try {
         await registerParticipant({

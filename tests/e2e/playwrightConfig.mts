@@ -11,10 +11,6 @@ import {
 
 import { mobileFirefoxAndroidContextOptions } from './support/profiles.mts';
 
-const mixedBrowserParticipantSpecs = [
-    '**/mixed-platform-poll.spec.ts',
-    '**/share-link.spec.ts',
-];
 const productionOnlySpecs = ['**/00-production-browser-readiness.spec.ts'];
 
 // The main e2e matrix runs WebKit on Linux, where Ed25519 and X25519 WebCrypto
@@ -29,6 +25,7 @@ const webkitUnsupportedModernCryptoSpecs =
               '**/duplicate-title-polls.spec.ts',
               '**/duplicate-voter-name.spec.ts',
               '**/multi-participant-counting.spec.ts',
+              '**/share-link.spec.ts',
               '**/voting-flow.spec.ts',
           ];
 
@@ -149,7 +146,6 @@ const projects: Project[] = [
     },
     {
         name: 'firefox-desktop',
-        testIgnore: mixedBrowserParticipantSpecs,
         use: {
             ...devices['Desktop Firefox'],
             browserName: 'firefox' as const,
@@ -157,10 +153,7 @@ const projects: Project[] = [
     },
     {
         name: 'webkit-desktop',
-        testIgnore: [
-            ...mixedBrowserParticipantSpecs,
-            ...webkitUnsupportedModernCryptoSpecs,
-        ],
+        testIgnore: webkitUnsupportedModernCryptoSpecs,
         use: {
             ...devices['Desktop Safari'],
             browserName: 'webkit' as const,
@@ -168,7 +161,6 @@ const projects: Project[] = [
     },
     {
         name: 'mobile-firefox-android',
-        testIgnore: mixedBrowserParticipantSpecs,
         use: {
             browserName: 'firefox',
             ...mobileFirefoxAndroidContextOptions,
@@ -272,5 +264,6 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
     return getCommonConfig(
         normalizeBaseUrl(productionBaseUrl, 'PLAYWRIGHT_BASE_URL'),
         'test-results/playwright-production',
+        { fullyParallel: true },
     );
 };

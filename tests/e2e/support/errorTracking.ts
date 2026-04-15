@@ -10,9 +10,6 @@ export type UnexpectedErrorTracker = {
     readonly pendingChecks: Set<Promise<void>>;
 };
 
-const boardMessageSessionMismatchMessage =
-    'The submitted payload does not match the active ceremony session.';
-
 const knownApiHostnames = new Set([
     '127.0.0.1',
     'localhost',
@@ -29,12 +26,14 @@ const matchesAllowedConsoleError = (
     pattern: RegExp,
     messageText: string,
 ): boolean => {
-    const statelessPattern = new RegExp(
-        pattern.source,
-        pattern.flags.replaceAll('g', '').replaceAll('y', ''),
-    );
+    const originalLastIndex = pattern.lastIndex;
+    pattern.lastIndex = 0;
 
-    return statelessPattern.test(messageText);
+    try {
+        return pattern.test(messageText);
+    } finally {
+        pattern.lastIndex = originalLastIndex;
+    }
 };
 
 const isTrackedApiResponse = (page: Page, responseUrl: URL): boolean => {
@@ -96,22 +95,6 @@ export const attachErrorTracking = (
         }
 
         const pendingCheck = (async () => {
-            if (responseUrl.pathname.endsWith('/board/messages')) {
-                try {
-                    const body = JSON.parse(await response.text()) as {
-                        message?: unknown;
-                    };
-
-                    if (
-                        body.message === boardMessageSessionMismatchMessage
-                    ) {
-                        return;
-                    }
-                } catch {
-                    // Fall through to the generic error capture below.
-                }
-            }
-
             tracker.errors.push(
                 `[${label}] response: ${response.status()} ${responseUrl.toString()}`,
             );
