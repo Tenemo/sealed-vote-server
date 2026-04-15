@@ -18,7 +18,10 @@
 
 [sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around `threshold-elgamal`. It uses a public roster, an append-only bulletin-board-style log, and local verification so that voters can audit who is participating while keeping ballot contents confidential.
 
-https://github.com/user-attachments/assets/f4334c3c-1781-462c-9f0e-3e7ccda372f1
+https://github.com/user-attachments/assets/30dd0e13-7511-4bd5-a6fc-55a058dc94b6
+
+_(recorded with Playwright, I got bored of manually re-recording the demo video after UI changes quite quickly)_
+
 
 ## Overview
 
