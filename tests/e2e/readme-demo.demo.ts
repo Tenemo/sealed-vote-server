@@ -28,6 +28,7 @@ import {
     readmeDemoManifestPath,
     readmeDemoPanelViewport,
     readmeDemoPlaybackRate,
+    type ReadmeDemoAddressPhase,
     type ReadmeDemoManifest,
     type ReadmeDemoPanelId,
 } from './support/readmeDemo.mts';
@@ -152,6 +153,14 @@ const gotoDemoPage = async ({
     await sleep(demoInteractionDelaysMs.navigationSettled);
 };
 
+const gotoBlankDemoPage = async (page: Page): Promise<void> => {
+    await page.goto('about:blank', {
+        waitUntil: 'load',
+    });
+    await parkMouse(page);
+    await sleep(demoInteractionDelaysMs.navigationSettled);
+};
+
 const createPollWithDemoMotion = async ({
     page,
     pollName,
@@ -223,12 +232,14 @@ const createPollWithDemoMotion = async ({
 };
 
 const submitVoteWithDemoMotion = async ({
+    onPollPageReady,
     page,
     pollUrl,
     scores = [8, 6, 7],
     voterName,
     choices = demoChoiceNames,
 }: {
+    onPollPageReady?: () => void;
     page: Page;
     pollUrl?: string;
     scores?: readonly number[];
@@ -240,6 +251,7 @@ const submitVoteWithDemoMotion = async ({
             page,
             url: pollUrl,
         });
+        onPollPageReady?.();
     }
 
     await typeWithDemoMotion({
@@ -307,10 +319,13 @@ const createDisplayedAddressText = (pollUrl: string): string => {
     return parsedPollUrl.toString();
 };
 
+const getElapsedMs = (startedAtMs: number): number =>
+    Math.max(0, Date.now() - startedAtMs);
+
 const writeDemoManifest = async (
     options: {
-        addressText: string;
         panels: Array<{
+            addressPhases: ReadonlyArray<ReadmeDemoAddressPhase>;
             id: ReadmeDemoPanelId;
             label: string;
             videoPath: string;
@@ -320,7 +335,7 @@ const writeDemoManifest = async (
     const manifest: ReadmeDemoManifest = {
         panels: options.panels.map((panel) => ({
             ...panel,
-            addressText: options.addressText,
+            addressPhases: [...panel.addressPhases],
         })),
         playbackRate: readmeDemoPlaybackRate,
         viewport: readmeDemoPanelViewport,
@@ -342,6 +357,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
 }, testInfo) => {
     const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
+    const recordingStartedAtMs = Date.now();
     const [creatorName, participantOneName, participantTwoName] =
         demoParticipantNames;
     const expectedResults = createExpectedVerifiedResults({
@@ -356,9 +372,14 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         );
     }
 
+    const creatorHomeAddressText = createDisplayedAddressText(demoHomeUrl);
     const creator = await openProjectParticipant(browser, testInfo);
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
+    let creatorPollAddressText: string | null = null;
+    let creatorPollCreatedAtMs: number | null = null;
+    let participantOneJoinedAtMs: number | null = null;
+    let participantTwoJoinedAtMs: number | null = null;
 
     const panels: Array<{
         id: ReadmeDemoPanelId;
@@ -391,14 +412,14 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await Promise.all(
-            panels.map(({ participant }) =>
-                gotoDemoPage({
-                    page: participant.page,
-                    url: demoHomeUrl,
-                }),
-            ),
-        );
+        await Promise.all([
+            gotoDemoPage({
+                page: creator.page,
+                url: demoHomeUrl,
+            }),
+            gotoBlankDemoPage(participantOne.page),
+            gotoBlankDemoPage(participantTwo.page),
+        ]);
         await sleep(demoBeatPausesMs.initial);
 
         const createdPoll = await createPollWithDemoMotion({
@@ -408,6 +429,8 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
             startUrl: demoHomeUrl,
         });
         createdPolls.push(createdPoll);
+        creatorPollAddressText = createDisplayedAddressText(createdPoll.pollUrl);
+        creatorPollCreatedAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.pollCreated);
 
         await submitVoteWithDemoMotion({
@@ -419,6 +442,9 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         await sleep(demoBeatPausesMs.voteSubmitted);
 
         await submitVoteWithDemoMotion({
+            onPollPageReady: () => {
+                participantOneJoinedAtMs = getElapsedMs(recordingStartedAtMs);
+            },
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
             scores: demoScorecards[1],
@@ -428,6 +454,9 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         await sleep(demoBeatPausesMs.voteSubmitted);
 
         await submitVoteWithDemoMotion({
+            onPollPageReady: () => {
+                participantTwoJoinedAtMs = getElapsedMs(recordingStartedAtMs);
+            },
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
             scores: demoScorecards[2],
@@ -470,9 +499,49 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
 
         await writeDemoManifest(
             {
-                addressText: createDisplayedAddressText(createdPoll.pollUrl),
                 panels: await Promise.all(
                     panels.map(async ({ id, label, video }) => ({
+                        addressPhases:
+                            id === 'creator'
+                                ? [
+                                      {
+                                          startMs: 0,
+                                          text: creatorHomeAddressText,
+                                      },
+                                      {
+                                          startMs:
+                                              creatorPollCreatedAtMs ??
+                                              getElapsedMs(recordingStartedAtMs),
+                                          text:
+                                              creatorPollAddressText ??
+                                              createDisplayedAddressText(
+                                                  createdPoll.pollUrl,
+                                              ),
+                                      },
+                                  ]
+                                : [
+                                      {
+                                          startMs: 0,
+                                          text: '',
+                                      },
+                                      {
+                                          startMs:
+                                              id === 'participant-one'
+                                                  ? (participantOneJoinedAtMs ??
+                                                    getElapsedMs(
+                                                        recordingStartedAtMs,
+                                                    ))
+                                                  : (participantTwoJoinedAtMs ??
+                                                    getElapsedMs(
+                                                        recordingStartedAtMs,
+                                                    )),
+                                          text:
+                                              creatorPollAddressText ??
+                                              createDisplayedAddressText(
+                                                  createdPoll.pollUrl,
+                                              ),
+                                      },
+                                  ],
                         id,
                         label,
                         videoPath: await video.path(),

@@ -15,10 +15,11 @@ import {
 } from '../support/readmeDemo.mts';
 
 const expectedPanelIds = ['creator', 'participant-one', 'participant-two'];
-const browserChromeHeight = 56;
-const browserOuterBorder = 1;
-const browserWindowGap = 48;
-const browserWindowOuterPadding = 48;
+const panelLabelHeight = 52;
+const panelGap = 48;
+const canvasColor = '0xe2e8f0';
+const labelTextColor = '0x111111';
+const labelDividerColor = '0xcbd5e1';
 
 const fail = (message: string): never => {
     console.error(message);
@@ -101,17 +102,58 @@ const readManifest = (): ReadmeDemoManifest => {
         }
 
         if (
-            typeof manifestPanel.addressText !== 'string' ||
-            manifestPanel.addressText.length === 0 ||
+            !Array.isArray(manifestPanel.addressPhases) ||
+            manifestPanel.addressPhases.length === 0 ||
             typeof manifestPanel.label !== 'string' ||
             manifestPanel.label.length === 0 ||
             typeof manifestPanel.videoPath !== 'string' ||
             manifestPanel.videoPath.length === 0
         ) {
             fail(
-                'Readme demo manifest includes a panel without address text, label, or path.',
+                'Readme demo manifest includes a panel without address phases, label, or path.',
             );
         }
+
+        let previousStartMs = -1;
+
+        manifestPanel.addressPhases.forEach((phase, phaseIndex) => {
+            if (!phase || typeof phase !== 'object') {
+                fail(
+                    `Readme demo panel ${manifestPanel.id} includes an invalid address phase.`,
+                );
+            }
+
+            if (
+                typeof phase.startMs !== 'number' ||
+                !Number.isFinite(phase.startMs) ||
+                phase.startMs < 0 ||
+                !Number.isInteger(phase.startMs)
+            ) {
+                fail(
+                    `Readme demo panel ${manifestPanel.id} has an invalid address phase start time.`,
+                );
+            }
+
+            if (typeof phase.text !== 'string') {
+                fail(
+                    `Readme demo panel ${manifestPanel.id} has an invalid address phase text value.`,
+                );
+            }
+
+            if (phase.startMs <= previousStartMs) {
+                fail(
+                    `Readme demo panel ${manifestPanel.id} address phases must be strictly increasing.`,
+                );
+            }
+
+            if (phaseIndex === 0 && phase.startMs !== 0) {
+                fail(
+                    `Readme demo panel ${manifestPanel.id} must start its address phases at 0ms.`,
+                );
+            }
+
+            previousStartMs = phase.startMs;
+        });
 
         if (!path.isAbsolute(manifestPanel.videoPath)) {
             fail(
@@ -139,31 +181,55 @@ const escapeDrawtext = (value: string): string =>
         .replaceAll(']', '\\]')
         .replaceAll('%', '\\%');
 
-const createFilterGraph = (manifest: ReadmeDemoManifest): string => {
-    const panelWindowFilters = manifest.panels.map((panel, index) => {
-        const escapedAddressText = escapeDrawtext(panel.addressText);
+const createPhaseEnableExpression = (
+    addressPhases: ReadonlyArray<{
+        startMs: number;
+        text: string;
+    }>,
+    index: number,
+): string => {
+    const phase = addressPhases[index];
+    const startSeconds = (phase.startMs / 1_000).toFixed(3);
+    const nextPhase = addressPhases[index + 1];
+
+    return nextPhase
+        ? `gte(t,${startSeconds})*lt(t,${(nextPhase.startMs / 1_000).toFixed(3)})`
+        : `gte(t,${startSeconds})`;
+};
+
+const createAddressTextFilters = (
+    addressPhases: ReadonlyArray<{
+        startMs: number;
+        text: string;
+    }>,
+): string[] =>
+    addressPhases.flatMap((phase, index) => {
+        const enableExpression = createPhaseEnableExpression(
+            addressPhases,
+            index,
+        );
+
+        if (phase.text.length === 0) {
+            return [
+                `drawbox=x=0:y=0:w=iw:h=ih:color=${canvasColor}:t=fill:enable='${enableExpression}'`,
+            ];
+        }
+
+        const escapedAddressText = escapeDrawtext(phase.text);
 
         return [
+            `drawbox=x=0:y=${panelLabelHeight - 1}:w=iw:h=1:color=${labelDividerColor}:t=fill:enable='${enableExpression}'`,
+            `drawtext=text='URL\\: ${escapedAddressText}':x=20:y=18:fontsize=18:fontcolor=${labelTextColor}:font='Courier New':enable='${enableExpression}'`,
+        ];
+    });
+
+const createFilterGraph = (manifest: ReadmeDemoManifest): string => {
+    const panelWindowFilters = manifest.panels.map((panel, index) => {
+        return [
             `[${index}:v]setpts=PTS/${manifest.playbackRate}`,
-            `pad=w=iw+${browserOuterBorder * 2}:h=ih+${
-                browserChromeHeight + browserOuterBorder * 2
-            }:x=${browserOuterBorder}:y=${
-                browserChromeHeight + browserOuterBorder
-            }:color=white`,
-            'drawbox=x=0:y=0:w=iw:h=ih:color=0xd6d9df:t=1',
-            `drawbox=x=0:y=0:w=iw:h=${browserChromeHeight}:color=0xf8fafc:t=fill`,
-            `drawbox=x=0:y=${browserChromeHeight}:w=iw:h=1:color=0xe5e7eb:t=fill`,
-            'drawbox=x=12:y=22:w=10:h=10:color=0xE57373:t=fill',
-            'drawbox=x=28:y=22:w=10:h=10:color=0xF0C674:t=fill',
-            'drawbox=x=44:y=22:w=10:h=10:color=0x81C784:t=fill',
-            'drawbox=x=74:y=14:w=iw-98:h=28:color=0xffffff:t=fill',
-            'drawbox=x=74:y=14:w=iw-98:h=28:color=0xd6d9df:t=1',
-            `drawtext=text='${escapedAddressText}':x=90:y=22:fontsize=16:fontcolor=0x4b5563`,
-            `drawbox=x=${browserOuterBorder}:y=${
-                browserChromeHeight + browserOuterBorder
-            }:w=iw-${browserOuterBorder * 2}:h=ih-${
-                browserChromeHeight + browserOuterBorder * 2
-            }:color=0xf3f4f6:t=1[panel${index}]`,
+            `pad=w=iw:h=ih+${panelLabelHeight}:x=0:y=${panelLabelHeight}:color=${canvasColor}`,
+            ...createAddressTextFilters(panel.addressPhases),
+            `format=yuv420p[panel${index}]`,
         ].join(',');
     });
     const stackedInputs = manifest.panels
@@ -176,19 +242,16 @@ const createFilterGraph = (manifest: ReadmeDemoManifest): string => {
             }
 
             if (index === 1) {
-                return `w0+${browserWindowGap}_0`;
+                return `w0+${panelGap}_0`;
             }
 
-            return `w0+w1+${browserWindowGap * 2}_0`;
+            return `w0+w1+${panelGap * 2}_0`;
         })
         .join('|');
 
     return [
         ...panelWindowFilters,
-        `${stackedInputs}xstack=inputs=${manifest.panels.length}:layout=${xstackLayout}:fill=white[stacked]`,
-        `[stacked]pad=w=iw+${browserWindowOuterPadding * 2}:h=ih+${
-            browserWindowOuterPadding * 2
-        }:x=${browserWindowOuterPadding}:y=${browserWindowOuterPadding}:color=white,format=yuv420p[v]`,
+        `${stackedInputs}xstack=inputs=${manifest.panels.length}:layout=${xstackLayout}:fill=${canvasColor},format=yuv420p[v]`,
     ].join(';');
 };
 

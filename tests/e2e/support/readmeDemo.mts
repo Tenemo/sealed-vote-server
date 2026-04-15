@@ -30,9 +30,14 @@ export type ReadmeDemoPanelId =
     | 'participant-one'
     | 'participant-two';
 
+export type ReadmeDemoAddressPhase = {
+    startMs: number;
+    text: string;
+};
+
 export type ReadmeDemoManifest = {
     panels: Array<{
-        addressText: string;
+        addressPhases: ReadonlyArray<ReadmeDemoAddressPhase>;
         id: ReadmeDemoPanelId;
         label: string;
         videoPath: string;
