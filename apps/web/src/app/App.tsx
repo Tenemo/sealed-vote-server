@@ -1,17 +1,14 @@
-import React, { Suspense, lazy } from 'react';
+import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Route, Routes } from 'react-router-dom';
 
 import { RenderErrorFallback } from './RenderErrorFallback';
 import VersionBadge from './VersionBadge';
 
-import { Panel } from '@/components/ui/panel';
-import { Spinner } from '@/components/ui/spinner';
 import Header from 'components/Header/Header';
 import NotFound from 'components/NotFound/NotFound';
+import Poll from 'features/Polls/Poll/Poll';
 import PollCreation from 'features/Polls/PollCreation/PollCreation';
-
-const Poll = lazy(() => import('features/Polls/Poll/Poll'));
 
 const App = (): React.JSX.Element => {
     const mainContentReference = React.useRef<HTMLElement>(null);
@@ -82,24 +79,11 @@ const App = (): React.JSX.Element => {
                     ref={mainContentReference}
                 >
                     <div className="flex w-full max-w-[96rem] flex-1 flex-col">
-                        <Suspense
-                            fallback={
-                                <div className="flex min-h-[40vh] items-center justify-center">
-                                    <Panel className="loading-panel max-w-xl">
-                                        <Spinner className="size-10" />
-                                    </Panel>
-                                </div>
-                            }
-                        >
-                            <Routes>
-                                <Route element={<PollCreation />} path="/" />
-                                <Route
-                                    element={<Poll />}
-                                    path="votes/:pollSlug"
-                                />
-                                <Route element={<NotFound />} path="*" />
-                            </Routes>
-                        </Suspense>
+                        <Routes>
+                            <Route element={<PollCreation />} path="/" />
+                            <Route element={<Poll />} path="votes/:pollSlug" />
+                            <Route element={<NotFound />} path="*" />
+                        </Routes>
                     </div>
                 </main>
                 <VersionBadge />
