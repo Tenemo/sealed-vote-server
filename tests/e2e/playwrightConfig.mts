@@ -149,7 +149,7 @@ const projects: Project[] = [
     },
     {
         name: 'firefox-desktop',
-        testIgnore: [...productionOnlySpecs, ...mixedBrowserParticipantSpecs],
+        testIgnore: mixedBrowserParticipantSpecs,
         use: {
             ...devices['Desktop Firefox'],
             browserName: 'firefox' as const,
@@ -158,7 +158,6 @@ const projects: Project[] = [
     {
         name: 'webkit-desktop',
         testIgnore: [
-            ...productionOnlySpecs,
             ...mixedBrowserParticipantSpecs,
             ...webkitUnsupportedModernCryptoSpecs,
         ],
@@ -169,7 +168,7 @@ const projects: Project[] = [
     },
     {
         name: 'mobile-firefox-android',
-        testIgnore: [...productionOnlySpecs, ...mixedBrowserParticipantSpecs],
+        testIgnore: mixedBrowserParticipantSpecs,
         use: {
             browserName: 'firefox',
             ...mobileFirefoxAndroidContextOptions,

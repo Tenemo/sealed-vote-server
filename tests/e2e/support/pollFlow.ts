@@ -31,9 +31,12 @@ export type CreatedPoll = {
 
 const getResultCard = (page: Page, choice: string) =>
     page
-        .getByText(choice, { exact: true })
-        .first()
-        .locator('xpath=ancestor::div[3]');
+        .getByTestId('verified-results-panel')
+        .getByTestId('verified-result-card')
+        .filter({
+            has: page.getByText(choice, { exact: true }),
+        })
+        .first();
 
 const waitForAnyVisibleText = async ({
     page,
@@ -245,6 +248,12 @@ export const waitForVerifiedResults = async ({
         }),
     ).toBeVisible({ timeout: 90_000 });
 
+    if (expectedResults && expectedResults.length === 0) {
+        throw new Error('expectedResults must include at least one result.');
+    }
+
+    const resultsPanel = page.getByTestId('verified-results-panel');
+
     const resultsToAssert =
         expectedResults ??
         choices.map((choice) => ({
@@ -253,6 +262,12 @@ export const waitForVerifiedResults = async ({
             displayedMean: '',
             tally: '',
         }));
+
+    await expect(
+        resultsPanel.getByTestId('verified-result-card'),
+    ).toHaveCount(resultsToAssert.length, {
+        timeout: 90_000,
+    });
 
     for (const result of resultsToAssert) {
         const resultCard = getResultCard(page, result.choice);
@@ -276,22 +291,6 @@ export const waitForVerifiedResults = async ({
             });
         }
     }
-};
-
-export const expectAcceptedBallotCount = async ({
-    choices = ['Apples', 'Bananas'],
-    count,
-    page,
-}: {
-    choices?: string[];
-    count: number;
-    page: Page;
-}): Promise<void> => {
-    const expectedText = `${count} accepted ballots`;
-
-    await expect(page.getByText(expectedText, { exact: true })).toHaveCount(
-        choices.length,
-    );
 };
 
 export const waitForCeremonyMetric = async ({

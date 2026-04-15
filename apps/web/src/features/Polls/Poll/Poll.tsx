@@ -1353,7 +1353,10 @@ const PollPage = (): React.JSX.Element => {
                     </Panel>
 
                     {poll.verification.status === 'verified' ? (
-                        <Panel className="space-y-4">
+                        <Panel
+                            className="space-y-4"
+                            data-testid="verified-results-panel"
+                        >
                             <div className="space-y-2">
                                 <h2 className="text-xl font-semibold">
                                     Results
@@ -1368,6 +1371,7 @@ const PollPage = (): React.JSX.Element => {
                                     (result) => (
                                         <div
                                             className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4"
+                                            data-testid="verified-result-card"
                                             key={result.optionIndex}
                                         >
                                             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

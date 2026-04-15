@@ -25,6 +25,18 @@ export const createUnexpectedErrorTracker = (): UnexpectedErrorTracker => ({
     pendingChecks: new Set(),
 });
 
+const matchesAllowedConsoleError = (
+    pattern: RegExp,
+    messageText: string,
+): boolean => {
+    const statelessPattern = new RegExp(
+        pattern.source,
+        pattern.flags.replaceAll('g', '').replaceAll('y', ''),
+    );
+
+    return statelessPattern.test(messageText);
+};
+
 const isTrackedApiResponse = (page: Page, responseUrl: URL): boolean => {
     if (!responseUrl.pathname.includes('/api/')) {
         return false;
@@ -60,7 +72,9 @@ export const attachErrorTracking = (
     page.on('console', (message) => {
         if (
             message.type() === 'error' &&
-            !allowedConsoleErrors.some((pattern) => pattern.test(message.text()))
+            !allowedConsoleErrors.some((pattern) =>
+                matchesAllowedConsoleError(pattern, message.text()),
+            )
         ) {
             tracker.errors.push(`[${label}] console: ${message.text()}`);
         }
