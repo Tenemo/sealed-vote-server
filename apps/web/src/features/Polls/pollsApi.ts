@@ -12,9 +12,14 @@ import {
     type RestartCeremonyRequest,
 } from '@sealed-vote/contracts';
 
-import { normalizePollApiBaseUrl } from './pollApiBaseUrl';
+const apiBaseUrl = (() => {
+    const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+    const normalizedApiBaseUrl = configuredApiBaseUrl
+        ? configuredApiBaseUrl.trim().replace(/\/+$/, '')
+        : '';
 
-const apiBaseUrl = normalizePollApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+    return normalizedApiBaseUrl || '/';
+})();
 
 export const pollsApi = createApi({
     reducerPath: 'polls',

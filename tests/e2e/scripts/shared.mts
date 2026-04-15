@@ -126,10 +126,12 @@ export const getForwardedCliArgs = (): string[] => {
 
 export const runLocalE2E = ({
     build = true,
+    forwardedCliArgs = getForwardedCliArgs(),
     turbo = false,
     useBuiltServers = true,
 }: {
     build?: boolean;
+    forwardedCliArgs?: string[];
     turbo?: boolean;
     useBuiltServers?: boolean;
 } = {}): void => {
@@ -171,7 +173,7 @@ export const runLocalE2E = ({
         'test',
         '--config',
         'tests/config/playwright.local.config.mts',
-        ...getForwardedCliArgs(),
+        ...forwardedCliArgs,
     ]);
 };
 

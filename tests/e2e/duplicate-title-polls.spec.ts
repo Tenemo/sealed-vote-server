@@ -32,8 +32,6 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     const firstPollVoterName = createVoterName('alice', namespace);
     const secondPollVoterName = createVoterName('bob', namespace);
 
-    attachErrorTracking(page, 'first-poll', tracker);
-
     const createPollWithTitle = async (): Promise<CreatedPoll> => {
         const createdPoll = await createPoll({
             page,
@@ -48,6 +46,8 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     const secondPoll = await createPollWithTitle();
 
     expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
+
+    attachErrorTracking(page, 'first-poll', tracker);
 
     await gotoInteractablePage(page, firstPoll.pollUrl);
     await registerParticipant({

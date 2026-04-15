@@ -5,7 +5,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
-import { mutedBodyClassName, pageTitleClassName } from '@/lib/uiClasses';
 import LoadingButton from 'components/LoadingButton/LoadingButton';
 import NotFound from 'components/NotFound/NotFound';
 import {
@@ -33,10 +32,6 @@ import {
     findPollDeviceStateByPollSlug,
     savePollDeviceState,
 } from 'features/Polls/pollDeviceStorage';
-import {
-    getPollRefreshInterval,
-    steadyStatePollingIntervalMs,
-} from 'features/Polls/pollRefreshInterval';
 import { derivePollWorkflow } from 'features/Polls/pollWorkflow';
 import {
     useCloseVotingMutation,
@@ -52,6 +47,8 @@ const minimumScore = 1;
 const maximumScore = 10;
 const boardConfirmationDelayMs = 250;
 const boardConfirmationMaxAttempts = 6;
+const steadyStatePollingIntervalMs = 5_000;
+const activeCeremonyPollingIntervalMs = 1_000;
 const scoreOptions = Array.from(
     { length: maximumScore - minimumScore + 1 },
     (_value, offset) => minimumScore + offset,
@@ -59,6 +56,11 @@ const scoreOptions = Array.from(
 
 type PollData = NonNullable<ReturnType<typeof useGetPollQuery>['data']>;
 type PollBoardEntry = PollData['boardEntries'][number];
+const activeCeremonyPhases = new Set<PollData['phase']>([
+    'ready-to-reveal',
+    'revealing',
+    'securing',
+]);
 
 const isSamePreparedAction = (
     left: PreparedCeremonyAction | null,
@@ -104,6 +106,13 @@ const phaseLabel = (phase: string): string =>
 
 const createEmptyScores = (choiceCount: number): (number | null)[] =>
     Array.from({ length: choiceCount }, () => null);
+
+const getPollRefreshInterval = (
+    poll: Pick<PollData, 'phase'> | null | undefined,
+): number =>
+    poll && activeCeremonyPhases.has(poll.phase)
+        ? activeCeremonyPollingIntervalMs
+        : steadyStatePollingIntervalMs;
 
 const formatDateTime = (value: string): string =>
     new Date(value).toLocaleString(undefined, {
@@ -1024,9 +1033,7 @@ const PollPage = (): React.JSX.Element => {
                                 <p className="text-sm text-secondary">
                                     {phaseLabel(poll.phase)}
                                 </p>
-                                <h1 className={pageTitleClassName}>
-                                    {poll.pollName}
-                                </h1>
+                                <h1 className="page-title">{poll.pollName}</h1>
                                 <p className="page-lead max-w-3xl">
                                     {primaryExplanation}
                                 </p>
@@ -1056,9 +1063,7 @@ const PollPage = (): React.JSX.Element => {
                                     {shareUrl}
                                 </div>
                                 {copyNotice ? (
-                                    <p className={mutedBodyClassName}>
-                                        {copyNotice}
-                                    </p>
+                                    <p className="field-note">{copyNotice}</p>
                                 ) : null}
                             </div>
                             <Button
@@ -1111,9 +1116,7 @@ const PollPage = (): React.JSX.Element => {
                             <h2 className="text-xl font-semibold">
                                 Your next step
                             </h2>
-                            <p className={mutedBodyClassName}>
-                                {nextStepExplanation}
-                            </p>
+                            <p className="field-note">{nextStepExplanation}</p>
                         </div>
 
                         {creatorSession?.pollId === poll.id &&
@@ -1205,7 +1208,7 @@ const PollPage = (): React.JSX.Element => {
                                         <h3 className="text-base font-semibold">
                                             Score every option
                                         </h3>
-                                        <p className={mutedBodyClassName}>
+                                        <p className="field-note">
                                             Every option must get one score from
                                             1 to 10. You can submit only once.
                                         </p>
@@ -1279,7 +1282,7 @@ const PollPage = (): React.JSX.Element => {
                                     <div className="text-base font-semibold">
                                         Vote stored on this device
                                     </div>
-                                    <p className={`${mutedBodyClassName} mt-2`}>
+                                    <p className="field-note mt-2">
                                         {workflow.currentStep ===
                                         'creator-can-close'
                                             ? 'Your vote is in. You can close voting when you are ready to freeze the submitted roster.'
@@ -1314,7 +1317,7 @@ const PollPage = (): React.JSX.Element => {
                                         </LoadingButton>
                                     </div>
                                 ) : isCreatorParticipant ? (
-                                    <p className={mutedBodyClassName}>
+                                    <p className="field-note">
                                         {poll.submittedParticipantCount <
                                         poll.minimumCloseParticipantCount
                                             ? `At least ${poll.minimumCloseParticipantCount} submitted participants are required before closing.`
@@ -1361,7 +1364,7 @@ const PollPage = (): React.JSX.Element => {
                                 <h2 className="text-xl font-semibold">
                                     Results
                                 </h2>
-                                <p className={mutedBodyClassName}>
+                                <p className="field-note">
                                     Arithmetic means are shown in the same 1.0
                                     to 10.0 range that each participant used.
                                 </p>
@@ -1414,7 +1417,7 @@ const PollPage = (): React.JSX.Element => {
                             <h2 className="text-xl font-semibold">
                                 Audit and verification
                             </h2>
-                            <p className={mutedBodyClassName}>
+                            <p className="field-note">
                                 The main flow hides the cryptography. This rail
                                 shows what the board currently proves.
                             </p>
@@ -1469,7 +1472,7 @@ const PollPage = (): React.JSX.Element => {
                             <h2 className="text-xl font-semibold">
                                 Ceremony progress
                             </h2>
-                            <p className={mutedBodyClassName}>
+                            <p className="field-note">
                                 Counts are derived from the accepted board log.
                             </p>
                         </div>
@@ -1556,7 +1559,7 @@ const PollPage = (): React.JSX.Element => {
                             <h2 className="text-xl font-semibold">
                                 Participants
                             </h2>
-                            <p className={mutedBodyClassName}>
+                            <p className="field-note">
                                 The pre-close roster is public and auditable.
                             </p>
                         </div>
@@ -1596,7 +1599,7 @@ const PollPage = (): React.JSX.Element => {
                             <h2 className="text-xl font-semibold">
                                 Board activity
                             </h2>
-                            <p className={mutedBodyClassName}>
+                            <p className="field-note">
                                 Digests and message counts come from the
                                 accepted bulletin board log.
                             </p>
