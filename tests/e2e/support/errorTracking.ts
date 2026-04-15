@@ -111,25 +111,32 @@ const extractResponseBodySummary = (bodyText: string): string | null => {
         return null;
     }
 
+    let parsedBody:
+        | {
+              error?: unknown;
+              message?: unknown;
+          }
+        | undefined;
+
     try {
-        const parsedBody = JSON.parse(bodyText) as {
+        parsedBody = JSON.parse(bodyText) as {
             error?: unknown;
             message?: unknown;
         };
-
-        if (typeof parsedBody.message === 'string') {
-            return `message=${truncateTrackedText(
-                normalizeTrackedText(parsedBody.message),
-            )}`;
-        }
-
-        if (typeof parsedBody.error === 'string') {
-            return `error=${truncateTrackedText(
-                normalizeTrackedText(parsedBody.error),
-            )}`;
-        }
     } catch {
-        return `body=${truncateTrackedText(normalizedBodyText)}`;
+        parsedBody = undefined;
+    }
+
+    if (typeof parsedBody?.message === 'string') {
+        return `message=${truncateTrackedText(
+            normalizeTrackedText(parsedBody.message),
+        )}`;
+    }
+
+    if (typeof parsedBody?.error === 'string') {
+        return `error=${truncateTrackedText(
+            normalizeTrackedText(parsedBody.error),
+        )}`;
     }
 
     return `body=${truncateTrackedText(normalizedBodyText)}`;
