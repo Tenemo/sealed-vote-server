@@ -1,4 +1,13 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import {
+    closePoll,
+    createPoll,
+    deletePoll,
+    fetchPoll,
+    postBoardMessage,
+    registerVoter,
+    restartPollCeremony,
+} from '@sealed-vote/testkit';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
@@ -8,15 +17,6 @@ import {
 } from 'threshold-elgamal';
 
 import { buildServer } from '../buildServer';
-import {
-    closePoll,
-    createPoll,
-    deletePoll,
-    fetchPoll,
-    postBoardMessage,
-    registerVoter,
-    restartPollCeremony,
-} from '../testUtils';
 
 const createBoardRegistrationPayload = async ({
     manifestHash,

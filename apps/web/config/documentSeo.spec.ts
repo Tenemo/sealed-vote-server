@@ -3,7 +3,6 @@ import { describe, expect, test, vi } from 'vitest';
 import {
     createPollSeoPayloadCache,
     extractVoteSlugFromPathname,
-    fetchPollTitle,
     renderDocumentHtml,
     resolveDocumentSeoMetadata,
     resolveSeoApiBaseUrl,
@@ -89,63 +88,6 @@ describe('shouldFetchPollSeoPayloadForRequest', () => {
                 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
             ),
         ).toBe(true);
-    });
-});
-
-describe('fetchPollTitle', () => {
-    test('returns the poll title when the payload is valid', async () => {
-        const fetchImpl = vi.fn(async () =>
-            Response.json({
-                pollName: 'Lunch vote',
-            }),
-        );
-
-        await expect(
-            fetchPollTitle({
-                apiBaseUrl: 'https://api.sealed.vote',
-                fetchImpl,
-                pollSlug: 'lunch-vote',
-            }),
-        ).resolves.toBe('Lunch vote');
-
-        expect(fetchImpl).toHaveBeenCalledWith(
-            new URL('/api/polls/lunch-vote', 'https://api.sealed.vote'),
-            expect.objectContaining({
-                headers: {
-                    accept: 'application/json',
-                },
-            }),
-        );
-    });
-
-    test('returns null when the backend responds with an error', async () => {
-        const fetchImpl = vi.fn(
-            async () => new Response(null, { status: 404 }),
-        );
-
-        await expect(
-            fetchPollTitle({
-                apiBaseUrl: 'https://api.sealed.vote',
-                fetchImpl,
-                pollSlug: 'missing-vote',
-            }),
-        ).resolves.toBeNull();
-    });
-
-    test('returns null when the payload shape is invalid', async () => {
-        const fetchImpl = vi.fn(async () =>
-            Response.json({
-                title: 'Lunch vote',
-            }),
-        );
-
-        await expect(
-            fetchPollTitle({
-                apiBaseUrl: 'https://api.sealed.vote',
-                fetchImpl,
-                pollSlug: 'lunch-vote',
-            }),
-        ).resolves.toBeNull();
     });
 });
 

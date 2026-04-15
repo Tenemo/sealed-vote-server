@@ -2,9 +2,9 @@ import { test } from '@playwright/test';
 
 import {
     closeVoting,
+    createExpectedVerifiedResults,
     createPoll,
     deletePolls,
-    expectAcceptedBallotCount,
     expectParticipantsVisible,
     expectSecuringVisible,
     submitVote,
@@ -39,6 +39,15 @@ test('counts every honest ballot when four participants complete the ceremony', 
     const participantOneName = createVoterName('bob', namespace);
     const participantTwoName = createVoterName('cora', namespace);
     const participantThreeName = createVoterName('dylan', namespace);
+    const expectedResults = createExpectedVerifiedResults({
+        choices: ['Apples', 'Bananas'],
+        scorecards: [
+            [9, 4],
+            [6, 8],
+            [7, 5],
+            [10, 3],
+        ],
+    });
 
     attachErrorTracking(page, 'creator', tracker);
 
@@ -96,22 +105,17 @@ test('counts every honest ballot when four participants complete the ceremony', 
 
         await waitForAutomaticReveal(page);
 
-        await waitForVerifiedResults({ page });
-        await waitForVerifiedResults({ page: participantOne.page });
-        await waitForVerifiedResults({ page: participantTwo.page });
-        await waitForVerifiedResults({ page: participantThree.page });
-
-        await expectAcceptedBallotCount({ count: 4, page });
-        await expectAcceptedBallotCount({
-            count: 4,
+        await waitForVerifiedResults({ expectedResults, page });
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantOne.page,
         });
-        await expectAcceptedBallotCount({
-            count: 4,
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantTwo.page,
         });
-        await expectAcceptedBallotCount({
-            count: 4,
+        await waitForVerifiedResults({
+            expectedResults,
             page: participantThree.page,
         });
         await expectNoUnexpectedErrors(tracker);

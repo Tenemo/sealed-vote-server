@@ -7,7 +7,7 @@ import createError from 'http-errors';
 
 import { polls } from '../db/schema.js';
 import { withTransaction } from '../utils/db.js';
-import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
 
 import {
@@ -48,7 +48,7 @@ export const deletePoll = async (fastify: FastifyInstance): Promise<void> => {
             const { creatorToken } = req.body;
 
             return await withTransaction(fastify, async (tx) => {
-                const poll = await lockPollByIdForCreatorAction(tx, pollId);
+                const poll = await lockPollById(tx, pollId);
                 if (!poll) {
                     throw createError(
                         404,

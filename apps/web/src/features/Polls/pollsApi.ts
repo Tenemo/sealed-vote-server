@@ -3,28 +3,30 @@ import {
     POLL_ROUTES,
     type BoardMessageRecord,
     type BoardMessageRequest,
-    type BoardMessagesResponse,
+    type CloseVotingRequest,
     type CreatePollRequest,
     type CreatePollResponse,
-    type CloseVotingRequest,
     type PollResponse,
-    type RecoverSessionRequest,
-    type RecoverSessionResponse,
     type RegisterVoterRequest,
     type RegisterVoterResponse,
     type RestartCeremonyRequest,
 } from '@sealed-vote/contracts';
 
-import { normalizePollApiBaseUrl } from './pollApiBaseUrl';
+const apiBaseUrl = (() => {
+    const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+    const normalizedApiBaseUrl = configuredApiBaseUrl
+        ? configuredApiBaseUrl.trim().replace(/\/+$/, '')
+        : '';
 
-const apiBaseUrl = normalizePollApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+    return normalizedApiBaseUrl || '/';
+})();
 
 export const pollsApi = createApi({
     reducerPath: 'polls',
     baseQuery: fetchBaseQuery({
         baseUrl: apiBaseUrl,
     }),
-    tagTypes: ['Poll', 'Board'],
+    tagTypes: ['Poll'],
     endpoints: (build) => ({
         createPoll: build.mutation<CreatePollResponse, CreatePollRequest>({
             query: (pollData) => ({
@@ -40,12 +42,7 @@ export const pollsApi = createApi({
                 method: 'GET',
             }),
             providesTags: (result) =>
-                result
-                    ? [
-                          { type: 'Poll', id: result.id },
-                          { type: 'Board', id: result.id },
-                      ]
-                    : [],
+                result ? [{ type: 'Poll', id: result.id }] : [],
         }),
         registerVoter: build.mutation<
             RegisterVoterResponse,
@@ -59,16 +56,6 @@ export const pollsApi = createApi({
             invalidatesTags: (_result, _error, { pollId }) => [
                 { type: 'Poll', id: pollId },
             ],
-        }),
-        recoverSession: build.mutation<
-            RecoverSessionResponse,
-            { pollId: string; recoveryData: RecoverSessionRequest }
-        >({
-            query: ({ pollId, recoveryData }) => ({
-                url: POLL_ROUTES.recoverSession(pollId),
-                method: 'POST',
-                body: recoveryData,
-            }),
         }),
         closeVoting: build.mutation<
             void,
@@ -96,19 +83,6 @@ export const pollsApi = createApi({
                 { type: 'Poll', id: pollId },
             ],
         }),
-        getBoardMessages: build.query<
-            BoardMessagesResponse,
-            { pollId: string; afterEntryHash?: string }
-        >({
-            query: ({ afterEntryHash, pollId }) => ({
-                url: POLL_ROUTES.boardMessages(pollId),
-                method: 'GET',
-                params: afterEntryHash ? { afterEntryHash } : undefined,
-            }),
-            providesTags: (_result, _error, { pollId }) => [
-                { type: 'Board', id: pollId },
-            ],
-        }),
         postBoardMessage: build.mutation<
             BoardMessageRecord,
             { pollId: string; boardMessage: BoardMessageRequest }
@@ -120,7 +94,6 @@ export const pollsApi = createApi({
             }),
             invalidatesTags: (_result, _error, { pollId }) => [
                 { type: 'Poll', id: pollId },
-                { type: 'Board', id: pollId },
             ],
         }),
     }),
@@ -130,11 +103,9 @@ export type { PollResponse };
 
 export const {
     useCreatePollMutation,
-    useGetBoardMessagesQuery,
     useGetPollQuery,
     useLazyGetPollQuery,
     usePostBoardMessageMutation,
-    useRecoverSessionMutation,
     useCloseVotingMutation,
     useRegisterVoterMutation,
     useRestartCeremonyMutation,

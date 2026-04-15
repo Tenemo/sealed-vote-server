@@ -29,5 +29,3 @@ export const lockPollById = async (
 };
 
 export type { LockedPoll };
-
-export const lockPollByIdForCreatorAction = lockPollById;

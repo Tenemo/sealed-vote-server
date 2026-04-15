@@ -14,6 +14,7 @@ The public poll read model exposes these phases:
 - `aborted`
 
 They are derived from accepted board payloads plus local ceremony verification.
+The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
 
 ## Product flow
 
@@ -46,6 +47,5 @@ They are derived from accepted board payloads plus local ceremony verification.
 ## Shared helpers
 
 - `acceptedBoardMessages` and `filterBoardMessagesByType` live in `packages/protocol/src/boardMessages.ts`
-- `derivePollPhase` and `canRegister` live in `packages/protocol/src/phases.ts`
 - `computeArithmeticMean`, `computePublishedResultScores`, and `hasVerifiedTallies` live in `packages/protocol/src/results.ts`
 - `canonicalUnsignedPayloadBytes`, `protocolPayloadSlotKey`, and `sortProtocolPayloads` live in `packages/protocol/src/protocolPayloads.ts`

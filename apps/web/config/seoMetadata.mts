@@ -392,7 +392,7 @@ const renderLinkTag = (rel: string, href: string): string =>
 const renderJsonLdScript = (structuredData: StructuredData): string =>
     `<script ${reactHelmetAttributeName}="${reactHelmetAttributeValue}" type="application/ld+json">${serializeStructuredData(structuredData)}</script>`;
 
-export const renderSeoBlock = (metadata: SeoMetadata): string =>
+const renderSeoBlock = (metadata: SeoMetadata): string =>
     [
         `<meta name="${seoMarkerStartName}" content="1" />`,
         renderMetaTag('author', siteAuthor),

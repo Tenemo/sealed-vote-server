@@ -8,7 +8,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
 import { withTransaction } from '../utils/db.js';
-import { lockPollByIdForCreatorAction } from '../utils/pollLocks.js';
+import { lockPollById } from '../utils/pollLocks.js';
 import { insertPollCeremonySession } from '../utils/pollCeremonySessions.js';
 import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
 import { getPollFetchReadModel } from '../utils/pollReadModel.js';
@@ -56,10 +56,7 @@ export const restartCeremony = async (
             const response = await withTransaction(
                 fastify,
                 async (tx): Promise<RestartCeremonyResponse> => {
-                    const poll = await lockPollByIdForCreatorAction(
-                        tx,
-                        req.params.pollId,
-                    );
+                    const poll = await lockPollById(tx, req.params.pollId);
 
                     if (!poll) {
                         throw createError(

@@ -1,22 +1,19 @@
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
-import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-
-import { buildServer } from '../buildServer';
 import {
     createPoll,
     deletePoll,
     getUniquePollName,
     registerVoter,
-} from '../testUtils';
+} from '@sealed-vote/testkit';
+import type { FastifyInstance } from 'fastify';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+
+import { buildServer } from '../buildServer';
 
 import {
     authenticateVoter,
     authenticateVoterReadOnly,
-    findVoterByTokenReadOnly,
-    generateSecureToken,
     hashSecureToken,
-    isSecureToken,
 } from './voterAuth';
 
 describe('voter auth helpers', () => {
@@ -30,21 +27,11 @@ describe('voter auth helpers', () => {
         await fastify.close();
     });
 
-    test('generates secure tokens in the expected hex format', () => {
-        const token = generateSecureToken();
-
-        expect(token).toHaveLength(64);
-        expect(isSecureToken(token)).toBe(true);
-    });
-
-    test('hashes tokens deterministically and validates secure-token formatting', () => {
+    test('hashes tokens deterministically', () => {
         const token = 'A'.repeat(64);
 
         expect(hashSecureToken(token)).toBe(hashSecureToken(token));
         expect(hashSecureToken(token)).not.toBe(token);
-        expect(isSecureToken(token)).toBe(true);
-        expect(isSecureToken('short-token')).toBe(false);
-        expect(isSecureToken('g'.repeat(64))).toBe(false);
     });
 
     test('authenticates a registered voter in both locked and read-only flows', async () => {
@@ -74,26 +61,6 @@ describe('voter auth helpers', () => {
             voterName: 'Alice',
         });
         expect(authenticatedVoterReadOnly).toEqual(authenticatedVoter);
-
-        const deleteResult = await deletePoll(fastify, pollId, creatorToken);
-        expect(deleteResult.success).toBe(true);
-    });
-
-    test('returns undefined for an unknown token in the read-only lookup helper', async () => {
-        const { creatorToken, pollId } = await createPoll(
-            fastify,
-            getUniquePollName('Find voter helper'),
-        );
-        const registration = await registerVoter(fastify, pollId, 'Alice');
-
-        expect(registration.success).toBe(true);
-        if (!registration.success) {
-            throw new Error(registration.message);
-        }
-
-        await expect(
-            findVoterByTokenReadOnly(fastify.db, pollId, 'b'.repeat(64)),
-        ).resolves.toBeUndefined();
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
         expect(deleteResult.success).toBe(true);

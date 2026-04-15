@@ -3,11 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
-import {
-    actionButtonClassName,
-    mutedBodyClassName,
-    pageTitleClassName,
-} from '@/lib/uiClasses';
 
 const NotFound = (): React.JSX.Element => {
     const { pathname } = useLocation();
@@ -20,9 +15,9 @@ const NotFound = (): React.JSX.Element => {
         <div className="flex min-h-[50vh] flex-1 items-center justify-center">
             <Panel className="w-full max-w-xl text-center">
                 <div className="space-y-4">
-                    <h1 className={pageTitleClassName}>Page not found</h1>
+                    <h1 className="page-title">Page not found</h1>
                     <div className="space-y-2">
-                        <p className={mutedBodyClassName}>
+                        <p className="field-note">
                             The requested path does not exist.
                         </p>
                         <p className="field-note">
@@ -33,7 +28,7 @@ const NotFound = (): React.JSX.Element => {
                     </div>
                     <div className="flex justify-center">
                         <Button
-                            className={actionButtonClassName}
+                            className="w-full sm:w-auto"
                             onClick={onClick}
                             variant="outline"
                         >

@@ -8,7 +8,7 @@ import {
     siteName,
     siteThemeColor,
     type SeoMetadata,
-} from './seo';
+} from '../../config/seoMetadata.mts';
 
 const PageSeo = ({
     metadata,

@@ -8,7 +8,6 @@ import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
-import { actionButtonClassName } from '@/lib/uiClasses';
 import { cn } from '@/lib/utils';
 
 type ChoiceAddingProps = {
@@ -74,7 +73,7 @@ const ChoiceAdding = ({
                     value={choiceName}
                 />
                 <Button
-                    className={cn(actionButtonClassName, 'justify-center')}
+                    className={cn('w-full sm:w-auto', 'justify-center')}
                     disabled={!isChoiceNameValid}
                     onClick={handleAddChoice}
                     size="lg"

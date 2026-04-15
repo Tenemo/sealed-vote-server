@@ -17,7 +17,6 @@ import createError from 'http-errors';
 
 import { choices as choicesTable, polls } from '../db/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/db.js';
-import { areStringArraysEqual } from '../utils/idempotency.js';
 import { getCreatePollSlugAttempts } from '../utils/pollSlug.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voterAuth.js';
@@ -55,6 +54,12 @@ type CreatePollRequest = CreatePollRequestContract;
 export type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
 const supportedProtocolVersion = 'v1' as const;
+const areStringArraysEqual = (
+    left: readonly string[],
+    right: readonly string[],
+): boolean =>
+    left.length === right.length &&
+    left.every((value, index) => value === right[index]);
 
 const getExistingPollByCreatorTokenHash = async (
     fastify: FastifyInstance,

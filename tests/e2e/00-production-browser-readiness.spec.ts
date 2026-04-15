@@ -2,6 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { gotoInteractablePage } from './support/navigation.mts';
 import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
+import {
+    attachErrorTracking,
+    createUnexpectedErrorTracker,
+    expectNoUnexpectedErrors,
+} from './support/errorTracking';
 
 // Keep this file first in the production suite so browser-commit failures show
 // up before the heavier multi-page ceremony specs start.
@@ -42,10 +47,12 @@ test('browser can commit the homepage and a real production vote page', async ({
     page,
     request,
 }) => {
+    const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
     let participantPage: Page | null = null;
 
     try {
+        attachErrorTracking(page, 'homepage', tracker);
         await gotoInteractablePage(page, '/');
         await expectHomepageReady(page);
 
@@ -58,8 +65,10 @@ test('browser can commit the homepage and a real production vote page', async ({
         createdPolls.push(createdPoll);
 
         participantPage = await page.context().newPage();
+        attachErrorTracking(participantPage, 'participant-page', tracker);
         await gotoInteractablePage(participantPage, createdPoll.pollUrl);
         await expectVotePageReady(participantPage);
+        await expectNoUnexpectedErrors(tracker);
     } finally {
         if (participantPage && !participantPage.isClosed()) {
             await participantPage.close();

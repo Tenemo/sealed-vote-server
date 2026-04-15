@@ -1,6 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
 import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import {
+    closePoll,
+    createPoll,
+    deletePoll,
+    getUniquePollName,
+    registerVoter,
+} from '@sealed-vote/testkit';
 import { eq } from 'drizzle-orm';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -13,13 +20,6 @@ import {
 
 import { buildServer } from '../buildServer';
 import { publicKeyShares } from '../db/schema.js';
-import {
-    createPoll,
-    deletePoll,
-    closePoll,
-    registerVoter,
-    getUniquePollName,
-} from '../testUtils';
 
 const generateToken = (): string => randomBytes(32).toString('hex');
 

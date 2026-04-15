@@ -8,13 +8,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import PageSeo from '@/app/PageSeo';
-import { actionButtonClassName, pageTitleClassName } from '@/lib/uiClasses';
-import { buildCreatePageSeo } from 'app/seo';
-import LoadingButton from 'components/LoadingButton';
+import LoadingButton from 'components/LoadingButton/LoadingButton';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { saveCreatorSession } from 'features/Polls/pollSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
+import { buildCreatePageSeo } from '../../../../config/seoMetadata.mts';
 
 type Form = {
     pollName: string;
@@ -103,7 +102,7 @@ const PollCreationPage = (): React.JSX.Element => {
             <PageSeo metadata={createPageSeo} />
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
-                    <h1 className={pageTitleClassName} id={pageTitleId}>
+                    <h1 className="page-title" id={pageTitleId}>
                         Create a new vote
                     </h1>
                     <p className="page-lead mx-auto max-w-2xl">
@@ -154,7 +153,7 @@ const PollCreationPage = (): React.JSX.Element => {
                     )}
                     <div className="flex justify-end">
                         <LoadingButton
-                            className={actionButtonClassName}
+                            className="w-full sm:w-auto"
                             disabled={!isFormValid || isLoading}
                             loading={isLoading}
                             loadingLabel="Creating vote"

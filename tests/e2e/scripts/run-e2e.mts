@@ -1,34 +1,21 @@
-import {
-    assertSafeE2EEnv,
-    getForwardedCliArgs,
-    runPnpmSync,
-} from './shared.mts';
+import { runLocalE2E } from './shared.mts';
 
-process.env.NODE_ENV = 'test';
-process.env.PLAYWRIGHT_USE_BUILT_SERVERS =
-    process.env.PLAYWRIGHT_USE_BUILT_SERVERS ?? 'true';
-process.env.VITE_API_BASE_URL =
-    process.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:4000';
-process.env.VITE_POLLING_INTERVAL_MS =
-    process.env.VITE_POLLING_INTERVAL_MS ?? '500';
+const cliArgs = process.argv.slice(2);
+const firstArg = cliArgs[0];
+const normalizeForwardedCliArgs = (args: string[]): string[] =>
+    args[0] === '--' ? args.slice(1) : args;
+const mode =
+    firstArg === 'ci' || firstArg === 'local' || firstArg === 'turbo'
+        ? firstArg
+        : 'local';
+const forwardedCliArgs =
+    mode === 'local'
+        ? normalizeForwardedCliArgs(cliArgs)
+        : normalizeForwardedCliArgs(cliArgs.slice(1));
 
-try {
-    assertSafeE2EEnv();
-} catch (error) {
-    console.error(
-        error instanceof Error ? error.message : 'Unsafe e2e environment.',
-    );
-    process.exit(1);
-}
-
-const args = getForwardedCliArgs();
-
-runPnpmSync(['build']);
-runPnpmSync([
-    'exec',
-    'playwright',
-    'test',
-    '--config',
-    'tests/config/playwright.local.config.mts',
-    ...args,
-]);
+runLocalE2E({
+    build: mode !== 'ci',
+    forwardedCliArgs,
+    turbo: mode === 'turbo',
+    useBuiltServers: true,
+});

@@ -11,12 +11,11 @@ import {
 
 import { mobileFirefoxAndroidContextOptions } from './support/profiles.mts';
 
-const chromiumOnlySpecs = [
-    '**/duplicate-title-polls.spec.ts',
-    '**/duplicate-voter-name.spec.ts',
+const mixedBrowserParticipantSpecs = [
     '**/mixed-platform-poll.spec.ts',
     '**/share-link.spec.ts',
 ];
+const productionOnlySpecs = ['**/00-production-browser-readiness.spec.ts'];
 
 // The main e2e matrix runs WebKit on Linux, where Ed25519 and X25519 WebCrypto
 // support still lags the latest Apple WebKit stack. We probe that support on
@@ -27,9 +26,9 @@ const webkitUnsupportedModernCryptoSpecs =
         : [
               '**/browser-crypto-compat.spec.ts',
               '**/ceremony-persistence.spec.ts',
-              '**/ceremony-rescue.spec.ts',
+              '**/duplicate-title-polls.spec.ts',
+              '**/duplicate-voter-name.spec.ts',
               '**/multi-participant-counting.spec.ts',
-              '**/setup-phase.spec.ts',
               '**/voting-flow.spec.ts',
           ];
 
@@ -150,7 +149,7 @@ const projects: Project[] = [
     },
     {
         name: 'firefox-desktop',
-        testIgnore: chromiumOnlySpecs,
+        testIgnore: mixedBrowserParticipantSpecs,
         use: {
             ...devices['Desktop Firefox'],
             browserName: 'firefox' as const,
@@ -159,7 +158,7 @@ const projects: Project[] = [
     {
         name: 'webkit-desktop',
         testIgnore: [
-            ...chromiumOnlySpecs,
+            ...mixedBrowserParticipantSpecs,
             ...webkitUnsupportedModernCryptoSpecs,
         ],
         use: {
@@ -169,7 +168,7 @@ const projects: Project[] = [
     },
     {
         name: 'mobile-firefox-android',
-        testIgnore: chromiumOnlySpecs,
+        testIgnore: mixedBrowserParticipantSpecs,
         use: {
             browserName: 'firefox',
             ...mobileFirefoxAndroidContextOptions,
@@ -194,7 +193,7 @@ const getCommonConfig = (
     fullyParallel: options?.fullyParallel ?? false,
     outputDir: path.resolve(repoRoot, outputDir),
     reporter: reporters,
-    retries: isCi ? 1 : 0,
+    retries: 0,
     use: {
         baseURL,
         screenshot: 'only-on-failure' as const,
@@ -230,6 +229,7 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
               }
             : undefined,
     ),
+    testIgnore: productionOnlySpecs,
     webServer: shouldUseBuiltServers
         ? [
               {
