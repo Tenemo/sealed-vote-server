@@ -124,14 +124,10 @@ export const getForwardedCliArgs = (): string[] => {
     return args;
 };
 
-export const runLocalE2E = ({
-    build = true,
-    forwardedCliArgs = getForwardedCliArgs(),
+export const configureLocalE2EEnv = ({
     turbo = false,
     useBuiltServers = true,
 }: {
-    build?: boolean;
-    forwardedCliArgs?: string[];
     turbo?: boolean;
     useBuiltServers?: boolean;
 } = {}): void => {
@@ -162,6 +158,23 @@ export const runLocalE2E = ({
         );
         process.exit(1);
     }
+};
+
+export const runLocalE2E = ({
+    build = true,
+    forwardedCliArgs = getForwardedCliArgs(),
+    turbo = false,
+    useBuiltServers = true,
+}: {
+    build?: boolean;
+    forwardedCliArgs?: string[];
+    turbo?: boolean;
+    useBuiltServers?: boolean;
+} = {}): void => {
+    configureLocalE2EEnv({
+        turbo,
+        useBuiltServers,
+    });
 
     if (build) {
         runPnpmSync(['build']);

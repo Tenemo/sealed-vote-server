@@ -10,7 +10,12 @@ import {
 } from '@playwright/test';
 
 import { mobileFirefoxAndroidContextOptions } from './support/profiles.mts';
+import {
+    readmeDemoPanelViewport,
+    readmeDemoRawVideoDir,
+} from './support/readmeDemo.mts';
 
+const demoOnlySpecs = ['**/readme-demo.demo.ts'];
 const productionOnlySpecs = ['**/00-production-browser-readiness.spec.ts'];
 
 // The main e2e matrix runs WebKit on Linux, where Ed25519 and X25519 WebCrypto
@@ -204,25 +209,8 @@ const getCommonConfig = (
     projects,
 });
 
-export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
-    ...getCommonConfig(
-        localWebBaseUrl,
-        isLocalTurbo
-            ? 'test-results/playwright-turbo'
-            : 'test-results/playwright',
-        isLocalTurbo
-            ? {
-                  fullyParallel: true,
-                  workers: parseWorkerCount(
-                      'PLAYWRIGHT_LOCAL_WORKERS',
-                      process.env.PLAYWRIGHT_LOCAL_WORKERS,
-                      localTurboWorkers,
-                  ),
-              }
-            : undefined,
-    ),
-    testIgnore: productionOnlySpecs,
-    webServer: shouldUseBuiltServers
+const createLocalWebServers = (): NonNullable<PlaywrightTestConfig['webServer']> =>
+    shouldUseBuiltServers
         ? [
               {
                   command: 'pnpm e2e:ci:serve:api',
@@ -251,7 +239,55 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
                   url: localWebBaseUrl,
                   reuseExistingServer: false,
               },
-          ],
+          ];
+
+export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
+    ...getCommonConfig(
+        localWebBaseUrl,
+        isLocalTurbo
+            ? 'test-results/playwright-turbo'
+            : 'test-results/playwright',
+        isLocalTurbo
+            ? {
+                  fullyParallel: true,
+                  workers: parseWorkerCount(
+                      'PLAYWRIGHT_LOCAL_WORKERS',
+                      process.env.PLAYWRIGHT_LOCAL_WORKERS,
+                      localTurboWorkers,
+                  ),
+              }
+            : undefined,
+    ),
+    testIgnore: [...productionOnlySpecs, ...demoOnlySpecs],
+    webServer: createLocalWebServers(),
+});
+
+export const createReadmeDemoConfig = (): PlaywrightTestConfig => ({
+    ...getCommonConfig(localWebBaseUrl, 'test-results/readme-demo', {
+        workers: 1,
+    }),
+    testMatch: '**/readme-demo.demo.ts',
+    use: {
+        baseURL: localWebBaseUrl,
+        screenshot: 'only-on-failure' as const,
+        trace: 'off' as const,
+        video: 'off' as const,
+    },
+    projects: [
+        {
+            name: 'chromium-readme-demo',
+            use: {
+                ...devices['Desktop Chrome'],
+                browserName: 'chromium' as const,
+                recordVideo: {
+                    dir: readmeDemoRawVideoDir,
+                    size: readmeDemoPanelViewport,
+                },
+                viewport: readmeDemoPanelViewport,
+            } as Project['use'],
+        },
+    ],
+    webServer: createLocalWebServers(),
 });
 
 export const createProductionE2EConfig = (): PlaywrightTestConfig => {
@@ -261,9 +297,12 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
         );
     }
 
-    return getCommonConfig(
-        normalizeBaseUrl(productionBaseUrl, 'PLAYWRIGHT_BASE_URL'),
-        'test-results/playwright-production',
-        { fullyParallel: true },
-    );
+    return {
+        ...getCommonConfig(
+            normalizeBaseUrl(productionBaseUrl, 'PLAYWRIGHT_BASE_URL'),
+            'test-results/playwright-production',
+            { fullyParallel: true },
+        ),
+        testIgnore: demoOnlySpecs,
+    };
 };

@@ -4,7 +4,7 @@ import {
     closeVoting,
     createPoll,
     deletePolls,
-    expectSecuringVisible,
+    expectPostCloseVisible,
     submitVote,
     type CreatedPoll,
 } from './support/pollFlow';
@@ -138,7 +138,7 @@ test('restores the securing state after refresh once voting is closed', async ({
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
         await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
 
-        await expectSecuringVisible(restoredPage);
+        await expectPostCloseVisible(restoredPage);
         await expectNoUnexpectedErrors(tracker);
     } finally {
         if (restoredContext) {

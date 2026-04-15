@@ -16,6 +16,7 @@
         "lint": "turbo run lint --output-logs=errors-only --log-prefix=none && pnpm exec eslint netlify/edge-functions netlify/functions --ext ts",
         "typecheck": "turbo run typecheck --output-logs=errors-only --log-prefix=none && tsc --project tsconfig.json",
         "e2e": "node --experimental-strip-types tests/e2e/scripts/run-e2e.mts",
+        "demo:record": "node --experimental-strip-types tests/e2e/scripts/run-readme-demo.mts",
         "e2e:compat": "node --experimental-strip-types tests/e2e/scripts/run-playwright.mts compat",
         "e2e:turbo": "node --experimental-strip-types tests/e2e/scripts/run-e2e.mts turbo",
         "e2e:ci:build": "node --experimental-strip-types tests/e2e/scripts/run-e2e-ci-build.mts",
