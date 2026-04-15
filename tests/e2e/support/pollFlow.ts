@@ -1,9 +1,20 @@
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import {
+    expect,
+    type APIRequestContext,
+    type Locator,
+    type Page,
+} from '@playwright/test';
 
 import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
+const postClosePhaseLabels = [
+    'Securing the election',
+    'Starting reveal',
+    'Revealing results',
+    'Verified results',
+] as const;
 
 const escapeRegExp = (value: string): string =>
     value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -29,7 +40,7 @@ export type CreatedPoll = {
     pollUrl: string;
 };
 
-const getResultCard = (page: Page, choice: string) =>
+const getResultCard = (page: Page, choice: string): Locator =>
     page
         .getByTestId('verified-results-panel')
         .getByTestId('verified-result-card')
@@ -51,7 +62,12 @@ const waitForAnyVisibleText = async ({
         .poll(
             async () => {
                 for (const text of texts) {
-                    if (await page.getByText(text, { exact: true }).first().isVisible()) {
+                    if (
+                        await page
+                            .getByText(text, { exact: true })
+                            .first()
+                            .isVisible()
+                    ) {
                         return text;
                     }
                 }
@@ -196,12 +212,7 @@ export const closeVoting = async (page: Page): Promise<void> => {
     await closeButton.click();
     await waitForAnyVisibleText({
         page,
-        texts: [
-            'Securing the election',
-            'Starting reveal',
-            'Revealing results',
-            'Verified results',
-        ],
+        texts: postClosePhaseLabels,
         timeout: 30_000,
     });
 };
@@ -263,11 +274,12 @@ export const waitForVerifiedResults = async ({
             tally: '',
         }));
 
-    await expect(
-        resultsPanel.getByTestId('verified-result-card'),
-    ).toHaveCount(resultsToAssert.length, {
-        timeout: 90_000,
-    });
+    await expect(resultsPanel.getByTestId('verified-result-card')).toHaveCount(
+        resultsToAssert.length,
+        {
+            timeout: 90_000,
+        },
+    );
 
     for (const result of resultsToAssert) {
         const resultCard = getResultCard(page, result.choice);
@@ -358,8 +370,10 @@ export const expectParticipantsHidden = async (
     }
 };
 
-export const expectSecuringVisible = async (page: Page): Promise<void> => {
-    await expect(page.getByText('Securing the election')).toBeVisible({
+export const expectPostCloseVisible = async (page: Page): Promise<void> => {
+    await waitForAnyVisibleText({
+        page,
+        texts: postClosePhaseLabels,
         timeout: 30_000,
     });
     await expect(

@@ -2,7 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-import { expect, test, type Locator, type Page, type Video } from '@playwright/test';
+import {
+    expect,
+    test,
+    type Locator,
+    type Page,
+    type Video,
+} from '@playwright/test';
 
 import {
     attachErrorTracking,
@@ -13,8 +19,8 @@ import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createExpectedVerifiedResults,
     deletePolls,
+    expectPostCloseVisible,
     expectParticipantsVisible,
-    expectSecuringVisible,
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
@@ -84,7 +90,12 @@ const waitForAnyVisibleText = async ({
         .poll(
             async () => {
                 for (const text of texts) {
-                    if (await page.getByText(text, { exact: true }).first().isVisible()) {
+                    if (
+                        await page
+                            .getByText(text, { exact: true })
+                            .first()
+                            .isVisible()
+                    ) {
                         return text;
                     }
                 }
@@ -212,11 +223,7 @@ const moveMouseSmoothly = async (
         targetPosition,
     });
 
-    for (
-        let stepIndex = 1;
-        stepIndex <= movePlan.steps;
-        stepIndex += 1
-    ) {
+    for (let stepIndex = 1; stepIndex <= movePlan.steps; stepIndex += 1) {
         const progress = stepIndex / movePlan.steps;
         const easedProgress = easeInOutCubic(progress);
         const nextPosition = {
@@ -248,16 +255,15 @@ const moveMouseToLocator = async (
     const box = await locator.boundingBox();
 
     if (!box) {
-        throw new Error('Expected a visible locator bounding box for demo motion.');
+        throw new Error(
+            'Expected a visible locator bounding box for demo motion.',
+        );
     }
 
-    await moveMouseSmoothly(
-        page,
-        {
-            x: box.x + box.width / 2,
-            y: box.y + box.height / 2,
-        },
-    );
+    await moveMouseSmoothly(page, {
+        x: box.x + box.width / 2,
+        y: box.y + box.height / 2,
+    });
     await sleep(demoInteractionDelaysMs.mouseMoveSettle);
 };
 
@@ -475,16 +481,14 @@ const createDisplayedAddressText = (pollUrl: string): string => {
 const getElapsedMs = (startedAtMs: number): number =>
     Math.max(0, Date.now() - startedAtMs);
 
-const writeDemoManifest = async (
-    options: {
-        panels: Array<{
-            addressPhases: ReadonlyArray<ReadmeDemoAddressPhase>;
-            id: ReadmeDemoPanelId;
-            label: string;
-            videoPath: string;
-        }>;
-    },
-): Promise<void> => {
+const writeDemoManifest = async (options: {
+    panels: Array<{
+        addressPhases: ReadonlyArray<ReadmeDemoAddressPhase>;
+        id: ReadmeDemoPanelId;
+        label: string;
+        videoPath: string;
+    }>;
+}): Promise<void> => {
     const manifest: ReadmeDemoManifest = {
         panels: options.panels.map((panel) => ({
             ...panel,
@@ -582,7 +586,9 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
             startUrl: demoHomeUrl,
         });
         createdPolls.push(createdPoll);
-        creatorPollAddressText = createDisplayedAddressText(createdPoll.pollUrl);
+        creatorPollAddressText = createDisplayedAddressText(
+            createdPoll.pollUrl,
+        );
         creatorPollCreatedAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.pollCreated);
 
@@ -628,7 +634,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         await closeVotingWithDemoMotion(creator.page);
         await Promise.all(
             panels.map(({ participant }) =>
-                expectSecuringVisible(participant.page),
+                expectPostCloseVisible(participant.page),
             ),
         );
         await sleep(demoBeatPausesMs.closeStarted);
@@ -650,58 +656,56 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
             await closeParticipant(participant);
         }
 
-        await writeDemoManifest(
-            {
-                panels: await Promise.all(
-                    panels.map(async ({ id, label, video }) => ({
-                        addressPhases:
-                            id === 'creator'
-                                ? [
-                                      {
-                                          startMs: 0,
-                                          text: creatorHomeAddressText,
-                                      },
-                                      {
-                                          startMs:
-                                              creatorPollCreatedAtMs ??
-                                              getElapsedMs(recordingStartedAtMs),
-                                          text:
-                                              creatorPollAddressText ??
-                                              createDisplayedAddressText(
-                                                  createdPoll.pollUrl,
-                                              ),
-                                      },
-                                  ]
-                                : [
-                                      {
-                                          startMs: 0,
-                                          text: '',
-                                      },
-                                      {
-                                          startMs:
-                                              id === 'participant-one'
-                                                  ? (participantOneJoinedAtMs ??
-                                                    getElapsedMs(
-                                                        recordingStartedAtMs,
-                                                    ))
-                                                  : (participantTwoJoinedAtMs ??
-                                                    getElapsedMs(
-                                                        recordingStartedAtMs,
-                                                    )),
-                                          text:
-                                              creatorPollAddressText ??
-                                              createDisplayedAddressText(
-                                                  createdPoll.pollUrl,
-                                              ),
-                                      },
-                                  ],
-                        id,
-                        label,
-                        videoPath: await video.path(),
-                    })),
-                ),
-            },
-        );
+        await writeDemoManifest({
+            panels: await Promise.all(
+                panels.map(async ({ id, label, video }) => ({
+                    addressPhases:
+                        id === 'creator'
+                            ? [
+                                  {
+                                      startMs: 0,
+                                      text: creatorHomeAddressText,
+                                  },
+                                  {
+                                      startMs:
+                                          creatorPollCreatedAtMs ??
+                                          getElapsedMs(recordingStartedAtMs),
+                                      text:
+                                          creatorPollAddressText ??
+                                          createDisplayedAddressText(
+                                              createdPoll.pollUrl,
+                                          ),
+                                  },
+                              ]
+                            : [
+                                  {
+                                      startMs: 0,
+                                      text: '',
+                                  },
+                                  {
+                                      startMs:
+                                          id === 'participant-one'
+                                              ? (participantOneJoinedAtMs ??
+                                                getElapsedMs(
+                                                    recordingStartedAtMs,
+                                                ))
+                                              : (participantTwoJoinedAtMs ??
+                                                getElapsedMs(
+                                                    recordingStartedAtMs,
+                                                )),
+                                      text:
+                                          creatorPollAddressText ??
+                                          createDisplayedAddressText(
+                                              createdPoll.pollUrl,
+                                          ),
+                                  },
+                              ],
+                    id,
+                    label,
+                    videoPath: await video.path(),
+                })),
+            ),
+        });
     } finally {
         for (const { participant } of panels) {
             await closeParticipant(participant);
