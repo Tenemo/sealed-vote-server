@@ -124,23 +124,3 @@ export type CloseVotingRequest = {
 export type RestartCeremonyRequest = {
     creatorToken: string;
 };
-
-export type RecoverSessionRequest =
-    | {
-          creatorToken: string;
-          voterToken?: never;
-      }
-    | {
-          creatorToken?: never;
-          voterToken: string;
-      };
-
-export type RecoverSessionResponse = {
-    role: 'creator' | 'voter';
-    pollId: string;
-    pollSlug: string;
-    phase: PollPhase;
-    isOpen: boolean;
-    voterName: string | null;
-    voterIndex: number | null;
-};

@@ -26,7 +26,6 @@ export const ERROR_MESSAGES = {
         'At least 3 active participants are required to continue the ceremony.',
     maxParticipantsReached:
         'Poll has reached its maximum number of participants.',
-    recoverSessionTokenRequired: 'Exactly one recovery token must be provided.',
     boardMessageSignatureRequired:
         'A signed protocol payload is required for board submission.',
     boardMessagePayloadInvalid:

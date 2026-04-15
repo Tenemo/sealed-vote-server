@@ -186,31 +186,6 @@ afterEntryHash=<entry-hash>
   - exact retransmissions are stored and classified as idempotent
   - conflicting payloads in the same canonical slot are stored and classified as equivocation
 
-## Recover session
-
-- `POST /api/polls/:pollId/recover-session`
-- request body:
-
-```json
-{
-    "creatorToken": "creator-token"
-}
-```
-
-or
-
-```json
-{
-    "voterToken": "voter-token"
-}
-```
-
-- response:
-  - poll id
-  - poll phase
-  - whether the poll is still open
-  - creator or voter session details, depending on the supplied token
-
 ## Delete poll
 
 - `DELETE /api/polls/:pollId`

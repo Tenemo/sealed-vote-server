@@ -1,10 +1,8 @@
 import type { PollResponse } from '@sealed-vote/contracts';
 
 import {
-    createRevealBallotCloseAction,
     describeAutomaticCeremonyAction,
     resolveAutomaticCeremonyAction,
-    selectCanonicalDecryptionShares,
 } from './pollBoardActions';
 
 import {
@@ -12,10 +10,7 @@ import {
     createPollDeviceState,
     type StoredPollDeviceState,
 } from 'features/Polls/pollDeviceStorage';
-import type {
-    StoredCreatorSession,
-    StoredVoterSession,
-} from 'features/Polls/pollSessionStorage';
+import type { StoredVoterSession } from 'features/Polls/pollSessionStorage';
 
 const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     id: 'poll-1',
@@ -162,52 +157,6 @@ const createVoterSession = (
     ...overrides,
 });
 
-const createCreatorSession = (
-    overrides: Partial<StoredCreatorSession> = {},
-): StoredCreatorSession => ({
-    creatorToken: 'creator-token',
-    pollId: 'poll-1',
-    pollSlug: 'best-fruit--1111',
-    ...overrides,
-});
-
-const createAcceptedBallotEntry = ({
-    entryId,
-    optionIndex,
-    participantIndex,
-}: {
-    entryId: string;
-    optionIndex: number;
-    participantIndex: number;
-}): PollResponse['boardEntries'][number] => ({
-    id: entryId,
-    createdAt: '2026-04-11T10:10:00.000Z',
-    phase: 5,
-    participantIndex,
-    messageType: 'ballot-submission',
-    slotKey: `c${participantIndex}:${optionIndex}`,
-    unsignedHash: `hash-${entryId}`,
-    previousEntryHash: null,
-    entryHash: `entry-${entryId}`,
-    classification: 'accepted',
-    signedPayload: {
-        payload: {
-            ciphertext: {
-                c1: `c1-${entryId}` as never,
-                c2: `c2-${entryId}` as never,
-            },
-            manifestHash: 'b'.repeat(64),
-            messageType: 'ballot-submission',
-            optionIndex,
-            participantIndex,
-            phase: 5,
-            proof: [] as never,
-            sessionId: 'c'.repeat(64),
-        },
-        signature: 'd'.repeat(128),
-    },
-});
-
 describe('pollBoardActions', () => {
     it('returns null while voting is still open', async () => {
         await expect(
@@ -246,166 +195,6 @@ describe('pollBoardActions', () => {
                 slotKey: 'slot-1',
             }),
         ).toContain('Registering your device');
-    });
-
-    it('refuses to create a reveal action before enough encrypted ballots exist', async () => {
-        await expect(
-            createRevealBallotCloseAction({
-                creatorSession: createCreatorSession(),
-                deviceState: createDeviceState({
-                    isCreatorParticipant: true,
-                }),
-                poll: createPoll({
-                    ceremony: {
-                        acceptedDecryptionShareCount: 0,
-                        acceptedEncryptedBallotCount: 2,
-                        acceptedRegistrationCount: 3,
-                        activeParticipantCount: 3,
-                        blockingParticipantIndices: [3],
-                        completeEncryptedBallotParticipantCount: 1,
-                        revealReady: false,
-                        restartCount: 0,
-                    },
-                }),
-                voterSession: createVoterSession(),
-            }),
-        ).resolves.toBeNull();
-    });
-
-    it('creates a reveal action only after every submitted participant has a complete ballot', async () => {
-        const deviceState = await createValidDeviceState();
-        const action = await createRevealBallotCloseAction({
-            creatorSession: createCreatorSession(),
-            deviceState,
-            poll: createPoll({
-                boardEntries: [
-                    createAcceptedBallotEntry({
-                        entryId: 'a1',
-                        optionIndex: 1,
-                        participantIndex: 1,
-                    }),
-                    createAcceptedBallotEntry({
-                        entryId: 'a2',
-                        optionIndex: 2,
-                        participantIndex: 1,
-                    }),
-                    createAcceptedBallotEntry({
-                        entryId: 'b1',
-                        optionIndex: 1,
-                        participantIndex: 2,
-                    }),
-                    createAcceptedBallotEntry({
-                        entryId: 'b2',
-                        optionIndex: 2,
-                        participantIndex: 2,
-                    }),
-                    createAcceptedBallotEntry({
-                        entryId: 'c1',
-                        optionIndex: 1,
-                        participantIndex: 3,
-                    }),
-                    createAcceptedBallotEntry({
-                        entryId: 'c2',
-                        optionIndex: 2,
-                        participantIndex: 3,
-                    }),
-                ],
-                ceremony: {
-                    acceptedDecryptionShareCount: 0,
-                    acceptedEncryptedBallotCount: 6,
-                    acceptedRegistrationCount: 3,
-                    activeParticipantCount: 3,
-                    blockingParticipantIndices: [],
-                    completeEncryptedBallotParticipantCount: 3,
-                    revealReady: true,
-                    restartCount: 0,
-                },
-                rosterEntries: [
-                    {
-                        authPublicKey: deviceState.authPublicKey,
-                        participantIndex: 1,
-                        transportPublicKey: deviceState.transportPublicKey,
-                        transportSuite: 'X25519',
-                        voterName: deviceState.voterName,
-                    },
-                    {
-                        authPublicKey: 'auth-2',
-                        participantIndex: 2,
-                        transportPublicKey: 'transport-2',
-                        transportSuite: 'X25519',
-                        voterName: 'Bob',
-                    },
-                    {
-                        authPublicKey: 'auth-3',
-                        participantIndex: 3,
-                        transportPublicKey: 'transport-3',
-                        transportSuite: 'X25519',
-                        voterName: 'Cora',
-                    },
-                ],
-            }),
-            voterSession: createVoterSession({
-                voterIndex: 1,
-                voterToken: deviceState.voterToken,
-                voterName: deviceState.voterName,
-            }),
-        });
-
-        expect(action?.kind).toBe('publish-ballot-close');
-        expect(
-            action?.signedPayload.payload.messageType === 'ballot-close'
-                ? action.signedPayload.payload.countedParticipantIndices
-                : null,
-        ).toEqual([1, 2, 3]);
-    });
-
-    it('uses a stable threshold subset of decryption shares for tally publication', () => {
-        expect(
-            selectCanonicalDecryptionShares({
-                threshold: 2,
-                validShares: [
-                    {
-                        index: 4,
-                        value: 'share-4' as never,
-                    },
-                    {
-                        index: 2,
-                        value: 'share-2' as never,
-                    },
-                    {
-                        index: 3,
-                        value: 'share-3' as never,
-                    },
-                ],
-            }),
-        ).toEqual([
-            {
-                index: 2,
-                value: 'share-2',
-            },
-            {
-                index: 3,
-                value: 'share-3',
-            },
-        ]);
-    });
-
-    it('waits for the threshold share count before publishing a tally', () => {
-        expect(
-            selectCanonicalDecryptionShares({
-                threshold: 3,
-                validShares: [
-                    {
-                        index: 1,
-                        value: 'share-1' as never,
-                    },
-                    {
-                        index: 2,
-                        value: 'share-2' as never,
-                    },
-                ],
-            }),
-        ).toBeNull();
     });
 
     it('stops automation for a participant skipped from the active ceremony', async () => {

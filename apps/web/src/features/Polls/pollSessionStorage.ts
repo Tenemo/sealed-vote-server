@@ -1,5 +1,3 @@
-import { canUseLocalStorage } from './storageAvailability';
-
 type StoredPollSession = {
     pollId: string;
     pollSlug: string;
@@ -38,6 +36,18 @@ export type StoredVoterSession = {
 
 const creatorSessionsStorageKey = 'sealed-vote.creator-sessions.v2';
 const voterSessionsStorageKey = 'sealed-vote.voter-sessions.v2';
+
+const canUseLocalStorage = (): boolean => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    try {
+        return typeof window.localStorage !== 'undefined';
+    } catch {
+        return false;
+    }
+};
 
 const isNonEmptyString = (value: unknown): value is string =>
     typeof value === 'string' && value.length > 0;
