@@ -264,5 +264,6 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
     return getCommonConfig(
         normalizeBaseUrl(productionBaseUrl, 'PLAYWRIGHT_BASE_URL'),
         'test-results/playwright-production',
+        { fullyParallel: true },
     );
 };
