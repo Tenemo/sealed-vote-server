@@ -77,38 +77,6 @@ const demoScorecards = [
 const windowsArrowCursorDataUrl =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA/0lEQVR4nO3TsWrCQBzH8f/vYkAIJKZQK32LTj5FX9GXaEbtkE1wkYC6BoeIk9ATLR2u/E9rtJq69O6W+07HLf9P/kmIEFci7PbJWYgriM7IHQJxpZRS7hA4ANwhUAPcIHAJsI/ANcAuArcB9hBoBuw/vywg0AzgNpsPwwj8DeBWq7VBBO4DuLJcasR/j2/9vthu9xRFbX0WQfpOxkO9ASl3iiiWb9nw5y8YitbjqxWAPA7n9wwkxWntSArjAHk2XF+JNMvz8XELaWZ0C9AfVj2c02ckcwbMZgvewtQYoCl+ch6ut4DOhGwXhL1n3gLEw0CETy/WAT6fz+fzkaW+AcZfRm/zFXLZAAAAAElFTkSuQmCC';
 
-const waitForAnyVisibleText = async ({
-    page,
-    texts,
-    timeout,
-}: {
-    page: Page;
-    texts: readonly string[];
-    timeout: number;
-}): Promise<void> => {
-    await expect
-        .poll(
-            async () => {
-                for (const text of texts) {
-                    if (
-                        await page
-                            .getByText(text, { exact: true })
-                            .first()
-                            .isVisible()
-                    ) {
-                        return text;
-                    }
-                }
-
-                return null;
-            },
-            {
-                timeout,
-            },
-        )
-        .not.toBeNull();
-};
-
 type DemoCursorPosition = {
     x: number;
     y: number;
@@ -446,16 +414,7 @@ const closeVotingWithDemoMotion = async (page: Page): Promise<void> => {
     await expect(closeButton).toBeVisible({ timeout: 30_000 });
     await expect(closeButton).toBeEnabled({ timeout: 30_000 });
     await clickWithDemoMotion(page, closeButton);
-    await waitForAnyVisibleText({
-        page,
-        texts: [
-            'Securing the election',
-            'Starting reveal',
-            'Revealing results',
-            'Verified results',
-        ],
-        timeout: 30_000,
-    });
+    await expectPostCloseVisible(page);
 };
 
 const getRecordedVideo = (page: Page, label: string): Video => {
@@ -533,6 +492,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
     const creator = await openProjectParticipant(browser, testInfo);
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
+    let creatorHomeVisibleAtMs: number | null = null;
     let creatorPollAddressText: string | null = null;
     let creatorPollCreatedAtMs: number | null = null;
     let participantOneJoinedAtMs: number | null = null;
@@ -577,6 +537,10 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
             gotoBlankDemoPage(participantOne.page),
             gotoBlankDemoPage(participantTwo.page),
         ]);
+        await expect(creator.page.getByLabel('Vote name')).toBeVisible({
+            timeout: 30_000,
+        });
+        creatorHomeVisibleAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.initial);
 
         const createdPoll = await createPollWithDemoMotion({
@@ -633,9 +597,11 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
 
         await closeVotingWithDemoMotion(creator.page);
         await Promise.all(
-            panels.map(({ participant }) =>
-                expectPostCloseVisible(participant.page),
-            ),
+            panels
+                .filter(({ id }) => id !== 'creator')
+                .map(({ participant }) =>
+                    expectPostCloseVisible(participant.page),
+                ),
         );
         await sleep(demoBeatPausesMs.closeStarted);
 
@@ -664,6 +630,12 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
                             ? [
                                   {
                                       startMs: 0,
+                                      text: '',
+                                  },
+                                  {
+                                      startMs:
+                                          creatorHomeVisibleAtMs ??
+                                          getElapsedMs(recordingStartedAtMs),
                                       text: creatorHomeAddressText,
                                   },
                                   {

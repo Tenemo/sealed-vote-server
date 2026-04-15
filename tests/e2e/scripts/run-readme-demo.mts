@@ -17,9 +17,10 @@ import {
 const expectedPanelIds = ['creator', 'participant-one', 'participant-two'];
 const panelLabelHeight = 52;
 const panelGap = 48;
-const canvasColor = '0xe2e8f0';
-const labelTextColor = '0x111111';
-const labelDividerColor = '0xcbd5e1';
+const canvasColor = '0x303030';
+const labelTextColor = '0xffffff';
+const labelDividerColor = '0x5a5a5a';
+const panelMarkerTextColor = '0x7a7a7a';
 
 const fail = (message: string): never => {
     console.error(message);
@@ -75,9 +76,41 @@ const readManifest = (): ReadmeDemoManifest => {
 
     const manifestRecord = parsedManifest as Partial<ReadmeDemoManifest>;
     const panels = manifestRecord.panels;
+    const playbackRate = manifestRecord.playbackRate;
+    const viewport = manifestRecord.viewport;
 
     if (!Array.isArray(panels)) {
         fail('Readme demo manifest has an invalid shape.');
+    }
+
+    if (
+        typeof playbackRate !== 'number' ||
+        !Number.isFinite(playbackRate) ||
+        playbackRate <= 0
+    ) {
+        fail('Readme demo manifest must include a positive playback rate.');
+    }
+
+    if (!viewport || typeof viewport !== 'object') {
+        fail('Readme demo manifest must include a viewport object.');
+    }
+
+    const validatedViewport = viewport as ReadmeDemoManifest['viewport'];
+    const { width, height } = validatedViewport;
+
+    if (
+        typeof width !== 'number' ||
+        !Number.isFinite(width) ||
+        !Number.isInteger(width) ||
+        width <= 0 ||
+        typeof height !== 'number' ||
+        !Number.isFinite(height) ||
+        !Number.isInteger(height) ||
+        height <= 0
+    ) {
+        fail(
+            'Readme demo manifest must include positive integer viewport dimensions.',
+        );
     }
 
     const validatedPanels = panels as ReadmeDemoManifest['panels'];
@@ -202,6 +235,7 @@ const createAddressTextFilters = (
         startMs: number;
         text: string;
     }>,
+    panelMarkerText: string,
 ): string[] =>
     addressPhases.flatMap((phase, index) => {
         const enableExpression = createPhaseEnableExpression(
@@ -210,8 +244,11 @@ const createAddressTextFilters = (
         );
 
         if (phase.text.length === 0) {
+            const escapedPanelMarkerText = escapeDrawtext(panelMarkerText);
+
             return [
                 `drawbox=x=0:y=0:w=iw:h=ih:color=${canvasColor}:t=fill:enable='${enableExpression}'`,
+                `drawtext=text='${escapedPanelMarkerText}':x=(w-text_w)/2:y=(h+${panelLabelHeight}-text_h)/2:fontsize=46:fontcolor=${panelMarkerTextColor}:font='Courier New Bold':enable='${enableExpression}'`,
             ];
         }
 
@@ -219,7 +256,7 @@ const createAddressTextFilters = (
 
         return [
             `drawbox=x=0:y=${panelLabelHeight - 1}:w=iw:h=1:color=${labelDividerColor}:t=fill:enable='${enableExpression}'`,
-            `drawtext=text='URL\\: ${escapedAddressText}':x=20:y=18:fontsize=18:fontcolor=${labelTextColor}:font='Courier New':enable='${enableExpression}'`,
+            `drawtext=text='URL\\: ${escapedAddressText}':x=20:y=18:fontsize=18:fontcolor=${labelTextColor}:font='Courier New Bold':enable='${enableExpression}'`,
         ];
     });
 
@@ -228,7 +265,10 @@ const createFilterGraph = (manifest: ReadmeDemoManifest): string => {
         return [
             `[${index}:v]setpts=PTS/${manifest.playbackRate}`,
             `pad=w=iw:h=ih+${panelLabelHeight}:x=0:y=${panelLabelHeight}:color=${canvasColor}`,
-            ...createAddressTextFilters(panel.addressPhases),
+            ...createAddressTextFilters(
+                panel.addressPhases,
+                `browser #${index + 1}`,
+            ),
             `format=yuv420p[panel${index}]`,
         ].join(',');
     });
