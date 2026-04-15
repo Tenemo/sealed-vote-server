@@ -68,6 +68,8 @@ const demoScorecards = [
     [8, 9, 5],
     [7, 6, 10],
 ] as const;
+const windowsArrowCursorDataUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA/0lEQVR4nO3TsWrCQBzH8f/vYkAIJKZQK32LTj5FX9GXaEbtkE1wkYC6BoeIk9ATLR2u/E9rtJq69O6W+07HLf9P/kmIEFci7PbJWYgriM7IHQJxpZRS7hA4ANwhUAPcIHAJsI/ANcAuArcB9hBoBuw/vywg0AzgNpsPwwj8DeBWq7VBBO4DuLJcasR/j2/9vthu9xRFbX0WQfpOxkO9ASl3iiiWb9nw5y8YitbjqxWAPA7n9wwkxWntSArjAHk2XF+JNMvz8XELaWZ0C9AfVj2c02ckcwbMZgvewtQYoCl+ch6ut4DOhGwXhL1n3gLEw0CETy/WAT6fz+fzkaW+AcZfRm/zFXLZAAAAAElFTkSuQmCC';
 
 const waitForAnyVisibleText = async ({
     page,
@@ -109,18 +111,18 @@ const demoCursorHomePosition: DemoCursorPosition = {
 const demoCursorPositions = new WeakMap<Page, DemoCursorPosition>();
 
 const ensureDemoCursor = async (page: Page): Promise<void> => {
-    await page.evaluate(() => {
+    await page.evaluate((cursorDataUrl) => {
         if (document.getElementById('__readme-demo-cursor')) {
             return;
         }
 
-        const cursor = document.createElement('div');
+        const cursor = document.createElement('img');
         cursor.id = '__readme-demo-cursor';
         cursor.setAttribute('aria-hidden', 'true');
-        cursor.innerHTML =
-            '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30" fill="none"><path d="M2 2L2 21L7.4 15.6L10.8 27.2L14.1 26.2L10.6 14.8H18L2 2Z" fill="white" stroke="black" stroke-linejoin="round" stroke-width="1.5"/></svg>';
+        cursor.alt = '';
+        cursor.src = cursorDataUrl;
         Object.assign(cursor.style, {
-            height: '30px',
+            height: '32px',
             left: '0',
             opacity: '0',
             pointerEvents: 'none',
@@ -128,13 +130,13 @@ const ensureDemoCursor = async (page: Page): Promise<void> => {
             top: '0',
             transform: 'translate(0px, 0px)',
             transformOrigin: 'top left',
-            width: '22px',
+            width: '32px',
             willChange: 'transform',
             zIndex: '2147483647',
         } satisfies Partial<CSSStyleDeclaration>);
 
         (document.body ?? document.documentElement).append(cursor);
-    });
+    }, windowsArrowCursorDataUrl);
 };
 
 const setDemoCursorPosition = async (
