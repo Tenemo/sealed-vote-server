@@ -9,7 +9,7 @@ describe('VersionBadge', () => {
         globalThis.fetch = originalFetch;
     });
 
-    it('renders the first 4 deployed commit characters in monospace-friendly text', async () => {
+    it('renders the first 4 deployed commit characters in compact debug text', async () => {
         globalThis.fetch = vi.fn().mockResolvedValue({
             json: async () => ({
                 commitSha: '8A9F1234567890AB',
@@ -19,7 +19,7 @@ describe('VersionBadge', () => {
 
         render(<VersionBadge />);
 
-        expect(await screen.findByText('Version: 8a9f')).toBeVisible();
+        expect(await screen.findByText('v. 8a9f')).toBeVisible();
     });
 
     it('stays hidden when the deployment version cannot be loaded', async () => {
@@ -33,7 +33,9 @@ describe('VersionBadge', () => {
         render(<VersionBadge />);
 
         await waitFor(() => {
-            expect(screen.queryByText(/^Version:/)).not.toBeInTheDocument();
+            expect(
+                screen.queryByText(/^v\.\s[0-9a-f]{4}$/),
+            ).not.toBeInTheDocument();
         });
     });
 });

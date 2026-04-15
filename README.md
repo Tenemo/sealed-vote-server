@@ -88,6 +88,7 @@ The default local setup serves:
 
 - Run the standard local browser suite with `pnpm e2e`.
 - Run the opt-in high-parallelism local suite with `pnpm e2e:turbo`.
+- Run `pnpm demo:record` to generate a stitched three-panel README demo video in `test-results/readme-demo/sealed-vote-demo.mp4`. The command also writes the raw per-panel videos and manifest in `test-results/readme-demo/` and requires local `ffmpeg`.
 - `pnpm e2e:turbo` keeps CI unchanged, enables Playwright `fullyParallel`, and defaults to up to 8 local workers.
 - Set `PLAYWRIGHT_LOCAL_WORKERS` if you want a different default for turbo mode. Passing Playwright CLI flags such as `--workers=32` still overrides the config directly.
 
