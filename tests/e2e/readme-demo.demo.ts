@@ -43,13 +43,19 @@ const demoBeatPausesMs = {
 } as const;
 
 const demoInteractionDelaysMs = {
-    afterClick: 300,
-    beforeTyping: 200,
-    mouseMoveSettle: 140,
+    afterClick: 260,
+    beforeTyping: 180,
+    mouseMoveSettle: 90,
     navigationSettled: 700,
-    typingCharacter: 85,
+    typingCharacter: 57,
 } as const;
-const demoMouseMoveSteps = 28;
+const demoMouseMotion = {
+    baseDuration: 90,
+    maxDuration: 210,
+    maxSteps: 18,
+    minSteps: 8,
+    msPerPixel: 0.24,
+} as const;
 const demoPollName = 'Member policy priorities';
 const demoParticipantNames = ['Alice', 'Ben', 'Clara'] as const;
 const demoChoiceNames = [
@@ -90,10 +96,144 @@ const waitForAnyVisibleText = async ({
         .not.toBeNull();
 };
 
-const parkMouse = async (page: Page): Promise<void> => {
-    await page.mouse.move(24, 24, {
-        steps: 12,
+type DemoCursorPosition = {
+    x: number;
+    y: number;
+};
+
+const demoCursorHomePosition: DemoCursorPosition = {
+    x: 24,
+    y: 24,
+};
+
+const demoCursorPositions = new WeakMap<Page, DemoCursorPosition>();
+
+const ensureDemoCursor = async (page: Page): Promise<void> => {
+    await page.evaluate(() => {
+        if (document.getElementById('__readme-demo-cursor')) {
+            return;
+        }
+
+        const cursor = document.createElement('div');
+        cursor.id = '__readme-demo-cursor';
+        cursor.setAttribute('aria-hidden', 'true');
+        cursor.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30" fill="none"><path d="M2 2L2 21L7.4 15.6L10.8 27.2L14.1 26.2L10.6 14.8H18L2 2Z" fill="white" stroke="black" stroke-linejoin="round" stroke-width="1.5"/></svg>';
+        Object.assign(cursor.style, {
+            height: '30px',
+            left: '0',
+            opacity: '0',
+            pointerEvents: 'none',
+            position: 'fixed',
+            top: '0',
+            transform: 'translate(0px, 0px)',
+            transformOrigin: 'top left',
+            width: '22px',
+            willChange: 'transform',
+            zIndex: '2147483647',
+        } satisfies Partial<CSSStyleDeclaration>);
+
+        (document.body ?? document.documentElement).append(cursor);
     });
+};
+
+const setDemoCursorPosition = async (
+    page: Page,
+    position: DemoCursorPosition,
+): Promise<void> => {
+    await ensureDemoCursor(page);
+    await page.evaluate(({ x, y }) => {
+        const cursor = document.getElementById('__readme-demo-cursor');
+
+        if (!cursor) {
+            throw new Error('Missing readme demo cursor overlay.');
+        }
+
+        cursor.style.opacity = '1';
+        cursor.style.transform = `translate(${x}px, ${y}px)`;
+    }, position);
+    demoCursorPositions.set(page, position);
+};
+
+const getDemoCursorPosition = (page: Page): DemoCursorPosition =>
+    demoCursorPositions.get(page) ?? demoCursorHomePosition;
+
+const clamp = (value: number, min: number, max: number): number =>
+    Math.min(max, Math.max(min, value));
+
+const easeInOutCubic = (progress: number): number =>
+    progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+const createMouseMovePlan = ({
+    startPosition,
+    targetPosition,
+}: {
+    startPosition: DemoCursorPosition;
+    targetPosition: DemoCursorPosition;
+}): {
+    delayMs: number;
+    steps: number;
+} => {
+    const distance = Math.hypot(
+        targetPosition.x - startPosition.x,
+        targetPosition.y - startPosition.y,
+    );
+    const durationMs = clamp(
+        Math.round(
+            demoMouseMotion.baseDuration +
+                distance * demoMouseMotion.msPerPixel,
+        ),
+        demoMouseMotion.baseDuration,
+        demoMouseMotion.maxDuration,
+    );
+    const steps = clamp(
+        Math.round(distance / 45),
+        demoMouseMotion.minSteps,
+        demoMouseMotion.maxSteps,
+    );
+
+    return {
+        delayMs: durationMs / steps,
+        steps,
+    };
+};
+
+const moveMouseSmoothly = async (
+    page: Page,
+    targetPosition: DemoCursorPosition,
+): Promise<void> => {
+    const startPosition = getDemoCursorPosition(page);
+    const movePlan = createMouseMovePlan({
+        startPosition,
+        targetPosition,
+    });
+
+    for (
+        let stepIndex = 1;
+        stepIndex <= movePlan.steps;
+        stepIndex += 1
+    ) {
+        const progress = stepIndex / movePlan.steps;
+        const easedProgress = easeInOutCubic(progress);
+        const nextPosition = {
+            x:
+                startPosition.x +
+                (targetPosition.x - startPosition.x) * easedProgress,
+            y:
+                startPosition.y +
+                (targetPosition.y - startPosition.y) * easedProgress,
+        };
+
+        await page.mouse.move(nextPosition.x, nextPosition.y);
+        await setDemoCursorPosition(page, nextPosition);
+        await sleep(movePlan.delayMs);
+    }
+};
+
+const parkMouse = async (page: Page): Promise<void> => {
+    await moveMouseSmoothly(page, demoCursorHomePosition);
     await sleep(demoInteractionDelaysMs.mouseMoveSettle);
 };
 
@@ -109,10 +249,19 @@ const moveMouseToLocator = async (
         throw new Error('Expected a visible locator bounding box for demo motion.');
     }
 
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
-        steps: demoMouseMoveSteps,
-    });
+    await moveMouseSmoothly(
+        page,
+        {
+            x: box.x + box.width / 2,
+            y: box.y + box.height / 2,
+        },
+    );
     await sleep(demoInteractionDelaysMs.mouseMoveSettle);
+};
+
+const showDemoCursor = async (page: Page): Promise<void> => {
+    await ensureDemoCursor(page);
+    await setDemoCursorPosition(page, getDemoCursorPosition(page));
 };
 
 const clickWithDemoMotion = async (
@@ -149,6 +298,7 @@ const gotoDemoPage = async ({
     url: string;
 }): Promise<void> => {
     await gotoInteractablePage(page, url);
+    await showDemoCursor(page);
     await parkMouse(page);
     await sleep(demoInteractionDelaysMs.navigationSettled);
 };
@@ -157,6 +307,7 @@ const gotoBlankDemoPage = async (page: Page): Promise<void> => {
     await page.goto('about:blank', {
         waitUntil: 'load',
     });
+    await showDemoCursor(page);
     await parkMouse(page);
     await sleep(demoInteractionDelaysMs.navigationSettled);
 };
