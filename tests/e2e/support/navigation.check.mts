@@ -106,6 +106,53 @@ test('gotoInteractablePage retries transient Firefox navigation errors once', as
     ]);
 });
 
+test('gotoInteractablePage can retry transient timeout stalls when enabled', async () => {
+    const gotoCalls: NavigationOptions[] = [];
+    const retryDelays: number[] = [];
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    let callCount = 0;
+    const page = createPageDouble();
+
+    page.goto = async (_url: string, options?: NavigationOptions) => {
+        gotoCalls.push(options as NavigationOptions);
+        callCount += 1;
+
+        if (callCount === 1) {
+            throw new Error('page.goto: Timeout 45000ms exceeded.');
+        }
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        await gotoInteractablePage(page, '/');
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(callCount, 2);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(gotoCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
 test('gotoInteractablePage does not retry non-transient navigation errors', async () => {
     const page = createPageDouble();
     let callCount = 0;

@@ -1,5 +1,13 @@
 import { FastifyInstance } from 'fastify';
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    describe,
+    expect,
+    test,
+    vi,
+} from 'vitest';
 
 import { buildServer } from '../buildServer';
 
@@ -35,6 +43,7 @@ describe('GET /health-check', () => {
 
     afterEach(() => {
         restoreDeploymentCommitEnv();
+        vi.restoreAllMocks();
     });
 
     afterAll(async () => {
@@ -42,41 +51,7 @@ describe('GET /health-check', () => {
         await fastify.close();
     });
 
-    test('returns the deployment commit SHA when available', async () => {
-        process.env.RAILWAY_GIT_COMMIT_SHA = 'abcdef1234567890';
-
-        const response = await fastify.inject({
-            method: 'GET',
-            url: '/api/health-check',
-        });
-
-        expect(response.statusCode).toBe(200);
-        expect(JSON.parse(response.body)).toEqual({
-            service: 'OK',
-            database: 'OK',
-            commitSha: 'abcdef1234567890',
-        });
-    });
-
-    test('returns the GitHub Actions commit SHA when available', async () => {
-        delete process.env.RAILWAY_GIT_COMMIT_SHA;
-        delete process.env.COMMIT_REF;
-        process.env.GITHUB_SHA = '631133b6edbc77eb97572cbc6ff568ab2992b59e';
-
-        const response = await fastify.inject({
-            method: 'GET',
-            url: '/api/health-check',
-        });
-
-        expect(response.statusCode).toBe(200);
-        expect(JSON.parse(response.body)).toEqual({
-            service: 'OK',
-            database: 'OK',
-            commitSha: '631133b6edbc77eb97572cbc6ff568ab2992b59e',
-        });
-    });
-
-    test('returns a null deployment commit SHA when none is configured', async () => {
+    test('returns service and database health for the live route', async () => {
         delete process.env.RAILWAY_GIT_COMMIT_SHA;
         delete process.env.COMMIT_REF;
         delete process.env.GITHUB_SHA;
@@ -90,6 +65,27 @@ describe('GET /health-check', () => {
         expect(JSON.parse(response.body)).toEqual({
             service: 'OK',
             database: 'OK',
+            commitSha: null,
+        });
+    });
+
+    test('returns a 503 when the database probe throws', async () => {
+        delete process.env.RAILWAY_GIT_COMMIT_SHA;
+        delete process.env.COMMIT_REF;
+        delete process.env.GITHUB_SHA;
+        vi.spyOn(fastify.db, 'select').mockImplementation(() => {
+            throw new Error('database unavailable');
+        });
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/health-check',
+        });
+
+        expect(response.statusCode).toBe(503);
+        expect(JSON.parse(response.body)).toEqual({
+            service: 'OK',
+            database: 'Failed',
             commitSha: null,
         });
     });

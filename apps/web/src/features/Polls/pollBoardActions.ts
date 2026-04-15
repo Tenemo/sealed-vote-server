@@ -1569,11 +1569,6 @@ export const resolveAutomaticCeremonyAction = async ({
 
     return null;
 };
-
-export const createRevealBallotCloseAction =
-    createRevealBallotCloseActionInternal;
-export { selectCanonicalDecryptionShares };
-
 export const describeAutomaticCeremonyAction = (
     action: PreparedCeremonyAction | null,
 ): string | null => {

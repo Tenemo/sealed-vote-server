@@ -6,8 +6,6 @@ const connectionErrorPattern =
     /failed to fetch|fetch_error|timeout_error|connection to the server was lost/i;
 
 export const connectionLostMessage = 'The connection to the server was lost.';
-export const reconnectingWorkflowMessage =
-    'Connection lost. Reconnecting and resuming in the background...';
 
 const isFetchBaseQueryError = (error: unknown): error is FetchBaseQueryError =>
     !!error && typeof error === 'object' && 'status' in error;

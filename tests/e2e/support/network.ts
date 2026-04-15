@@ -60,26 +60,3 @@ export const dropNextPostResponseAfterServerCommit = async ({
         },
     };
 };
-
-export const failPollFetches = async ({
-    page,
-    url,
-}: {
-    page: Page;
-    url: RouteUrlMatcher;
-}): Promise<() => Promise<void>> => {
-    const handler = async (route: Route): Promise<void> => {
-        if (route.request().method() !== 'GET') {
-            await route.continue();
-            return;
-        }
-
-        await route.abort('failed');
-    };
-
-    await page.route(url, handler);
-
-    return async (): Promise<void> => {
-        await page.unroute(url, handler);
-    };
-};

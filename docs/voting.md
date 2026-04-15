@@ -46,6 +46,4 @@ The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
 
 ## Shared helpers
 
-- `acceptedBoardMessages` and `filterBoardMessagesByType` live in `packages/protocol/src/boardMessages.ts`
-- `computeArithmeticMean`, `computePublishedResultScores`, and `hasVerifiedTallies` live in `packages/protocol/src/results.ts`
 - `canonicalUnsignedPayloadBytes`, `protocolPayloadSlotKey`, and `sortProtocolPayloads` live in `packages/protocol/src/protocolPayloads.ts`

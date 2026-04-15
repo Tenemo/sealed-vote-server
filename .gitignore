@@ -20,12 +20,17 @@ coverage/
 
 # Miscellaneous
 .DS_Store
-.tmp/
 debug.log
 sh.exe.stackdump
+
+# Temporary files
 temp/
 temp.*
+temp-*
+temp-preview-*.txt
 tmp/
+tmp.*
+tmp-*
 
 # Environment
 .env

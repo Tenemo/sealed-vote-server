@@ -1,5 +1,6 @@
 import { normalizeTrimmedString } from '@sealed-vote/contracts';
 import React, { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 
 import ChoiceAdding from './ChoiceAdding';
@@ -7,13 +8,19 @@ import ChoiceAdding from './ChoiceAdding';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
-import PageSeo from '@/app/PageSeo';
 import LoadingButton from 'components/LoadingButton/LoadingButton';
 import { generateClientToken } from 'features/Polls/clientToken';
 import { saveCreatorSession } from 'features/Polls/pollSessionStorage';
 import { useCreatePollMutation } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
-import { buildCreatePageSeo } from '../../../../config/seoMetadata.mts';
+import {
+    buildCreatePageSeo,
+    serializeStructuredData,
+    siteAuthor,
+    siteLocale,
+    siteName,
+    siteThemeColor,
+} from '../../../../config/seoMetadata.mts';
 
 type Form = {
     pollName: string;
@@ -99,7 +106,66 @@ const PollCreationPage = (): React.JSX.Element => {
 
     return (
         <>
-            <PageSeo metadata={createPageSeo} />
+            <Helmet prioritizeSeoTags>
+                <title>{createPageSeo.title}</title>
+                <meta content={siteAuthor} name="author" />
+                <meta content={siteName} name="application-name" />
+                <meta content={siteName} name="apple-mobile-web-app-title" />
+                <meta content="dark" name="color-scheme" />
+                <meta content={createPageSeo.description} name="description" />
+                <meta content="telephone=no" name="format-detection" />
+                <meta content={createPageSeo.keywords} name="keywords" />
+                <meta content={createPageSeo.robots} name="robots" />
+                <meta content={siteThemeColor} name="theme-color" />
+                <meta content={createPageSeo.url} name="twitter:url" />
+                <meta
+                    content={createPageSeo.imageAlt}
+                    name="twitter:image:alt"
+                />
+                <meta content={createPageSeo.imageUrl} name="twitter:image" />
+                <meta
+                    content={createPageSeo.description}
+                    name="twitter:description"
+                />
+                <meta content={createPageSeo.title} name="twitter:title" />
+                <meta content="summary_large_image" name="twitter:card" />
+                <meta content={siteName} property="og:site_name" />
+                <meta
+                    content={createPageSeo.description}
+                    property="og:description"
+                />
+                <meta
+                    content={createPageSeo.imageAlt}
+                    property="og:image:alt"
+                />
+                <meta
+                    content={createPageSeo.imageHeight.toString()}
+                    property="og:image:height"
+                />
+                <meta content={createPageSeo.imageUrl} property="og:image" />
+                <meta
+                    content={createPageSeo.imageUrl}
+                    property="og:image:secure_url"
+                />
+                <meta
+                    content={createPageSeo.imageType}
+                    property="og:image:type"
+                />
+                <meta
+                    content={createPageSeo.imageWidth.toString()}
+                    property="og:image:width"
+                />
+                <meta content={siteLocale} property="og:locale" />
+                <meta content={createPageSeo.title} property="og:title" />
+                <meta content="website" property="og:type" />
+                <meta content={createPageSeo.url} property="og:url" />
+                <link href={createPageSeo.canonicalUrl} rel="canonical" />
+                {createPageSeo.structuredData.map((structuredData, index) => (
+                    <script key={index} type="application/ld+json">
+                        {serializeStructuredData(structuredData)}
+                    </script>
+                ))}
+            </Helmet>
             <section className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
                 <div className="space-y-3 text-center">
                     <h1 className="page-title" id={pageTitleId}>

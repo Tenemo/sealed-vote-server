@@ -17,7 +17,6 @@ import { create } from './routes/create.js';
 import { deletePoll } from './routes/delete.js';
 import { fetch } from './routes/fetch.js';
 import { healthCheck } from './routes/health-check.js';
-import { recoverSession } from './routes/recoverSession.js';
 import { register } from './routes/register.js';
 import { restartCeremony } from './routes/restartCeremony.js';
 
@@ -114,6 +113,9 @@ const getStatusCode = (error: unknown): number | null => {
     return typeof statusCode === 'number' ? statusCode : null;
 };
 
+const removedRecoverSessionMessage =
+    'The /polls/:pollId/recover-session endpoint has been removed. Use the supported local recovery flow instead.';
+
 export const buildServer = async (
     isLoggingEnabled?: boolean,
 ): Promise<
@@ -178,9 +180,16 @@ export const buildServer = async (
     await fastify.register(fetch, { prefix: '/api' });
     await fastify.register(deletePoll, { prefix: '/api' });
     await fastify.register(register, { prefix: '/api' });
-    await fastify.register(recoverSession, { prefix: '/api' });
     await fastify.register(closeVoting, { prefix: '/api' });
     await fastify.register(restartCeremony, { prefix: '/api' });
     await fastify.register(boardMessageRoutes, { prefix: '/api' });
+    fastify.all(
+        '/api/polls/:pollId/recover-session',
+        async (_request, reply) => {
+            await reply.status(410).send({
+                message: removedRecoverSessionMessage,
+            });
+        },
+    );
     return fastify;
 };

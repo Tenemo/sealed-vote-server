@@ -6,8 +6,6 @@ import {
     type SignedPayload,
 } from 'threshold-elgamal';
 
-import { canUseLocalStorage } from './storageAvailability';
-
 type StoredPollDeviceState = {
     authPrivateKeyPkcs8: string;
     authPublicKey: string;
@@ -40,6 +38,18 @@ type PendingPollDeviceState = Pick<
 type StoredPollDeviceStates = Record<string, StoredPollDeviceState>;
 
 const storageKey = 'sealed-vote.poll-device-state.v2';
+
+const canUseLocalStorage = (): boolean => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    try {
+        return typeof window.localStorage !== 'undefined';
+    } catch {
+        return false;
+    }
+};
 
 const bytesToHex = (bytes: Uint8Array): string =>
     Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -369,17 +379,6 @@ export const findPollDeviceStateByPollSlug = (
     Object.values(readStoredStates()).find(
         (state) => state.pollSlug === pollSlug,
     ) ?? null;
-
-export const removePollDeviceState = (pollId: string): void => {
-    const storedStates = readStoredStates();
-
-    if (!storedStates[pollId]) {
-        return;
-    }
-
-    delete storedStates[pollId];
-    writeStoredStates(storedStates);
-};
 
 export const restoreStoredTransportPrivateKey = async (
     state: StoredPollDeviceState,
