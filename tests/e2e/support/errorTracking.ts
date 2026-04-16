@@ -313,13 +313,20 @@ const formatTrackedFrameNavigation = ({
 
 const resolveTrackedHostnames = (page: Page): Set<string> => {
     const allowedHostnames = new Set(knownApiHostnames);
-    const currentPageUrl = page.url();
+    const currentPageUrl = formatTrackedPageUrl(page);
 
     if (!currentPageUrl) {
         return allowedHostnames;
     }
 
-    const currentPageHostname = new URL(currentPageUrl).hostname;
+    let currentPageHostname = '';
+
+    try {
+        currentPageHostname = new URL(currentPageUrl).hostname;
+    } catch {
+        return allowedHostnames;
+    }
+
     allowedHostnames.add(currentPageHostname);
 
     if (

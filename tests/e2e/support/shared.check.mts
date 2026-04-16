@@ -9,16 +9,16 @@ test(
         skip: !process.env.npm_execpath,
     },
     () => {
-    const byteCount = 2 * 1024 * 1024 + 321;
-    const output = runPnpmCaptureSync([
-        'exec',
-        'node',
-        '-e',
-        `process.stdout.write('x'.repeat(${byteCount}))`,
-    ]);
+        const byteCount = 2 * 1024 * 1024 + 321;
+        const output = runPnpmCaptureSync([
+            'exec',
+            'node',
+            '-e',
+            `process.stdout.write('x'.repeat(${byteCount}))`,
+        ]);
 
-    assert.equal(output.length, byteCount);
-    assert.equal(output[0], 'x');
-    assert.equal(output.at(-1), 'x');
+        assert.equal(output.length, byteCount);
+        assert.equal(output[0], 'x');
+        assert.equal(output.at(-1), 'x');
     },
 );

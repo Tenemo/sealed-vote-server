@@ -65,6 +65,7 @@ const createMockPage = (
     state: {
         bodyText?: string;
         currentUrl?: string;
+        currentUrlThrows?: boolean;
         readyState?: string;
         title?: string;
         visibilityState?: string;
@@ -101,7 +102,13 @@ const createMockPage = (
             ) => {
                 listeners.set(eventName, listener);
             },
-            url: () => currentUrl,
+            url: () => {
+                if (state.currentUrlThrows) {
+                    throw new Error('Page already closed');
+                }
+
+                return currentUrl;
+            },
         },
     };
 };
@@ -236,6 +243,36 @@ test('attachErrorTracking records tracked request failures as recent activity', 
     assert.deepEqual(tracker.errors, []);
     assert.deepEqual(tracker.recentEvents, [
         '[page] requestfailed: GET https://sealed.vote/votes/mock-poll resource=document (page https://sealed.vote/votes/mock-poll) failure=net::ERR_CONNECTION_RESET',
+    ]);
+});
+
+test('attachErrorTracking tolerates page url access failures in response tracking', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage({
+        currentUrlThrows: true,
+    });
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const responseListener = listeners.get('response');
+    assert.ok(responseListener);
+
+    assert.doesNotThrow(() => {
+        responseListener(
+            createMockResponse({
+                bodyText: JSON.stringify({
+                    message: 'The active ceremony session changed.',
+                }),
+                status: 409,
+                url: 'https://api.sealed.vote/api/board/messages',
+            }),
+        );
+    });
+
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    assert.deepEqual(tracker.errors, [
+        '[page] response: POST 409 https://api.sealed.vote/api/board/messages message=The active ceremony session changed.',
     ]);
 });
 
