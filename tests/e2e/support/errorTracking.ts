@@ -694,6 +694,7 @@ export const attachErrorTracking = (
                 page,
             }),
         );
+        tracker.trackedPages.delete(page);
     });
 };
 

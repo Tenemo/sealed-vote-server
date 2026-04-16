@@ -314,6 +314,55 @@ test('expectNoUnexpectedErrors includes recent activity and tracked page snapsho
     });
 });
 
+test('expectNoUnexpectedErrors drops closed pages from snapshots while keeping the close event', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const firstTrackedPage = createMockPage({
+        currentUrl: 'https://sealed.vote/votes/closed-poll',
+    });
+    const secondTrackedPage = createMockPage({
+        bodyText: 'Open page body',
+        currentUrl: 'https://sealed.vote/votes/open-poll',
+        title: 'Open vote page',
+    });
+
+    attachErrorTracking(firstTrackedPage.page as never, 'page-one', tracker);
+    attachErrorTracking(secondTrackedPage.page as never, 'page-two', tracker);
+
+    const closeFirstPage = firstTrackedPage.listeners.get('close');
+    const secondPageConsoleListener = secondTrackedPage.listeners.get('console');
+    assert.ok(closeFirstPage);
+    assert.ok(secondPageConsoleListener);
+
+    closeFirstPage();
+    secondPageConsoleListener(
+        createMockConsoleMessage('Unexpected console failure'),
+    );
+
+    assert.equal(tracker.trackedPages.has(firstTrackedPage.page as never), false);
+    assert.equal(tracker.trackedPages.has(secondTrackedPage.page as never), true);
+
+    await assert.rejects(
+        async () => await expectNoUnexpectedErrors(tracker),
+        (error) => {
+            assert.ok(error instanceof Error);
+            assert.match(
+                error.message,
+                /\[page-one\] close \(page https:\/\/sealed\.vote\/votes\/closed-poll\)/u,
+            );
+            assert.doesNotMatch(
+                error.message,
+                /\[page-one\] snapshot:/u,
+            );
+            assert.match(
+                error.message,
+                /\[page-two\] snapshot: pageUrl=https:\/\/sealed\.vote\/votes\/open-poll/u,
+            );
+
+            return true;
+        },
+    );
+});
+
 test('createErrorTrackingAttacher avoids duplicate listeners on the same page and attaches to replacements', () => {
     const tracker = createUnexpectedErrorTracker();
     const firstPage = createMockPage();
