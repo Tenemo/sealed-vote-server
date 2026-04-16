@@ -28,6 +28,7 @@ type HtmlProbeStatus = {
 
 type ReadinessStatus = {
     apiHealth: JsonProbeStatus;
+    browserApiHealth: JsonProbeStatus;
     homepage: HtmlProbeStatus;
     votePage: HtmlProbeStatus;
     webVersion: JsonProbeStatus;
@@ -371,33 +372,40 @@ export const loadReadinessStatus = async (
         options.expectedCommitSha,
     );
 
-    const [webVersion, apiHealth, homepage, votePage] = await Promise.all([
-        loadJsonProbeStatus(
-            options.webBaseUrl,
-            '/version.json',
-            options.requestTimeoutMs,
-        ),
-        loadJsonProbeStatus(
-            options.apiBaseUrl,
-            '/api/health-check',
-            options.requestTimeoutMs,
-        ),
-        loadHtmlProbeStatus(
-            options.webBaseUrl,
-            '/',
-            options.requestTimeoutMs,
-            expectations.homepage,
-        ),
-        loadHtmlProbeStatus(
-            options.webBaseUrl,
-            syntheticVotePath,
-            options.requestTimeoutMs,
-            expectations.votePage,
-        ),
-    ]);
+    const [webVersion, apiHealth, browserApiHealth, homepage, votePage] =
+        await Promise.all([
+            loadJsonProbeStatus(
+                options.webBaseUrl,
+                '/version.json',
+                options.requestTimeoutMs,
+            ),
+            loadJsonProbeStatus(
+                options.apiBaseUrl,
+                '/api/health-check',
+                options.requestTimeoutMs,
+            ),
+            loadJsonProbeStatus(
+                options.webBaseUrl,
+                '/api/health-check',
+                options.requestTimeoutMs,
+            ),
+            loadHtmlProbeStatus(
+                options.webBaseUrl,
+                '/',
+                options.requestTimeoutMs,
+                expectations.homepage,
+            ),
+            loadHtmlProbeStatus(
+                options.webBaseUrl,
+                syntheticVotePath,
+                options.requestTimeoutMs,
+                expectations.votePage,
+            ),
+        ]);
 
     return {
         apiHealth,
+        browserApiHealth,
         homepage,
         votePage,
         webVersion,
@@ -410,10 +418,12 @@ export const isReadinessStatusSuccessful = (
 ): boolean =>
     status.webVersion.ok &&
     status.apiHealth.ok &&
+    status.browserApiHealth.ok &&
     status.homepage.ok &&
     status.votePage.ok &&
     status.webVersion.commitSha === expectedCommitSha &&
-    status.apiHealth.commitSha === expectedCommitSha;
+    status.apiHealth.commitSha === expectedCommitSha &&
+    status.browserApiHealth.commitSha === expectedCommitSha;
 
 const sleep = async (delayMs: number): Promise<void> => {
     await new Promise((resolve) => {
@@ -442,6 +452,7 @@ export const formatReadinessStatus = (status: ReadinessStatus): string =>
     [
         formatJsonStatus('web version', status.webVersion),
         formatJsonStatus('api health', status.apiHealth),
+        formatJsonStatus('browser api health', status.browserApiHealth),
         formatHtmlStatus('homepage', status.homepage),
         formatHtmlStatus('vote page', status.votePage),
     ].join(' ');

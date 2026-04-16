@@ -45,6 +45,7 @@ const createHtmlStatus = (
 const createReadinessStatus = (
     overrides: Partial<{
         apiHealth: ReturnType<typeof createJsonStatus>;
+        browserApiHealth: ReturnType<typeof createJsonStatus>;
         homepage: ReturnType<typeof createHtmlStatus>;
         votePage: ReturnType<typeof createHtmlStatus>;
         webVersion: ReturnType<typeof createJsonStatus>;
@@ -52,6 +53,9 @@ const createReadinessStatus = (
 ) => ({
     apiHealth: createJsonStatus({
         url: 'https://api.sealed.vote/api/health-check?t=1',
+    }),
+    browserApiHealth: createJsonStatus({
+        url: 'https://sealed.vote/api/health-check?t=1',
     }),
     homepage: createHtmlStatus({
         url: 'https://sealed.vote/?t=1',
@@ -93,6 +97,19 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
     assert.equal(
         isReadinessStatusSuccessful(
             createReadinessStatus({
+                browserApiHealth: createJsonStatus({
+                    commitSha: 'e715a02987075c168f6e88c54488a3708096664a',
+                    url: 'https://sealed.vote/api/health-check?t=1',
+                }),
+            }),
+            expectedCommitSha,
+        ),
+        false,
+    );
+
+    assert.equal(
+        isReadinessStatusSuccessful(
+            createReadinessStatus({
                 votePage: createHtmlStatus({
                     missingSnippetLabel: 'vote page canonical',
                     ok: false,
@@ -105,6 +122,20 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
 });
 
 test('formatReadinessStatus reports unreachable, missing, and unknown HTML marker states', () => {
+    assert.match(
+        formatReadinessStatus(
+            createReadinessStatus({
+                browserApiHealth: createJsonStatus({
+                    commitSha: null,
+                    ok: false,
+                    statusCode: null,
+                    url: 'https://sealed.vote/api/health-check?t=1',
+                }),
+            }),
+        ),
+        /browser api health: status=unreachable, commitSha=missing/u,
+    );
+
     assert.match(
         formatReadinessStatus(
             createReadinessStatus({

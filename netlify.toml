@@ -47,6 +47,13 @@
   [headers.values]
     Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
 
+# Keep browser API traffic same-origin on Netlify so transient upstream errors
+# stay visible as normal HTTP failures instead of getting masked by CORS.
+[[redirects]]
+  from = "/api/*"
+  to = "https://api.sealed.vote/api/:splat"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

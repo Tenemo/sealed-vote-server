@@ -12,14 +12,13 @@ import {
     type RestartCeremonyRequest,
 } from '@sealed-vote/contracts';
 
-const apiBaseUrl = (() => {
-    const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-    const normalizedApiBaseUrl = configuredApiBaseUrl
-        ? configuredApiBaseUrl.trim().replace(/\/+$/, '')
-        : '';
+import { resolveBrowserApiBaseUrl } from './apiBaseUrl';
 
-    return normalizedApiBaseUrl || '/';
-})();
+const apiBaseUrl = resolveBrowserApiBaseUrl({
+    browserOrigin:
+        typeof window === 'undefined' ? undefined : window.location.origin,
+    configuredApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+});
 
 export const pollsApi = createApi({
     reducerPath: 'polls',
