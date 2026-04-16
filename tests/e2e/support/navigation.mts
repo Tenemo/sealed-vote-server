@@ -63,6 +63,12 @@ const transientNavigationErrorPatterns = [
 const transientNavigationTimeoutPattern = /Timeout \d+ms exceeded/u;
 const relativeUrlBase = 'https://playwright-navigation-check.invalid';
 const navigationDiagnosticSnippetLength = 240;
+const blankNavigationContentPattern = /<body[^>]*><\/body>/u;
+const loadingNavigationTitlePatterns = [
+    /^loading\s+https?:\/\//iu,
+    /^connecting\s+to\s+/iu,
+    /^waiting\s+for\s+/iu,
+] as const;
 
 export const resolveNavigationTimeoutMs = (
     rawTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS,
@@ -144,6 +150,78 @@ const extractNavigationContentSnippet = (html: string): string | null => {
     return normalizedText
         ? truncateNavigationText(normalizedText)
         : null;
+};
+
+const normalizeNavigationHtml = (value: string): string =>
+    value
+        .replaceAll(/<!doctype[^>]*>/giu, '')
+        .replaceAll(/\s+/gu, '')
+        .toLowerCase();
+
+const hasMeaningfulNavigationDocument = async (
+    page: NavigationTarget,
+): Promise<boolean | null> => {
+    if (typeof page.content !== 'function') {
+        return null;
+    }
+
+    try {
+        const normalizedHtml = normalizeNavigationHtml(await page.content());
+
+        if (!normalizedHtml) {
+            return false;
+        }
+
+        return !blankNavigationContentPattern.test(normalizedHtml);
+    } catch {
+        return null;
+    }
+};
+
+const isLoadingNavigationTitle = (title: string): boolean =>
+    loadingNavigationTitlePatterns.some((pattern) => pattern.test(title));
+
+const createNavigationOperationTimeoutError = (
+    actionLabel: string,
+    timeoutMs: number,
+): Error => new Error(`${actionLabel}: Timeout ${timeoutMs}ms exceeded.`);
+
+const runNavigationAction = async (
+    actionLabel: string,
+    action: () => Promise<void>,
+    timeoutMs: number,
+): Promise<void> => {
+    let didTimeOut = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+    const actionPromise = action().catch((error: unknown) => {
+        if (didTimeOut) {
+            return;
+        }
+
+        throw error;
+    });
+
+    try {
+        await Promise.race([
+            actionPromise,
+            new Promise<void>((_resolve, reject) => {
+                timeoutHandle = setTimeout(() => {
+                    didTimeOut = true;
+                    reject(
+                        createNavigationOperationTimeoutError(
+                            actionLabel,
+                            timeoutMs,
+                        ),
+                    );
+                }, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutHandle !== null) {
+            clearTimeout(timeoutHandle);
+        }
+    }
 };
 
 const resolveNavigationRecoveryTimeoutMs = (
@@ -317,7 +395,23 @@ const isRecoveredTargetReady = async ({
 
     const readyState = await getNavigationTargetReadyState(page);
 
-    return readyState === 'interactive' || readyState === 'complete';
+    if (readyState !== 'interactive' && readyState !== 'complete') {
+        return false;
+    }
+
+    const hasMeaningfulDocument = await hasMeaningfulNavigationDocument(page);
+
+    if (hasMeaningfulDocument === false) {
+        return false;
+    }
+
+    if (hasMeaningfulDocument === true) {
+        return true;
+    }
+
+    const title = await getNavigationTargetTitle(page);
+
+    return Boolean(title && !isLoadingNavigationTitle(title));
 };
 
 const waitForRecoveredTarget = async ({
@@ -339,7 +433,10 @@ const waitForRecoveredTarget = async ({
             },
         );
 
-        return true;
+        return await isRecoveredTargetReady({
+            expectedUrl,
+            page,
+        });
     } catch (error) {
         if (!isTransientRecoveryProbeError(error)) {
             throw error;
@@ -508,10 +605,16 @@ export const gotoInteractablePage = async <T extends NavigationTarget>(
         return await navigateOnTarget(
             page,
             async (target) => {
-                await target.goto(url, {
-                    timeout: navigationTimeoutMs,
-                    waitUntil: navigationReadyState,
-                });
+                await runNavigationAction(
+                    'page.goto',
+                    async () => {
+                        await target.goto(url, {
+                            timeout: navigationTimeoutMs,
+                            waitUntil: navigationReadyState,
+                        });
+                    },
+                    navigationTimeoutMs,
+                );
             },
             navigationTimeoutMs,
             url,
@@ -530,10 +633,16 @@ export const gotoInteractablePage = async <T extends NavigationTarget>(
         return await navigateOnTarget(
             replacementPage,
             async (target) => {
-                await target.goto(url, {
-                    timeout: navigationTimeoutMs,
-                    waitUntil: navigationReadyState,
-                });
+                await runNavigationAction(
+                    'page.goto',
+                    async () => {
+                        await target.goto(url, {
+                            timeout: navigationTimeoutMs,
+                            waitUntil: navigationReadyState,
+                        });
+                    },
+                    navigationTimeoutMs,
+                );
             },
             navigationTimeoutMs,
             url,
@@ -551,10 +660,16 @@ export const reloadInteractablePage = async <T extends NavigationTarget>(
         return await navigateOnTarget(
             page,
             async (target) => {
-                await target.reload({
-                    timeout: navigationTimeoutMs,
-                    waitUntil: navigationReadyState,
-                });
+                await runNavigationAction(
+                    'page.reload',
+                    async () => {
+                        await target.reload({
+                            timeout: navigationTimeoutMs,
+                            waitUntil: navigationReadyState,
+                        });
+                    },
+                    navigationTimeoutMs,
+                );
             },
             navigationTimeoutMs,
             currentPageUrl,
@@ -573,10 +688,16 @@ export const reloadInteractablePage = async <T extends NavigationTarget>(
         return await navigateOnTarget(
             replacementPage,
             async (target) => {
-                await target.goto(currentPageUrl, {
-                    timeout: navigationTimeoutMs,
-                    waitUntil: navigationReadyState,
-                });
+                await runNavigationAction(
+                    'page.goto',
+                    async () => {
+                        await target.goto(currentPageUrl, {
+                            timeout: navigationTimeoutMs,
+                            waitUntil: navigationReadyState,
+                        });
+                    },
+                    navigationTimeoutMs,
+                );
             },
             navigationTimeoutMs,
             currentPageUrl,

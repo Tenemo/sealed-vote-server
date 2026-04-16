@@ -34,6 +34,9 @@ type PageDouble = NavigationTarget & {
     isClosed: () => boolean;
 };
 
+const blankPlaceholderHtml = '<html><head></head><body></body></html>';
+const readyPageHtml = '<html><body><main>Ready</main></body></html>';
+
 const createWaitForUrlTimeoutError = (timeout: number): Error =>
     new Error(`page.waitForURL: Timeout ${timeout}ms exceeded.`);
 
@@ -69,7 +72,9 @@ const createPageDouble = (
         close: async () => {
             isClosed = true;
         },
-        content: async () => state.htmlContent ?? '',
+        content: async () =>
+            state.htmlContent ??
+            (state.isInteractable ? readyPageHtml : blankPlaceholderHtml),
         context: () => ({
             newPage: async () => {
                 const replacement = options.createReplacement;
@@ -90,7 +95,8 @@ const createPageDouble = (
         setViewportSize: async (viewportSize) => {
             state.viewportSize = viewportSize;
         },
-        title: async () => state.documentTitle ?? '',
+        title: async () =>
+            state.documentTitle ?? (state.isInteractable ? 'Ready' : ''),
         url: () => state.currentUrl,
         viewportSize: () => state.viewportSize ?? null,
         waitForTimeout: async () => undefined,
@@ -523,6 +529,8 @@ test('gotoInteractablePage accepts a page that becomes ready after the recovery 
     page.goto = async () => {
         callCount += 1;
         state.currentUrl = 'https://sealed.vote/votes/example--1234';
+        state.htmlContent = blankPlaceholderHtml;
+        state.readyState = 'complete';
         throw new Error('page.goto: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
@@ -540,6 +548,7 @@ test('gotoInteractablePage accepts a page that becomes ready after the recovery 
         }
 
         state.isInteractable = true;
+        state.htmlContent = readyPageHtml;
         state.readyState = 'complete';
     };
 
@@ -617,6 +626,8 @@ test('gotoInteractablePage accepts a replacement page that becomes ready after t
     };
     replacementPage.goto = async () => {
         replacementState.currentUrl = 'https://sealed.vote/';
+        replacementState.htmlContent = blankPlaceholderHtml;
+        replacementState.readyState = 'complete';
         throw new Error('page.goto: Timeout 45000ms exceeded.');
     };
     replacementPage.waitForTimeout = async (timeout: number) => {
@@ -634,6 +645,7 @@ test('gotoInteractablePage accepts a replacement page that becomes ready after t
         }
 
         replacementState.isInteractable = true;
+        replacementState.htmlContent = readyPageHtml;
         replacementState.readyState = 'complete';
     };
 
@@ -674,6 +686,61 @@ test('gotoInteractablePage accepts a replacement page that becomes ready after t
             waitUntil: 'domcontentloaded',
         },
     ]);
+});
+
+test('gotoInteractablePage recovers when page.goto never returns but the page finishes loading', async () => {
+    const retryDelays: number[] = [];
+    const state: PageDoubleState = {
+        currentUrl: 'about:blank',
+        isInteractable: false,
+        readyState: 'loading',
+    };
+    const page = createPageDouble(state);
+    const previousNavigationTimeout =
+        process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    let callCount = 0;
+
+    page.goto = async () => {
+        callCount += 1;
+        state.currentUrl = 'https://sealed.vote/votes/example--1234';
+        state.documentTitle = 'Vote | sealed.vote';
+        state.htmlContent = readyPageHtml;
+        state.isInteractable = true;
+        state.readyState = 'complete';
+        await new Promise(() => undefined);
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '50';
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        await gotoInteractablePage(
+            page,
+            'https://sealed.vote/votes/example--1234',
+        );
+    } finally {
+        if (previousNavigationTimeout === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS =
+                previousNavigationTimeout;
+        }
+
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(callCount, 1);
+    assert.deepEqual(retryDelays, [1_000]);
 });
 
 test('gotoInteractablePage appends page diagnostics when recovery is exhausted', async () => {
@@ -891,6 +958,8 @@ test('reloadInteractablePage accepts a page that becomes ready after the recover
 
     page.reload = async () => {
         callCount += 1;
+        state.htmlContent = blankPlaceholderHtml;
+        state.readyState = 'complete';
         throw new Error('page.reload: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
@@ -908,6 +977,7 @@ test('reloadInteractablePage accepts a page that becomes ready after the recover
         }
 
         state.isInteractable = true;
+        state.htmlContent = readyPageHtml;
         state.readyState = 'complete';
     };
 
