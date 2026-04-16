@@ -18,6 +18,7 @@ type NavigationUrlMatcher = string | RegExp | ((url: URL) => boolean);
 type PageDoubleState = {
     currentUrl: string;
     isInteractable: boolean;
+    readyState: 'complete' | 'interactive' | 'loading';
 };
 
 const createWaitForUrlTimeoutError = (timeout: number): Error =>
@@ -42,9 +43,11 @@ const createPageDouble = (
     state: PageDoubleState = {
         currentUrl: 'about:blank',
         isInteractable: true,
+        readyState: 'complete',
     },
 ): NavigationTarget => ({
     goto: async () => undefined,
+    evaluate: async <Result,>() => state.readyState as unknown as Result,
     reload: async () => undefined,
     url: () => state.currentUrl,
     waitForTimeout: async () => undefined,
@@ -122,6 +125,7 @@ test('gotoInteractablePage retries transient Firefox navigation errors once', as
     const page = createPageDouble({
         currentUrl: 'about:blank',
         isInteractable: false,
+        readyState: 'loading',
     });
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
@@ -158,6 +162,7 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
     const state: PageDoubleState = {
         currentUrl: 'about:blank',
         isInteractable: false,
+        readyState: 'loading',
     };
     const page = createPageDouble(state);
     const previousNavigationTimeout =
@@ -180,8 +185,12 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
     ) => {
         recoveryWaits.push(options as NavigationOptions);
         state.isInteractable = true;
+        state.readyState = 'complete';
         assert.equal(
-            doesMatcherMatch(matcher, 'https://sealed.vote/votes/example--1234'),
+            doesMatcherMatch(
+                matcher,
+                'https://sealed.vote/votes/example--1234',
+            ),
             true,
         );
     };
@@ -229,6 +238,7 @@ test('gotoInteractablePage can retry transient timeout stalls when enabled', asy
     const page = createPageDouble({
         currentUrl: 'about:blank',
         isInteractable: false,
+        readyState: 'loading',
     });
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
@@ -275,6 +285,7 @@ test('gotoInteractablePage still retries when a transient abort lands on the wro
     const state: PageDoubleState = {
         currentUrl: 'https://sealed.vote/unexpected',
         isInteractable: true,
+        readyState: 'complete',
     };
     let callCount = 0;
     const page = createPageDouble(state);
@@ -312,11 +323,71 @@ test('gotoInteractablePage does not retry non-transient navigation errors', asyn
     assert.equal(callCount, 1);
 });
 
+test('gotoInteractablePage accepts a page that already loaded after the timeout', async () => {
+    const retryDelays: number[] = [];
+    const state: PageDoubleState = {
+        currentUrl: 'about:blank',
+        isInteractable: false,
+        readyState: 'loading',
+    };
+    const page = createPageDouble(state);
+    const previousNavigationTimeout =
+        process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    let callCount = 0;
+    let recoveryProbeCount = 0;
+
+    page.goto = async () => {
+        callCount += 1;
+        state.currentUrl = 'https://sealed.vote/votes/example--1234';
+        state.isInteractable = true;
+        state.readyState = 'complete';
+        throw new Error('page.goto: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    page.waitForURL = async () => {
+        recoveryProbeCount += 1;
+        throw createWaitForUrlTimeoutError(10_000);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '45000';
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        await gotoInteractablePage(
+            page,
+            'https://sealed.vote/votes/example--1234',
+        );
+    } finally {
+        if (previousNavigationTimeout === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS =
+                previousNavigationTimeout;
+        }
+
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(callCount, 1);
+    assert.equal(recoveryProbeCount, 0);
+    assert.deepEqual(retryDelays, [1_000]);
+});
+
 test('reloadInteractablePage uses the same navigation policy', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble({
         currentUrl: 'https://sealed.vote/votes/example--1234',
         isInteractable: true,
+        readyState: 'complete',
     });
     page.reload = async (options?: NavigationOptions) => {
         calls.push(options as NavigationOptions);
@@ -337,6 +408,7 @@ test('reloadInteractablePage accepts a recovered page without a second reload', 
     const state: PageDoubleState = {
         currentUrl: 'https://sealed.vote/votes/example--1234',
         isInteractable: false,
+        readyState: 'loading',
     };
     const page = createPageDouble(state);
     const previousRetrySetting =
@@ -346,6 +418,7 @@ test('reloadInteractablePage accepts a recovered page without a second reload', 
     page.reload = async () => {
         callCount += 1;
         state.isInteractable = true;
+        state.readyState = 'complete';
         throw new Error('page.reload: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
@@ -366,6 +439,51 @@ test('reloadInteractablePage accepts a recovered page without a second reload', 
     }
 
     assert.equal(callCount, 1);
+    assert.deepEqual(retryDelays, [1_000]);
+});
+
+test('reloadInteractablePage accepts a page that already reloaded after the timeout', async () => {
+    const retryDelays: number[] = [];
+    const state: PageDoubleState = {
+        currentUrl: 'https://sealed.vote/votes/example--1234',
+        isInteractable: false,
+        readyState: 'loading',
+    };
+    const page = createPageDouble(state);
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    let callCount = 0;
+    let recoveryProbeCount = 0;
+
+    page.reload = async () => {
+        callCount += 1;
+        state.isInteractable = true;
+        state.readyState = 'complete';
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    page.waitForURL = async () => {
+        recoveryProbeCount += 1;
+        throw createWaitForUrlTimeoutError(3_750);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        await reloadInteractablePage(page);
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(callCount, 1);
+    assert.equal(recoveryProbeCount, 0);
     assert.deepEqual(retryDelays, [1_000]);
 });
 
