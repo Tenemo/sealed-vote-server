@@ -47,7 +47,7 @@ const createPageDouble = (
     },
 ): NavigationTarget => ({
     goto: async () => undefined,
-    evaluate: async () => state.readyState as never,
+    evaluate: async <Result,>() => state.readyState as unknown as Result,
     reload: async () => undefined,
     url: () => state.currentUrl,
     waitForTimeout: async () => undefined,

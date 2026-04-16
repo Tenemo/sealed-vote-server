@@ -12,7 +12,10 @@ type WaitOptions = {
 type WaitDependencies = {
     log?: (message: string) => void;
     now?: () => number;
-    runReadinessCheck?: (forwardedCliArgs: string[]) => boolean;
+    runReadinessCheck?: (
+        forwardedCliArgs: string[],
+        timeoutMs: number,
+    ) => boolean;
     sleep?: (delayMs: number) => Promise<void>;
 };
 
@@ -49,47 +52,84 @@ export const parsePositiveInteger = (
     return parsedValue;
 };
 
-const getForwardedCliArgs = (args: string[]): string[] => {
+const splitCliArgs = (
+    args: string[],
+): {
+    forwardedCliArgs: string[];
+    scriptArgs: string[];
+} => {
     const separatorIndex = args.indexOf('--');
 
     if (separatorIndex === -1) {
-        return [];
+        return {
+            forwardedCliArgs: [],
+            scriptArgs: args,
+        };
     }
 
-    return args.slice(separatorIndex + 1);
+    return {
+        forwardedCliArgs: args.slice(separatorIndex + 1),
+        scriptArgs: args.slice(0, separatorIndex),
+    };
 };
 
-const parseArgs = (): WaitOptions => {
-    const args = process.argv.slice(2);
-    const getArgValue = (flag: string): string | undefined => {
-        const flagIndex = args.indexOf(flag);
+export const parseWaitCliArgs = (args: string[]): WaitOptions => {
+    const { forwardedCliArgs, scriptArgs } = splitCliArgs(args);
+    const pendingScriptArgs = [...scriptArgs];
+    let rawIntervalMs: string | undefined;
+    let rawRequiredStableChecks: string | undefined;
+    let rawTimeoutMs: string | undefined;
 
-        if (flagIndex === -1) {
-            return undefined;
+    while (pendingScriptArgs.length > 0) {
+        const arg = pendingScriptArgs.shift();
+        const value = pendingScriptArgs.shift();
+
+        if (arg === undefined) {
+            break;
         }
 
-        return args[flagIndex + 1];
-    };
+        if (value === undefined) {
+            fail(`Missing value for "${arg}".`);
+        }
+
+        switch (arg) {
+            case '--interval-ms':
+                rawIntervalMs = value;
+                break;
+            case '--required-stable-checks':
+                rawRequiredStableChecks = value;
+                break;
+            case '--timeout-ms':
+                rawTimeoutMs = value;
+                break;
+            default:
+                fail(
+                    `Unexpected argument "${arg}". Pass forwarded arguments after "--".`,
+                );
+        }
+    }
 
     return {
-        forwardedCliArgs: getForwardedCliArgs(args),
+        forwardedCliArgs,
         intervalMs: parsePositiveInteger(
-            getArgValue('--interval-ms'),
+            rawIntervalMs,
             defaultIntervalMs,
             '--interval-ms',
         ),
         requiredStableChecks: parsePositiveInteger(
-            getArgValue('--required-stable-checks'),
+            rawRequiredStableChecks,
             defaultRequiredStableChecks,
             '--required-stable-checks',
         ),
         timeoutMs: parsePositiveInteger(
-            getArgValue('--timeout-ms'),
+            rawTimeoutMs,
             defaultTimeoutMs,
             '--timeout-ms',
         ),
     };
 };
+
+const parseArgs = (): WaitOptions => parseWaitCliArgs(process.argv.slice(2));
 
 const sleep = async (delayMs: number): Promise<void> => {
     await new Promise((resolve) => {
@@ -121,7 +161,10 @@ const resolvePnpmInvocation = (): {
     };
 };
 
-const runReadinessCheck = (forwardedCliArgs: string[]): boolean => {
+const runReadinessCheck = (
+    forwardedCliArgs: string[],
+    timeoutMs: number,
+): boolean => {
     const pnpmInvocation = resolvePnpmInvocation();
 
     const result = spawnSync(
@@ -142,10 +185,15 @@ const runReadinessCheck = (forwardedCliArgs: string[]): boolean => {
             cwd: repoRoot,
             env: process.env,
             stdio: 'inherit',
+            timeout: timeoutMs,
         },
     );
 
     if (result.error) {
+        if ((result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+            return false;
+        }
+
         throw result.error;
     }
 
@@ -167,7 +215,16 @@ export const waitForProductionBrowserReadiness = async (
     let stableChecks = 0;
 
     while (resolveNow() <= deadline) {
-        const isSuccessful = runCheck(options.forwardedCliArgs);
+        const remainingCheckBudgetMs = deadline - resolveNow();
+
+        if (remainingCheckBudgetMs <= 0) {
+            break;
+        }
+
+        const isSuccessful = runCheck(
+            options.forwardedCliArgs,
+            remainingCheckBudgetMs,
+        );
 
         if (isSuccessful) {
             stableChecks += 1;
@@ -188,7 +245,13 @@ export const waitForProductionBrowserReadiness = async (
             );
         }
 
-        await wait(options.intervalMs);
+        const remainingSleepBudgetMs = deadline - resolveNow();
+
+        if (remainingSleepBudgetMs <= 0) {
+            break;
+        }
+
+        await wait(Math.min(options.intervalMs, remainingSleepBudgetMs));
     }
 
     fail(
