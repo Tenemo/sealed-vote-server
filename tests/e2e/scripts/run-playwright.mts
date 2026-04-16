@@ -1,4 +1,7 @@
-import { collectListedSpecFiles } from './runPlaywrightHelpers.mts';
+import {
+    collectListedSpecFiles,
+    resolveProductionIsolatedInvocationArgs,
+} from './runPlaywrightHelpers.mts';
 import {
     getForwardedCliArgs,
     runPnpmCaptureSync,
@@ -60,8 +63,10 @@ if (!shouldIsolateProductionByFile) {
             'test',
             '--config',
             configPath,
-            listedFile,
-            ...forwardedCliArgs,
+            ...resolveProductionIsolatedInvocationArgs(
+                listedFile,
+                forwardedCliArgs,
+            ),
         ]);
     }
 }
