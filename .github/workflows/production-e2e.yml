@@ -15,6 +15,7 @@ concurrency:
 jobs:
     wait-for-production-deploy:
         name: wait for production deploy
+        if: github.event_name != 'workflow_dispatch'
         runs-on: ubuntu-latest
         timeout-minutes: 40
 
@@ -41,6 +42,14 @@ jobs:
     wait-for-production-browser-readiness:
         name: wait for production browser readiness (${{ matrix.project.name }})
         needs: wait-for-production-deploy
+        if: >-
+            ${{
+                always() &&
+                (
+                    github.event_name == 'workflow_dispatch' ||
+                    needs.wait-for-production-deploy.result == 'success'
+                )
+            }}
         runs-on: ubuntu-latest
         container:
             image: mcr.microsoft.com/playwright:v1.59.1-noble
@@ -97,6 +106,15 @@ jobs:
         name: production e2e (${{ matrix.project.name }})
         needs:
             [wait-for-production-deploy, wait-for-production-browser-readiness]
+        if: >-
+            ${{
+                always() &&
+                needs.wait-for-production-browser-readiness.result == 'success' &&
+                (
+                    github.event_name == 'workflow_dispatch' ||
+                    needs.wait-for-production-deploy.result == 'success'
+                )
+            }}
         runs-on: ubuntu-latest
         container:
             image: mcr.microsoft.com/playwright:v1.59.1-noble
@@ -250,7 +268,7 @@ jobs:
         steps:
             - name: assert production e2e jobs passed
               run: |
-                  if [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
+                  if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
                     echo "wait-for-production-deploy result: ${{ needs.wait-for-production-deploy.result }}"
                     exit 1
                   fi
