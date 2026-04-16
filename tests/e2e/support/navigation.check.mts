@@ -14,26 +14,57 @@ type NavigationOptions = {
     waitUntil?: 'commit' | 'domcontentloaded' | 'load' | 'networkidle';
 };
 
+type NavigationUrlMatcher = string | RegExp | ((url: URL) => boolean);
 type PageDoubleState = {
     currentUrl: string;
-    readyState: 'loading' | 'interactive' | 'complete';
+    isInteractable: boolean;
+};
+
+const createWaitForUrlTimeoutError = (timeout: number): Error =>
+    new Error(`page.waitForURL: Timeout ${timeout}ms exceeded.`);
+
+const doesMatcherMatch = (
+    matcher: NavigationUrlMatcher,
+    currentUrl: string,
+): boolean => {
+    if (typeof matcher === 'function') {
+        return matcher(new URL(currentUrl));
+    }
+
+    if (matcher instanceof RegExp) {
+        return matcher.test(currentUrl);
+    }
+
+    return currentUrl === matcher;
 };
 
 const createPageDouble = (
     state: PageDoubleState = {
-        currentUrl: '',
-        readyState: 'complete',
+        currentUrl: 'about:blank',
+        isInteractable: true,
     },
 ): NavigationTarget => ({
     goto: async () => undefined,
     reload: async () => undefined,
     url: () => state.currentUrl,
-    evaluate: async <T,>() => state.readyState as T,
     waitForTimeout: async () => undefined,
+    waitForURL: async (
+        matcher: NavigationUrlMatcher,
+        options?: NavigationOptions,
+    ) => {
+        const timeout = options?.timeout ?? 0;
+
+        if (
+            !state.isInteractable ||
+            !doesMatcherMatch(matcher, state.currentUrl)
+        ) {
+            throw createWaitForUrlTimeoutError(timeout);
+        }
+    },
 });
 
 // These helper checks look a bit unusual because they test Playwright plumbing
-// rather than the app directly, but they pin the retry and timeout behavior
+// rather than the app directly, but they pin the retry and recovery behavior
 // that keeps the browser matrix stable across transient navigation failures.
 test('gotoInteractablePage waits for commit with a short timeout', async () => {
     const calls: NavigationOptions[] = [];
@@ -88,7 +119,10 @@ test('gotoInteractablePage retries transient Firefox navigation errors once', as
     const gotoCalls: NavigationOptions[] = [];
     const retryDelays: number[] = [];
     let callCount = 0;
-    const page = createPageDouble();
+    const page = createPageDouble({
+        currentUrl: 'about:blank',
+        isInteractable: false,
+    });
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
         gotoCalls.push(options as NavigationOptions);
@@ -118,13 +152,16 @@ test('gotoInteractablePage retries transient Firefox navigation errors once', as
     ]);
 });
 
-test('gotoInteractablePage accepts a transient timeout once the target page is interactive', async () => {
+test('gotoInteractablePage accepts a recovered target without a second navigate', async () => {
     const retryDelays: number[] = [];
+    const recoveryWaits: NavigationOptions[] = [];
     const state: PageDoubleState = {
-        currentUrl: '',
-        readyState: 'loading',
+        currentUrl: 'about:blank',
+        isInteractable: false,
     };
     const page = createPageDouble(state);
+    const previousNavigationTimeout =
+        process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
     const previousRetrySetting =
         process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
     let callCount = 0;
@@ -132,13 +169,24 @@ test('gotoInteractablePage accepts a transient timeout once the target page is i
     page.goto = async () => {
         callCount += 1;
         state.currentUrl = 'https://sealed.vote/votes/example--1234';
-        state.readyState = 'complete';
         throw new Error('page.goto: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
         retryDelays.push(timeout);
     };
+    page.waitForURL = async (
+        matcher: NavigationUrlMatcher,
+        options?: NavigationOptions,
+    ) => {
+        recoveryWaits.push(options as NavigationOptions);
+        state.isInteractable = true;
+        assert.equal(
+            doesMatcherMatch(matcher, 'https://sealed.vote/votes/example--1234'),
+            true,
+        );
+    };
 
+    process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '45000';
     process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
 
     try {
@@ -147,6 +195,13 @@ test('gotoInteractablePage accepts a transient timeout once the target page is i
             'https://sealed.vote/votes/example--1234',
         );
     } finally {
+        if (previousNavigationTimeout === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS =
+                previousNavigationTimeout;
+        }
+
         if (previousRetrySetting === undefined) {
             delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
         } else {
@@ -157,6 +212,12 @@ test('gotoInteractablePage accepts a transient timeout once the target page is i
 
     assert.equal(callCount, 1);
     assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(recoveryWaits, [
+        {
+            timeout: 10_000,
+            waitUntil: 'domcontentloaded',
+        },
+    ]);
 });
 
 test('gotoInteractablePage can retry transient timeout stalls when enabled', async () => {
@@ -165,7 +226,10 @@ test('gotoInteractablePage can retry transient timeout stalls when enabled', asy
     const previousRetrySetting =
         process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
     let callCount = 0;
-    const page = createPageDouble();
+    const page = createPageDouble({
+        currentUrl: 'about:blank',
+        isInteractable: false,
+    });
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
         gotoCalls.push(options as NavigationOptions);
@@ -210,7 +274,7 @@ test('gotoInteractablePage still retries when a transient abort lands on the wro
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
         currentUrl: 'https://sealed.vote/unexpected',
-        readyState: 'complete',
+        isInteractable: true,
     };
     let callCount = 0;
     const page = createPageDouble(state);
@@ -252,7 +316,7 @@ test('reloadInteractablePage uses the same navigation policy', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble({
         currentUrl: 'https://sealed.vote/votes/example--1234',
-        readyState: 'complete',
+        isInteractable: true,
     });
     page.reload = async (options?: NavigationOptions) => {
         calls.push(options as NavigationOptions);
@@ -268,26 +332,38 @@ test('reloadInteractablePage uses the same navigation policy', async () => {
     ]);
 });
 
-test('reloadInteractablePage accepts a transient abort once the current page is interactive', async () => {
+test('reloadInteractablePage accepts a recovered page without a second reload', async () => {
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
         currentUrl: 'https://sealed.vote/votes/example--1234',
-        readyState: 'interactive',
+        isInteractable: false,
     };
-    let callCount = 0;
     const page = createPageDouble(state);
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    let callCount = 0;
 
     page.reload = async () => {
         callCount += 1;
-        throw new Error(
-            'page.reload: net::ERR_ABORTED; maybe frame was detached?',
-        );
+        state.isInteractable = true;
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
         retryDelays.push(timeout);
     };
 
-    await reloadInteractablePage(page);
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        await reloadInteractablePage(page);
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
 
     assert.equal(callCount, 1);
     assert.deepEqual(retryDelays, [1_000]);
