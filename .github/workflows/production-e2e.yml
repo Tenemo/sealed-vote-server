@@ -38,9 +38,65 @@ jobs:
                   --request-timeout-ms 10000
                   --required-stable-checks 2
 
+    wait-for-production-browser-readiness:
+        name: wait for production browser readiness (${{ matrix.project.name }})
+        needs: wait-for-production-deploy
+        runs-on: ubuntu-latest
+        container:
+            image: mcr.microsoft.com/playwright:v1.59.1-noble
+            options: --ipc=host
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            max-parallel: 4
+            matrix:
+                project:
+                    - name: chromium-desktop
+                      ci_workers: '1'
+                    - name: firefox-desktop
+                      ci_workers: '1'
+                    - name: webkit-desktop
+                      ci_workers: '1'
+                    - name: mobile-firefox-android
+                      ci_workers: '1'
+
+        env:
+            HOME: /root
+            PLAYWRIGHT_BASE_URL: https://sealed.vote
+            PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
+            PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS: 'true'
+            PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: wait for browser production readiness
+              run: >-
+                  node --experimental-strip-types tests/e2e/scripts/wait-for-production-browser-readiness.mts
+                  --timeout-ms 1200000
+                  --interval-ms 15000
+                  --required-stable-checks 2
+                  --
+                  --project ${{ matrix.project.name }}
+
     production-e2e-matrix:
         name: production e2e (${{ matrix.project.name }})
-        needs: wait-for-production-deploy
+        needs:
+            [wait-for-production-deploy, wait-for-production-browser-readiness]
         runs-on: ubuntu-latest
         container:
             image: mcr.microsoft.com/playwright:v1.59.1-noble
@@ -185,6 +241,7 @@ jobs:
         needs:
             [
                 wait-for-production-deploy,
+                wait-for-production-browser-readiness,
                 production-e2e-matrix,
                 production-e2e-report,
             ]
@@ -195,6 +252,11 @@ jobs:
               run: |
                   if [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
                     echo "wait-for-production-deploy result: ${{ needs.wait-for-production-deploy.result }}"
+                    exit 1
+                  fi
+
+                  if [ "${{ needs.wait-for-production-browser-readiness.result }}" != "success" ]; then
+                    echo "wait-for-production-browser-readiness result: ${{ needs.wait-for-production-browser-readiness.result }}"
                     exit 1
                   fi
 

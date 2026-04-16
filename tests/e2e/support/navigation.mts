@@ -18,6 +18,9 @@ export type NavigationTarget = {
     goto: (url: string, options?: NavigationGotoOptions) => Promise<unknown>;
     reload: (options?: NavigationReloadOptions) => Promise<unknown>;
     url: () => string;
+    evaluate: <Result>(
+        pageFunction: () => Result | Promise<Result>,
+    ) => Promise<Result>;
     waitForTimeout: (timeout: number) => Promise<void>;
     waitForURL: (
         url: NavigationUrlMatcher,
@@ -152,6 +155,26 @@ const isTransientRecoveryProbeError = (error: unknown): boolean => {
     );
 };
 
+const isRecoveredTargetReady = async ({
+    expectedUrl,
+    page,
+}: {
+    expectedUrl: string;
+    page: NavigationTarget;
+}): Promise<boolean> => {
+    if (!doesPageMatchTargetUrl(page.url(), expectedUrl)) {
+        return false;
+    }
+
+    try {
+        const readyState = await page.evaluate(() => document.readyState);
+
+        return readyState === 'interactive' || readyState === 'complete';
+    } catch {
+        return false;
+    }
+};
+
 const waitForRecoveredTarget = async ({
     expectedUrl,
     navigationTimeoutMs,
@@ -165,9 +188,8 @@ const waitForRecoveredTarget = async ({
         await page.waitForURL(
             (url) => doesPageMatchTargetUrl(url.toString(), expectedUrl),
             {
-                timeout: resolveNavigationRecoveryTimeoutMs(
-                    navigationTimeoutMs,
-                ),
+                timeout:
+                    resolveNavigationRecoveryTimeoutMs(navigationTimeoutMs),
                 waitUntil: recoveryReadyState,
             },
         );
@@ -202,9 +224,27 @@ const retryTransientNavigation = async (
             await page.waitForTimeout(navigationRetryDelayMs);
 
             if (
+                await isRecoveredTargetReady({
+                    expectedUrl,
+                    page,
+                })
+            ) {
+                return;
+            }
+
+            if (
                 await waitForRecoveredTarget({
                     expectedUrl,
                     navigationTimeoutMs,
+                    page,
+                })
+            ) {
+                return;
+            }
+
+            if (
+                await isRecoveredTargetReady({
+                    expectedUrl,
                     page,
                 })
             ) {
