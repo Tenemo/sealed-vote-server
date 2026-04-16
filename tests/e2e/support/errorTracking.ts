@@ -10,6 +10,8 @@ type ErrorTrackingOptions = {
     allowedConsoleErrors?: RegExp[];
 };
 
+type ErrorTrackingAttacher = (page: Page) => Page;
+
 export type UnexpectedErrorTracker = {
     readonly errors: string[];
     readonly pendingChecks: Set<Promise<void>>;
@@ -264,6 +266,28 @@ export const attachErrorTracking = (
             tracker.pendingChecks.delete(pendingCheck);
         });
     });
+};
+
+export const createErrorTrackingAttacher = ({
+    label,
+    options = {},
+    tracker,
+}: {
+    label: string;
+    options?: ErrorTrackingOptions;
+    tracker: UnexpectedErrorTracker;
+}): ErrorTrackingAttacher => {
+    const attachedPages = new WeakSet<Page>();
+
+    return (page: Page): Page => {
+        if (attachedPages.has(page)) {
+            return page;
+        }
+
+        attachErrorTracking(page, label, tracker, options);
+        attachedPages.add(page);
+        return page;
+    };
 };
 
 export const expectNoUnexpectedErrors = (

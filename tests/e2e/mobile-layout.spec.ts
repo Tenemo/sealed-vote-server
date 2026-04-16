@@ -4,7 +4,7 @@ import { expectNoAxeViolations } from './support/a11y';
 import { gotoInteractablePage } from './support/navigation.mts';
 import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -28,10 +28,15 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     page,
 }) => {
     const tracker = createUnexpectedErrorTracker();
-    attachErrorTracking(page, 'mobile-home', tracker);
+    const attachMobileHomeTracking = createErrorTrackingAttacher({
+        label: 'mobile-home',
+        tracker,
+    });
+
+    page = attachMobileHomeTracking(page);
 
     await page.setViewportSize(mobileViewport);
-    page = await gotoInteractablePage(page, '/');
+    page = attachMobileHomeTracking(await gotoInteractablePage(page, '/'));
 
     await expect(
         page.getByRole('heading', { name: 'Create a new vote' }),
@@ -55,10 +60,13 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
     const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
-
-    attachErrorTracking(page, 'mobile-poll', tracker);
+    const attachMobilePollTracking = createErrorTrackingAttacher({
+        label: 'mobile-poll',
+        tracker,
+    });
 
     try {
+        page = attachMobilePollTracking(page);
         await page.setViewportSize(mobileViewport);
         const pollName = createPollName('Mobile layout', namespace);
 
@@ -66,7 +74,7 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
             page,
             pollName,
         });
-        page = createdPollResult.page;
+        page = attachMobilePollTracking(createdPollResult.page);
         const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
 

@@ -15,7 +15,7 @@ import {
     openProjectParticipant,
 } from './support/participants';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -33,14 +33,22 @@ test('keeps creator controls after reopening the shared link in a new browser se
     const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator-initial',
+        tracker,
+    });
+    const attachRestoredTracking = createErrorTrackingAttacher({
+        label: 'creator-restored',
+        tracker,
+    });
 
-    attachErrorTracking(page, 'creator-initial', tracker);
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Creator resume vote', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -51,11 +59,11 @@ test('keeps creator controls after reopening the shared link in a new browser se
             ...(getProjectContextOptions(testInfo) ?? {}),
             storageState: await page.context().storageState(),
         });
-        const restoredPage = await restoredContext.newPage();
-        attachErrorTracking(restoredPage, 'creator-restored', tracker);
-        const resumedPage = await gotoInteractablePage(
-            restoredPage,
-            createdPoll.pollUrl,
+        const restoredPage = attachRestoredTracking(
+            await restoredContext.newPage(),
+        );
+        const resumedPage = attachRestoredTracking(
+            await gotoInteractablePage(restoredPage, createdPoll.pollUrl),
         );
         const nextStepPanel = resumedPage
             .getByRole('heading', { name: /your next step/i })
@@ -98,14 +106,30 @@ test('restores the securing state after refresh once voting is closed', async ({
     const creatorName = createVoterName('alice', namespace);
     const participantOneName = createVoterName('bob', namespace);
     const participantTwoName = createVoterName('cora', namespace);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
+    const attachRestoredTracking = createErrorTrackingAttacher({
+        label: 'creator-restored',
+        tracker,
+    });
 
-    attachErrorTracking(page, 'creator', tracker);
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Voter resume vote', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -113,27 +137,33 @@ test('restores the securing state after refresh once voting is closed', async ({
     const participantTwo = await openProjectParticipant(browser, testInfo);
     let restoredContext: BrowserContext | null = null;
 
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
 
     try {
-        page = await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        participantOne.page = await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        participantTwo.page = await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
 
         await closeVoting(page);
 
@@ -141,11 +171,11 @@ test('restores the securing state after refresh once voting is closed', async ({
             ...(getProjectContextOptions(testInfo) ?? {}),
             storageState: await page.context().storageState(),
         });
-        const restoredPage = await restoredContext.newPage();
-        attachErrorTracking(restoredPage, 'creator-restored', tracker);
-        const resumedPage = await gotoInteractablePage(
-            restoredPage,
-            createdPoll.pollUrl,
+        const restoredPage = attachRestoredTracking(
+            await restoredContext.newPage(),
+        );
+        const resumedPage = attachRestoredTracking(
+            await gotoInteractablePage(restoredPage, createdPoll.pollUrl),
         );
 
         await expectPostCloseVisible(resumedPage);

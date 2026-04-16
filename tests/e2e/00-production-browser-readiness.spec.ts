@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { gotoInteractablePage } from './support/navigation.mts';
 import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -50,10 +50,18 @@ test('browser can commit the homepage and a real production vote page', async ({
     const tracker = createUnexpectedErrorTracker();
     const createdPolls: CreatedPoll[] = [];
     let participantPage: Page | null = null;
+    const attachHomepageTracking = createErrorTrackingAttacher({
+        label: 'homepage',
+        tracker,
+    });
+    const attachParticipantTracking = createErrorTrackingAttacher({
+        label: 'participant-page',
+        tracker,
+    });
 
     try {
-        attachErrorTracking(page, 'homepage', tracker);
-        page = await gotoInteractablePage(page, '/');
+        page = attachHomepageTracking(page);
+        page = attachHomepageTracking(await gotoInteractablePage(page, '/'));
         await expectHomepageReady(page);
 
         const createdPollResult = await createPoll({
@@ -62,15 +70,15 @@ test('browser can commit the homepage and a real production vote page', async ({
             choices: readinessChoices,
             skipInitialNavigation: true,
         });
-        page = createdPollResult.page;
+        page = attachHomepageTracking(createdPollResult.page);
         const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
 
-        participantPage = await page.context().newPage();
-        attachErrorTracking(participantPage, 'participant-page', tracker);
-        participantPage = await gotoInteractablePage(
-            participantPage,
-            createdPoll.pollUrl,
+        participantPage = attachParticipantTracking(
+            await page.context().newPage(),
+        );
+        participantPage = attachParticipantTracking(
+            await gotoInteractablePage(participantPage, createdPoll.pollUrl),
         );
         await expectVotePageReady(participantPage);
         await expectNoUnexpectedErrors(tracker);

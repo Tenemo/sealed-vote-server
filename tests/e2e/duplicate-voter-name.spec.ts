@@ -13,7 +13,7 @@ import {
     type CreatedPoll,
 } from './support/pollFlow';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -33,35 +33,45 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     const namespace = createTestNamespace(testInfo);
     const firstVoterName = createVoterName('alice', namespace);
     const secondVoterName = createVoterName('bob', namespace);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'page-1',
+        tracker,
+    });
+    const attachParticipantTracking = createErrorTrackingAttacher({
+        label: 'page-2',
+        options: {
+            allowedApiStatuses: [409],
+            allowedConsoleErrors: [
+                /Failed to load resource: the server responded with a status of 409/u,
+            ],
+        },
+        tracker,
+    });
 
-    attachErrorTracking(page, 'page-1', tracker);
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Duplicate name vote', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
-    page = await submitVote({
-        page,
-        scores: [9, 4],
-        voterName: firstVoterName,
-    });
+    page = attachCreatorTracking(
+        await submitVote({
+            page,
+            scores: [9, 4],
+            voterName: firstVoterName,
+        }),
+    );
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'page-2', tracker, {
-        allowedApiStatuses: [409],
-        allowedConsoleErrors: [
-            /Failed to load resource: the server responded with a status of 409/u,
-        ],
-    });
+    participant.page = attachParticipantTracking(participant.page);
 
     try {
-        participant.page = await gotoInteractablePage(
-            participant.page,
-            createdPoll.pollUrl,
+        participant.page = attachParticipantTracking(
+            await gotoInteractablePage(participant.page, createdPoll.pollUrl),
         );
 
         await participant.page

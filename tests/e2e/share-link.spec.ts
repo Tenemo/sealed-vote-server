@@ -12,7 +12,7 @@ import {
     type CreatedPoll,
 } from './support/pollFlow';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -31,25 +31,33 @@ test('keeps slug-based poll links shareable in a separate participant context', 
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const pollName = createPollName('Share link vote', namespace);
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantTracking = createErrorTrackingAttacher({
+        label: 'participant',
+        tracker,
+    });
+
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName,
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     expect(createdPoll.pollUrl).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'participant', tracker);
+    participant.page = attachParticipantTracking(participant.page);
 
     try {
-        participant.page = await gotoInteractablePage(
-            participant.page,
-            createdPoll.pollUrl,
+        participant.page = attachParticipantTracking(
+            await gotoInteractablePage(participant.page, createdPoll.pollUrl),
         );
         await expect(
             participant.page.getByRole('heading', { name: pollName }),
@@ -59,11 +67,13 @@ test('keeps slug-based poll links shareable in a separate participant context', 
             participant.page.getByRole('heading', { name: 'Your next step' }),
         ).toBeVisible();
 
-        participant.page = await submitVote({
-            page: participant.page,
-            scores: [8, 6],
-            voterName: createVoterName('bob', namespace),
-        });
+        participant.page = attachParticipantTracking(
+            await submitVote({
+                page: participant.page,
+                scores: [8, 6],
+                voterName: createVoterName('bob', namespace),
+            }),
+        );
         await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);

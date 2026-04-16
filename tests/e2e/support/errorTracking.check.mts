@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
     attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
 } from './errorTracking.ts';
 
@@ -162,5 +163,30 @@ test('attachErrorTracking records page errors with page url and stack', () => {
 
     assert.deepEqual(tracker.errors, [
         '[page] pageerror (page https://sealed.vote/votes/mock-poll): Unexpected render failure stack=Error: Unexpected render failure at Poll (Poll.tsx:42:9)',
+    ]);
+});
+
+test('createErrorTrackingAttacher avoids duplicate listeners on the same page and attaches to replacements', () => {
+    const tracker = createUnexpectedErrorTracker();
+    const firstPage = createMockPage();
+    const replacementPage = createMockPage();
+    const attachPageTracking = createErrorTrackingAttacher({
+        label: 'page',
+        tracker,
+    });
+
+    attachPageTracking(firstPage.page as never);
+    attachPageTracking(firstPage.page as never);
+    attachPageTracking(replacementPage.page as never);
+
+    assert.deepEqual([...firstPage.listeners.keys()].sort(), [
+        'console',
+        'pageerror',
+        'response',
+    ]);
+    assert.deepEqual([...replacementPage.listeners.keys()].sort(), [
+        'console',
+        'pageerror',
+        'response',
     ]);
 });

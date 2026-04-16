@@ -18,7 +18,7 @@ import {
     reopenProjectParticipant,
 } from './support/participants';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -73,13 +73,34 @@ test('automatically resumes a stored vote after a participant closes the browser
         ],
     });
 
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
+    const attachParticipantThreeTracking = createErrorTrackingAttacher({
+        label: 'participant-three',
+        tracker,
+    });
+    const attachParticipantOneRestoredTracking = createErrorTrackingAttacher({
+        label: 'participant-one-restored',
+        tracker,
+    });
+
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Persist vote before close', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -87,34 +108,44 @@ test('automatically resumes a stored vote after a participant closes the browser
     const participantTwo = await openProjectParticipant(browser, testInfo);
     const participantThree = await openProjectParticipant(browser, testInfo);
 
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
-    attachErrorTracking(participantThree.page, 'participant-three', tracker);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
+    participantThree.page = attachParticipantThreeTracking(
+        participantThree.page,
+    );
 
     try {
-        page = await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        participantOne.page = await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        participantTwo.page = await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
-        participantThree.page = await submitVote({
-            page: participantThree.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [10, 3],
-            voterName: participantThreeName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await submitVote({
+                page: participantThree.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [10, 3],
+                voterName: participantThreeName,
+            }),
+        );
 
         const participantOneStorageState =
             await participantOne.context.storageState();
@@ -132,10 +163,11 @@ test('automatically resumes a stored vote after a participant closes the browser
             storageState: participantOneStorageState,
             testInfo,
         });
-        attachErrorTracking(participantOne.page, 'participant-one-restored', tracker);
-        participantOne.page = await gotoInteractablePage(
+        participantOne.page = attachParticipantOneRestoredTracking(
             participantOne.page,
-            createdPoll.pollUrl,
+        );
+        participantOne.page = attachParticipantOneRestoredTracking(
+            await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
         await waitForCeremonyMetric({
             label: 'Board registrations',
@@ -191,13 +223,43 @@ test('automatically republishes a stored vote after a participant rejoins during
         ],
     });
 
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
+    const attachParticipantThreeTracking = createErrorTrackingAttacher({
+        label: 'participant-three',
+        tracker,
+    });
+    const attachMissingParticipantTracking = createErrorTrackingAttacher({
+        label: 'missing-participant',
+        tracker,
+    });
+    const attachParticipantOneRestoredTracking = createErrorTrackingAttacher({
+        label: 'participant-one-restored',
+        tracker,
+    });
+    const attachMissingParticipantReopenedTracking =
+        createErrorTrackingAttacher({
+            label: 'missing-participant-reopened',
+            tracker,
+        });
+
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Persist vote after restart', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -206,41 +268,55 @@ test('automatically republishes a stored vote after a participant rejoins during
     const participantThree = await openProjectParticipant(browser, testInfo);
     let missingParticipant = await openProjectParticipant(browser, testInfo);
 
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
-    attachErrorTracking(participantThree.page, 'participant-three', tracker);
-    attachErrorTracking(missingParticipant.page, 'missing-participant', tracker);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
+    participantThree.page = attachParticipantThreeTracking(
+        participantThree.page,
+    );
+    missingParticipant.page = attachMissingParticipantTracking(
+        missingParticipant.page,
+    );
 
     try {
-        page = await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        participantOne.page = await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        participantTwo.page = await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
-        participantThree.page = await submitVote({
-            page: participantThree.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [8, 9],
-            voterName: participantThreeName,
-        });
-        missingParticipant.page = await submitVote({
-            page: missingParticipant.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [10, 3],
-            voterName: missingParticipantName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await submitVote({
+                page: participantThree.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [8, 9],
+                voterName: participantThreeName,
+            }),
+        );
+        missingParticipant.page = attachMissingParticipantTracking(
+            await submitVote({
+                page: missingParticipant.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [10, 3],
+                voterName: missingParticipantName,
+            }),
+        );
 
         const missingParticipantStorageState =
             await missingParticipant.context.storageState();
@@ -269,10 +345,11 @@ test('automatically republishes a stored vote after a participant rejoins during
             storageState: participantOneStorageState,
             testInfo,
         });
-        attachErrorTracking(participantOne.page, 'participant-one-restored', tracker);
-        participantOne.page = await gotoInteractablePage(
+        participantOne.page = attachParticipantOneRestoredTracking(
             participantOne.page,
-            createdPoll.pollUrl,
+        );
+        participantOne.page = attachParticipantOneRestoredTracking(
+            await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
 
         await waitForVerifiedResults({ expectedResults, page });
@@ -299,14 +376,14 @@ test('automatically republishes a stored vote after a participant rejoins during
             storageState: missingParticipantStorageState,
             testInfo,
         });
-        attachErrorTracking(
+        missingParticipant.page = attachMissingParticipantReopenedTracking(
             missingParticipant.page,
-            'missing-participant-reopened',
-            tracker,
         );
-        missingParticipant.page = await gotoInteractablePage(
-            missingParticipant.page,
-            createdPoll.pollUrl,
+        missingParticipant.page = attachMissingParticipantReopenedTracking(
+            await gotoInteractablePage(
+                missingParticipant.page,
+                createdPoll.pollUrl,
+            ),
         );
         await expect(
             missingParticipant.page.getByText(
@@ -348,13 +425,34 @@ test('lets the organizer rescue multiple missing participants and finish with th
         ],
     });
 
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
+    const attachMissingParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'missing-participant-one',
+        tracker,
+    });
+    const attachMissingParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'missing-participant-two',
+        tracker,
+    });
+
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Rescue multiple missing voters', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -363,49 +461,55 @@ test('lets the organizer rescue multiple missing participants and finish with th
     const missingParticipantOne = await openProjectParticipant(browser, testInfo);
     const missingParticipantTwo = await openProjectParticipant(browser, testInfo);
 
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
-    attachErrorTracking(
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
+    missingParticipantOne.page = attachMissingParticipantOneTracking(
         missingParticipantOne.page,
-        'missing-participant-one',
-        tracker,
     );
-    attachErrorTracking(
+    missingParticipantTwo.page = attachMissingParticipantTwoTracking(
         missingParticipantTwo.page,
-        'missing-participant-two',
-        tracker,
     );
 
     try {
-        page = await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        participantOne.page = await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        participantTwo.page = await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
-        missingParticipantOne.page = await submitVote({
-            page: missingParticipantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [10, 3],
-            voterName: missingParticipantOneName,
-        });
-        missingParticipantTwo.page = await submitVote({
-            page: missingParticipantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [5, 9],
-            voterName: missingParticipantTwoName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
+        missingParticipantOne.page = attachMissingParticipantOneTracking(
+            await submitVote({
+                page: missingParticipantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [10, 3],
+                voterName: missingParticipantOneName,
+            }),
+        );
+        missingParticipantTwo.page = attachMissingParticipantTwoTracking(
+            await submitVote({
+                page: missingParticipantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [5, 9],
+                voterName: missingParticipantTwoName,
+            }),
+        );
 
         await closeParticipant(missingParticipantOne);
         await closeParticipant(missingParticipantTwo);
@@ -474,13 +578,34 @@ test('supports repeated organizer rescues at different securing steps', async ({
         ],
     });
 
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
+    const attachParticipantThreeTracking = createErrorTrackingAttacher({
+        label: 'participant-three',
+        tracker,
+    });
+    const attachMissingParticipantTracking = createErrorTrackingAttacher({
+        label: 'missing-participant',
+        tracker,
+    });
+
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Repeated rescue', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -489,41 +614,55 @@ test('supports repeated organizer rescues at different securing steps', async ({
     const participantThree = await openProjectParticipant(browser, testInfo);
     const missingParticipant = await openProjectParticipant(browser, testInfo);
 
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
-    attachErrorTracking(participantThree.page, 'participant-three', tracker);
-    attachErrorTracking(missingParticipant.page, 'missing-participant', tracker);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
+    participantThree.page = attachParticipantThreeTracking(
+        participantThree.page,
+    );
+    missingParticipant.page = attachMissingParticipantTracking(
+        missingParticipant.page,
+    );
 
     try {
-        page = await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        participantOne.page = await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        participantTwo.page = await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
-        participantThree.page = await submitVote({
-            page: participantThree.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [8, 9],
-            voterName: participantThreeName,
-        });
-        missingParticipant.page = await submitVote({
-            page: missingParticipant.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [10, 3],
-            voterName: missingParticipantName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await submitVote({
+                page: participantThree.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [8, 9],
+                voterName: participantThreeName,
+            }),
+        );
+        missingParticipant.page = attachMissingParticipantTracking(
+            await submitVote({
+                page: missingParticipant.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [10, 3],
+                voterName: missingParticipantName,
+            }),
+        );
 
         await closeParticipant(missingParticipant);
         await closeVoting(page);

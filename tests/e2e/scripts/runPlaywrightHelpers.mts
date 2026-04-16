@@ -1,5 +1,5 @@
 const listedSpecPattern =
-    /^\s*\[[^\]]+\]\s+›\s+(.+?):\d+:\d+\s+›\s+/u;
+    /^\s*\[[^\]]+\]\s+\u203a\s+(.+):\d+:\d+\s+\u203a\s+/u;
 
 export const collectListedSpecFiles = (listOutput: string): string[] => {
     const listedFiles = new Set<string>();

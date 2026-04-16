@@ -14,6 +14,11 @@ type NavigationCloseOptions = {
     runBeforeUnload?: boolean;
 };
 
+type NavigationViewportSize = {
+    height: number;
+    width: number;
+};
+
 type NavigationReloadOptions = Omit<NavigationGotoOptions, 'referer'>;
 type NavigationWaitForUrlOptions = Omit<NavigationGotoOptions, 'referer'>;
 type NavigationUrlMatcher = string | RegExp | ((url: URL) => boolean);
@@ -30,6 +35,8 @@ export type NavigationTarget = {
         newPage: () => Promise<NavigationTarget>;
     };
     isClosed?: () => boolean;
+    setViewportSize?: (viewportSize: NavigationViewportSize) => Promise<void>;
+    viewportSize?: () => NavigationViewportSize | null;
     waitForTimeout: (timeout: number) => Promise<void>;
     waitForURL: (
         url: NavigationUrlMatcher,
@@ -236,6 +243,8 @@ const replaceNavigationTarget = async <T extends NavigationTarget>(
         return null;
     }
 
+    const previousViewportSize = page.viewportSize?.() ?? null;
+
     try {
         if (!page.isClosed?.()) {
             await page.close({
@@ -248,7 +257,13 @@ const replaceNavigationTarget = async <T extends NavigationTarget>(
         }
     }
 
-    return (await page.context().newPage()) as T;
+    const replacementPage = (await page.context().newPage()) as T;
+
+    if (previousViewportSize && replacementPage.setViewportSize) {
+        await replacementPage.setViewportSize(previousViewportSize);
+    }
+
+    return replacementPage;
 };
 
 const navigateOnTarget = async <T extends NavigationTarget>(

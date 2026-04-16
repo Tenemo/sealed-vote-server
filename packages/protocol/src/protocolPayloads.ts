@@ -1,6 +1,7 @@
 import type { ProtocolPayload } from 'threshold-elgamal';
 
 const textEncoder = new TextEncoder();
+const maxEncodedElementLength = 0xffff_ffff;
 
 const canonicalizeJson = (value: unknown): string => {
     if (
@@ -48,9 +49,13 @@ const concatBytes = (...arrays: readonly Uint8Array[]): Uint8Array => {
 };
 
 const encodeLength = (length: number): Uint8Array => {
-    if (!Number.isInteger(length) || length < 0) {
+    if (
+        !Number.isInteger(length) ||
+        length < 0 ||
+        length > maxEncodedElementLength
+    ) {
         throw new TypeError(
-            'Encoded element length must be a non-negative integer.',
+            'Encoded element length must fit in a 32-bit unsigned integer.',
         );
     }
 

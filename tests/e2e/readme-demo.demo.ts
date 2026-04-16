@@ -11,7 +11,7 @@ import {
 } from '@playwright/test';
 
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -502,6 +502,18 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
     const creator = await openProjectParticipant(browser, testInfo);
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
     let creatorHomeVisibleAtMs: number | null = null;
     let creatorPollAddressText: string | null = null;
     let creatorPollCreatedAtMs: number | null = null;
@@ -534,17 +546,19 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         },
     ];
 
-    attachErrorTracking(creator.page, 'creator', tracker);
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
+    creator.page = attachCreatorTracking(creator.page);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
 
     try {
         await Promise.all([
             (async () => {
-                creator.page = await gotoDemoPage({
-                    page: creator.page,
-                    url: demoHomeUrl,
-                });
+                creator.page = attachCreatorTracking(
+                    await gotoDemoPage({
+                        page: creator.page,
+                        url: demoHomeUrl,
+                    }),
+                );
             })(),
             gotoBlankDemoPage(participantOne.page),
             gotoBlankDemoPage(participantTwo.page),
@@ -561,7 +575,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
             skipInitialNavigation: true,
             startUrl: demoHomeUrl,
         });
-        creator.page = createdPollResult.page;
+        creator.page = attachCreatorTracking(createdPollResult.page);
         const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
         creatorPollAddressText = createDisplayedAddressText(
@@ -570,36 +584,46 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         creatorPollCreatedAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.pollCreated);
 
-        creator.page = await submitVoteWithDemoMotion({
-            page: creator.page,
-            scores: demoScorecards[0],
-            choices: demoChoiceNames,
-            voterName: creatorName,
-        });
+        creator.page = attachCreatorTracking(
+            await submitVoteWithDemoMotion({
+                page: creator.page,
+                scores: demoScorecards[0],
+                choices: demoChoiceNames,
+                voterName: creatorName,
+            }),
+        );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        participantOne.page = await submitVoteWithDemoMotion({
-            onPollPageReady: () => {
-                participantOneJoinedAtMs = getElapsedMs(recordingStartedAtMs);
-            },
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: demoScorecards[1],
-            choices: demoChoiceNames,
-            voterName: participantOneName,
-        });
+        participantOne.page = attachParticipantOneTracking(
+            await submitVoteWithDemoMotion({
+                onPollPageReady: () => {
+                    participantOneJoinedAtMs = getElapsedMs(
+                        recordingStartedAtMs,
+                    );
+                },
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: demoScorecards[1],
+                choices: demoChoiceNames,
+                voterName: participantOneName,
+            }),
+        );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        participantTwo.page = await submitVoteWithDemoMotion({
-            onPollPageReady: () => {
-                participantTwoJoinedAtMs = getElapsedMs(recordingStartedAtMs);
-            },
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: demoScorecards[2],
-            choices: demoChoiceNames,
-            voterName: participantTwoName,
-        });
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVoteWithDemoMotion({
+                onPollPageReady: () => {
+                    participantTwoJoinedAtMs = getElapsedMs(
+                        recordingStartedAtMs,
+                    );
+                },
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: demoScorecards[2],
+                choices: demoChoiceNames,
+                voterName: participantTwoName,
+            }),
+        );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
         await expectParticipantsVisible(creator.page, [

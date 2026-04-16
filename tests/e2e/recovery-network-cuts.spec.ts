@@ -83,14 +83,13 @@ test('retries poll creation safely after the initial response is lost', async ({
         );
     };
 
-    page.on('request', captureCreateRequest);
-
     let droppedCreate:
         | Awaited<ReturnType<typeof dropNextPostResponseAfterServerCommit>>
         | null = null;
 
     try {
         page = await gotoInteractablePage(page, '/');
+        page.on('request', captureCreateRequest);
         await page.getByLabel('Vote name').fill(pollName);
 
         for (const choice of ['Apples', 'Bananas']) {

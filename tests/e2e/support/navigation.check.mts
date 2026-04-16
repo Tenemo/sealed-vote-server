@@ -19,6 +19,10 @@ type PageDoubleState = {
     currentUrl: string;
     isInteractable: boolean;
     readyState: 'complete' | 'interactive' | 'loading';
+    viewportSize?: {
+        height: number;
+        width: number;
+    } | null;
 };
 type PageDouble = NavigationTarget & {
     close: () => Promise<void>;
@@ -51,6 +55,7 @@ const createPageDouble = (
         currentUrl: 'about:blank',
         isInteractable: true,
         readyState: 'complete',
+        viewportSize: null,
     },
     options: {
         createReplacement?: () => Promise<PageDouble> | PageDouble;
@@ -79,7 +84,11 @@ const createPageDouble = (
         evaluate: async <Result,>() => state.readyState as unknown as Result,
         isClosed: () => isClosed,
         reload: async () => undefined,
+        setViewportSize: async (viewportSize) => {
+            state.viewportSize = viewportSize;
+        },
         url: () => state.currentUrl,
+        viewportSize: () => state.viewportSize ?? null,
         waitForTimeout: async () => undefined,
         waitForURL: async (
             matcher: NavigationUrlMatcher,
@@ -194,6 +203,49 @@ test('gotoInteractablePage replaces the page after a transient Firefox navigatio
             waitUntil: 'commit',
         },
     ]);
+});
+
+test('gotoInteractablePage preserves the viewport on a replacement page', async () => {
+    const replacementState: PageDoubleState = {
+        currentUrl: 'about:blank',
+        isInteractable: true,
+        readyState: 'complete',
+        viewportSize: null,
+    };
+    const replacementPage = createPageDouble(replacementState);
+    const page = createPageDouble(
+        {
+            currentUrl: 'about:blank',
+            isInteractable: false,
+            readyState: 'loading',
+            viewportSize: {
+                height: 640,
+                width: 320,
+            },
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+
+    page.goto = async () => {
+        throw new Error('page.goto: Timeout 45000ms exceeded.');
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await gotoInteractablePage(page, '/');
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    }
+
+    assert.deepEqual(replacementState.viewportSize, {
+        height: 640,
+        width: 320,
+    });
 });
 
 test('gotoInteractablePage accepts a recovered target without a second navigate', async () => {

@@ -17,7 +17,7 @@ import {
     openProjectParticipant,
 } from './support/participants';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -49,13 +49,30 @@ test('counts every honest ballot when four participants complete the ceremony', 
         ],
     });
 
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
+    const attachParticipantThreeTracking = createErrorTrackingAttacher({
+        label: 'participant-three',
+        tracker,
+    });
+
+    page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Four participant ceremony', namespace),
     });
-    page = createdPollResult.page;
+    page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
@@ -63,34 +80,44 @@ test('counts every honest ballot when four participants complete the ceremony', 
     const participantTwo = await openProjectParticipant(browser, testInfo);
     const participantThree = await openProjectParticipant(browser, testInfo);
 
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
-    attachErrorTracking(participantThree.page, 'participant-three', tracker);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
+    participantThree.page = attachParticipantThreeTracking(
+        participantThree.page,
+    );
 
     try {
-        page = await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        participantOne.page = await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        participantTwo.page = await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
-        participantThree.page = await submitVote({
-            page: participantThree.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [10, 3],
-            voterName: participantThreeName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await submitVote({
+                page: participantThree.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [10, 3],
+                voterName: participantThreeName,
+            }),
+        );
 
         await expectParticipantsVisible(page, [
             creatorName,
