@@ -934,6 +934,55 @@ test('gotoInteractablePage appends page diagnostics when recovery is exhausted',
     }
 });
 
+test('gotoInteractablePage keeps the original failure when diagnostics cannot read the current url', async () => {
+    const page = createPageDouble({
+        currentUrl: 'https://sealed.vote/',
+        documentTitle: 'Sealed vote',
+        htmlContent:
+            '<main><h1>Vote name</h1><button>Create vote</button></main>',
+        isInteractable: false,
+        readyState: 'loading',
+    });
+    let urlReadCount = 0;
+
+    page.goto = async () => {
+        throw new Error('Synthetic navigation failure.');
+    };
+    page.url = () => {
+        urlReadCount += 1;
+
+        if (urlReadCount > 1) {
+            throw new Error('page.url failed unexpectedly.');
+        }
+
+        return 'https://sealed.vote/';
+    };
+
+    await assert.rejects(
+        async () =>
+            await gotoInteractablePage(
+                page,
+                'https://sealed.vote/votes/example--1234',
+            ),
+        (error) => {
+            assert.ok(error instanceof Error);
+            assert.match(error.message, /Synthetic navigation failure\./u);
+            assert.doesNotMatch(
+                error.message,
+                /page\.url failed unexpectedly\./u,
+            );
+            assert.match(error.message, /navigation diagnostics:/u);
+            assert.match(error.message, /currentUrl=<empty>/u);
+            assert.match(
+                error.message,
+                /expectedUrl=https:\/\/sealed\.vote\/votes\/example--1234/u,
+            );
+
+            return true;
+        },
+    );
+});
+
 test('reloadInteractablePage uses the same navigation policy', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble({

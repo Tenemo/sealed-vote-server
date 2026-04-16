@@ -349,6 +349,14 @@ const getNavigationTargetContentSnippet = async (
     }
 };
 
+const getNavigationTargetUrl = (page: NavigationTarget): string => {
+    try {
+        return page.url();
+    } catch {
+        return '';
+    }
+};
+
 const formatNavigationFailureDiagnostics = async ({
     expectedUrl,
     navigationTimeoutMs,
@@ -358,7 +366,7 @@ const formatNavigationFailureDiagnostics = async ({
     navigationTimeoutMs: number;
     page: NavigationTarget;
 }): Promise<string> => {
-    const currentUrl = page.url();
+    const currentUrl = getNavigationTargetUrl(page);
     const readyState = await getNavigationTargetReadyState(page);
     const title = await getNavigationTargetTitle(page);
     const contentSnippet = await getNavigationTargetContentSnippet(page);
