@@ -126,7 +126,7 @@ test('gotoInteractablePage waits for commit with a short timeout', async () => {
         calls.push(options as NavigationOptions);
     };
 
-    await gotoInteractablePage(page, 'https://sealed.vote/votes/example--1234');
+    await gotoInteractablePage(page, '/');
 
     assert.deepEqual(calls, [
         {
@@ -148,10 +148,7 @@ test('gotoInteractablePage allows an explicit navigation-timeout override', asyn
     process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '45000';
 
     try {
-        await gotoInteractablePage(
-            page,
-            'https://sealed.vote/votes/example--1234',
-        );
+        await gotoInteractablePage(page, '/');
     } finally {
         if (previousTimeout === undefined) {
             delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
@@ -168,6 +165,37 @@ test('gotoInteractablePage allows an explicit navigation-timeout override', asyn
     ]);
 });
 
+test('gotoInteractablePage bootstraps a blank page before deep-link navigation', async () => {
+    const urls: string[] = [];
+    const optionsCalls: NavigationOptions[] = [];
+    const page = createPageDouble();
+
+    page.goto = async (url: string, options?: NavigationOptions) => {
+        urls.push(url);
+        optionsCalls.push(options as NavigationOptions);
+    };
+
+    await gotoInteractablePage(
+        page,
+        'https://sealed.vote/votes/example--1234',
+    );
+
+    assert.deepEqual(urls, [
+        'https://sealed.vote/',
+        'https://sealed.vote/votes/example--1234',
+    ]);
+    assert.deepEqual(optionsCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
 test('gotoInteractablePage replaces the page after a transient Firefox navigation error', async () => {
     const originalGotoCalls: NavigationOptions[] = [];
     const replacementGotoCalls: NavigationOptions[] = [];
@@ -179,7 +207,7 @@ test('gotoInteractablePage replaces the page after a transient Firefox navigatio
 
     const page = createPageDouble(
         {
-            currentUrl: 'about:blank',
+            currentUrl: 'https://sealed.vote/',
             isInteractable: false,
             readyState: 'loading',
         },
@@ -262,7 +290,7 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
     const retryDelays: number[] = [];
     const recoveryWaits: NavigationOptions[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'about:blank',
+        currentUrl: 'https://sealed.vote/',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -401,7 +429,7 @@ test('gotoInteractablePage replaces a blank off-target stall without waiting for
     const replacementGotoCalls: NavigationOptions[] = [];
     const replacementPage = createPageDouble();
     const pageState: PageDoubleState = {
-        currentUrl: 'about:blank',
+        currentUrl: 'https://sealed.vote/',
         htmlContent: blankPlaceholderHtml,
         isInteractable: false,
         readyState: 'complete',
@@ -530,7 +558,7 @@ test('gotoInteractablePage does not retry non-transient navigation errors', asyn
 test('gotoInteractablePage accepts a page that already loaded after the timeout', async () => {
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'about:blank',
+        currentUrl: 'https://sealed.vote/',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -590,7 +618,7 @@ test('gotoInteractablePage accepts a page that becomes ready after the recovery 
     const retryDelays: number[] = [];
     const recoveryWaits: NavigationOptions[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'about:blank',
+        currentUrl: 'https://sealed.vote/',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -680,7 +708,7 @@ test('gotoInteractablePage accepts a replacement page that becomes ready after t
     const replacementPage = createPageDouble(replacementState);
     const page = createPageDouble(
         {
-            currentUrl: 'about:blank',
+            currentUrl: 'https://sealed.vote/',
             isInteractable: false,
             readyState: 'loading',
         },
@@ -767,7 +795,7 @@ test('gotoInteractablePage accepts a replacement page that becomes ready after t
 test('gotoInteractablePage recovers when page.goto never returns but the page finishes loading', async () => {
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'about:blank',
+        currentUrl: 'https://sealed.vote/',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -831,7 +859,7 @@ test('gotoInteractablePage appends page diagnostics when recovery is exhausted',
     const replacementPage = createPageDouble(replacementState);
     const page = createPageDouble(
         {
-            currentUrl: 'about:blank',
+            currentUrl: 'https://sealed.vote/',
             isInteractable: false,
             readyState: 'loading',
         },

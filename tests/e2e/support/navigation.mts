@@ -158,6 +158,50 @@ const normalizeNavigationHtml = (value: string): string =>
         .replaceAll(/\s+/gu, '')
         .toLowerCase();
 
+const isBlankNavigationStartUrl = (value: string): boolean =>
+    !value || value === 'about:blank';
+
+const resolveNavigationBootstrapUrl = ({
+    currentUrl,
+    targetUrl,
+}: {
+    currentUrl: string;
+    targetUrl: string;
+}): string | null => {
+    if (!isBlankNavigationStartUrl(currentUrl)) {
+        return null;
+    }
+
+    const parsedAbsoluteTargetUrl = tryParseUrl(targetUrl);
+
+    if (parsedAbsoluteTargetUrl) {
+        if (
+            parsedAbsoluteTargetUrl.protocol !== 'http:' &&
+            parsedAbsoluteTargetUrl.protocol !== 'https:'
+        ) {
+            return null;
+        }
+
+        if (
+            parsedAbsoluteTargetUrl.pathname === '/' &&
+            !parsedAbsoluteTargetUrl.search &&
+            !parsedAbsoluteTargetUrl.hash
+        ) {
+            return null;
+        }
+
+        return `${parsedAbsoluteTargetUrl.origin}/`;
+    }
+
+    const parsedRelativeTargetUrl = tryParseUrl(targetUrl, relativeUrlBase);
+
+    if (!parsedRelativeTargetUrl) {
+        return null;
+    }
+
+    return targetUrl === '/' ? null : '/';
+};
+
 const hasMeaningfulNavigationDocument = async (
     page: NavigationTarget,
 ): Promise<boolean | null> => {
@@ -650,6 +694,17 @@ export const gotoInteractablePage = async <T extends NavigationTarget>(
     url: string,
 ): Promise<T> => {
     const navigationTimeoutMs = resolveNavigationTimeoutMs();
+    const bootstrapUrl = resolveNavigationBootstrapUrl({
+        currentUrl: page.url(),
+        targetUrl: url,
+    });
+
+    // Mobile Firefox production artifacts showed deep links timing out when a
+    // fresh participant page jumped straight from about:blank to the vote URL,
+    // while pages that first established the origin on "/" stayed stable.
+    if (bootstrapUrl) {
+        page = await gotoInteractablePage(page, bootstrapUrl);
+    }
 
     try {
         return await navigateOnTarget(
