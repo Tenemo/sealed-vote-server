@@ -11,13 +11,18 @@ type NavigationGotoOptions = {
 };
 
 type NavigationReloadOptions = Omit<NavigationGotoOptions, 'referer'>;
+type NavigationWaitForUrlOptions = Omit<NavigationGotoOptions, 'referer'>;
+type NavigationUrlMatcher = string | RegExp | ((url: URL) => boolean);
 
 export type NavigationTarget = {
     goto: (url: string, options?: NavigationGotoOptions) => Promise<unknown>;
     reload: (options?: NavigationReloadOptions) => Promise<unknown>;
     url: () => string;
-    evaluate: <T>(pageFunction: () => T) => Promise<T>;
     waitForTimeout: (timeout: number) => Promise<void>;
+    waitForURL: (
+        url: NavigationUrlMatcher,
+        options?: NavigationWaitForUrlOptions,
+    ) => Promise<unknown>;
 };
 
 // Production artifacts showed pages rendering successfully while Playwright was
@@ -25,6 +30,7 @@ export type NavigationTarget = {
 // the first committed response, then let each caller wait for the specific UI it
 // needs before interacting.
 const navigationReadyState = 'commit' as const;
+const recoveryReadyState = 'domcontentloaded' as const;
 const defaultNavigationTimeoutMs = 15_000;
 const navigationRetryDelayMs = 1_000;
 const transientNavigationErrorPatterns = [
@@ -35,7 +41,6 @@ const transientNavigationErrorPatterns = [
 ] as const;
 const transientNavigationTimeoutPattern = /Timeout \d+ms exceeded/u;
 const relativeUrlBase = 'https://playwright-navigation-check.invalid';
-const interactableReadyStates = new Set(['interactive', 'complete']);
 
 export const resolveNavigationTimeoutMs = (
     rawTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS,
@@ -98,6 +103,11 @@ const formatComparableAbsoluteUrl = (url: URL): string =>
 const formatComparableRelativeUrl = (url: URL): string =>
     `${url.pathname}${url.search}${url.hash}`;
 
+const resolveNavigationRecoveryTimeoutMs = (
+    navigationTimeoutMs: number,
+): number =>
+    Math.min(10_000, Math.max(2_000, Math.floor(navigationTimeoutMs / 4)));
+
 const doesPageMatchTargetUrl = (
     currentPageUrl: string,
     targetUrl: string,
@@ -129,36 +139,52 @@ const doesPageMatchTargetUrl = (
     );
 };
 
-const isInteractableDocumentReady = async (
-    page: NavigationTarget,
-): Promise<boolean> => {
-    try {
-        const readyState = await page.evaluate(() => document.readyState);
-
-        return interactableReadyStates.has(readyState);
-    } catch {
+const isTransientRecoveryProbeError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) {
         return false;
     }
+
+    return (
+        transientNavigationTimeoutPattern.test(error.message) ||
+        transientNavigationErrorPatterns.some((pattern) =>
+            pattern.test(error.message),
+        )
+    );
 };
 
-const didNavigationReachInteractableTarget = async ({
+const waitForRecoveredTarget = async ({
     expectedUrl,
+    navigationTimeoutMs,
     page,
 }: {
     expectedUrl: string;
+    navigationTimeoutMs: number;
     page: NavigationTarget;
 }): Promise<boolean> => {
-    const currentPageUrl = page.url();
+    try {
+        await page.waitForURL(
+            (url) => doesPageMatchTargetUrl(url.toString(), expectedUrl),
+            {
+                timeout: resolveNavigationRecoveryTimeoutMs(
+                    navigationTimeoutMs,
+                ),
+                waitUntil: recoveryReadyState,
+            },
+        );
 
-    if (!doesPageMatchTargetUrl(currentPageUrl, expectedUrl)) {
+        return true;
+    } catch (error) {
+        if (!isTransientRecoveryProbeError(error)) {
+            throw error;
+        }
+
         return false;
     }
-
-    return isInteractableDocumentReady(page);
 };
 
 const retryTransientNavigation = async (
     navigate: () => Promise<void>,
+    navigationTimeoutMs: number,
     page: NavigationTarget,
     expectedUrl: string,
 ): Promise<void> => {
@@ -176,8 +202,9 @@ const retryTransientNavigation = async (
             await page.waitForTimeout(navigationRetryDelayMs);
 
             if (
-                await didNavigationReachInteractableTarget({
+                await waitForRecoveredTarget({
                     expectedUrl,
+                    navigationTimeoutMs,
                     page,
                 })
             ) {
@@ -206,6 +233,7 @@ export const gotoInteractablePage = async (
                 waitUntil: navigationReadyState,
             });
         },
+        navigationTimeoutMs,
         page,
         url,
     );
@@ -224,6 +252,7 @@ export const reloadInteractablePage = async (
                 waitUntil: navigationReadyState,
             });
         },
+        navigationTimeoutMs,
         page,
         currentPageUrl,
     );
