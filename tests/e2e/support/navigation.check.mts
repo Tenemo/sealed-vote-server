@@ -395,6 +395,82 @@ test('gotoInteractablePage replaces the page after a transient timeout stall whe
     ]);
 });
 
+test('gotoInteractablePage replaces a blank off-target stall without waiting for recovery probes', async () => {
+    const recoveryWaits: NavigationOptions[] = [];
+    const retryDelays: number[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
+    const replacementPage = createPageDouble();
+    const pageState: PageDoubleState = {
+        currentUrl: 'about:blank',
+        htmlContent: blankPlaceholderHtml,
+        isInteractable: false,
+        readyState: 'complete',
+    };
+    const page = createPageDouble(pageState, {
+        createReplacement: () => replacementPage,
+    });
+    const previousNavigationTimeout =
+        process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+
+    page.goto = async () => {
+        throw new Error('page.goto: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    page.waitForURL = async (
+        _matcher: NavigationUrlMatcher,
+        options?: NavigationOptions,
+    ) => {
+        recoveryWaits.push(options as NavigationOptions);
+        throw createWaitForUrlTimeoutError(options?.timeout ?? 0);
+    };
+    replacementPage.goto = async (
+        _url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoCalls.push(options as NavigationOptions);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '45000';
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await gotoInteractablePage(
+            page,
+            'https://sealed.vote/votes/example--1234',
+        );
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        if (previousNavigationTimeout === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS =
+                previousNavigationTimeout;
+        }
+
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(recoveryWaits, []);
+    assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 45_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
 test('gotoInteractablePage replaces the page when a transient abort lands on the wrong page', async () => {
     const replacementGotoCalls: NavigationOptions[] = [];
     const retryDelays: number[] = [];

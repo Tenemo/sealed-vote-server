@@ -414,6 +414,38 @@ const isRecoveredTargetReady = async ({
     return Boolean(title && !isLoadingNavigationTitle(title));
 };
 
+const isBlankOffTargetNavigationStall = async ({
+    expectedUrl,
+    page,
+}: {
+    expectedUrl: string;
+    page: NavigationTarget;
+}): Promise<boolean> => {
+    if (doesPageMatchTargetUrl(page.url(), expectedUrl)) {
+        return false;
+    }
+
+    const readyState = await getNavigationTargetReadyState(page);
+
+    if (readyState !== 'interactive' && readyState !== 'complete') {
+        return false;
+    }
+
+    const hasMeaningfulDocument = await hasMeaningfulNavigationDocument(page);
+
+    if (hasMeaningfulDocument === true) {
+        return false;
+    }
+
+    if (hasMeaningfulDocument === false) {
+        return true;
+    }
+
+    const title = await getNavigationTargetTitle(page);
+
+    return !title || isLoadingNavigationTitle(title);
+};
+
 const waitForRecoveredTarget = async ({
     expectedUrl,
     navigationTimeoutMs,
@@ -558,6 +590,15 @@ const navigateOnTarget = async <T extends NavigationTarget>(
         }
 
         if (
+            await isBlankOffTargetNavigationStall({
+                expectedUrl,
+                page,
+            })
+        ) {
+            throw error;
+        }
+
+        if (
             await waitForRecoveredTarget({
                 expectedUrl,
                 navigationTimeoutMs,
@@ -574,6 +615,15 @@ const navigateOnTarget = async <T extends NavigationTarget>(
             })
         ) {
             return page;
+        }
+
+        if (
+            await isBlankOffTargetNavigationStall({
+                expectedUrl,
+                page,
+            })
+        ) {
+            throw error;
         }
 
         if (
