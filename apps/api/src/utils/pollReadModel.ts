@@ -31,7 +31,7 @@ import {
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 type PollRow = Pick<
     typeof polls.$inferSelect,
-    'createdAt' | 'id' | 'isOpen' | 'pollName' | 'slug'
+    'createdAt' | 'id' | 'isOpen' | 'pollName' | 'protocolVersion' | 'slug'
 >;
 
 const validationTarget = 15;
@@ -635,6 +635,7 @@ const getPollRow = async (
             id: true,
             isOpen: true,
             pollName: true,
+            protocolVersion: true,
             slug: true,
         },
         with: {
@@ -694,6 +695,7 @@ export const getPollFetchReadModel = async (
         persistedSessions: poll.pollCeremonySessions,
         pollCreatedAt: poll.createdAt,
         pollId: poll.id,
+        protocolVersion: poll.protocolVersion,
     });
     const activeParticipantCount = ceremonySession.activeParticipantCount;
     const participantDeviceReadinessByIndex = new Map(

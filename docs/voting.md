@@ -22,7 +22,7 @@ The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
 2. Each participant opens the link, scores every option from `1` to `10`, and submits one final vote.
 3. The browser stores those plaintext scores locally on-device and registers the participant with the backend for the later ceremony.
 4. The organizer closes voting once at least three submitted participants exist. That freezes the roster.
-5. After close, the app automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
+5. After close, the app derives a frozen manifest `{ rosterHash, optionList, scoreRange }`, where `scoreRange` is fixed to `{ min: 1, max: 10 }` in this product, then automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
 6. Once every submitted participant has a complete encrypted ballot, the creator browser automatically publishes one `ballot-close` payload.
 7. Decryption shares and tally publications arrive asynchronously after the counted ballot set is frozen.
 8. Every client replays the ceremony from the board log and shows verified arithmetic means.
@@ -30,6 +30,7 @@ The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
 ## Integrity and liveness
 
 - Every board submission is tied to a `voterToken`, and the payload `participantIndex` must match the authenticated voter.
+- Every signed board payload includes `protocolVersion: 'v1'`, and the backend rejects payloads that omit it or mismatch the poll's stored protocol version.
 - Exact retransmissions are idempotent when the unsigned canonical payload bytes match.
 - Slot conflicts are treated as equivocation and remain visible in the board audit.
 - The cryptographic threshold is honest-majority only and is derived from the frozen roster with `majorityThreshold`.

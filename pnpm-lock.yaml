@@ -22,8 +22,8 @@ catalogs:
       specifier: ^6.1.3
       version: 6.1.3
     threshold-elgamal:
-      specifier: 1.0.1
-      version: 1.0.1
+      specifier: 2.0.0
+      version: 2.0.0
     typescript:
       specifier: ^6.0.2
       version: 6.0.2
@@ -149,7 +149,7 @@ importers:
         version: 13.1.3
       threshold-elgamal:
         specifier: 'catalog:'
-        version: 1.0.1
+        version: 2.0.0
     devDependencies:
       '@sealed-vote/testkit':
         specifier: workspace:*
@@ -189,7 +189,7 @@ importers:
         version: 8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.0.1))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
+        version: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.2.0))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
 
   apps/web:
     dependencies:
@@ -252,7 +252,7 @@ importers:
         version: 4.2.2
       threshold-elgamal:
         specifier: 'catalog:'
-        version: 1.0.1
+        version: 2.0.0
       tslib:
         specifier: ^2.8.1
         version: 2.8.1
@@ -292,7 +292,7 @@ importers:
         version: 4.1.4(vitest@4.1.4)
       jsdom:
         specifier: ^29.0.2
-        version: 29.0.2(@noble/hashes@2.0.1)
+        version: 29.0.2(@noble/hashes@2.2.0)
       rimraf:
         specifier: 'catalog:'
         version: 6.1.3
@@ -310,13 +310,13 @@ importers:
         version: 8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.0.1))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
+        version: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.2.0))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
 
   packages/contracts:
     dependencies:
       threshold-elgamal:
         specifier: 'catalog:'
-        version: 1.0.1
+        version: 2.0.0
     devDependencies:
       rimraf:
         specifier: 'catalog:'
@@ -338,7 +338,7 @@ importers:
         version: 10.6.0
       threshold-elgamal:
         specifier: 'catalog:'
-        version: 1.0.1
+        version: 2.0.0
     devDependencies:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -354,7 +354,7 @@ importers:
         version: 8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0)
       vitest:
         specifier: 'catalog:'
-        version: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.0.1))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
+        version: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.2.0))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
 
   packages/testkit:
     dependencies:
@@ -366,7 +366,7 @@ importers:
         version: link:../protocol
       threshold-elgamal:
         specifier: 'catalog:'
-        version: 1.0.1
+        version: 2.0.0
     devDependencies:
       fastify:
         specifier: ^5.8.4
@@ -1188,12 +1188,12 @@ packages:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
 
-  '@noble/curves@2.0.1':
-    resolution: {integrity: sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw==}
+  '@noble/curves@2.2.0':
+    resolution: {integrity: sha512-T/BoHgFXirb0ENSPBquzX0rcjXeM6Lo892a2jlYJkqk83LqZx0l1Of7DzlKJ6jkpvMrkHSnAcgb5JegL8SeIkQ==}
     engines: {node: '>= 20.19.0'}
 
-  '@noble/hashes@2.0.1':
-    resolution: {integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==}
+  '@noble/hashes@2.2.0':
+    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
 
   '@nodelib/fs.scandir@2.1.5':
@@ -4902,8 +4902,8 @@ packages:
     resolution: {integrity: sha512-4iMVL6HAINXWf1ZKZjIPcz5wYaOdPhtO8ATvZ+Xqp3BTdaqtAwQkNmKORqcIo5YkQqGXq5cwfswDwMqqQNrpJA==}
     engines: {node: '>=20'}
 
-  threshold-elgamal@1.0.1:
-    resolution: {integrity: sha512-3B1OaupF33ANMfaVGS9TznqnIE+yU+s+QMNf6RInCQ9S8QAD0HRH3rGbI8N+DOZJDlUJh+31sMF2OdLPKOrTCw==}
+  threshold-elgamal@2.0.0:
+    resolution: {integrity: sha512-BZ8Dt3EDNndVr7I/AmN10rxc1H8JcNoYNJjnMIS4YWAouLE97PClKqScp0Y1bojDq1Bl6seyKZbM2m66Izgykw==}
     engines: {node: '>=24.14.1'}
 
   tinybench@2.9.0:
@@ -5754,9 +5754,9 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exodus/bytes@1.15.0(@noble/hashes@2.0.1)':
+  '@exodus/bytes@1.15.0(@noble/hashes@2.2.0)':
     optionalDependencies:
-      '@noble/hashes': 2.0.1
+      '@noble/hashes': 2.2.0
 
   '@fastify/ajv-compiler@4.0.5':
     dependencies:
@@ -5898,11 +5898,11 @@ snapshots:
       '@tybys/wasm-util': 0.10.1
     optional: true
 
-  '@noble/curves@2.0.1':
+  '@noble/curves@2.2.0':
     dependencies:
-      '@noble/hashes': 2.0.1
+      '@noble/hashes': 2.2.0
 
-  '@noble/hashes@2.0.1': {}
+  '@noble/hashes@2.2.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -7226,7 +7226,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.0.1))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
+      vitest: 4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.2.0))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
 
   '@vitest/expect@4.1.4':
     dependencies:
@@ -7573,10 +7573,10 @@ snapshots:
 
   damerau-levenshtein@1.0.8: {}
 
-  data-urls@7.0.0(@noble/hashes@2.0.1):
+  data-urls@7.0.0(@noble/hashes@2.2.0):
     dependencies:
       whatwg-mimetype: 5.0.0
-      whatwg-url: 16.0.1(@noble/hashes@2.0.1)
+      whatwg-url: 16.0.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -8388,9 +8388,9 @@ snapshots:
 
   hookified@2.1.1: {}
 
-  html-encoding-sniffer@6.0.0(@noble/hashes@2.0.1):
+  html-encoding-sniffer@6.0.0(@noble/hashes@2.2.0):
     dependencies:
-      '@exodus/bytes': 1.15.0(@noble/hashes@2.0.1)
+      '@exodus/bytes': 1.15.0(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -8615,17 +8615,17 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  jsdom@29.0.2(@noble/hashes@2.0.1):
+  jsdom@29.0.2(@noble/hashes@2.2.0):
     dependencies:
       '@asamuzakjp/css-color': 5.1.8
       '@asamuzakjp/dom-selector': 7.0.8
       '@bramus/specificity': 2.4.2
       '@csstools/css-syntax-patches-for-csstree': 1.1.2(css-tree@3.2.1)
-      '@exodus/bytes': 1.15.0(@noble/hashes@2.0.1)
+      '@exodus/bytes': 1.15.0(@noble/hashes@2.2.0)
       css-tree: 3.2.1
-      data-urls: 7.0.0(@noble/hashes@2.0.1)
+      data-urls: 7.0.0(@noble/hashes@2.2.0)
       decimal.js: 10.6.0
-      html-encoding-sniffer: 6.0.0(@noble/hashes@2.0.1)
+      html-encoding-sniffer: 6.0.0(@noble/hashes@2.2.0)
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.3.3
       parse5: 8.0.0
@@ -8636,7 +8636,7 @@ snapshots:
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
-      whatwg-url: 16.0.1(@noble/hashes@2.0.1)
+      whatwg-url: 16.0.1(@noble/hashes@2.2.0)
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - '@noble/hashes'
@@ -9764,10 +9764,10 @@ snapshots:
     dependencies:
       real-require: 0.2.0
 
-  threshold-elgamal@1.0.1:
+  threshold-elgamal@2.0.0:
     dependencies:
-      '@noble/curves': 2.0.1
-      '@noble/hashes': 2.0.1
+      '@noble/curves': 2.2.0
+      '@noble/hashes': 2.2.0
 
   tinybench@2.9.0: {}
 
@@ -9991,7 +9991,7 @@ snapshots:
       sugarss: 5.0.1(postcss@8.5.9)
       tsx: 4.21.0
 
-  vitest@4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.0.1))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0)):
+  vitest@4.1.4(@types/node@25.5.2)(@vitest/coverage-v8@4.1.4)(jsdom@29.0.2(@noble/hashes@2.2.0))(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0)):
     dependencies:
       '@vitest/expect': 4.1.4
       '@vitest/mocker': 4.1.4(msw@2.13.0(@types/node@25.5.2)(typescript@6.0.2))(vite@8.0.8(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(sass@1.99.0)(sugarss@5.0.1(postcss@8.5.9))(tsx@4.21.0))
@@ -10016,7 +10016,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.5.2
       '@vitest/coverage-v8': 4.1.4(vitest@4.1.4)
-      jsdom: 29.0.2(@noble/hashes@2.0.1)
+      jsdom: 29.0.2(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
 
@@ -10028,9 +10028,9 @@ snapshots:
 
   whatwg-mimetype@5.0.0: {}
 
-  whatwg-url@16.0.1(@noble/hashes@2.0.1):
+  whatwg-url@16.0.1(@noble/hashes@2.2.0):
     dependencies:
-      '@exodus/bytes': 1.15.0(@noble/hashes@2.0.1)
+      '@exodus/bytes': 1.15.0(@noble/hashes@2.2.0)
       tr46: 6.0.0
       webidl-conversions: 8.0.1
     transitivePeerDependencies:

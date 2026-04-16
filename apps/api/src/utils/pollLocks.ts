@@ -5,9 +5,10 @@ import { polls } from '../db/schema.js';
 
 type LockedPoll = {
     createdAt: Date;
+    creatorTokenHash: string;
     id: string;
     isOpen: boolean;
-    creatorTokenHash: string;
+    protocolVersion: string;
 };
 
 export const lockPollById = async (
@@ -17,9 +18,10 @@ export const lockPollById = async (
     const [poll] = await tx
         .select({
             createdAt: polls.createdAt,
+            creatorTokenHash: polls.creatorTokenHash,
             id: polls.id,
             isOpen: polls.isOpen,
-            creatorTokenHash: polls.creatorTokenHash,
+            protocolVersion: polls.protocolVersion,
         })
         .from(polls)
         .where(eq(polls.id, pollId))

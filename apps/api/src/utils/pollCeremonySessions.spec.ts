@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fixedScoreRange } from '@sealed-vote/contracts';
 
 import { serializeParticipantDeviceRecord } from './participantDevices.js';
 import {
@@ -79,6 +80,7 @@ describe('pollCeremonySessions', () => {
             persistedSessions,
             pollCreatedAt: new Date('2026-04-09T10:00:00.000Z'),
             pollId: 'poll-1',
+            protocolVersion: 'v1',
         });
         const closedSession = await derivePollCeremonySession({
             choices: ['Apples', 'Bananas'],
@@ -87,6 +89,7 @@ describe('pollCeremonySessions', () => {
             persistedSessions,
             pollCreatedAt: new Date('2026-04-09T10:00:00.000Z'),
             pollId: 'poll-1',
+            protocolVersion: 'v1',
         });
 
         expect(openSession.activeParticipantIndices).toEqual([1, 2, 3]);
@@ -114,6 +117,7 @@ describe('pollCeremonySessions', () => {
             },
         ]);
         expect(closedSession.manifest).not.toBeNull();
+        expect(closedSession.manifest?.scoreRange).toEqual(fixedScoreRange);
         expect(closedSession.manifestHash).toMatch(/^[a-f0-9]{64}$/i);
         expect(closedSession.rosterHash).toMatch(/^[a-f0-9]{64}$/i);
         expect(closedSession.sessionId).toMatch(/^[a-f0-9]{64}$/i);
@@ -142,6 +146,7 @@ describe('pollCeremonySessions', () => {
             persistedSessions: [],
             pollCreatedAt: new Date('2026-04-09T10:00:00.000Z'),
             pollId: 'poll-1',
+            protocolVersion: 'v1',
         });
 
         expect(session.activeParticipantIndices).toEqual([1, 2]);
@@ -177,6 +182,7 @@ describe('pollCeremonySessions', () => {
             ],
             pollCreatedAt: new Date('2026-04-09T10:00:00.000Z'),
             pollId: 'poll-1',
+            protocolVersion: 'v1',
         });
 
         expect(

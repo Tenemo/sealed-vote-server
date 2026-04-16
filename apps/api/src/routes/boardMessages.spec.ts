@@ -104,6 +104,7 @@ const createSignedRegistrationPayload = async ({
         sessionId,
         manifestHash,
         participantIndex,
+        protocolVersion: 'v1',
         rosterHash,
         authPublicKey: await exportAuthPublicKey(authKeyPair.publicKey),
         transportPublicKey: await exportTransportPublicKey(
@@ -339,6 +340,7 @@ describe('Board messages endpoint', () => {
                             phase: 0,
                             participantIndex: participant.voterIndex,
                             messageType: 'registration',
+                            protocolVersion: 'v1',
                             rosterHash: fixedRosterHash,
                             transportPublicKey: 'deadbeef',
                         },
@@ -423,6 +425,7 @@ describe('Board messages endpoint', () => {
                     manifest: pollBeforeManifest.manifest,
                     manifestHash: pollBeforeManifest.manifestHash,
                     participantIndex: creatorParticipant.voterIndex,
+                    protocolVersion: 'v1',
                     sessionId: pollBeforeManifest.sessionId,
                 },
             );

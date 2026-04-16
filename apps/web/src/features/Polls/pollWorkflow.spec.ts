@@ -1,4 +1,4 @@
-import type { PollResponse } from '@sealed-vote/contracts';
+import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 
 import { derivePollWorkflow } from './pollWorkflow';
 
@@ -62,6 +62,7 @@ const createClosedPoll = (
         manifest: {
             optionList: ['Apples', 'Bananas'],
             rosterHash: 'a'.repeat(64),
+            scoreRange: fixedScoreRange,
         },
         manifestHash: 'b'.repeat(64),
         phase: 'securing',

@@ -1,12 +1,13 @@
 import {
+    fixedScoreRange,
     ERROR_MESSAGES,
     type BoardMessageRecord as BoardMessageRecordContract,
     type BoardMessageRequest as BoardMessageRequestContract,
     type BoardMessagesResponse as BoardMessagesResponseContract,
 } from '@sealed-vote/contracts';
 import {
-    canonicalUnsignedPayloadBytes,
     isProtocolMessageType,
+    signedProtocolPayloadBytes,
 } from '@sealed-vote/protocol';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -110,6 +111,8 @@ const validateBoardPayloadShape = (
     const { payload } = signedPayload;
 
     if (
+        typeof payload.protocolVersion !== 'string' ||
+        payload.protocolVersion.length === 0 ||
         !isHex64(payload.sessionId) ||
         !isHex64(payload.manifestHash) ||
         !Number.isInteger(payload.phase) ||
@@ -192,16 +195,19 @@ const filterAcceptedPayloadsBySession = ({
 
 const assertPayloadMatchesActiveCeremonySession = ({
     manifestHash,
+    protocolVersion,
     rosterHash,
     sessionId,
     signedPayload,
 }: {
     manifestHash: string;
+    protocolVersion: string;
     rosterHash: string;
     sessionId: string;
     signedPayload: SignedPayload;
 }): void => {
     if (
+        signedPayload.payload.protocolVersion !== protocolVersion ||
         signedPayload.payload.sessionId !== sessionId ||
         signedPayload.payload.manifestHash !== manifestHash ||
         (isRegistrationPayload(signedPayload) &&
@@ -220,7 +226,7 @@ const verifyPayloadSignature = async ({
 }): Promise<void> => {
     const publicKey = await importAuthPublicKey(authPublicKey);
     const verified = await verifyAuthSignature({
-        payloadBytes: canonicalUnsignedPayloadBytes(signedPayload.payload),
+        payloadBytes: signedProtocolPayloadBytes(signedPayload.payload),
         publicKey,
         signature: signedPayload.signature,
     });
@@ -358,6 +364,16 @@ const verifyManifestPublicationPayload = async ({
         throw createError(
             400,
             'Manifest option list does not match the poll choices.',
+        );
+    }
+
+    if (
+        manifest.scoreRange.min !== fixedScoreRange.min ||
+        manifest.scoreRange.max !== fixedScoreRange.max
+    ) {
+        throw createError(
+            400,
+            'Manifest score range does not match the sealed.vote fixed score range.',
         );
     }
 };
@@ -561,6 +577,7 @@ export const boardMessageRoutes = async (
                     persistedSessions: pollCeremonySessions,
                     pollCreatedAt: poll.createdAt,
                     pollId: poll.id,
+                    protocolVersion: poll.protocolVersion,
                 });
                 const authenticatedCeremonyParticipant =
                     ceremonySession.activeParticipants.find(
@@ -599,6 +616,7 @@ export const boardMessageRoutes = async (
 
                 assertPayloadMatchesActiveCeremonySession({
                     manifestHash: ceremonySession.manifestHash,
+                    protocolVersion: poll.protocolVersion,
                     rosterHash: ceremonySession.manifest.rosterHash,
                     sessionId: ceremonySession.sessionId,
                     signedPayload,

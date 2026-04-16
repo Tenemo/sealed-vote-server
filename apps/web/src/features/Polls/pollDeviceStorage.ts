@@ -1,3 +1,4 @@
+import { fixedScoreRange } from '@sealed-vote/contracts';
 import {
     exportAuthPublicKey,
     exportTransportPublicKey,
@@ -37,7 +38,7 @@ type PendingPollDeviceState = Pick<
 
 type StoredPollDeviceStates = Record<string, StoredPollDeviceState>;
 
-const storageKey = 'sealed-vote.poll-device-state.v2';
+const storageKey = 'sealed-vote.poll-device-state.v3';
 
 const canUseLocalStorage = (): boolean => {
     if (typeof window === 'undefined') {
@@ -94,8 +95,8 @@ const isStoredBallotScores = (value: unknown): value is number[] | null =>
             (score) =>
                 typeof score === 'number' &&
                 Number.isInteger(score) &&
-                score >= 1 &&
-                score <= 10,
+                score >= fixedScoreRange.min &&
+                score <= fixedScoreRange.max,
         ));
 
 const isStoredPollDeviceState = (

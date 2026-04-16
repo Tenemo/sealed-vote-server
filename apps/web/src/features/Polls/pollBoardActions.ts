@@ -1,4 +1,4 @@
-import type { PollResponse } from '@sealed-vote/contracts';
+import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 import {
     combineDecryptionShares,
     createBallotClosePayload,
@@ -29,8 +29,9 @@ import {
     hashProtocolTranscript,
     majorityThreshold,
     modQ,
+    prepareAggregateForDecryption,
     RISTRETTO_GROUP,
-    scoreVotingDomain,
+    scoreRangeDomain,
     SHIPPED_PROTOCOL_VERSION,
     verifyBallotSubmissionPayloadsByOption,
     verifyDKGTranscript,
@@ -740,6 +741,32 @@ const deriveLocalAcceptedShareContributions = async ({
     return contributions;
 };
 
+const prepareAggregateForReveal = ({
+    aggregate,
+    jointPublicKey,
+    manifestHash,
+    optionIndex,
+    sessionId,
+}: {
+    aggregate: Awaited<
+        ReturnType<typeof verifyBallotSubmissionPayloadsByOption>
+    >[number]['aggregate'];
+    jointPublicKey: EncodedPoint;
+    manifestHash: string;
+    optionIndex: number;
+    sessionId: string;
+}): Awaited<
+    ReturnType<typeof verifyBallotSubmissionPayloadsByOption>
+>[number]['aggregate'] =>
+    prepareAggregateForDecryption({
+        aggregate,
+        publicKey: jointPublicKey,
+        protocolVersion: SHIPPED_PROTOCOL_VERSION,
+        manifestHash,
+        sessionId,
+        optionIndex,
+    });
+
 const buildVerifiedBallotsForReveal = async ({
     poll,
     verifiedDkg,
@@ -1266,7 +1293,7 @@ export const resolveAutomaticCeremonyAction = async ({
                         vote,
                         verifiedDkg.jointPublicKey,
                         randomness,
-                        10n,
+                        BigInt(fixedScoreRange.max),
                     );
                     const context: ProofContext = {
                         protocolVersion: SHIPPED_PROTOCOL_VERSION,
@@ -1282,7 +1309,7 @@ export const resolveAutomaticCeremonyAction = async ({
                         randomness,
                         ciphertext,
                         verifiedDkg.jointPublicKey,
-                        scoreVotingDomain(),
+                        scoreRangeDomain(manifest.scoreRange),
                         RISTRETTO_GROUP,
                         context,
                     );
@@ -1383,17 +1410,23 @@ export const resolveAutomaticCeremonyAction = async ({
 
             return await getOrCreatePreparedAction({
                 buildSignedPayload: async () => {
-                    if (optionBallots.aggregate.transcriptHash.trim() === '') {
+                    const preparedAggregate = prepareAggregateForReveal({
+                        aggregate: optionBallots.aggregate,
+                        jointPublicKey: verifiedDkg.jointPublicKey,
+                        manifestHash,
+                        optionIndex: optionBallots.optionIndex,
+                        sessionId,
+                    });
+
+                    if (preparedAggregate.transcriptHash.trim() === '') {
                         throw new Error(
                             'Verified aggregate ciphertext requires a non-empty transcript hash.',
                         );
                     }
 
                     if (
-                        !Number.isInteger(
-                            optionBallots.aggregate.ballotCount,
-                        ) ||
-                        optionBallots.aggregate.ballotCount < 1
+                        !Number.isInteger(preparedAggregate.ballotCount) ||
+                        preparedAggregate.ballotCount < 1
                     ) {
                         throw new Error(
                             'Verified aggregate ciphertext requires at least one accepted ballot.',
@@ -1401,7 +1434,7 @@ export const resolveAutomaticCeremonyAction = async ({
                     }
 
                     const decryptionShare = createDecryptionShare(
-                        optionBallots.aggregate.ciphertext,
+                        preparedAggregate.ciphertext,
                         finalShare,
                     );
                     const statement: DLEQStatement = {
@@ -1410,7 +1443,7 @@ export const resolveAutomaticCeremonyAction = async ({
                             participantIndex,
                             RISTRETTO_GROUP,
                         ),
-                        ciphertext: optionBallots.aggregate.ciphertext,
+                        ciphertext: preparedAggregate.ciphertext,
                         decryptionShare: decryptionShare.value,
                     };
                     const context: ProofContext = {
@@ -1434,8 +1467,8 @@ export const resolveAutomaticCeremonyAction = async ({
                         manifestHash,
                         participantIndex,
                         optionIndex: optionBallots.optionIndex,
-                        transcriptHash: optionBallots.aggregate.transcriptHash,
-                        ballotCount: optionBallots.aggregate.ballotCount,
+                        transcriptHash: preparedAggregate.transcriptHash,
+                        ballotCount: preparedAggregate.ballotCount,
                         decryptionShare: decryptionShare.value,
                         proof,
                     });
@@ -1458,6 +1491,13 @@ export const resolveAutomaticCeremonyAction = async ({
     const acceptedTallyPayloads = getAcceptedTallyPayloads(poll);
 
     for (const optionBallots of verifiedBallotsByOption) {
+        const preparedAggregate = prepareAggregateForReveal({
+            aggregate: optionBallots.aggregate,
+            jointPublicKey: verifiedDkg.jointPublicKey,
+            manifestHash,
+            optionIndex: optionBallots.optionIndex,
+            sessionId,
+        });
         const slotKey = getLocalPayloadSlotKey({
             kind: 'publish-tally',
             optionIndex: optionBallots.optionIndex,
@@ -1495,7 +1535,7 @@ export const resolveAutomaticCeremonyAction = async ({
                             payload.payload.participantIndex,
                             RISTRETTO_GROUP,
                         ),
-                        ciphertext: optionBallots.aggregate.ciphertext,
+                        ciphertext: preparedAggregate.ciphertext,
                         decryptionShare: payload.payload.decryptionShare,
                     };
                     const context: ProofContext = {
@@ -1548,12 +1588,13 @@ export const resolveAutomaticCeremonyAction = async ({
                     manifestHash,
                     participantIndex,
                     optionIndex: optionBallots.optionIndex,
-                    transcriptHash: optionBallots.aggregate.transcriptHash,
-                    ballotCount: optionBallots.aggregate.ballotCount,
+                    transcriptHash: preparedAggregate.transcriptHash,
+                    ballotCount: preparedAggregate.ballotCount,
                     tally: combineDecryptionShares(
-                        optionBallots.aggregate.ciphertext,
+                        preparedAggregate.ciphertext,
                         selectedShares,
-                        BigInt(optionBallots.aggregate.ballotCount) * 10n,
+                        BigInt(preparedAggregate.ballotCount) *
+                            BigInt(fixedScoreRange.max),
                     ),
                     decryptionParticipantIndices: selectedShares.map(
                         (share) => share.index,
@@ -1605,3 +1646,4 @@ export const describeAutomaticCeremonyAction = (
 };
 
 export type { PreparedCeremonyAction };
+export { prepareAggregateForReveal };

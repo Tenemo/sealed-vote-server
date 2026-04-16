@@ -33,6 +33,7 @@ _(recorded with Playwright, I got bored of manually re-recording the demo video 
 - `tests/e2e` Playwright browser tests
 
 The frontend and backend both rely on [`threshold-elgamal`](https://www.npmjs.com/package/threshold-elgamal), a TypeScript cryptography library used for the board ceremony, threshold encryption workflow, and local verification.
+Closed polls publish a frozen manifest with `rosterHash`, `optionList`, and the fixed score range `{ min: 1, max: 10 }`, and every signed board payload is versioned with `protocolVersion: 'v1'`.
 
 ## How it works
 

@@ -35,6 +35,7 @@ const createBoardRegistrationPayload = async ({
         ),
         manifestHash,
         participantIndex: participant.voterIndex,
+        protocolVersion: 'v1',
         rosterHash,
         sessionId,
         transportPublicKey: await exportTransportPublicKey(

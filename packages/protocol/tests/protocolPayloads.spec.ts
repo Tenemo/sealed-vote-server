@@ -5,11 +5,15 @@ import {
     canonicalUnsignedPayloadBytes,
     isProtocolMessageType,
     protocolPayloadSlotKey,
+    signedProtocolPayloadBytes,
     sortProtocolPayloads,
 } from '../src/index.js';
 
 const decodeBytes = (value: Uint8Array): string =>
     new TextDecoder().decode(value);
+
+const bytesToHex = (value: Uint8Array): string =>
+    Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
 const createRegistrationPayload = (
     overrides: Partial<ProtocolPayload> = {},
@@ -20,6 +24,7 @@ const createRegistrationPayload = (
         messageType: 'registration',
         participantIndex: 1,
         phase: 0,
+        protocolVersion: 'v1',
         rosterHash: 'b'.repeat(64),
         sessionId: 'c'.repeat(64),
         transportPublicKey: 'transport-public-key' as never,
@@ -43,6 +48,7 @@ const createBallotPayload = ({
         optionIndex,
         participantIndex,
         phase: 5,
+        protocolVersion: 'v1',
         proof: {
             branches: [],
         } as never,
@@ -63,11 +69,37 @@ describe('protocol payload helpers', () => {
             participantIndex: 1,
             messageType: 'registration',
             manifestHash: 'a'.repeat(64),
+            protocolVersion: 'v1',
             authPublicKey: 'auth-public-key-left' as never,
         } as ProtocolPayload;
 
         expect(decodeBytes(canonicalUnsignedPayloadBytes(leftPayload))).toBe(
             decodeBytes(canonicalUnsignedPayloadBytes(rightPayload)),
+        );
+    });
+
+    test('signedProtocolPayloadBytes is stable across object key ordering and distinct from unsigned bytes', () => {
+        const leftPayload = createRegistrationPayload({
+            authPublicKey: 'auth-public-key-left' as never,
+            transportPublicKey: 'transport-public-key-left' as never,
+        });
+        const rightPayload = {
+            transportPublicKey: 'transport-public-key-left' as never,
+            sessionId: 'c'.repeat(64),
+            rosterHash: 'b'.repeat(64),
+            phase: 0,
+            participantIndex: 1,
+            messageType: 'registration',
+            manifestHash: 'a'.repeat(64),
+            protocolVersion: 'v1',
+            authPublicKey: 'auth-public-key-left' as never,
+        } as ProtocolPayload;
+
+        expect(bytesToHex(signedProtocolPayloadBytes(leftPayload))).toBe(
+            bytesToHex(signedProtocolPayloadBytes(rightPayload)),
+        );
+        expect(bytesToHex(signedProtocolPayloadBytes(leftPayload))).not.toBe(
+            bytesToHex(canonicalUnsignedPayloadBytes(leftPayload)),
         );
     });
 
@@ -97,6 +129,7 @@ describe('protocol payload helpers', () => {
                 countedParticipantIndices: [1, 2, 3],
                 participantIndex: 9,
                 phase: 6,
+                protocolVersion: 'v1',
                 sessionId: 'session-2',
             } as ProtocolPayload),
         ).toBe('session-2:6:ballot-close');

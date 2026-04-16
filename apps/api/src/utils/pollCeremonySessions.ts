@@ -1,4 +1,5 @@
 import { asc, desc, eq } from 'drizzle-orm';
+import { fixedScoreRange } from '@sealed-vote/contracts';
 import {
     createElectionManifest,
     deriveSessionId,
@@ -150,6 +151,7 @@ export const derivePollCeremonySession = async ({
     persistedSessions,
     pollCreatedAt,
     pollId,
+    protocolVersion,
 }: {
     choices: readonly string[];
     isOpen: boolean;
@@ -157,6 +159,7 @@ export const derivePollCeremonySession = async ({
     persistedSessions: readonly PollCeremonySessionSnapshot[];
     pollCreatedAt: Date | string;
     pollId: string;
+    protocolVersion: string;
 }): Promise<DerivedPollCeremonySession> => {
     const latestSession =
         persistedSessions.length > 0
@@ -231,6 +234,7 @@ export const derivePollCeremonySession = async ({
             ? createElectionManifest({
                   optionList: choices,
                   rosterHash,
+                  scoreRange: fixedScoreRange,
               })
             : null;
     const manifestHash = manifest ? await hashElectionManifest(manifest) : null;
@@ -244,6 +248,7 @@ export const derivePollCeremonySession = async ({
                   rosterHash,
                   pollId,
                   sessionTimestamp,
+                  protocolVersion,
               )
             : null;
 

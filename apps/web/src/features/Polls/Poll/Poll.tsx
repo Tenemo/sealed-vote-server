@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
+import { fixedScoreRange } from '@sealed-vote/contracts';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -43,8 +44,8 @@ import {
 } from 'features/Polls/pollsApi';
 import { renderError } from 'utils/networkErrors';
 
-const minimumScore = 1;
-const maximumScore = 10;
+const minimumScore = fixedScoreRange.min;
+const maximumScore = fixedScoreRange.max;
 const boardConfirmationDelayMs = 250;
 const boardConfirmationMaxAttempts = 6;
 const steadyStatePollingIntervalMs = 5_000;
