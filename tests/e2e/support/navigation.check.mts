@@ -1231,6 +1231,78 @@ test('reloadInteractablePage replaces the page after a transient reload timeout'
     ]);
 });
 
+test('reloadInteractablePage bootstraps a blank replacement page before deep-link navigation', async () => {
+    const retryDelays: number[] = [];
+    const replacementGotoUrls: string[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    const replacementState: PageDoubleState = {
+        currentUrl: 'about:blank',
+        isInteractable: true,
+        readyState: 'complete',
+    };
+    const replacementPage = createPageDouble(replacementState);
+    const currentPageUrl = 'https://sealed.vote/votes/example--1234';
+    const page = createPageDouble(
+        {
+            currentUrl: currentPageUrl,
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+
+    page.reload = async () => {
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    replacementPage.goto = async (
+        url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoUrls.push(url);
+        replacementGotoCalls.push(options as NavigationOptions);
+        replacementState.currentUrl = url;
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(replacementGotoUrls, [
+        'https://sealed.vote/',
+        currentPageUrl,
+    ]);
+    assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
 test('resolveNavigationTimeoutMs rejects invalid overrides', () => {
     assert.throws(
         () => resolveNavigationTimeoutMs('not-a-number'),
