@@ -114,6 +114,35 @@ export const runPnpmSync = (args: string[]): void => {
     }
 };
 
+export const runPnpmCaptureSync = (args: string[]): string => {
+    const [command, commandPrefix] = getPnpmCommand();
+    const result = spawnSync(command, [...commandPrefix, ...args], {
+        cwd: repoRoot,
+        env: process.env,
+        encoding: 'utf8',
+        stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    if (result.error) {
+        console.error(result.error);
+        process.exit(1);
+    }
+
+    if (result.status !== 0) {
+        if (result.stdout) {
+            process.stdout.write(result.stdout);
+        }
+
+        if (result.stderr) {
+            process.stderr.write(result.stderr);
+        }
+
+        process.exit(result.status ?? 1);
+    }
+
+    return result.stdout ?? '';
+};
+
 export const getForwardedCliArgs = (): string[] => {
     const args = process.argv.slice(2);
 

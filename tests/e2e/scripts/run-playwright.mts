@@ -1,4 +1,9 @@
-import { getForwardedCliArgs, runPnpmSync } from './shared.mts';
+import { collectListedSpecFiles } from './runPlaywrightHelpers.mts';
+import {
+    getForwardedCliArgs,
+    runPnpmCaptureSync,
+    runPnpmSync,
+} from './shared.mts';
 
 const cliArgs = process.argv.slice(2);
 const firstArg = cliArgs[0];
@@ -14,11 +19,49 @@ const configPath =
         ? 'tests/config/playwright.production.config.mts'
         : 'tests/config/playwright.compat.config.mts';
 
-runPnpmSync([
-    'exec',
-    'playwright',
-    'test',
-    '--config',
-    configPath,
-    ...forwardedCliArgs,
-]);
+const shouldIsolateProductionByFile =
+    mode === 'production' &&
+    process.env.PLAYWRIGHT_PRODUCTION_ISOLATE_BY_FILE === 'true' &&
+    !forwardedCliArgs.includes('--list');
+
+if (!shouldIsolateProductionByFile) {
+    runPnpmSync([
+        'exec',
+        'playwright',
+        'test',
+        '--config',
+        configPath,
+        ...forwardedCliArgs,
+    ]);
+} else {
+    const listedFiles = collectListedSpecFiles(
+        runPnpmCaptureSync([
+            'exec',
+            'playwright',
+            'test',
+            '--config',
+            configPath,
+            '--list',
+            ...forwardedCliArgs,
+        ]),
+    );
+
+    if (listedFiles.length === 0) {
+        throw new Error(
+            'Production Playwright isolation could not discover any matching spec files.',
+        );
+    }
+
+    for (const listedFile of listedFiles) {
+        console.log(`Running production Playwright file in isolation: ${listedFile}`);
+        runPnpmSync([
+            'exec',
+            'playwright',
+            'test',
+            '--config',
+            configPath,
+            listedFile,
+            ...forwardedCliArgs,
+        ]);
+    }
+}
