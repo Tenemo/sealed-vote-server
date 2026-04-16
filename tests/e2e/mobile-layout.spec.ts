@@ -26,8 +26,8 @@ const expectNoHorizontalOverflow = async (page: Page): Promise<void> => {
 
 test('keeps the home page readable and accessible at 320 pixels wide', async ({
     page,
-}) => {
-    const tracker = createUnexpectedErrorTracker();
+}, testInfo) => {
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const attachMobileHomeTracking = createErrorTrackingAttacher({
         label: 'mobile-home',
         tracker,
@@ -57,7 +57,7 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const attachMobilePollTracking = createErrorTrackingAttacher({

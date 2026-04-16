@@ -297,6 +297,11 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
         );
     }
 
+    // Production e2e intentionally runs the full browser suite against the live
+    // production URL. Manual production dispatches from test-fix branches are
+    // also intentional, because production-only navigation behavior is part of
+    // what these tests are validating. Do not narrow this to smoke coverage or
+    // reroute it to a preview environment.
     return {
         ...getCommonConfig(
             normalizeBaseUrl(productionBaseUrl, 'PLAYWRIGHT_BASE_URL'),

@@ -46,8 +46,8 @@ const expectVotePageReady = async (page: Page): Promise<void> => {
 test('browser can commit the homepage and a real production vote page', async ({
     page,
     request,
-}) => {
-    const tracker = createUnexpectedErrorTracker();
+}, testInfo) => {
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     let participantPage: Page | null = null;
     const attachHomepageTracking = createErrorTrackingAttacher({

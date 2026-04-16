@@ -481,7 +481,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
     browser,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const recordingStartedAtMs = Date.now();
     const [creatorName, participantOneName, participantTwoName] =

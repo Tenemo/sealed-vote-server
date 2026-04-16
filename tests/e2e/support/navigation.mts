@@ -24,8 +24,10 @@ type NavigationWaitForUrlOptions = Omit<NavigationGotoOptions, 'referer'>;
 type NavigationUrlMatcher = string | RegExp | ((url: URL) => boolean);
 
 export type NavigationTarget = {
+    content?: () => Promise<string>;
     goto: (url: string, options?: NavigationGotoOptions) => Promise<unknown>;
     reload: (options?: NavigationReloadOptions) => Promise<unknown>;
+    title?: () => Promise<string>;
     url: () => string;
     evaluate: <Result>(
         pageFunction: () => Result | Promise<Result>,
@@ -60,6 +62,7 @@ const transientNavigationErrorPatterns = [
 ] as const;
 const transientNavigationTimeoutPattern = /Timeout \d+ms exceeded/u;
 const relativeUrlBase = 'https://playwright-navigation-check.invalid';
+const navigationDiagnosticSnippetLength = 240;
 
 export const resolveNavigationTimeoutMs = (
     rawTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS,
@@ -122,10 +125,36 @@ const formatComparableAbsoluteUrl = (url: URL): string =>
 const formatComparableRelativeUrl = (url: URL): string =>
     `${url.pathname}${url.search}${url.hash}`;
 
+const normalizeNavigationText = (value: string): string =>
+    value.replaceAll(/\s+/gu, ' ').trim();
+
+const truncateNavigationText = (value: string): string =>
+    value.length <= navigationDiagnosticSnippetLength
+        ? value
+        : `${value.slice(0, navigationDiagnosticSnippetLength - 3)}...`;
+
+const extractNavigationContentSnippet = (html: string): string | null => {
+    const normalizedText = normalizeNavigationText(
+        html
+            .replaceAll(/<script\b[\s\S]*?<\/script>/giu, ' ')
+            .replaceAll(/<style\b[\s\S]*?<\/style>/giu, ' ')
+            .replaceAll(/<[^>]+>/gu, ' '),
+    );
+
+    return normalizedText
+        ? truncateNavigationText(normalizedText)
+        : null;
+};
+
 const resolveNavigationRecoveryTimeoutMs = (
     navigationTimeoutMs: number,
 ): number =>
     Math.min(10_000, Math.max(2_000, Math.floor(navigationTimeoutMs / 4)));
+
+const resolveNavigationLateRecoveryTimeoutMs = (
+    navigationTimeoutMs: number,
+): number =>
+    Math.min(30_000, Math.max(5_000, Math.floor(navigationTimeoutMs / 2)));
 
 const doesPageMatchTargetUrl = (
     currentPageUrl: string,
@@ -158,6 +187,110 @@ const doesPageMatchTargetUrl = (
     );
 };
 
+const getNavigationTargetReadyState = async (
+    page: NavigationTarget,
+): Promise<string | null> => {
+    try {
+        return await page.evaluate(() => document.readyState);
+    } catch {
+        return null;
+    }
+};
+
+const getNavigationTargetTitle = async (
+    page: NavigationTarget,
+): Promise<string | null> => {
+    if (typeof page.title !== 'function') {
+        return null;
+    }
+
+    try {
+        const title = await page.title();
+
+        return title ? truncateNavigationText(normalizeNavigationText(title)) : null;
+    } catch {
+        return null;
+    }
+};
+
+const getNavigationTargetContentSnippet = async (
+    page: NavigationTarget,
+): Promise<string | null> => {
+    if (typeof page.content !== 'function') {
+        return null;
+    }
+
+    try {
+        return extractNavigationContentSnippet(await page.content());
+    } catch {
+        return null;
+    }
+};
+
+const formatNavigationFailureDiagnostics = async ({
+    expectedUrl,
+    navigationTimeoutMs,
+    page,
+}: {
+    expectedUrl: string;
+    navigationTimeoutMs: number;
+    page: NavigationTarget;
+}): Promise<string> => {
+    const currentUrl = page.url();
+    const readyState = await getNavigationTargetReadyState(page);
+    const title = await getNavigationTargetTitle(page);
+    const contentSnippet = await getNavigationTargetContentSnippet(page);
+
+    return [
+        'navigation diagnostics:',
+        currentUrl ? `currentUrl=${currentUrl}` : 'currentUrl=<empty>',
+        `expectedUrl=${expectedUrl}`,
+        `matchesExpected=${doesPageMatchTargetUrl(currentUrl, expectedUrl)}`,
+        `readyState=${readyState ?? '<unavailable>'}`,
+        typeof page.isClosed === 'function'
+            ? `closed=${page.isClosed()}`
+            : null,
+        `recoveryWaitMs=${resolveNavigationRecoveryTimeoutMs(
+            navigationTimeoutMs,
+        )}`,
+        `lateRecoveryWaitMs=${resolveNavigationLateRecoveryTimeoutMs(
+            navigationTimeoutMs,
+        )}`,
+        title ? `title=${JSON.stringify(title)}` : null,
+        contentSnippet ? `content=${JSON.stringify(contentSnippet)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+};
+
+const appendNavigationFailureDiagnostics = async ({
+    error,
+    expectedUrl,
+    navigationTimeoutMs,
+    page,
+}: {
+    error: unknown;
+    expectedUrl: string;
+    navigationTimeoutMs: number;
+    page: NavigationTarget;
+}): Promise<Error> => {
+    const diagnostics = await formatNavigationFailureDiagnostics({
+        expectedUrl,
+        navigationTimeoutMs,
+        page,
+    });
+
+    if (error instanceof Error) {
+        if (!error.message.includes(diagnostics)) {
+            error.message = `${error.message}\n${diagnostics}`;
+        }
+
+        return error;
+    }
+
+    return new Error(`${String(error)}\n${diagnostics}`);
+};
+
 const isTransientRecoveryProbeError = (error: unknown): boolean => {
     if (!(error instanceof Error)) {
         return false;
@@ -182,13 +315,9 @@ const isRecoveredTargetReady = async ({
         return false;
     }
 
-    try {
-        const readyState = await page.evaluate(() => document.readyState);
+    const readyState = await getNavigationTargetReadyState(page);
 
-        return readyState === 'interactive' || readyState === 'complete';
-    } catch {
-        return false;
-    }
+    return readyState === 'interactive' || readyState === 'complete';
 };
 
 const waitForRecoveredTarget = async ({
@@ -218,6 +347,41 @@ const waitForRecoveredTarget = async ({
 
         return false;
     }
+};
+
+// Live production can occasionally finish rendering after Playwright gives up
+// on the navigation promise, so keep observing the recovered page state a bit
+// longer before failing or replacing the target.
+const waitForLateRecoveredTarget = async ({
+    expectedUrl,
+    navigationTimeoutMs,
+    page,
+}: {
+    expectedUrl: string;
+    navigationTimeoutMs: number;
+    page: NavigationTarget;
+}): Promise<boolean> => {
+    try {
+        await page.waitForURL(
+            (url) => doesPageMatchTargetUrl(url.toString(), expectedUrl),
+            {
+                timeout:
+                    resolveNavigationLateRecoveryTimeoutMs(
+                        navigationTimeoutMs,
+                    ),
+                waitUntil: recoveryReadyState,
+            },
+        );
+    } catch (error) {
+        if (!isTransientRecoveryProbeError(error)) {
+            throw error;
+        }
+    }
+
+    return await isRecoveredTargetReady({
+        expectedUrl,
+        page,
+    });
 };
 
 type ReplaceableNavigationTarget<T extends NavigationTarget> = T & {
@@ -277,7 +441,12 @@ const navigateOnTarget = async <T extends NavigationTarget>(
         return page;
     } catch (error) {
         if (!isTransientNavigationError(error)) {
-            throw error;
+            throw await appendNavigationFailureDiagnostics({
+                error,
+                expectedUrl,
+                navigationTimeoutMs,
+                page,
+            });
         }
 
         await page.waitForTimeout(navigationRetryDelayMs);
@@ -310,7 +479,22 @@ const navigateOnTarget = async <T extends NavigationTarget>(
             return page;
         }
 
-        throw error;
+        if (
+            await waitForLateRecoveredTarget({
+                expectedUrl,
+                navigationTimeoutMs,
+                page,
+            })
+        ) {
+            return page;
+        }
+
+        throw await appendNavigationFailureDiagnostics({
+            error,
+            expectedUrl,
+            navigationTimeoutMs,
+            page,
+        });
     }
 };
 

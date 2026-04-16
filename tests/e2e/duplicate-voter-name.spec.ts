@@ -28,7 +28,7 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const firstVoterName = createVoterName('alice', namespace);

@@ -25,7 +25,7 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const pollTitle = `Duplicate title vote ${namespace}`.slice(0, 64);

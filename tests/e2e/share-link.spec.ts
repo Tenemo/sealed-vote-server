@@ -27,7 +27,7 @@ test('keeps slug-based poll links shareable in a separate participant context', 
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const pollName = createPollName('Share link vote', namespace);

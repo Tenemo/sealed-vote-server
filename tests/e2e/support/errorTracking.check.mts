@@ -5,6 +5,7 @@ import {
     attachErrorTracking,
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
+    expectNoUnexpectedErrors,
 } from './errorTracking.ts';
 
 const createMockConsoleMessage = (
@@ -41,16 +42,66 @@ const createMockResponse = ({
     url: () => url,
 });
 
-const createMockPage = () => {
-    const listeners = new Map<string, (value: unknown) => void>();
+const createMockRequest = ({
+    errorText,
+    method = 'GET',
+    resourceType = 'document',
+    url,
+}: {
+    errorText: string;
+    method?: string;
+    resourceType?: string;
+    url: string;
+}) => ({
+    failure: () => ({
+        errorText,
+    }),
+    method: () => method,
+    resourceType: () => resourceType,
+    url: () => url,
+});
+
+const createMockPage = (
+    state: {
+        bodyText?: string;
+        currentUrl?: string;
+        readyState?: string;
+        title?: string;
+        visibilityState?: string;
+    } = {},
+) => {
+    const listeners = new Map<string, (...values: unknown[]) => void>();
+    const currentUrl = state.currentUrl ?? 'https://sealed.vote/votes/mock-poll';
+    const mainFrame = {
+        url: () => currentUrl,
+    };
 
     return {
         listeners,
         page: {
-            on: (eventName: string, listener: (value: unknown) => void) => {
+            evaluate: async () => ({
+                bodyText: state.bodyText ?? 'Create vote Mock poll body',
+                locationHref: currentUrl,
+                navigationEntry: {
+                    domContentLoadedEventEnd: 80,
+                    duration: 125,
+                    loadEventEnd: 110,
+                    responseEnd: 45,
+                    type: 'navigate',
+                },
+                readyState: state.readyState ?? 'complete',
+                title: state.title ?? 'Mock vote page',
+                visibilityState: state.visibilityState ?? 'visible',
+            }),
+            isClosed: () => false,
+            mainFrame: () => mainFrame,
+            on: (
+                eventName: string,
+                listener: (...values: unknown[]) => void,
+            ) => {
                 listeners.set(eventName, listener);
             },
-            url: () => 'https://sealed.vote/votes/mock-poll',
+            url: () => currentUrl,
         },
     };
 };
@@ -166,6 +217,66 @@ test('attachErrorTracking records page errors with page url and stack', () => {
     ]);
 });
 
+test('attachErrorTracking records tracked request failures as recent activity', () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage();
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const requestFailedListener = listeners.get('requestfailed');
+    assert.ok(requestFailedListener);
+
+    requestFailedListener(
+        createMockRequest({
+            errorText: 'net::ERR_CONNECTION_RESET',
+            url: 'https://sealed.vote/votes/mock-poll',
+        }),
+    );
+
+    assert.deepEqual(tracker.errors, []);
+    assert.deepEqual(tracker.recentEvents, [
+        '[page] requestfailed: GET https://sealed.vote/votes/mock-poll resource=document (page https://sealed.vote/votes/mock-poll) failure=net::ERR_CONNECTION_RESET',
+    ]);
+});
+
+test('expectNoUnexpectedErrors includes recent activity and tracked page snapshots', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage({
+        bodyText: 'Create vote Mock poll body',
+        readyState: 'interactive',
+        title: 'Mock vote page',
+    });
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const loadListener = listeners.get('load');
+    const consoleListener = listeners.get('console');
+    assert.ok(loadListener);
+    assert.ok(consoleListener);
+
+    loadListener();
+    consoleListener(createMockConsoleMessage('Unexpected console failure'));
+
+    await assert.rejects(async () => await expectNoUnexpectedErrors(tracker), (error) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Unexpected browser errors detected:/u);
+        assert.match(error.message, /Recent page activity:/u);
+        assert.match(
+            error.message,
+            /\[page\] load \(page https:\/\/sealed\.vote\/votes\/mock-poll\)/u,
+        );
+        assert.match(error.message, /Tracked page snapshots:/u);
+        assert.match(error.message, /readyState=interactive/u);
+        assert.match(error.message, /title="Mock vote page"/u);
+        assert.match(
+            error.message,
+            /body="Create vote Mock poll body"/u,
+        );
+
+        return true;
+    });
+});
+
 test('createErrorTrackingAttacher avoids duplicate listeners on the same page and attaches to replacements', () => {
     const tracker = createUnexpectedErrorTracker();
     const firstPage = createMockPage();
@@ -180,13 +291,23 @@ test('createErrorTrackingAttacher avoids duplicate listeners on the same page an
     attachPageTracking(replacementPage.page as never);
 
     assert.deepEqual([...firstPage.listeners.keys()].sort(), [
+        'close',
         'console',
+        'domcontentloaded',
+        'framenavigated',
+        'load',
         'pageerror',
+        'requestfailed',
         'response',
     ]);
     assert.deepEqual([...replacementPage.listeners.keys()].sort(), [
+        'close',
         'console',
+        'domcontentloaded',
+        'framenavigated',
+        'load',
         'pageerror',
+        'requestfailed',
         'response',
     ]);
 });

@@ -56,7 +56,7 @@ test('automatically resumes a stored vote after a participant closes the browser
 }, testInfo) => {
     test.slow();
 
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
@@ -205,7 +205,7 @@ test('automatically republishes a stored vote after a participant rejoins during
 }, testInfo) => {
     test.slow();
 
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
@@ -408,7 +408,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
 }, testInfo) => {
     test.slow();
 
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
@@ -561,7 +561,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
 }, testInfo) => {
     test.slow();
 
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);

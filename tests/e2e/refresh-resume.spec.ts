@@ -30,7 +30,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const attachCreatorTracking = createErrorTrackingAttacher({
@@ -100,7 +100,7 @@ test('restores the securing state after refresh once voting is closed', async ({
         'Non-macOS Playwright WebKit does not support the Ed25519 and X25519 WebCrypto key generation required for device-backed vote submission.',
     );
 
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
