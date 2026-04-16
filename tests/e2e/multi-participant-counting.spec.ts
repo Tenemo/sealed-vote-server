@@ -69,6 +69,7 @@ test('counts every honest ballot when four participants complete the ceremony', 
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Four participant ceremony', namespace),
     });
@@ -96,6 +97,7 @@ test('counts every honest ballot when four participants complete the ceremony', 
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -104,6 +106,7 @@ test('counts every honest ballot when four participants complete the ceremony', 
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],
@@ -112,6 +115,7 @@ test('counts every honest ballot when four participants complete the ceremony', 
         );
         participantThree.page = attachParticipantThreeTracking(
             await submitVote({
+                attachPage: attachParticipantThreeTracking,
                 page: participantThree.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [10, 3],

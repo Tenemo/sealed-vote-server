@@ -65,6 +65,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Full ceremony', namespace),
     });
@@ -87,6 +88,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -95,6 +97,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],

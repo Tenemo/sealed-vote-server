@@ -45,6 +45,7 @@ test('keeps creator controls after reopening the shared link in a new browser se
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Creator resume vote', namespace),
     });
@@ -126,6 +127,7 @@ test('restores the securing state after refresh once voting is closed', async ({
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Voter resume vote', namespace),
     });
@@ -150,6 +152,7 @@ test('restores the securing state after refresh once voting is closed', async ({
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -158,6 +161,7 @@ test('restores the securing state after refresh once voting is closed', async ({
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],

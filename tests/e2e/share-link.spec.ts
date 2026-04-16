@@ -43,6 +43,7 @@ test('keeps slug-based poll links shareable in a separate participant context', 
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName,
     });

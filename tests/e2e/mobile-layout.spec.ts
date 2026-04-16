@@ -71,6 +71,7 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
         const pollName = createPollName('Mobile layout', namespace);
 
         const createdPollResult = await createPoll({
+            attachPage: attachMobilePollTracking,
             page,
             pollName,
         });

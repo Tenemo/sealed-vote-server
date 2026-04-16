@@ -51,6 +51,7 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Duplicate name vote', namespace),
     });

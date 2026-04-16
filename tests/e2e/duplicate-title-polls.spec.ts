@@ -81,6 +81,7 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     try {
         participant.page = attachSecondPollTracking(
             await registerParticipant({
+                attachPage: attachSecondPollTracking,
                 page: participant.page,
                 pollUrl: secondPoll.pollUrl,
                 voterName: secondPollVoterName,

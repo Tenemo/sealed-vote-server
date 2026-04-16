@@ -45,6 +45,25 @@ export type CreatedPollResult = {
     page: Page;
 };
 
+type PageAttacher = (page: Page) => Page;
+
+type CreatePollOptions = {
+    attachPage?: PageAttacher;
+    choices?: string[];
+    page: Page;
+    pollName: string;
+    skipInitialNavigation?: boolean;
+};
+
+type SubmitVoteOptions = {
+    attachPage?: PageAttacher;
+    choices?: string[];
+    page: Page;
+    pollUrl?: string;
+    scores?: number[];
+    voterName: string;
+};
+
 const getResultCard = (page: Page, choice: string): Locator =>
     page
         .getByTestId('verified-results-panel')
@@ -53,6 +72,11 @@ const getResultCard = (page: Page, choice: string): Locator =>
             has: page.getByText(choice, { exact: true }),
         })
         .first();
+
+const attachPollFlowPage = (
+    page: Page,
+    attachPage?: PageAttacher,
+): Page => (attachPage ? attachPage(page) : page);
 
 const waitForAnyVisibleText = async ({
     page,
@@ -87,18 +111,17 @@ const waitForAnyVisibleText = async ({
 };
 
 export const createPoll = async ({
+    attachPage,
     page,
     pollName,
     choices = ['Apples', 'Bananas'],
     skipInitialNavigation = false,
-}: {
-    page: Page;
-    pollName: string;
-    choices?: string[];
-    skipInitialNavigation?: boolean;
-}): Promise<CreatedPollResult> => {
+}: CreatePollOptions): Promise<CreatedPollResult> => {
     if (!skipInitialNavigation) {
-        page = await gotoInteractablePage(page, '/');
+        page = attachPollFlowPage(
+            await gotoInteractablePage(page, '/'),
+            attachPage,
+        );
     }
 
     await page.getByLabel('Vote name').fill(pollName);
@@ -134,20 +157,18 @@ export const createPoll = async ({
 };
 
 export const submitVote = async ({
+    attachPage,
     page,
     pollUrl,
     scores = [8, 6],
     voterName,
     choices = ['Apples', 'Bananas'],
-}: {
-    page: Page;
-    pollUrl?: string;
-    scores?: number[];
-    voterName: string;
-    choices?: string[];
-}): Promise<Page> => {
+}: SubmitVoteOptions): Promise<Page> => {
     if (pollUrl) {
-        page = await gotoInteractablePage(page, pollUrl);
+        page = attachPollFlowPage(
+            await gotoInteractablePage(page, pollUrl),
+            attachPage,
+        );
     }
 
     await page.getByLabel('Your public name').fill(voterName);
@@ -202,11 +223,9 @@ export const createExpectedVerifiedResults = ({
     });
 };
 
-export const registerParticipant = async (input: {
-    page: Page;
-    pollUrl?: string;
-    voterName: string;
-}): Promise<Page> => {
+export const registerParticipant = async (
+    input: Pick<SubmitVoteOptions, 'attachPage' | 'page' | 'pollUrl' | 'voterName'>,
+): Promise<Page> => {
     return await submitVote({
         ...input,
     });

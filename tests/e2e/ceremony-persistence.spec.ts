@@ -97,6 +97,7 @@ test('automatically resumes a stored vote after a participant closes the browser
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Persist vote before close', namespace),
     });
@@ -124,6 +125,7 @@ test('automatically resumes a stored vote after a participant closes the browser
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -132,6 +134,7 @@ test('automatically resumes a stored vote after a participant closes the browser
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],
@@ -140,6 +143,7 @@ test('automatically resumes a stored vote after a participant closes the browser
         );
         participantThree.page = attachParticipantThreeTracking(
             await submitVote({
+                attachPage: attachParticipantThreeTracking,
                 page: participantThree.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [10, 3],
@@ -256,6 +260,7 @@ test('automatically republishes a stored vote after a participant rejoins during
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Persist vote after restart', namespace),
     });
@@ -287,6 +292,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -295,6 +301,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],
@@ -303,6 +310,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         );
         participantThree.page = attachParticipantThreeTracking(
             await submitVote({
+                attachPage: attachParticipantThreeTracking,
                 page: participantThree.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [8, 9],
@@ -311,6 +319,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         );
         missingParticipant.page = attachMissingParticipantTracking(
             await submitVote({
+                attachPage: attachMissingParticipantTracking,
                 page: missingParticipant.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [10, 3],
@@ -449,6 +458,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Rescue multiple missing voters', namespace),
     });
@@ -480,6 +490,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -488,6 +499,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],
@@ -496,6 +508,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
         );
         missingParticipantOne.page = attachMissingParticipantOneTracking(
             await submitVote({
+                attachPage: attachMissingParticipantOneTracking,
                 page: missingParticipantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [10, 3],
@@ -504,6 +517,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
         );
         missingParticipantTwo.page = attachMissingParticipantTwoTracking(
             await submitVote({
+                attachPage: attachMissingParticipantTwoTracking,
                 page: missingParticipantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [5, 9],
@@ -602,6 +616,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
     page = attachCreatorTracking(page);
 
     const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Repeated rescue', namespace),
     });
@@ -633,6 +648,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
         );
         participantOne.page = attachParticipantOneTracking(
             await submitVote({
+                attachPage: attachParticipantOneTracking,
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [6, 8],
@@ -641,6 +657,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
         );
         participantTwo.page = attachParticipantTwoTracking(
             await submitVote({
+                attachPage: attachParticipantTwoTracking,
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [7, 5],
@@ -649,6 +666,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
         );
         participantThree.page = attachParticipantThreeTracking(
             await submitVote({
+                attachPage: attachParticipantThreeTracking,
                 page: participantThree.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [8, 9],
@@ -657,6 +675,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
         );
         missingParticipant.page = attachMissingParticipantTracking(
             await submitVote({
+                attachPage: attachMissingParticipantTracking,
                 page: missingParticipant.page,
                 pollUrl: createdPoll.pollUrl,
                 scores: [10, 3],
