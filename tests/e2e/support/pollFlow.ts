@@ -40,6 +40,11 @@ export type CreatedPoll = {
     pollUrl: string;
 };
 
+export type CreatedPollResult = {
+    createdPoll: CreatedPoll;
+    page: Page;
+};
+
 const getResultCard = (page: Page, choice: string): Locator =>
     page
         .getByTestId('verified-results-panel')
@@ -91,9 +96,9 @@ export const createPoll = async ({
     pollName: string;
     choices?: string[];
     skipInitialNavigation?: boolean;
-}): Promise<CreatedPoll> => {
+}): Promise<CreatedPollResult> => {
     if (!skipInitialNavigation) {
-        await gotoInteractablePage(page, '/');
+        page = await gotoInteractablePage(page, '/');
     }
 
     await page.getByLabel('Vote name').fill(pollName);
@@ -117,11 +122,14 @@ export const createPoll = async ({
     const createdPoll = (await createPollResponse.json()) as CreatePollResponse;
 
     return {
-        apiBaseUrl: new URL(createPollResponse.url()).origin,
-        creatorToken: createdPoll.creatorToken,
-        pollId: createdPoll.id,
-        pollSlug: createdPoll.slug,
-        pollUrl: page.url(),
+        createdPoll: {
+            apiBaseUrl: new URL(createPollResponse.url()).origin,
+            creatorToken: createdPoll.creatorToken,
+            pollId: createdPoll.id,
+            pollSlug: createdPoll.slug,
+            pollUrl: page.url(),
+        },
+        page,
     };
 };
 
@@ -137,9 +145,9 @@ export const submitVote = async ({
     scores?: number[];
     voterName: string;
     choices?: string[];
-}): Promise<void> => {
+}): Promise<Page> => {
     if (pollUrl) {
-        await gotoInteractablePage(page, pollUrl);
+        page = await gotoInteractablePage(page, pollUrl);
     }
 
     await page.getByLabel('Your public name').fill(voterName);
@@ -157,6 +165,8 @@ export const submitVote = async ({
     await expect(
         page.getByText('Vote stored on this device', { exact: true }),
     ).toBeVisible({ timeout: 30_000 });
+
+    return page;
 };
 
 export const createExpectedVerifiedResults = ({
@@ -196,8 +206,8 @@ export const registerParticipant = async (input: {
     page: Page;
     pollUrl?: string;
     voterName: string;
-}): Promise<void> => {
-    await submitVote({
+}): Promise<Page> => {
+    return await submitVote({
         ...input,
     });
 };
@@ -384,9 +394,8 @@ export const expectPostCloseVisible = async (page: Page): Promise<void> => {
     ).toBeVisible();
 };
 
-export const reloadPollPage = async (page: Page): Promise<void> => {
+export const reloadPollPage = async (page: Page): Promise<Page> =>
     await reloadInteractablePage(page);
-};
 
 const deletePoll = async (
     request: APIRequestContext,

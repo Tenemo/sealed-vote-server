@@ -53,20 +53,25 @@ test('browser can commit the homepage and a real production vote page', async ({
 
     try {
         attachErrorTracking(page, 'homepage', tracker);
-        await gotoInteractablePage(page, '/');
+        page = await gotoInteractablePage(page, '/');
         await expectHomepageReady(page);
 
-        const createdPoll = await createPoll({
+        const createdPollResult = await createPoll({
             page,
             pollName: `Production readiness ${test.info().project.name} ${Date.now()}`,
             choices: readinessChoices,
             skipInitialNavigation: true,
         });
+        page = createdPollResult.page;
+        const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
 
         participantPage = await page.context().newPage();
         attachErrorTracking(participantPage, 'participant-page', tracker);
-        await gotoInteractablePage(participantPage, createdPoll.pollUrl);
+        participantPage = await gotoInteractablePage(
+            participantPage,
+            createdPoll.pollUrl,
+        );
         await expectVotePageReady(participantPage);
         await expectNoUnexpectedErrors(tracker);
     } finally {

@@ -36,13 +36,15 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
 
     attachErrorTracking(page, 'page-1', tracker);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Duplicate name vote', namespace),
     });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
-    await submitVote({
+    page = await submitVote({
         page,
         scores: [9, 4],
         voterName: firstVoterName,
@@ -57,7 +59,10 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     });
 
     try {
-        await gotoInteractablePage(participant.page, createdPoll.pollUrl);
+        participant.page = await gotoInteractablePage(
+            participant.page,
+            createdPoll.pollUrl,
+        );
 
         await participant.page
             .getByLabel('Your public name')

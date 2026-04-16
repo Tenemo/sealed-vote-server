@@ -51,10 +51,12 @@ test('counts every honest ballot when four participants complete the ceremony', 
 
     attachErrorTracking(page, 'creator', tracker);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Four participant ceremony', namespace),
     });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     const participantOne = await openProjectParticipant(browser, testInfo);
@@ -66,24 +68,24 @@ test('counts every honest ballot when four participants complete the ceremony', 
     attachErrorTracking(participantThree.page, 'participant-three', tracker);
 
     try {
-        await submitVote({
+        page = await submitVote({
             page,
             scores: [9, 4],
             voterName: creatorName,
         });
-        await submitVote({
+        participantOne.page = await submitVote({
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
             scores: [6, 8],
             voterName: participantOneName,
         });
-        await submitVote({
+        participantTwo.page = await submitVote({
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
             scores: [7, 5],
             voterName: participantTwoName,
         });
-        await submitVote({
+        participantThree.page = await submitVote({
             page: participantThree.page,
             pollUrl: createdPoll.pollUrl,
             scores: [10, 3],

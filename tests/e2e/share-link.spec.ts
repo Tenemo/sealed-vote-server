@@ -33,10 +33,12 @@ test('keeps slug-based poll links shareable in a separate participant context', 
     const pollName = createPollName('Share link vote', namespace);
     attachErrorTracking(page, 'creator', tracker);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
         page,
         pollName,
     });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     expect(createdPoll.pollUrl).toMatch(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
@@ -45,7 +47,10 @@ test('keeps slug-based poll links shareable in a separate participant context', 
     attachErrorTracking(participant.page, 'participant', tracker);
 
     try {
-        await gotoInteractablePage(participant.page, createdPoll.pollUrl);
+        participant.page = await gotoInteractablePage(
+            participant.page,
+            createdPoll.pollUrl,
+        );
         await expect(
             participant.page.getByRole('heading', { name: pollName }),
         ).toBeVisible();
@@ -54,7 +59,7 @@ test('keeps slug-based poll links shareable in a separate participant context', 
             participant.page.getByRole('heading', { name: 'Your next step' }),
         ).toBeVisible();
 
-        await submitVote({
+        participant.page = await submitVote({
             page: participant.page,
             scores: [8, 6],
             voterName: createVoterName('bob', namespace),

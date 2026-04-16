@@ -33,10 +33,12 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     const secondPollVoterName = createVoterName('bob', namespace);
 
     const createPollWithTitle = async (): Promise<CreatedPoll> => {
-        const createdPoll = await createPoll({
+        const createdPollResult = await createPoll({
             page,
             pollName: pollTitle,
         });
+        page = createdPollResult.page;
+        const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
 
         return createdPoll;
@@ -51,8 +53,8 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
         allowedConsoleErrors: [/^Error$/],
     });
 
-    await gotoInteractablePage(page, firstPoll.pollUrl);
-    await registerParticipant({
+    page = await gotoInteractablePage(page, firstPoll.pollUrl);
+    page = await registerParticipant({
         page,
         voterName: firstPollVoterName,
     });
@@ -64,7 +66,7 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     });
 
     try {
-        await registerParticipant({
+        participant.page = await registerParticipant({
             page: participant.page,
             pollUrl: secondPoll.pollUrl,
             voterName: secondPollVoterName,

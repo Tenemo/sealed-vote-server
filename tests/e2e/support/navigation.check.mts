@@ -20,6 +20,13 @@ type PageDoubleState = {
     isInteractable: boolean;
     readyState: 'complete' | 'interactive' | 'loading';
 };
+type PageDouble = NavigationTarget & {
+    close: () => Promise<void>;
+    context: () => {
+        newPage: () => Promise<PageDouble>;
+    };
+    isClosed: () => boolean;
+};
 
 const createWaitForUrlTimeoutError = (timeout: number): Error =>
     new Error(`page.waitForURL: Timeout ${timeout}ms exceeded.`);
@@ -45,26 +52,50 @@ const createPageDouble = (
         isInteractable: true,
         readyState: 'complete',
     },
-): NavigationTarget => ({
-    goto: async () => undefined,
-    evaluate: async <Result,>() => state.readyState as unknown as Result,
-    reload: async () => undefined,
-    url: () => state.currentUrl,
-    waitForTimeout: async () => undefined,
-    waitForURL: async (
-        matcher: NavigationUrlMatcher,
-        options?: NavigationOptions,
-    ) => {
-        const timeout = options?.timeout ?? 0;
+    options: {
+        createReplacement?: () => Promise<PageDouble> | PageDouble;
+    } = {},
+): PageDouble => {
+    let isClosed = false;
 
-        if (
-            !state.isInteractable ||
-            !doesMatcherMatch(matcher, state.currentUrl)
-        ) {
-            throw createWaitForUrlTimeoutError(timeout);
-        }
-    },
-});
+    return {
+        close: async () => {
+            isClosed = true;
+        },
+        context: () => ({
+            newPage: async () => {
+                const replacement = options.createReplacement;
+
+                if (!replacement) {
+                    throw new Error(
+                        'Replacement page requested unexpectedly.',
+                    );
+                }
+
+                return await replacement();
+            },
+        }),
+        goto: async () => undefined,
+        evaluate: async <Result,>() => state.readyState as unknown as Result,
+        isClosed: () => isClosed,
+        reload: async () => undefined,
+        url: () => state.currentUrl,
+        waitForTimeout: async () => undefined,
+        waitForURL: async (
+            matcher: NavigationUrlMatcher,
+            options?: NavigationOptions,
+        ) => {
+            const timeout = options?.timeout ?? 0;
+
+            if (
+                !state.isInteractable ||
+                !doesMatcherMatch(matcher, state.currentUrl)
+            ) {
+                throw createWaitForUrlTimeoutError(timeout);
+            }
+        },
+    };
+};
 
 // These helper checks look a bit unusual because they test Playwright plumbing
 // rather than the app directly, but they pin the retry and recovery behavior
@@ -118,37 +149,46 @@ test('gotoInteractablePage allows an explicit navigation-timeout override', asyn
     ]);
 });
 
-test('gotoInteractablePage retries transient Firefox navigation errors once', async () => {
-    const gotoCalls: NavigationOptions[] = [];
+test('gotoInteractablePage replaces the page after a transient Firefox navigation error', async () => {
+    const originalGotoCalls: NavigationOptions[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
     const retryDelays: number[] = [];
-    let callCount = 0;
-    const page = createPageDouble({
-        currentUrl: 'about:blank',
-        isInteractable: false,
-        readyState: 'loading',
-    });
+    const replacementPage = createPageDouble();
+    replacementPage.goto = async (_url: string, options?: NavigationOptions) => {
+        replacementGotoCalls.push(options as NavigationOptions);
+    };
+
+    const page = createPageDouble(
+        {
+            currentUrl: 'about:blank',
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
-        gotoCalls.push(options as NavigationOptions);
-        callCount += 1;
-
-        if (callCount === 1) {
-            throw new Error('page.goto: NS_ERROR_NET_TIMEOUT');
-        }
+        originalGotoCalls.push(options as NavigationOptions);
+        throw new Error('page.goto: NS_ERROR_NET_TIMEOUT');
     };
     page.waitForTimeout = async (timeout: number) => {
         retryDelays.push(timeout);
     };
 
-    await gotoInteractablePage(page, '/');
+    const resolvedPage = await gotoInteractablePage(page, '/');
 
-    assert.equal(callCount, 2);
+    assert.equal(resolvedPage, replacementPage);
+    assert.equal(page.isClosed(), true);
     assert.deepEqual(retryDelays, [1_000]);
-    assert.deepEqual(gotoCalls, [
+    assert.deepEqual(originalGotoCalls, [
         {
             timeout: 15_000,
             waitUntil: 'commit',
         },
+    ]);
+    assert.deepEqual(replacementGotoCalls, [
         {
             timeout: 15_000,
             waitUntil: 'commit',
@@ -229,25 +269,34 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
     ]);
 });
 
-test('gotoInteractablePage can retry transient timeout stalls when enabled', async () => {
-    const gotoCalls: NavigationOptions[] = [];
+test('gotoInteractablePage replaces the page after a transient timeout stall when enabled', async () => {
+    const originalGotoCalls: NavigationOptions[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
     const retryDelays: number[] = [];
     const previousRetrySetting =
         process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
-    let callCount = 0;
-    const page = createPageDouble({
-        currentUrl: 'about:blank',
-        isInteractable: false,
-        readyState: 'loading',
-    });
+    const replacementPage = createPageDouble();
+    const page = createPageDouble(
+        {
+            currentUrl: 'about:blank',
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+
+    replacementPage.goto = async (
+        _url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoCalls.push(options as NavigationOptions);
+    };
 
     page.goto = async (_url: string, options?: NavigationOptions) => {
-        gotoCalls.push(options as NavigationOptions);
-        callCount += 1;
-
-        if (callCount === 1) {
-            throw new Error('page.goto: Timeout 45000ms exceeded.');
-        }
+        originalGotoCalls.push(options as NavigationOptions);
+        throw new Error('page.goto: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
         retryDelays.push(timeout);
@@ -256,7 +305,9 @@ test('gotoInteractablePage can retry transient timeout stalls when enabled', asy
     process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
 
     try {
-        await gotoInteractablePage(page, '/');
+        const resolvedPage = await gotoInteractablePage(page, '/');
+
+        assert.equal(resolvedPage, replacementPage);
     } finally {
         if (previousRetrySetting === undefined) {
             delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
@@ -266,13 +317,15 @@ test('gotoInteractablePage can retry transient timeout stalls when enabled', asy
         }
     }
 
-    assert.equal(callCount, 2);
+    assert.equal(page.isClosed(), true);
     assert.deepEqual(retryDelays, [1_000]);
-    assert.deepEqual(gotoCalls, [
+    assert.deepEqual(originalGotoCalls, [
         {
             timeout: 15_000,
             waitUntil: 'commit',
         },
+    ]);
+    assert.deepEqual(replacementGotoCalls, [
         {
             timeout: 15_000,
             waitUntil: 'commit',
@@ -280,31 +333,44 @@ test('gotoInteractablePage can retry transient timeout stalls when enabled', asy
     ]);
 });
 
-test('gotoInteractablePage still retries when a transient abort lands on the wrong page', async () => {
+test('gotoInteractablePage replaces the page when a transient abort lands on the wrong page', async () => {
+    const replacementGotoCalls: NavigationOptions[] = [];
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
         currentUrl: 'https://sealed.vote/unexpected',
         isInteractable: true,
         readyState: 'complete',
     };
-    let callCount = 0;
-    const page = createPageDouble(state);
+    const replacementPage = createPageDouble();
+    const page = createPageDouble(state, {
+        createReplacement: () => replacementPage,
+    });
+
+    replacementPage.goto = async (
+        _url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoCalls.push(options as NavigationOptions);
+    };
 
     page.goto = async () => {
-        callCount += 1;
-
-        if (callCount === 1) {
-            throw new Error('page.goto: NS_BINDING_ABORTED');
-        }
+        throw new Error('page.goto: NS_BINDING_ABORTED');
     };
     page.waitForTimeout = async (timeout: number) => {
         retryDelays.push(timeout);
     };
 
-    await gotoInteractablePage(page, '/');
+    const resolvedPage = await gotoInteractablePage(page, '/');
 
-    assert.equal(callCount, 2);
+    assert.equal(resolvedPage, replacementPage);
+    assert.equal(page.isClosed(), true);
     assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
 });
 
 test('gotoInteractablePage does not retry non-transient navigation errors', async () => {
@@ -393,8 +459,9 @@ test('reloadInteractablePage uses the same navigation policy', async () => {
         calls.push(options as NavigationOptions);
     };
 
-    await reloadInteractablePage(page);
+    const resolvedPage = await reloadInteractablePage(page);
 
+    assert.equal(resolvedPage, page);
     assert.deepEqual(calls, [
         {
             timeout: 15_000,
@@ -428,7 +495,9 @@ test('reloadInteractablePage accepts a recovered page without a second reload', 
     process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
 
     try {
-        await reloadInteractablePage(page);
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, page);
     } finally {
         if (previousRetrySetting === undefined) {
             delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
@@ -472,7 +541,9 @@ test('reloadInteractablePage accepts a page that already reloaded after the time
     process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
 
     try {
-        await reloadInteractablePage(page);
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, page);
     } finally {
         if (previousRetrySetting === undefined) {
             delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
@@ -485,6 +556,65 @@ test('reloadInteractablePage accepts a page that already reloaded after the time
     assert.equal(callCount, 1);
     assert.equal(recoveryProbeCount, 0);
     assert.deepEqual(retryDelays, [1_000]);
+});
+
+test('reloadInteractablePage replaces the page after a transient reload timeout', async () => {
+    const retryDelays: number[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    const replacementPage = createPageDouble({
+        currentUrl: 'https://sealed.vote/votes/example--1234',
+        isInteractable: true,
+        readyState: 'complete',
+    });
+    const page = createPageDouble(
+        {
+            currentUrl: 'https://sealed.vote/votes/example--1234',
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+
+    page.reload = async () => {
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    replacementPage.goto = async (
+        _url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoCalls.push(options as NavigationOptions);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
 });
 
 test('resolveNavigationTimeoutMs rejects invalid overrides', () => {

@@ -272,11 +272,13 @@ const gotoDemoPage = async ({
 }: {
     page: Page;
     url: string;
-}): Promise<void> => {
-    await gotoInteractablePage(page, url);
+}): Promise<Page> => {
+    page = await gotoInteractablePage(page, url);
     await showDemoCursor(page);
     await parkMouse(page);
     await sleep(demoInteractionDelaysMs.navigationSettled);
+
+    return page;
 };
 
 const gotoBlankDemoPage = async (page: Page): Promise<void> => {
@@ -300,9 +302,12 @@ const createPollWithDemoMotion = async ({
     choices?: readonly string[];
     skipInitialNavigation?: boolean;
     startUrl: string;
-}): Promise<CreatedPoll> => {
+}): Promise<{
+    createdPoll: CreatedPoll;
+    page: Page;
+}> => {
     if (!skipInitialNavigation) {
-        await gotoDemoPage({
+        page = await gotoDemoPage({
             page,
             url: startUrl,
         });
@@ -350,11 +355,14 @@ const createPollWithDemoMotion = async ({
     };
 
     return {
-        apiBaseUrl: new URL(createPollResponse.url()).origin,
-        creatorToken: createdPoll.creatorToken,
-        pollId: createdPoll.id,
-        pollSlug: createdPoll.slug,
-        pollUrl: page.url(),
+        createdPoll: {
+            apiBaseUrl: new URL(createPollResponse.url()).origin,
+            creatorToken: createdPoll.creatorToken,
+            pollId: createdPoll.id,
+            pollSlug: createdPoll.slug,
+            pollUrl: page.url(),
+        },
+        page,
     };
 };
 
@@ -372,9 +380,9 @@ const submitVoteWithDemoMotion = async ({
     scores?: readonly number[];
     voterName: string;
     choices?: readonly string[];
-}): Promise<void> => {
+}): Promise<Page> => {
     if (pollUrl) {
-        await gotoDemoPage({
+        page = await gotoDemoPage({
             page,
             url: pollUrl,
         });
@@ -404,6 +412,8 @@ const submitVoteWithDemoMotion = async ({
     await expect(
         page.getByText('Vote stored on this device', { exact: true }),
     ).toBeVisible({ timeout: 30_000 });
+
+    return page;
 };
 
 const closeVotingWithDemoMotion = async (page: Page): Promise<void> => {
@@ -530,10 +540,12 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
 
     try {
         await Promise.all([
-            gotoDemoPage({
-                page: creator.page,
-                url: demoHomeUrl,
-            }),
+            (async () => {
+                creator.page = await gotoDemoPage({
+                    page: creator.page,
+                    url: demoHomeUrl,
+                });
+            })(),
             gotoBlankDemoPage(participantOne.page),
             gotoBlankDemoPage(participantTwo.page),
         ]);
@@ -543,12 +555,14 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         creatorHomeVisibleAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.initial);
 
-        const createdPoll = await createPollWithDemoMotion({
+        const createdPollResult = await createPollWithDemoMotion({
             page: creator.page,
             pollName: demoPollName,
             skipInitialNavigation: true,
             startUrl: demoHomeUrl,
         });
+        creator.page = createdPollResult.page;
+        const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
         creatorPollAddressText = createDisplayedAddressText(
             createdPoll.pollUrl,
@@ -556,7 +570,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         creatorPollCreatedAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.pollCreated);
 
-        await submitVoteWithDemoMotion({
+        creator.page = await submitVoteWithDemoMotion({
             page: creator.page,
             scores: demoScorecards[0],
             choices: demoChoiceNames,
@@ -564,7 +578,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         });
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        await submitVoteWithDemoMotion({
+        participantOne.page = await submitVoteWithDemoMotion({
             onPollPageReady: () => {
                 participantOneJoinedAtMs = getElapsedMs(recordingStartedAtMs);
             },
@@ -576,7 +590,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         });
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        await submitVoteWithDemoMotion({
+        participantTwo.page = await submitVoteWithDemoMotion({
             onPollPageReady: () => {
                 participantTwoJoinedAtMs = getElapsedMs(recordingStartedAtMs);
             },

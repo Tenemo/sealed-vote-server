@@ -36,10 +36,12 @@ test('keeps creator controls after reopening the shared link in a new browser se
 
     attachErrorTracking(page, 'creator-initial', tracker);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Creator resume vote', namespace),
     });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     let restoredContext: BrowserContext | null = null;
@@ -51,13 +53,16 @@ test('keeps creator controls after reopening the shared link in a new browser se
         });
         const restoredPage = await restoredContext.newPage();
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
-        await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
-        const nextStepPanel = restoredPage
+        const resumedPage = await gotoInteractablePage(
+            restoredPage,
+            createdPoll.pollUrl,
+        );
+        const nextStepPanel = resumedPage
             .getByRole('heading', { name: /your next step/i })
             .locator('xpath=..');
 
         await expect(
-            restoredPage.getByRole('heading', { name: /your next step/i }),
+            resumedPage.getByRole('heading', { name: /your next step/i }),
         ).toBeVisible();
         await expect(
             nextStepPanel.getByText(
@@ -96,10 +101,12 @@ test('restores the securing state after refresh once voting is closed', async ({
 
     attachErrorTracking(page, 'creator', tracker);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Voter resume vote', namespace),
     });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     const participantOne = await openProjectParticipant(browser, testInfo);
@@ -110,18 +117,18 @@ test('restores the securing state after refresh once voting is closed', async ({
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await submitVote({
+        page = await submitVote({
             page,
             scores: [9, 4],
             voterName: creatorName,
         });
-        await submitVote({
+        participantOne.page = await submitVote({
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
             scores: [6, 8],
             voterName: participantOneName,
         });
-        await submitVote({
+        participantTwo.page = await submitVote({
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
             scores: [7, 5],
@@ -136,9 +143,12 @@ test('restores the securing state after refresh once voting is closed', async ({
         });
         const restoredPage = await restoredContext.newPage();
         attachErrorTracking(restoredPage, 'creator-restored', tracker);
-        await gotoInteractablePage(restoredPage, createdPoll.pollUrl);
+        const resumedPage = await gotoInteractablePage(
+            restoredPage,
+            createdPoll.pollUrl,
+        );
 
-        await expectPostCloseVisible(restoredPage);
+        await expectPostCloseVisible(resumedPage);
         await expectNoUnexpectedErrors(tracker);
     } finally {
         if (restoredContext) {

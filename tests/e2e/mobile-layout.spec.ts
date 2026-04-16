@@ -31,7 +31,7 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     attachErrorTracking(page, 'mobile-home', tracker);
 
     await page.setViewportSize(mobileViewport);
-    await gotoInteractablePage(page, '/');
+    page = await gotoInteractablePage(page, '/');
 
     await expect(
         page.getByRole('heading', { name: 'Create a new vote' }),
@@ -62,10 +62,12 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
         await page.setViewportSize(mobileViewport);
         const pollName = createPollName('Mobile layout', namespace);
 
-        const createdPoll = await createPoll({
+        const createdPollResult = await createPoll({
             page,
             pollName,
         });
+        page = createdPollResult.page;
+        const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
 
         await expect(

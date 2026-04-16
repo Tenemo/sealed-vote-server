@@ -90,7 +90,7 @@ test('retries poll creation safely after the initial response is lost', async ({
         | null = null;
 
     try {
-        await gotoInteractablePage(page, '/');
+        page = await gotoInteractablePage(page, '/');
         await page.getByLabel('Vote name').fill(pollName);
 
         for (const choice of ['Apples', 'Bananas']) {

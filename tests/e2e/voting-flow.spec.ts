@@ -51,10 +51,12 @@ test('completes the full vote-to-results ceremony across three live sessions', a
 
     attachErrorTracking(page, 'creator', tracker);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
         page,
         pollName: createPollName('Full ceremony', namespace),
     });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     const participantOne = await openProjectParticipant(browser, testInfo);
@@ -63,18 +65,18 @@ test('completes the full vote-to-results ceremony across three live sessions', a
     attachErrorTracking(participantTwo.page, 'participant-two', tracker);
 
     try {
-        await submitVote({
+        page = await submitVote({
             page,
             scores: [9, 4],
             voterName: creatorName,
         });
-        await submitVote({
+        participantOne.page = await submitVote({
             page: participantOne.page,
             pollUrl: createdPoll.pollUrl,
             scores: [6, 8],
             voterName: participantOneName,
         });
-        await submitVote({
+        participantTwo.page = await submitVote({
             page: participantTwo.page,
             pollUrl: createdPoll.pollUrl,
             scores: [7, 5],
@@ -87,9 +89,9 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             participantTwoName,
         ]);
         await closeVoting(page);
-        await reloadPollPage(page);
-        await reloadPollPage(participantOne.page);
-        await reloadPollPage(participantTwo.page);
+        page = await reloadPollPage(page);
+        participantOne.page = await reloadPollPage(participantOne.page);
+        participantTwo.page = await reloadPollPage(participantTwo.page);
         await expectPostCloseVisible(page);
         await expectPostCloseVisible(participantOne.page);
         await expectPostCloseVisible(participantTwo.page);

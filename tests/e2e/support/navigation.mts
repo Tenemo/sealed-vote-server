@@ -10,6 +10,10 @@ type NavigationGotoOptions = {
     waitUntil?: NavigationWaitUntil;
 };
 
+type NavigationCloseOptions = {
+    runBeforeUnload?: boolean;
+};
+
 type NavigationReloadOptions = Omit<NavigationGotoOptions, 'referer'>;
 type NavigationWaitForUrlOptions = Omit<NavigationGotoOptions, 'referer'>;
 type NavigationUrlMatcher = string | RegExp | ((url: URL) => boolean);
@@ -21,6 +25,11 @@ export type NavigationTarget = {
     evaluate: <Result>(
         pageFunction: () => Result | Promise<Result>,
     ) => Promise<Result>;
+    close?: (options?: NavigationCloseOptions) => Promise<void>;
+    context?: () => {
+        newPage: () => Promise<NavigationTarget>;
+    };
+    isClosed?: () => boolean;
     waitForTimeout: (timeout: number) => Promise<void>;
     waitForURL: (
         url: NavigationUrlMatcher,
@@ -204,96 +213,174 @@ const waitForRecoveredTarget = async ({
     }
 };
 
-const retryTransientNavigation = async (
-    navigate: () => Promise<void>,
-    navigationTimeoutMs: number,
-    page: NavigationTarget,
-    expectedUrl: string,
-): Promise<void> => {
-    let attemptsRemaining = 2;
+type ReplaceableNavigationTarget<T extends NavigationTarget> = T & {
+    close: (options?: NavigationCloseOptions) => Promise<void>;
+    context: () => {
+        newPage: () => Promise<T>;
+    };
+};
 
-    while (attemptsRemaining > 0) {
-        try {
-            await navigate();
-            return;
-        } catch (error) {
-            if (!isTransientNavigationError(error)) {
-                throw error;
-            }
+const isClosedTargetError = (error: unknown): boolean =>
+    error instanceof Error &&
+    /Target page, context or browser has been closed/u.test(error.message);
 
-            await page.waitForTimeout(navigationRetryDelayMs);
+const isReplaceableNavigationTarget = <T extends NavigationTarget>(
+    page: T,
+): page is ReplaceableNavigationTarget<T> =>
+    typeof page.close === 'function' && typeof page.context === 'function';
 
-            if (
-                await isRecoveredTargetReady({
-                    expectedUrl,
-                    page,
-                })
-            ) {
-                return;
-            }
+const replaceNavigationTarget = async <T extends NavigationTarget>(
+    page: T,
+): Promise<T | null> => {
+    if (!isReplaceableNavigationTarget(page)) {
+        return null;
+    }
 
-            if (
-                await waitForRecoveredTarget({
-                    expectedUrl,
-                    navigationTimeoutMs,
-                    page,
-                })
-            ) {
-                return;
-            }
-
-            if (
-                await isRecoveredTargetReady({
-                    expectedUrl,
-                    page,
-                })
-            ) {
-                return;
-            }
-
-            attemptsRemaining -= 1;
-
-            if (attemptsRemaining === 0) {
-                throw error;
-            }
+    try {
+        if (!page.isClosed?.()) {
+            await page.close({
+                runBeforeUnload: false,
+            });
         }
+    } catch (error) {
+        if (!isClosedTargetError(error)) {
+            throw error;
+        }
+    }
+
+    return (await page.context().newPage()) as T;
+};
+
+const navigateOnTarget = async <T extends NavigationTarget>(
+    page: T,
+    navigate: (target: T) => Promise<void>,
+    navigationTimeoutMs: number,
+    expectedUrl: string,
+): Promise<T> => {
+    try {
+        await navigate(page);
+        return page;
+    } catch (error) {
+        if (!isTransientNavigationError(error)) {
+            throw error;
+        }
+
+        await page.waitForTimeout(navigationRetryDelayMs);
+
+        if (
+            await isRecoveredTargetReady({
+                expectedUrl,
+                page,
+            })
+        ) {
+            return page;
+        }
+
+        if (
+            await waitForRecoveredTarget({
+                expectedUrl,
+                navigationTimeoutMs,
+                page,
+            })
+        ) {
+            return page;
+        }
+
+        if (
+            await isRecoveredTargetReady({
+                expectedUrl,
+                page,
+            })
+        ) {
+            return page;
+        }
+
+        throw error;
     }
 };
 
-export const gotoInteractablePage = async (
-    page: NavigationTarget,
+export const gotoInteractablePage = async <T extends NavigationTarget>(
+    page: T,
     url: string,
-): Promise<void> => {
+): Promise<T> => {
     const navigationTimeoutMs = resolveNavigationTimeoutMs();
 
-    await retryTransientNavigation(
-        async () => {
-            await page.goto(url, {
-                timeout: navigationTimeoutMs,
-                waitUntil: navigationReadyState,
-            });
-        },
-        navigationTimeoutMs,
-        page,
-        url,
-    );
+    try {
+        return await navigateOnTarget(
+            page,
+            async (target) => {
+                await target.goto(url, {
+                    timeout: navigationTimeoutMs,
+                    waitUntil: navigationReadyState,
+                });
+            },
+            navigationTimeoutMs,
+            url,
+        );
+    } catch (error) {
+        if (!isTransientNavigationError(error)) {
+            throw error;
+        }
+
+        const replacementPage = await replaceNavigationTarget(page);
+
+        if (!replacementPage) {
+            throw error;
+        }
+
+        return await navigateOnTarget(
+            replacementPage,
+            async (target) => {
+                await target.goto(url, {
+                    timeout: navigationTimeoutMs,
+                    waitUntil: navigationReadyState,
+                });
+            },
+            navigationTimeoutMs,
+            url,
+        );
+    }
 };
 
-export const reloadInteractablePage = async (
-    page: NavigationTarget,
-): Promise<void> => {
+export const reloadInteractablePage = async <T extends NavigationTarget>(
+    page: T,
+): Promise<T> => {
     const navigationTimeoutMs = resolveNavigationTimeoutMs();
     const currentPageUrl = page.url();
 
-    await retryTransientNavigation(
-        async () => {
-            await page.reload({
-                timeout: navigationTimeoutMs,
-                waitUntil: navigationReadyState,
-            });
-        },
-        navigationTimeoutMs,
-        page,
-        currentPageUrl,
-    );
+    try {
+        return await navigateOnTarget(
+            page,
+            async (target) => {
+                await target.reload({
+                    timeout: navigationTimeoutMs,
+                    waitUntil: navigationReadyState,
+                });
+            },
+            navigationTimeoutMs,
+            currentPageUrl,
+        );
+    } catch (error) {
+        if (!isTransientNavigationError(error)) {
+            throw error;
+        }
+
+        const replacementPage = await replaceNavigationTarget(page);
+
+        if (!replacementPage) {
+            throw error;
+        }
+
+        return await navigateOnTarget(
+            replacementPage,
+            async (target) => {
+                await target.goto(currentPageUrl, {
+                    timeout: navigationTimeoutMs,
+                    waitUntil: navigationReadyState,
+                });
+            },
+            navigationTimeoutMs,
+            currentPageUrl,
+        );
+    }
 };
