@@ -8,7 +8,7 @@ catalog:
   "@vitest/coverage-v8": "^4.1.4"
   "husky": "^9.1.7"
   "rimraf": "^6.1.3"
-  "threshold-elgamal": "2.0.0"
+  "threshold-elgamal": "2.2.0"
   "typescript": "^6.0.2"
   "vite": "^8.0.8"
   "vitest": "^4.1.4"
