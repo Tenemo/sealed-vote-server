@@ -7,6 +7,7 @@ const ProtocolMessageTypeSchema = Type.Union(
 
 const ProtocolPayloadSchema = Type.Object(
     {
+        protocolVersion: Type.String({ minLength: 1 }),
         sessionId: Type.String({
             minLength: 64,
             maxLength: 64,

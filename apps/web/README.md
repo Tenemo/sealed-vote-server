@@ -32,7 +32,9 @@ pnpm --filter @sealed-vote/web test
 pnpm --filter @sealed-vote/web build
 ```
 
-The frontend only needs one user-configured environment variable: `VITE_API_BASE_URL` for deployed builds that talk to the backend on a different origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
+The frontend only needs one user-configured environment variable: `VITE_API_BASE_URL` for deployments that talk to the backend on a different origin. Local development does not need it because Vite proxies `/api` to the backend dev server.
+
+On Netlify production and deploy preview hosts, the browser uses the same-origin `/api` proxy from [netlify.toml](../../netlify.toml) so upstream API failures remain normal HTTP responses instead of turning into cross-origin browser failures. Server-side SEO helpers still resolve their own API base URL independently.
 
 When serving built frontend assets behind a proxy or preview domain, you can
 also set `SEO_PUBLIC_ORIGIN` so request-aware canonical, Open Graph, and

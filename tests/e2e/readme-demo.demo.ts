@@ -11,7 +11,7 @@ import {
 } from '@playwright/test';
 
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -272,11 +272,13 @@ const gotoDemoPage = async ({
 }: {
     page: Page;
     url: string;
-}): Promise<void> => {
-    await gotoInteractablePage(page, url);
+}): Promise<Page> => {
+    page = await gotoInteractablePage(page, url);
     await showDemoCursor(page);
     await parkMouse(page);
     await sleep(demoInteractionDelaysMs.navigationSettled);
+
+    return page;
 };
 
 const gotoBlankDemoPage = async (page: Page): Promise<void> => {
@@ -300,9 +302,12 @@ const createPollWithDemoMotion = async ({
     choices?: readonly string[];
     skipInitialNavigation?: boolean;
     startUrl: string;
-}): Promise<CreatedPoll> => {
+}): Promise<{
+    createdPoll: CreatedPoll;
+    page: Page;
+}> => {
     if (!skipInitialNavigation) {
-        await gotoDemoPage({
+        page = await gotoDemoPage({
             page,
             url: startUrl,
         });
@@ -350,11 +355,14 @@ const createPollWithDemoMotion = async ({
     };
 
     return {
-        apiBaseUrl: new URL(createPollResponse.url()).origin,
-        creatorToken: createdPoll.creatorToken,
-        pollId: createdPoll.id,
-        pollSlug: createdPoll.slug,
-        pollUrl: page.url(),
+        createdPoll: {
+            apiBaseUrl: new URL(createPollResponse.url()).origin,
+            creatorToken: createdPoll.creatorToken,
+            pollId: createdPoll.id,
+            pollSlug: createdPoll.slug,
+            pollUrl: page.url(),
+        },
+        page,
     };
 };
 
@@ -372,9 +380,9 @@ const submitVoteWithDemoMotion = async ({
     scores?: readonly number[];
     voterName: string;
     choices?: readonly string[];
-}): Promise<void> => {
+}): Promise<Page> => {
     if (pollUrl) {
-        await gotoDemoPage({
+        page = await gotoDemoPage({
             page,
             url: pollUrl,
         });
@@ -404,6 +412,8 @@ const submitVoteWithDemoMotion = async ({
     await expect(
         page.getByText('Vote stored on this device', { exact: true }),
     ).toBeVisible({ timeout: 30_000 });
+
+    return page;
 };
 
 const closeVotingWithDemoMotion = async (page: Page): Promise<void> => {
@@ -471,7 +481,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
     browser,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const recordingStartedAtMs = Date.now();
     const [creatorName, participantOneName, participantTwoName] =
@@ -492,6 +502,18 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
     const creator = await openProjectParticipant(browser, testInfo);
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
     let creatorHomeVisibleAtMs: number | null = null;
     let creatorPollAddressText: string | null = null;
     let creatorPollCreatedAtMs: number | null = null;
@@ -524,16 +546,20 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         },
     ];
 
-    attachErrorTracking(creator.page, 'creator', tracker);
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
+    creator.page = attachCreatorTracking(creator.page);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
 
     try {
         await Promise.all([
-            gotoDemoPage({
-                page: creator.page,
-                url: demoHomeUrl,
-            }),
+            (async () => {
+                creator.page = attachCreatorTracking(
+                    await gotoDemoPage({
+                        page: creator.page,
+                        url: demoHomeUrl,
+                    }),
+                );
+            })(),
             gotoBlankDemoPage(participantOne.page),
             gotoBlankDemoPage(participantTwo.page),
         ]);
@@ -543,12 +569,14 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         creatorHomeVisibleAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.initial);
 
-        const createdPoll = await createPollWithDemoMotion({
+        const createdPollResult = await createPollWithDemoMotion({
             page: creator.page,
             pollName: demoPollName,
             skipInitialNavigation: true,
             startUrl: demoHomeUrl,
         });
+        creator.page = attachCreatorTracking(createdPollResult.page);
+        const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
         creatorPollAddressText = createDisplayedAddressText(
             createdPoll.pollUrl,
@@ -556,36 +584,46 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         creatorPollCreatedAtMs = getElapsedMs(recordingStartedAtMs);
         await sleep(demoBeatPausesMs.pollCreated);
 
-        await submitVoteWithDemoMotion({
-            page: creator.page,
-            scores: demoScorecards[0],
-            choices: demoChoiceNames,
-            voterName: creatorName,
-        });
+        creator.page = attachCreatorTracking(
+            await submitVoteWithDemoMotion({
+                page: creator.page,
+                scores: demoScorecards[0],
+                choices: demoChoiceNames,
+                voterName: creatorName,
+            }),
+        );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        await submitVoteWithDemoMotion({
-            onPollPageReady: () => {
-                participantOneJoinedAtMs = getElapsedMs(recordingStartedAtMs);
-            },
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: demoScorecards[1],
-            choices: demoChoiceNames,
-            voterName: participantOneName,
-        });
+        participantOne.page = attachParticipantOneTracking(
+            await submitVoteWithDemoMotion({
+                onPollPageReady: () => {
+                    participantOneJoinedAtMs = getElapsedMs(
+                        recordingStartedAtMs,
+                    );
+                },
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: demoScorecards[1],
+                choices: demoChoiceNames,
+                voterName: participantOneName,
+            }),
+        );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        await submitVoteWithDemoMotion({
-            onPollPageReady: () => {
-                participantTwoJoinedAtMs = getElapsedMs(recordingStartedAtMs);
-            },
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: demoScorecards[2],
-            choices: demoChoiceNames,
-            voterName: participantTwoName,
-        });
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVoteWithDemoMotion({
+                onPollPageReady: () => {
+                    participantTwoJoinedAtMs = getElapsedMs(
+                        recordingStartedAtMs,
+                    );
+                },
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: demoScorecards[2],
+                choices: demoChoiceNames,
+                voterName: participantTwoName,
+            }),
+        );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
         await expectParticipantsVisible(creator.page, [

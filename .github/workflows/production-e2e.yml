@@ -4,6 +4,8 @@ on:
     push:
         branches: [master, main]
     workflow_dispatch:
+        # Intentional: we use manual production runs from test-fix branches to
+        # validate the live-production suite itself.
 
 permissions:
     contents: read
@@ -146,6 +148,7 @@ jobs:
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_BLOB_REPORT: 'true'
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
+            PLAYWRIGHT_PRODUCTION_ISOLATE_BY_FILE: 'true'
             PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS: 'true'
             PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
 
@@ -167,6 +170,8 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: run production browser e2e
+              # Intentional: production coverage stays full-suite against the
+              # live site instead of falling back to smoke-only checks.
               run: pnpm e2e:production:test -- --project ${{ matrix.project.name }}
 
             - name: capture same-container endpoint diagnostics

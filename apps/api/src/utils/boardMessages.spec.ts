@@ -66,6 +66,7 @@ const createSignedRegistrationPayload = async ({
             messageType: 'registration',
             participantIndex,
             phase: 0,
+            protocolVersion: 'v1',
             rosterHash,
             sessionId: fixedSessionId,
             transportPublicKey: keyMaterial.transportPublicKey,

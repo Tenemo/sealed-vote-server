@@ -11,6 +11,7 @@ const safeDatabaseHosts = new Set(['localhost', '127.0.0.1', '::1', 'postgres'])
 const safeApiHosts = new Set(['localhost', '127.0.0.1', '::1']);
 const requiredDatabaseName = 'sv-db';
 const pnpmExecPath = process.env.npm_execpath;
+const pnpmCaptureMaxBufferBytes = 16 * 1024 * 1024;
 
 export const repoRoot = path.resolve(currentDirectory, '../../..');
 const apiWorkspaceRoot = path.resolve(repoRoot, 'apps', 'api');
@@ -112,6 +113,39 @@ export const runPnpmSync = (args: string[]): void => {
     if (result.status !== 0) {
         process.exit(result.status ?? 1);
     }
+};
+
+export const runPnpmCaptureSync = (args: string[]): string => {
+    const [command, commandPrefix] = getPnpmCommand();
+    const result = spawnSync(command, [...commandPrefix, ...args], {
+        cwd: repoRoot,
+        env: process.env,
+        encoding: 'utf8',
+        // Playwright --list output grows with the suite and can exceed Node's
+        // small default sync capture buffer, which would otherwise fail with
+        // ENOBUFS before we can isolate files one by one.
+        maxBuffer: pnpmCaptureMaxBufferBytes,
+        stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    if (result.error) {
+        console.error(result.error);
+        process.exit(1);
+    }
+
+    if (result.status !== 0) {
+        if (result.stdout) {
+            process.stdout.write(result.stdout);
+        }
+
+        if (result.stderr) {
+            process.stderr.write(result.stderr);
+        }
+
+        process.exit(result.status ?? 1);
+    }
+
+    return result.stdout ?? '';
 };
 
 export const getForwardedCliArgs = (): string[] => {

@@ -1,4 +1,4 @@
-import type { PollResponse } from '@sealed-vote/contracts';
+import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 
 import {
     getLocalCeremonyState,
@@ -39,6 +39,7 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     manifest: {
         optionList: ['Apples', 'Bananas'],
         rosterHash: 'a'.repeat(64),
+        scoreRange: fixedScoreRange,
     },
     manifestHash: 'b'.repeat(64),
     sessionId: 'c'.repeat(64),
@@ -151,6 +152,7 @@ const createAction = (
             messageType: 'registration',
             participantIndex: 3,
             phase: 0,
+            protocolVersion: 'v1',
             rosterHash: 'a'.repeat(64),
             sessionId: 'c'.repeat(64),
             transportPublicKey: 'transport-4' as never,

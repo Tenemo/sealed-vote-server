@@ -29,7 +29,7 @@
         "threshold-elgamal": "catalog:"
     },
     "devDependencies": {
-        "fastify": "^5.8.4",
+        "fastify": "^5.8.5",
         "rimraf": "catalog:",
         "typescript": "catalog:"
     }

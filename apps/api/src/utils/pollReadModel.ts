@@ -4,14 +4,10 @@ import { eq } from 'drizzle-orm';
 import {
     hashProtocolTranscript,
     majorityThreshold,
-    type BallotClosePayload,
-    type BallotSubmissionPayload,
-    type DecryptionSharePayload,
     type ElectionManifest,
     type ManifestPublicationPayload,
     type RegistrationPayload,
     type SignedPayload,
-    type TallyPublicationPayload,
     tryVerifyElectionCeremony,
     verifyDKGTranscript,
 } from 'threshold-elgamal';
@@ -31,7 +27,7 @@ import {
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 type PollRow = Pick<
     typeof polls.$inferSelect,
-    'createdAt' | 'id' | 'isOpen' | 'pollName' | 'slug'
+    'createdAt' | 'id' | 'isOpen' | 'pollName' | 'protocolVersion' | 'slug'
 >;
 
 const validationTarget = 15;
@@ -114,6 +110,103 @@ const filterBoardRecordsBySession = ({
               (record) => record.signedPayload.payload.sessionId === sessionId,
           )
         : [];
+
+type TypedSignedPayload<
+    TPayload extends SignedPayload['payload']['messageType'],
+> = SignedPayload<Extract<SignedPayload['payload'], { messageType: TPayload }>>;
+
+const getAcceptedPayloadsOfType = <
+    TPayload extends SignedPayload['payload']['messageType'],
+>(
+    acceptedPayloads: readonly SignedPayload[],
+    messageType: TPayload,
+): readonly TypedSignedPayload<TPayload>[] =>
+    acceptedPayloads.filter((payload) =>
+        isSignedPayloadOfType(payload, messageType),
+    ) as unknown as readonly TypedSignedPayload<TPayload>[];
+
+const getRecordPayloadsOfType = <
+    TPayload extends SignedPayload['payload']['messageType'],
+>(
+    records: PollResponse['boardEntries'],
+    messageType: TPayload,
+): readonly TypedSignedPayload<TPayload>[] => {
+    return records
+        .filter((record) => record.messageType === messageType)
+        .map(
+            (record) => record.signedPayload,
+        ) as unknown as readonly TypedSignedPayload<TPayload>[];
+};
+
+type BallotCloseSlotState = {
+    acceptedPayload: TypedSignedPayload<'ballot-close'> | null;
+    acceptedPayloads: readonly TypedSignedPayload<'ballot-close'>[];
+    invalidReason: string | null;
+    occupied: boolean;
+    rawPayloads: readonly TypedSignedPayload<'ballot-close'>[];
+};
+
+export const deriveBallotCloseSlotState = ({
+    acceptedPayloads,
+    currentSessionRecords,
+}: {
+    acceptedPayloads: readonly SignedPayload[];
+    currentSessionRecords: PollResponse['boardEntries'];
+}): BallotCloseSlotState => {
+    const rawPayloads = getRecordPayloadsOfType(
+        currentSessionRecords,
+        'ballot-close',
+    );
+    const acceptedBallotClosePayloads = getAcceptedPayloadsOfType(
+        acceptedPayloads,
+        'ballot-close',
+    );
+    const hasEquivocation = currentSessionRecords.some(
+        (record) =>
+            record.messageType === 'ballot-close' &&
+            record.classification === 'equivocation',
+    );
+
+    if (rawPayloads.length === 0) {
+        return {
+            acceptedPayload: null,
+            acceptedPayloads: acceptedBallotClosePayloads,
+            invalidReason: null,
+            occupied: false,
+            rawPayloads,
+        };
+    }
+
+    if (hasEquivocation) {
+        return {
+            acceptedPayload: null,
+            acceptedPayloads: acceptedBallotClosePayloads,
+            invalidReason:
+                'Detected ballot-close equivocation for the current session.',
+            occupied: true,
+            rawPayloads,
+        };
+    }
+
+    if (acceptedBallotClosePayloads.length !== 1) {
+        return {
+            acceptedPayload: null,
+            acceptedPayloads: acceptedBallotClosePayloads,
+            invalidReason:
+                'Ballot close requires exactly one accepted payload in the current session.',
+            occupied: true,
+            rawPayloads,
+        };
+    }
+
+    return {
+        acceptedPayload: acceptedBallotClosePayloads[0],
+        acceptedPayloads: acceptedBallotClosePayloads,
+        invalidReason: null,
+        occupied: true,
+        rawPayloads,
+    };
+};
 
 const findMissingParticipantsByMessageType = ({
     activeParticipants,
@@ -360,11 +453,13 @@ const buildVerifiedVerification = ({
 
 const buildVerificationSummary = async ({
     acceptedPayloads,
+    currentSessionRecords,
     manifest,
     sessionId,
     participantCount,
 }: {
     acceptedPayloads: readonly SignedPayload[];
+    currentSessionRecords: PollResponse['boardEntries'];
     manifest: ElectionManifest | null;
     sessionId: string | null;
     participantCount: number;
@@ -384,7 +479,7 @@ const buildVerificationSummary = async ({
         };
     }
 
-    const dkgTranscript = acceptedPayloads.filter(
+    const acceptedDkgTranscript = acceptedPayloads.filter(
         (payload) =>
             !isSignedPayloadOfType(payload, 'ballot-submission') &&
             !isSignedPayloadOfType(payload, 'ballot-close') &&
@@ -393,7 +488,7 @@ const buildVerificationSummary = async ({
     );
 
     if (
-        !dkgTranscript.some((payload) =>
+        !acceptedDkgTranscript.some((payload) =>
             isSignedPayloadOfType(payload, 'manifest-publication'),
         )
     ) {
@@ -441,7 +536,7 @@ const buildVerificationSummary = async ({
     let verifiedDkg: Awaited<ReturnType<typeof verifyDKGTranscript>>;
     try {
         verifiedDkg = await verifyDKGTranscript({
-            transcript: dkgTranscript,
+            transcript: acceptedDkgTranscript,
             manifest,
             sessionId,
         });
@@ -458,11 +553,12 @@ const buildVerificationSummary = async ({
         };
     }
 
-    const ballotClosePayload = acceptedPayloads.find((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-close'),
-    ) as SignedPayload<BallotClosePayload> | undefined;
+    const ballotCloseSlotState = deriveBallotCloseSlotState({
+        acceptedPayloads,
+        currentSessionRecords,
+    });
 
-    if (!ballotClosePayload) {
+    if (!ballotCloseSlotState.occupied) {
         const completeEncryptedBallotParticipantCount =
             countCompleteBallotParticipants({
                 acceptedPayloads,
@@ -481,9 +577,21 @@ const buildVerificationSummary = async ({
         };
     }
 
-    const decryptionSharePayloads = acceptedPayloads.filter((payload) =>
-        isSignedPayloadOfType(payload, 'decryption-share'),
-    ) as readonly SignedPayload<DecryptionSharePayload>[];
+    if (ballotCloseSlotState.invalidReason) {
+        return {
+            dkgCompleted: true,
+            qualParticipantIndices: verifiedDkg.qualifiedParticipantIndices,
+            verification: buildInvalidVerification(
+                verifiedDkg.qualifiedParticipantIndices,
+                ballotCloseSlotState.invalidReason,
+            ),
+        };
+    }
+
+    const decryptionSharePayloads = getAcceptedPayloadsOfType(
+        acceptedPayloads,
+        'decryption-share',
+    );
 
     if (decryptionSharePayloads.length === 0) {
         return {
@@ -496,9 +604,10 @@ const buildVerificationSummary = async ({
         };
     }
 
-    const tallyPublications = acceptedPayloads.filter((payload) =>
-        isSignedPayloadOfType(payload, 'tally-publication'),
-    ) as readonly SignedPayload<TallyPublicationPayload>[];
+    const tallyPublications = getAcceptedPayloadsOfType(
+        acceptedPayloads,
+        'tally-publication',
+    );
 
     if (tallyPublications.length === 0) {
         return {
@@ -522,18 +631,34 @@ const buildVerificationSummary = async ({
         };
     }
 
-    const ballotPayloads = acceptedPayloads.filter((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-submission'),
-    ) as readonly SignedPayload<BallotSubmissionPayload>[];
+    const currentSessionPayloads = currentSessionRecords.map(
+        (record) => record.signedPayload,
+    );
+    const rawDkgTranscript = currentSessionPayloads.filter(
+        (payload) =>
+            !isSignedPayloadOfType(payload, 'ballot-submission') &&
+            !isSignedPayloadOfType(payload, 'ballot-close') &&
+            !isSignedPayloadOfType(payload, 'decryption-share') &&
+            !isSignedPayloadOfType(payload, 'tally-publication'),
+    );
 
     const verificationResult = await tryVerifyElectionCeremony({
         manifest,
         sessionId,
-        dkgTranscript,
-        ballotPayloads,
-        ballotClosePayload,
-        decryptionSharePayloads,
-        tallyPublications,
+        dkgTranscript: rawDkgTranscript,
+        ballotPayloads: getRecordPayloadsOfType(
+            currentSessionRecords,
+            'ballot-submission',
+        ),
+        ballotClosePayloads: ballotCloseSlotState.rawPayloads,
+        decryptionSharePayloads: getRecordPayloadsOfType(
+            currentSessionRecords,
+            'decryption-share',
+        ),
+        tallyPublications: getRecordPayloadsOfType(
+            currentSessionRecords,
+            'tally-publication',
+        ),
     });
 
     if (!verificationResult.ok) {
@@ -635,6 +760,7 @@ const getPollRow = async (
             id: true,
             isOpen: true,
             pollName: true,
+            protocolVersion: true,
             slug: true,
         },
         with: {
@@ -694,6 +820,7 @@ export const getPollFetchReadModel = async (
         persistedSessions: poll.pollCeremonySessions,
         pollCreatedAt: poll.createdAt,
         pollId: poll.id,
+        protocolVersion: poll.protocolVersion,
     });
     const activeParticipantCount = ceremonySession.activeParticipantCount;
     const participantDeviceReadinessByIndex = new Map(
@@ -739,9 +866,11 @@ export const getPollFetchReadModel = async (
             optionCount: poll.choices.length,
         });
     const reconstructionThreshold = thresholds.reconstructionThreshold;
-    const hasBallotClose = acceptedPayloads.some((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-close'),
-    );
+    const ballotCloseSlotState = deriveBallotCloseSlotState({
+        acceptedPayloads,
+        currentSessionRecords,
+    });
+    const hasBallotClose = ballotCloseSlotState.occupied;
     const revealReady =
         !poll.isOpen &&
         reconstructionThreshold !== null &&
@@ -766,6 +895,7 @@ export const getPollFetchReadModel = async (
 
     const verificationSummary = await buildVerificationSummary({
         acceptedPayloads,
+        currentSessionRecords,
         manifest,
         sessionId,
         participantCount: activeParticipantCount,

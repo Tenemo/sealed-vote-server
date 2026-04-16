@@ -1,7 +1,9 @@
-import type { PollResponse } from '@sealed-vote/contracts';
+import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
+import { RISTRETTO_GROUP } from 'threshold-elgamal';
 
 import {
     describeAutomaticCeremonyAction,
+    prepareAggregateForReveal,
     resolveAutomaticCeremonyAction,
 } from './pollBoardActions';
 
@@ -42,6 +44,7 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     manifest: {
         optionList: ['Apples', 'Bananas'],
         rosterHash: 'a'.repeat(64),
+        scoreRange: fixedScoreRange,
     },
     manifestHash: 'b'.repeat(64),
     sessionId: 'c'.repeat(64),
@@ -158,6 +161,34 @@ const createVoterSession = (
 });
 
 describe('pollBoardActions', () => {
+    it('rerandomizes reveal aggregates when the accepted aggregate ciphertext has identity c1', () => {
+        const aggregate = {
+            ballotCount: 1,
+            ciphertext: {
+                c1: '0'.repeat(64),
+                c2: '0'.repeat(64),
+            },
+            transcriptHash: 'a'.repeat(64),
+        } as Parameters<typeof prepareAggregateForReveal>[0]['aggregate'];
+
+        const preparedAggregate = prepareAggregateForReveal({
+            aggregate,
+            jointPublicKey: RISTRETTO_GROUP.g,
+            manifestHash: 'b'.repeat(64),
+            optionIndex: 1,
+            sessionId: 'c'.repeat(64),
+        });
+
+        expect(preparedAggregate.ciphertext.c1).not.toBe(
+            aggregate.ciphertext.c1,
+        );
+        expect(preparedAggregate.ciphertext.c2).not.toBe(
+            aggregate.ciphertext.c2,
+        );
+        expect(preparedAggregate.transcriptHash).toBe(aggregate.transcriptHash);
+        expect(preparedAggregate.ballotCount).toBe(aggregate.ballotCount);
+    });
+
     it('returns null while voting is still open', async () => {
         await expect(
             resolveAutomaticCeremonyAction({
@@ -185,6 +216,7 @@ describe('pollBoardActions', () => {
                         messageType: 'registration',
                         participantIndex: 1,
                         phase: 0,
+                        protocolVersion: 'v1',
                         rosterHash: 'b'.repeat(64),
                         sessionId: 'c'.repeat(64),
                         authPublicKey: 'auth-1' as never,

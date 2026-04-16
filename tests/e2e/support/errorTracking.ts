@@ -1,8 +1,10 @@
 import {
-    expect,
     type ConsoleMessage,
+    type Frame,
     type Page,
+    type Request,
     type Response,
+    type TestInfo,
 } from '@playwright/test';
 
 type ErrorTrackingOptions = {
@@ -10,12 +12,38 @@ type ErrorTrackingOptions = {
     allowedConsoleErrors?: RegExp[];
 };
 
+type ErrorTrackingAttacher = (page: Page) => Page;
+
 export type UnexpectedErrorTracker = {
     readonly errors: string[];
     readonly pendingChecks: Set<Promise<void>>;
+    readonly recentEvents: string[];
+    readonly trackedPages: Map<Page, string>;
+    readonly testInfo?: TestInfo;
+    reportAttached: boolean;
+};
+
+type TrackedPageSnapshot = {
+    bodyText: string;
+    locationHref: string;
+    navigationEntry: {
+        domContentLoadedEventEnd: number;
+        duration: number;
+        loadEventEnd: number;
+        responseEnd: number;
+        type: string;
+    } | null;
+    readyState: string;
+    title: string;
+    visibilityState: string;
 };
 
 const maxTrackedDetailLength = 240;
+const maxTrackedRecentEvents = 40;
+const pageSnapshotBodyTextLength = 320;
+const pageSnapshotTimeoutMs = 5_000;
+const unexpectedErrorReportAttachmentName =
+    'unexpected-error-diagnostics.txt';
 
 const knownApiHostnames = new Set([
     '127.0.0.1',
@@ -23,19 +51,37 @@ const knownApiHostnames = new Set([
     'sealed.vote',
     'api.sealed.vote',
 ]);
+const trackedRequestFailureResourceTypes = new Set([
+    'document',
+    'fetch',
+    'script',
+    'stylesheet',
+    'xhr',
+]);
 
-export const createUnexpectedErrorTracker = (): UnexpectedErrorTracker => ({
+export const createUnexpectedErrorTracker = ({
+    testInfo,
+}: {
+    testInfo?: TestInfo;
+} = {}): UnexpectedErrorTracker => ({
     errors: [],
     pendingChecks: new Set(),
+    recentEvents: [],
+    trackedPages: new Map(),
+    reportAttached: false,
+    testInfo,
 });
 
 const normalizeTrackedText = (value: string): string =>
     value.replaceAll(/\s+/gu, ' ').trim();
 
-const truncateTrackedText = (value: string): string =>
-    value.length <= maxTrackedDetailLength
+const truncateTrackedText = (
+    value: string,
+    maxLength = maxTrackedDetailLength,
+): string =>
+    value.length <= maxLength
         ? value
-        : `${value.slice(0, maxTrackedDetailLength - 3)}...`;
+        : `${value.slice(0, maxLength - 3)}...`;
 
 const matchesAllowedConsoleError = (
     pattern: RegExp,
@@ -77,9 +123,37 @@ const formatTrackedLocation = ({
 };
 
 const formatTrackedPageUrl = (page: Page): string | null => {
-    const pageUrl = page.url();
+    let pageUrl = '';
+
+    try {
+        pageUrl = page.url();
+    } catch {
+        pageUrl = '';
+    }
 
     return pageUrl ? pageUrl : null;
+};
+
+const pushTrackerEvent = (
+    tracker: UnexpectedErrorTracker,
+    message: string,
+): void => {
+    tracker.recentEvents.push(message);
+
+    if (tracker.recentEvents.length > maxTrackedRecentEvents) {
+        tracker.recentEvents.splice(
+            0,
+            tracker.recentEvents.length - maxTrackedRecentEvents,
+        );
+    }
+};
+
+const recordTrackedError = (
+    tracker: UnexpectedErrorTracker,
+    message: string,
+): void => {
+    tracker.errors.push(message);
+    pushTrackerEvent(tracker, message);
 };
 
 const formatConsoleError = ({
@@ -172,27 +246,316 @@ const formatTrackedResponseError = async ({
         .join(' ');
 };
 
+const formatTrackedRequestFailure = ({
+    label,
+    page,
+    request,
+}: {
+    label: string;
+    page: Page;
+    request: Request;
+}): string => {
+    const pageUrl = formatTrackedPageUrl(page);
+    const failureText = request.failure()?.errorText;
+
+    return [
+        `[${label}] requestfailed: ${request.method()} ${request.url()}`,
+        `resource=${request.resourceType()}`,
+        pageUrl ? `(page ${pageUrl})` : null,
+        failureText
+            ? `failure=${truncateTrackedText(
+                  normalizeTrackedText(failureText),
+              )}`
+            : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+};
+
+const formatTrackedLifecycleEvent = ({
+    eventName,
+    label,
+    page,
+}: {
+    eventName: 'close' | 'domcontentloaded' | 'load';
+    label: string;
+    page: Page;
+}): string => {
+    const pageUrl = formatTrackedPageUrl(page);
+
+    return [
+        `[${label}] ${eventName}`,
+        pageUrl ? `(page ${pageUrl})` : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+};
+
+const formatTrackedFrameNavigation = ({
+    frame,
+    label,
+    page,
+}: {
+    frame: Frame;
+    label: string;
+    page: Page;
+}): string => {
+    const pageUrl = formatTrackedPageUrl(page);
+    const frameUrl = frame.url();
+
+    return [
+        `[${label}] framenavigated: ${frameUrl}`,
+        pageUrl && pageUrl !== frameUrl ? `(page ${pageUrl})` : null,
+    ]
+        .filter(Boolean)
+        .join(' ');
+};
+
+const resolveTrackedHostnames = (page: Page): Set<string> => {
+    const allowedHostnames = new Set(knownApiHostnames);
+    const currentPageUrl = formatTrackedPageUrl(page);
+
+    if (!currentPageUrl) {
+        return allowedHostnames;
+    }
+
+    let currentPageHostname = '';
+
+    try {
+        currentPageHostname = new URL(currentPageUrl).hostname;
+    } catch {
+        return allowedHostnames;
+    }
+
+    allowedHostnames.add(currentPageHostname);
+
+    if (
+        currentPageHostname !== 'localhost' &&
+        currentPageHostname !== '127.0.0.1'
+    ) {
+        allowedHostnames.add(`api.${currentPageHostname}`);
+    }
+
+    return allowedHostnames;
+};
+
 const isTrackedApiResponse = (page: Page, responseUrl: URL): boolean => {
     if (!responseUrl.pathname.includes('/api/')) {
         return false;
     }
 
-    const allowedHostnames = new Set(knownApiHostnames);
-    const currentPageUrl = page.url();
+    return resolveTrackedHostnames(page).has(responseUrl.hostname);
+};
 
-    if (currentPageUrl) {
-        const currentPageHostname = new URL(currentPageUrl).hostname;
-        allowedHostnames.add(currentPageHostname);
+const isTrackedRequestFailure = (page: Page, request: Request): boolean => {
+    let requestUrl: URL;
 
-        if (
-            currentPageHostname !== 'localhost' &&
-            currentPageHostname !== '127.0.0.1'
-        ) {
-            allowedHostnames.add(`api.${currentPageHostname}`);
-        }
+    try {
+        requestUrl = new URL(request.url());
+    } catch {
+        return false;
     }
 
-    return allowedHostnames.has(responseUrl.hostname);
+    return (
+        trackedRequestFailureResourceTypes.has(request.resourceType()) &&
+        resolveTrackedHostnames(page).has(requestUrl.hostname)
+    );
+};
+
+const isTrackedMainFrame = (page: Page, frame: Frame): boolean =>
+    frame === page.mainFrame();
+
+const withTimeout = async <Result>(
+    promise: Promise<Result>,
+    label: string,
+    timeoutMs: number,
+): Promise<Result> => {
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<Result>((_resolve, reject) => {
+                timeoutHandle = setTimeout(() => {
+                    reject(
+                        new Error(
+                            `${label} timed out after ${timeoutMs}ms.`,
+                        ),
+                    );
+                }, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutHandle !== null) {
+            clearTimeout(timeoutHandle);
+        }
+    }
+};
+
+const collectTrackedPageSnapshot = async (
+    page: Page,
+): Promise<TrackedPageSnapshot> =>
+    await withTimeout(
+        page.evaluate(() => {
+            const navigationEntries =
+                window.performance.getEntriesByType('navigation');
+            const navigationEntry =
+                navigationEntries.length > 0 ? navigationEntries[0] : null;
+            const normalizedNavigationEntry =
+                navigationEntry &&
+                typeof navigationEntry === 'object' &&
+                'responseEnd' in navigationEntry &&
+                typeof navigationEntry.responseEnd === 'number' &&
+                'domContentLoadedEventEnd' in navigationEntry &&
+                typeof navigationEntry.domContentLoadedEventEnd === 'number' &&
+                'loadEventEnd' in navigationEntry &&
+                typeof navigationEntry.loadEventEnd === 'number' &&
+                'duration' in navigationEntry &&
+                typeof navigationEntry.duration === 'number' &&
+                'type' in navigationEntry &&
+                typeof navigationEntry.type === 'string'
+                    ? {
+                          domContentLoadedEventEnd: Math.round(
+                              navigationEntry.domContentLoadedEventEnd,
+                          ),
+                          duration: Math.round(navigationEntry.duration),
+                          loadEventEnd: Math.round(
+                              navigationEntry.loadEventEnd,
+                          ),
+                          responseEnd: Math.round(
+                              navigationEntry.responseEnd,
+                          ),
+                          type: navigationEntry.type,
+                      }
+                    : null;
+
+            return {
+                bodyText: document.body?.innerText ?? '',
+                locationHref: window.location.href,
+                navigationEntry: normalizedNavigationEntry,
+                readyState: document.readyState,
+                title: document.title,
+                visibilityState: document.visibilityState,
+            };
+        }),
+        'page snapshot',
+        pageSnapshotTimeoutMs,
+    );
+
+const formatTrackedNavigationEntry = (
+    navigationEntry: NonNullable<TrackedPageSnapshot['navigationEntry']>,
+): string =>
+    `navigation=${navigationEntry.type} responseEnd=${navigationEntry.responseEnd} domContentLoaded=${navigationEntry.domContentLoadedEventEnd} load=${navigationEntry.loadEventEnd} duration=${navigationEntry.duration}`;
+
+const formatTrackedPageSnapshot = async ({
+    label,
+    page,
+}: {
+    label: string;
+    page: Page;
+}): Promise<string> => {
+    const pageUrl = formatTrackedPageUrl(page);
+
+    if (page.isClosed()) {
+        return [
+            `[${label}] snapshot: closed`,
+            pageUrl ? `pageUrl=${pageUrl}` : null,
+        ]
+            .filter(Boolean)
+            .join(' ');
+    }
+
+    try {
+        const snapshot = await collectTrackedPageSnapshot(page);
+        const bodyText = truncateTrackedText(
+            normalizeTrackedText(snapshot.bodyText),
+            pageSnapshotBodyTextLength,
+        );
+        const title = truncateTrackedText(
+            normalizeTrackedText(snapshot.title),
+        );
+
+        return [
+            `[${label}] snapshot:`,
+            pageUrl ? `pageUrl=${pageUrl}` : null,
+            snapshot.locationHref
+                ? `location=${snapshot.locationHref}`
+                : null,
+            `readyState=${snapshot.readyState}`,
+            `visibility=${snapshot.visibilityState}`,
+            title ? `title=${JSON.stringify(title)}` : null,
+            bodyText ? `body=${JSON.stringify(bodyText)}` : null,
+            snapshot.navigationEntry
+                ? formatTrackedNavigationEntry(snapshot.navigationEntry)
+                : null,
+        ]
+            .filter(Boolean)
+            .join(' ');
+    } catch (error) {
+        const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
+        return [
+            `[${label}] snapshot unavailable:`,
+            pageUrl ? `pageUrl=${pageUrl}` : null,
+            `reason=${truncateTrackedText(
+                normalizeTrackedText(errorMessage),
+            )}`,
+        ]
+            .filter(Boolean)
+            .join(' ');
+    }
+};
+
+const buildUnexpectedErrorReport = async (
+    tracker: UnexpectedErrorTracker,
+): Promise<string> => {
+    const pageSnapshots = await Promise.all(
+        [...tracker.trackedPages.entries()].map(
+            async ([page, label]) =>
+                await formatTrackedPageSnapshot({
+                    label,
+                    page,
+                }),
+        ),
+    );
+    const reportLines = [
+        'Unexpected browser errors detected:',
+        ...tracker.errors.map((message) => `- ${message}`),
+    ];
+
+    if (tracker.recentEvents.length > 0) {
+        reportLines.push(
+            '',
+            'Recent page activity:',
+            ...tracker.recentEvents.map((message) => `- ${message}`),
+        );
+    }
+
+    if (pageSnapshots.length > 0) {
+        reportLines.push(
+            '',
+            'Tracked page snapshots:',
+            ...pageSnapshots.map((snapshot) => `- ${snapshot}`),
+        );
+    }
+
+    return reportLines.join('\n');
+};
+
+const attachUnexpectedErrorReport = async (
+    tracker: UnexpectedErrorTracker,
+    report: string,
+): Promise<void> => {
+    if (!tracker.testInfo || tracker.reportAttached) {
+        return;
+    }
+
+    tracker.reportAttached = true;
+    await tracker.testInfo.attach(unexpectedErrorReportAttachmentName, {
+        body: Buffer.from(report, 'utf8'),
+        contentType: 'text/plain',
+    });
 };
 
 export const attachErrorTracking = (
@@ -204,6 +567,8 @@ export const attachErrorTracking = (
     const allowedApiStatuses = new Set(options.allowedApiStatuses ?? []);
     const allowedConsoleErrors = options.allowedConsoleErrors ?? [];
 
+    tracker.trackedPages.set(page, label);
+
     page.on('console', (message) => {
         if (
             message.type() === 'error' &&
@@ -211,7 +576,8 @@ export const attachErrorTracking = (
                 matchesAllowedConsoleError(pattern, message.text()),
             )
         ) {
-            tracker.errors.push(
+            recordTrackedError(
+                tracker,
                 formatConsoleError({
                     label,
                     message,
@@ -230,7 +596,8 @@ export const attachErrorTracking = (
                   )}`
                 : '';
 
-        tracker.errors.push(
+        recordTrackedError(
+            tracker,
             `[${label}] pageerror${
                 pageUrl ? ` (page ${pageUrl})` : ''
             }: ${error.message}${stack}`,
@@ -249,7 +616,8 @@ export const attachErrorTracking = (
         }
 
         const pendingCheck = (async () => {
-            tracker.errors.push(
+            recordTrackedError(
+                tracker,
                 await formatTrackedResponseError({
                     label,
                     page,
@@ -264,11 +632,104 @@ export const attachErrorTracking = (
             tracker.pendingChecks.delete(pendingCheck);
         });
     });
+
+    page.on('requestfailed', (request) => {
+        if (!isTrackedRequestFailure(page, request)) {
+            return;
+        }
+
+        pushTrackerEvent(
+            tracker,
+            formatTrackedRequestFailure({
+                label,
+                page,
+                request,
+            }),
+        );
+    });
+
+    page.on('framenavigated', (frame) => {
+        if (!isTrackedMainFrame(page, frame)) {
+            return;
+        }
+
+        pushTrackerEvent(
+            tracker,
+            formatTrackedFrameNavigation({
+                frame,
+                label,
+                page,
+            }),
+        );
+    });
+
+    page.on('domcontentloaded', () => {
+        pushTrackerEvent(
+            tracker,
+            formatTrackedLifecycleEvent({
+                eventName: 'domcontentloaded',
+                label,
+                page,
+            }),
+        );
+    });
+
+    page.on('load', () => {
+        pushTrackerEvent(
+            tracker,
+            formatTrackedLifecycleEvent({
+                eventName: 'load',
+                label,
+                page,
+            }),
+        );
+    });
+
+    page.on('close', () => {
+        pushTrackerEvent(
+            tracker,
+            formatTrackedLifecycleEvent({
+                eventName: 'close',
+                label,
+                page,
+            }),
+        );
+        tracker.trackedPages.delete(page);
+    });
 };
 
-export const expectNoUnexpectedErrors = (
+export const createErrorTrackingAttacher = ({
+    label,
+    options = {},
+    tracker,
+}: {
+    label: string;
+    options?: ErrorTrackingOptions;
+    tracker: UnexpectedErrorTracker;
+}): ErrorTrackingAttacher => {
+    const attachedPages = new WeakSet<Page>();
+
+    return (page: Page): Page => {
+        if (attachedPages.has(page)) {
+            return page;
+        }
+
+        attachErrorTracking(page, label, tracker, options);
+        attachedPages.add(page);
+        return page;
+    };
+};
+
+export const expectNoUnexpectedErrors = async (
     tracker: UnexpectedErrorTracker,
-): Promise<void> =>
-    Promise.allSettled([...tracker.pendingChecks]).then(() => {
-        expect(tracker.errors).toEqual([]);
-    });
+): Promise<void> => {
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    if (tracker.errors.length === 0) {
+        return;
+    }
+
+    const report = await buildUnexpectedErrorReport(tracker);
+    await attachUnexpectedErrorReport(tracker, report);
+    throw new Error(report);
+};

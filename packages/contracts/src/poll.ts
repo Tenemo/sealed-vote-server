@@ -1,6 +1,11 @@
-import type { ElectionManifest } from 'threshold-elgamal';
+import type { ElectionManifest, ScoreRange } from 'threshold-elgamal';
 
 import type { BoardMessageRecord } from './vote.js';
+
+export const fixedScoreRange = {
+    min: 1,
+    max: 10,
+} as const satisfies ScoreRange;
 
 export type CreatePollRequest = {
     choices: string[];

@@ -14,7 +14,7 @@ import {
     type CreatedPoll,
 } from './support/pollFlow';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -25,18 +25,34 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const pollTitle = `Duplicate title vote ${namespace}`.slice(0, 64);
     const firstPollVoterName = createVoterName('alice', namespace);
     const secondPollVoterName = createVoterName('bob', namespace);
+    const attachFirstPollTracking = createErrorTrackingAttacher({
+        label: 'first-poll',
+        options: {
+            allowedConsoleErrors: [/^Error$/],
+        },
+        tracker,
+    });
+    const attachSecondPollTracking = createErrorTrackingAttacher({
+        label: 'second-poll',
+        options: {
+            allowedConsoleErrors: [/^Error$/],
+        },
+        tracker,
+    });
 
     const createPollWithTitle = async (): Promise<CreatedPoll> => {
-        const createdPoll = await createPoll({
+        const createdPollResult = await createPoll({
             page,
             pollName: pollTitle,
         });
+        page = createdPollResult.page;
+        const createdPoll = createdPollResult.createdPoll;
         createdPolls.push(createdPoll);
 
         return createdPoll;
@@ -47,28 +63,30 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
 
     expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
 
-    attachErrorTracking(page, 'first-poll', tracker, {
-        allowedConsoleErrors: [/^Error$/],
-    });
-
-    await gotoInteractablePage(page, firstPoll.pollUrl);
-    await registerParticipant({
-        page,
-        voterName: firstPollVoterName,
-    });
+    page = attachFirstPollTracking(page);
+    page = attachFirstPollTracking(
+        await gotoInteractablePage(page, firstPoll.pollUrl),
+    );
+    page = attachFirstPollTracking(
+        await registerParticipant({
+            page,
+            voterName: firstPollVoterName,
+        }),
+    );
     await expectParticipantsVisible(page, [firstPollVoterName]);
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'second-poll', tracker, {
-        allowedConsoleErrors: [/^Error$/],
-    });
+    participant.page = attachSecondPollTracking(participant.page);
 
     try {
-        await registerParticipant({
-            page: participant.page,
-            pollUrl: secondPoll.pollUrl,
-            voterName: secondPollVoterName,
-        });
+        participant.page = attachSecondPollTracking(
+            await registerParticipant({
+                attachPage: attachSecondPollTracking,
+                page: participant.page,
+                pollUrl: secondPoll.pollUrl,
+                voterName: secondPollVoterName,
+            }),
+        );
 
         await expectParticipantsVisible(participant.page, [
             secondPollVoterName,

@@ -31,6 +31,7 @@ temp-preview-*.txt
 tmp/
 tmp.*
 tmp-*
+.tmp-*
 
 # Environment
 .env

@@ -1,6 +1,7 @@
 import type { ProtocolPayload } from 'threshold-elgamal';
 
 const textEncoder = new TextEncoder();
+const maxEncodedElementLength = 0xffff_ffff;
 
 const canonicalizeJson = (value: unknown): string => {
     if (
@@ -32,6 +33,45 @@ const canonicalizeJson = (value: unknown): string => {
     );
 };
 
+const protocolSignatureDomain = 'threshold-elgamal/protocol-signature';
+
+const concatBytes = (...arrays: readonly Uint8Array[]): Uint8Array => {
+    const totalLength = arrays.reduce((sum, array) => sum + array.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+
+    for (const array of arrays) {
+        result.set(array, offset);
+        offset += array.length;
+    }
+
+    return result;
+};
+
+const encodeLength = (length: number): Uint8Array => {
+    if (
+        !Number.isInteger(length) ||
+        length < 0 ||
+        length > maxEncodedElementLength
+    ) {
+        throw new TypeError(
+            'Encoded element length must fit in a 32-bit unsigned integer.',
+        );
+    }
+
+    const bytes = new Uint8Array(4);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, length, false);
+    return bytes;
+};
+
+const encodeForChallenge = (...elements: readonly Uint8Array[]): Uint8Array =>
+    concatBytes(
+        ...elements.map((element) =>
+            concatBytes(encodeLength(element.length), element),
+        ),
+    );
+
 export const protocolPayloadSlotKey = (payload: ProtocolPayload): string => {
     const prefix = `${payload.sessionId}:${payload.phase}:${payload.participantIndex}:${payload.messageType}`;
 
@@ -58,6 +98,15 @@ export const protocolPayloadSlotKey = (payload: ProtocolPayload): string => {
 export const canonicalUnsignedPayloadBytes = (
     payload: ProtocolPayload,
 ): Uint8Array => textEncoder.encode(canonicalizeJson(payload));
+
+export const signedProtocolPayloadBytes = (
+    payload: ProtocolPayload,
+): Uint8Array =>
+    encodeForChallenge(
+        textEncoder.encode(protocolSignatureDomain),
+        textEncoder.encode(payload.protocolVersion),
+        canonicalUnsignedPayloadBytes(payload),
+    );
 
 const compareStrings = (left: string, right: string): number => {
     if (left < right) {

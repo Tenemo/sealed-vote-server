@@ -13,7 +13,7 @@ import {
     type CreatedPoll,
 } from './support/pollFlow';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -28,36 +28,52 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const firstVoterName = createVoterName('alice', namespace);
     const secondVoterName = createVoterName('bob', namespace);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'page-1',
+        tracker,
+    });
+    const attachParticipantTracking = createErrorTrackingAttacher({
+        label: 'page-2',
+        options: {
+            allowedApiStatuses: [409],
+            allowedConsoleErrors: [
+                /Failed to load resource: the server responded with a status of 409/u,
+            ],
+        },
+        tracker,
+    });
 
-    attachErrorTracking(page, 'page-1', tracker);
+    page = attachCreatorTracking(page);
 
-    const createdPoll = await createPoll({
+    const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Duplicate name vote', namespace),
     });
+    page = attachCreatorTracking(createdPollResult.page);
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
-    await submitVote({
-        page,
-        scores: [9, 4],
-        voterName: firstVoterName,
-    });
+    page = attachCreatorTracking(
+        await submitVote({
+            page,
+            scores: [9, 4],
+            voterName: firstVoterName,
+        }),
+    );
 
     const participant = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participant.page, 'page-2', tracker, {
-        allowedApiStatuses: [409],
-        allowedConsoleErrors: [
-            /Failed to load resource: the server responded with a status of 409/u,
-        ],
-    });
+    participant.page = attachParticipantTracking(participant.page);
 
     try {
-        await gotoInteractablePage(participant.page, createdPoll.pollUrl);
+        participant.page = attachParticipantTracking(
+            await gotoInteractablePage(participant.page, createdPoll.pollUrl),
+        );
 
         await participant.page
             .getByLabel('Your public name')

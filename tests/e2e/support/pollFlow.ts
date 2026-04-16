@@ -40,6 +40,30 @@ export type CreatedPoll = {
     pollUrl: string;
 };
 
+export type CreatedPollResult = {
+    createdPoll: CreatedPoll;
+    page: Page;
+};
+
+type PageAttacher = (page: Page) => Page;
+
+type CreatePollOptions = {
+    attachPage?: PageAttacher;
+    choices?: string[];
+    page: Page;
+    pollName: string;
+    skipInitialNavigation?: boolean;
+};
+
+type SubmitVoteOptions = {
+    attachPage?: PageAttacher;
+    choices?: string[];
+    page: Page;
+    pollUrl?: string;
+    scores?: number[];
+    voterName: string;
+};
+
 const getResultCard = (page: Page, choice: string): Locator =>
     page
         .getByTestId('verified-results-panel')
@@ -48,6 +72,11 @@ const getResultCard = (page: Page, choice: string): Locator =>
             has: page.getByText(choice, { exact: true }),
         })
         .first();
+
+const attachPollFlowPage = (
+    page: Page,
+    attachPage?: PageAttacher,
+): Page => (attachPage ? attachPage(page) : page);
 
 const waitForAnyVisibleText = async ({
     page,
@@ -82,18 +111,17 @@ const waitForAnyVisibleText = async ({
 };
 
 export const createPoll = async ({
+    attachPage,
     page,
     pollName,
     choices = ['Apples', 'Bananas'],
     skipInitialNavigation = false,
-}: {
-    page: Page;
-    pollName: string;
-    choices?: string[];
-    skipInitialNavigation?: boolean;
-}): Promise<CreatedPoll> => {
+}: CreatePollOptions): Promise<CreatedPollResult> => {
     if (!skipInitialNavigation) {
-        await gotoInteractablePage(page, '/');
+        page = attachPollFlowPage(
+            await gotoInteractablePage(page, '/'),
+            attachPage,
+        );
     }
 
     await page.getByLabel('Vote name').fill(pollName);
@@ -117,29 +145,30 @@ export const createPoll = async ({
     const createdPoll = (await createPollResponse.json()) as CreatePollResponse;
 
     return {
-        apiBaseUrl: new URL(createPollResponse.url()).origin,
-        creatorToken: createdPoll.creatorToken,
-        pollId: createdPoll.id,
-        pollSlug: createdPoll.slug,
-        pollUrl: page.url(),
+        createdPoll: {
+            apiBaseUrl: new URL(createPollResponse.url()).origin,
+            creatorToken: createdPoll.creatorToken,
+            pollId: createdPoll.id,
+            pollSlug: createdPoll.slug,
+            pollUrl: page.url(),
+        },
+        page,
     };
 };
 
 export const submitVote = async ({
+    attachPage,
     page,
     pollUrl,
     scores = [8, 6],
     voterName,
     choices = ['Apples', 'Bananas'],
-}: {
-    page: Page;
-    pollUrl?: string;
-    scores?: number[];
-    voterName: string;
-    choices?: string[];
-}): Promise<void> => {
+}: SubmitVoteOptions): Promise<Page> => {
     if (pollUrl) {
-        await gotoInteractablePage(page, pollUrl);
+        page = attachPollFlowPage(
+            await gotoInteractablePage(page, pollUrl),
+            attachPage,
+        );
     }
 
     await page.getByLabel('Your public name').fill(voterName);
@@ -157,6 +186,8 @@ export const submitVote = async ({
     await expect(
         page.getByText('Vote stored on this device', { exact: true }),
     ).toBeVisible({ timeout: 30_000 });
+
+    return page;
 };
 
 export const createExpectedVerifiedResults = ({
@@ -192,12 +223,10 @@ export const createExpectedVerifiedResults = ({
     });
 };
 
-export const registerParticipant = async (input: {
-    page: Page;
-    pollUrl?: string;
-    voterName: string;
-}): Promise<void> => {
-    await submitVote({
+export const registerParticipant = async (
+    input: Pick<SubmitVoteOptions, 'attachPage' | 'page' | 'pollUrl' | 'voterName'>,
+): Promise<Page> => {
+    return await submitVote({
         ...input,
     });
 };
@@ -384,9 +413,8 @@ export const expectPostCloseVisible = async (page: Page): Promise<void> => {
     ).toBeVisible();
 };
 
-export const reloadPollPage = async (page: Page): Promise<void> => {
+export const reloadPollPage = async (page: Page): Promise<Page> =>
     await reloadInteractablePage(page);
-};
 
 const deletePoll = async (
     request: APIRequestContext,

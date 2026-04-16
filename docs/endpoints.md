@@ -28,6 +28,7 @@ The backend routes live under `/api`. The payloads below match the shared contra
 - response highlights:
   - public submitted roster
   - manifest and manifest hash after close
+  - when `manifest` is not `null`, it has the shape `{ rosterHash, optionList, scoreRange }`, where `scoreRange` is fixed to `{ "min": 1, "max": 10 }`
   - session id and human-readable session fingerprint after close
   - derived poll phase
   - honest-majority threshold summary
@@ -44,8 +45,18 @@ Example response:
     "pollName": "Lunch vote",
     "choices": ["Pizza", "Sushi", "Pasta"],
     "voters": [
-        { "voterIndex": 1, "voterName": "Alice", "deviceReady": true },
-        { "voterIndex": 2, "voterName": "Bob", "deviceReady": true }
+        {
+            "voterIndex": 1,
+            "voterName": "Alice",
+            "deviceReady": true,
+            "ceremonyState": "active"
+        },
+        {
+            "voterIndex": 2,
+            "voterName": "Bob",
+            "deviceReady": true,
+            "ceremonyState": "active"
+        }
     ],
     "isOpen": true,
     "phase": "open",
@@ -72,7 +83,6 @@ Example response:
     "thresholds": {
         "reconstructionThreshold": null,
         "minimumPublishedVoterCount": null,
-        "strictMajorityFloor": null,
         "maxParticipants": 51,
         "validationTarget": 15
     },
@@ -80,8 +90,26 @@ Example response:
         "acceptedRegistrationCount": 0,
         "acceptedEncryptedBallotCount": 0,
         "acceptedDecryptionShareCount": 0,
+        "activeParticipantCount": 2,
+        "blockingParticipantIndices": [],
         "completeEncryptedBallotParticipantCount": 0,
-        "revealReady": false
+        "revealReady": false,
+        "restartCount": 0
+    }
+}
+```
+
+Closed-poll manifest shape:
+
+```json
+{
+    "manifest": {
+        "rosterHash": "roster-hash",
+        "optionList": ["Pizza", "Sushi", "Pasta"],
+        "scoreRange": {
+            "min": 1,
+            "max": 10
+        }
     }
 }
 ```
@@ -166,6 +194,7 @@ afterEntryHash=<entry-hash>
             "phase": 0,
             "participantIndex": 1,
             "messageType": "registration",
+            "protocolVersion": "v1",
             "rosterHash": "roster-hash",
             "authPublicKey": "spki-hex",
             "transportPublicKey": "raw-public-key-hex"
@@ -179,6 +208,7 @@ afterEntryHash=<entry-hash>
   - board messages are accepted only after voting is closed
   - the normal product UI posts these payloads in the background; it does not expose a raw signed-payload form
   - the authenticated voter token must match `signedPayload.payload.participantIndex`
+  - `signedPayload.payload.protocolVersion` is required and must match the poll's stored protocol version
   - the payload must include a valid base protocol shape before signature checks or participant checks run
   - registration payloads are verified against the embedded auth public key and the stored pre-close device record
   - manifest-publication payloads are verified against the accepted registration roster without requiring a previously published manifest

@@ -19,7 +19,7 @@ import {
     openProjectParticipant,
 } from './support/participants';
 import {
-    attachErrorTracking,
+    createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
 } from './support/errorTracking';
@@ -34,7 +34,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
     page,
     request,
 }, testInfo) => {
-    const tracker = createUnexpectedErrorTracker();
+    const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
     const creatorName = createVoterName('alice', namespace);
@@ -49,37 +49,61 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         ],
     });
 
-    attachErrorTracking(page, 'creator', tracker);
+    const attachCreatorTracking = createErrorTrackingAttacher({
+        label: 'creator',
+        tracker,
+    });
+    const attachParticipantOneTracking = createErrorTrackingAttacher({
+        label: 'participant-one',
+        tracker,
+    });
+    const attachParticipantTwoTracking = createErrorTrackingAttacher({
+        label: 'participant-two',
+        tracker,
+    });
 
-    const createdPoll = await createPoll({
+    page = attachCreatorTracking(page);
+
+    const createdPollResult = await createPoll({
+        attachPage: attachCreatorTracking,
         page,
         pollName: createPollName('Full ceremony', namespace),
     });
+    page = attachCreatorTracking(createdPollResult.page);
+    const createdPoll = createdPollResult.createdPoll;
     createdPolls.push(createdPoll);
 
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
-    attachErrorTracking(participantOne.page, 'participant-one', tracker);
-    attachErrorTracking(participantTwo.page, 'participant-two', tracker);
+    participantOne.page = attachParticipantOneTracking(participantOne.page);
+    participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
 
     try {
-        await submitVote({
-            page,
-            scores: [9, 4],
-            voterName: creatorName,
-        });
-        await submitVote({
-            page: participantOne.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [6, 8],
-            voterName: participantOneName,
-        });
-        await submitVote({
-            page: participantTwo.page,
-            pollUrl: createdPoll.pollUrl,
-            scores: [7, 5],
-            voterName: participantTwoName,
-        });
+        page = attachCreatorTracking(
+            await submitVote({
+                page,
+                scores: [9, 4],
+                voterName: creatorName,
+            }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await submitVote({
+                attachPage: attachParticipantOneTracking,
+                page: participantOne.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [6, 8],
+                voterName: participantOneName,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await submitVote({
+                attachPage: attachParticipantTwoTracking,
+                page: participantTwo.page,
+                pollUrl: createdPoll.pollUrl,
+                scores: [7, 5],
+                voterName: participantTwoName,
+            }),
+        );
 
         await expectParticipantsVisible(page, [
             creatorName,
@@ -87,9 +111,13 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             participantTwoName,
         ]);
         await closeVoting(page);
-        await reloadPollPage(page);
-        await reloadPollPage(participantOne.page);
-        await reloadPollPage(participantTwo.page);
+        page = attachCreatorTracking(await reloadPollPage(page));
+        participantOne.page = attachParticipantOneTracking(
+            await reloadPollPage(participantOne.page),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await reloadPollPage(participantTwo.page),
+        );
         await expectPostCloseVisible(page);
         await expectPostCloseVisible(participantOne.page);
         await expectPostCloseVisible(participantTwo.page);

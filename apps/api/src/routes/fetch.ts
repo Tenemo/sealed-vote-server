@@ -1,4 +1,7 @@
-import type { PollResponse as PollResponseContract } from '@sealed-vote/contracts';
+import {
+    fixedScoreRange,
+    type PollResponse as PollResponseContract,
+} from '@sealed-vote/contracts';
 import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
@@ -36,6 +39,16 @@ const PollRosterEntrySchema = Type.Object({
 const ElectionManifestSchema = Type.Object({
     optionList: Type.Array(Type.String()),
     rosterHash: Type.String(),
+    scoreRange: Type.Object({
+        min: Type.Integer({
+            minimum: fixedScoreRange.min,
+            maximum: fixedScoreRange.min,
+        }),
+        max: Type.Integer({
+            minimum: fixedScoreRange.max,
+            maximum: fixedScoreRange.max,
+        }),
+    }),
 });
 
 export const PollResponseSchema = Type.Object({
