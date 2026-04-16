@@ -169,7 +169,7 @@ test('restores the securing state after refresh once voting is closed', async ({
             }),
         );
 
-        await closeVoting(page);
+        page = attachCreatorTracking(await closeVoting(page));
 
         restoredContext = await browser.newContext({
             ...(getProjectContextOptions(testInfo) ?? {}),

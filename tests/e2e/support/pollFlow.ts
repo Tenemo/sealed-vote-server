@@ -15,6 +15,8 @@ const postClosePhaseLabels = [
     'Revealing results',
     'Verified results',
 ] as const;
+const voteStoredNoticeText =
+    'Vote stored on this device. You can close the app and come back after voting closes.';
 
 const escapeRegExp = (value: string): string =>
     value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -77,6 +79,66 @@ const attachPollFlowPage = (
     page: Page,
     attachPage?: PageAttacher,
 ): Page => (attachPage ? attachPage(page) : page);
+
+const getCeremonyMetricRow = (page: Page, label: string): Locator =>
+    page
+        .getByRole('heading', { name: 'Ceremony progress' })
+        .locator('xpath=../following-sibling::*[1]')
+        .getByText(label, { exact: true })
+        .locator('xpath=..');
+
+const normalizePollFlowText = (value: string): string =>
+    value.replaceAll(/\s+/gu, ' ').trim();
+
+export const parseSubmittedParticipantCount = (value: string): number | null => {
+    const match = normalizePollFlowText(value).match(
+        /^Submitted participants\s+(\d+)/u,
+    );
+
+    if (!match) {
+        return null;
+    }
+
+    return Number.parseInt(match[1], 10);
+};
+
+const readSubmittedParticipantCount = async (
+    page: Page,
+): Promise<number | null> => {
+    const metricText = await getCeremonyMetricRow(
+        page,
+        'Submitted participants',
+    ).innerText();
+
+    return parseSubmittedParticipantCount(metricText);
+};
+
+export const syncPollPageForSharedState = async (
+    page: Page,
+    reloadPage: (page: Page) => Promise<Page> = reloadInteractablePage,
+): Promise<Page> => {
+    // Live production e2e keeps several browser contexts active at once.
+    // Background pages can lag behind the server state, so shared-state
+    // assertions should first bring the page forward and resync it.
+    await page.bringToFront();
+    return await reloadPage(page);
+};
+
+const waitForCeremonyMetricValue = async ({
+    label,
+    page,
+    timeout = 60_000,
+    value,
+}: {
+    label: string;
+    page: Page;
+    timeout?: number;
+    value: string;
+}): Promise<void> => {
+    await expect(getCeremonyMetricRow(page, label)).toContainText(value, {
+        timeout,
+    });
+};
 
 const waitForAnyVisibleText = async ({
     page,
@@ -171,6 +233,9 @@ export const submitVote = async ({
         );
     }
 
+    const submittedParticipantCountBeforeSubmit =
+        await readSubmittedParticipantCount(page);
+
     await page.getByLabel('Your public name').fill(voterName);
 
     for (const [index, choice] of choices.entries()) {
@@ -183,9 +248,17 @@ export const submitVote = async ({
     }
 
     await page.getByRole('button', { name: 'Submit vote' }).click();
-    await expect(
-        page.getByText('Vote stored on this device', { exact: true }),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(voteStoredNoticeText, { exact: true })).toBeVisible({
+        timeout: 30_000,
+    });
+
+    if (submittedParticipantCountBeforeSubmit !== null) {
+        await waitForCeremonyMetricValue({
+            label: 'Submitted participants',
+            page,
+            value: String(submittedParticipantCountBeforeSubmit + 1),
+        });
+    }
 
     return page;
 };
@@ -231,7 +304,8 @@ export const registerParticipant = async (
     });
 };
 
-export const closeVoting = async (page: Page): Promise<void> => {
+export const closeVoting = async (page: Page): Promise<Page> => {
+    page = await syncPollPageForSharedState(page);
     const closeButton = page.getByRole('button', {
         name: 'Close voting',
     });
@@ -244,9 +318,11 @@ export const closeVoting = async (page: Page): Promise<void> => {
         texts: postClosePhaseLabels,
         timeout: 30_000,
     });
+    return page;
 };
 
-export const waitForAutomaticReveal = async (page: Page): Promise<void> => {
+export const waitForAutomaticReveal = async (page: Page): Promise<Page> => {
+    await page.bringToFront();
     await waitForAnyVisibleText({
         page,
         texts: [
@@ -259,6 +335,7 @@ export const waitForAutomaticReveal = async (page: Page): Promise<void> => {
     await expect(
         page.getByRole('button', { name: 'Reveal results' }),
     ).toHaveCount(0);
+    return page;
 };
 
 export const waitForVerifiedResults = async ({
@@ -269,7 +346,8 @@ export const waitForVerifiedResults = async ({
     expectedResults?: readonly ExpectedVerifiedResult[];
     page: Page;
     choices?: string[];
-}): Promise<void> => {
+}): Promise<Page> => {
+    await page.bringToFront();
     await expect
         .poll(
             async () =>
@@ -332,6 +410,8 @@ export const waitForVerifiedResults = async ({
             });
         }
     }
+
+    return page;
 };
 
 export const waitForCeremonyMetric = async ({
@@ -342,10 +422,14 @@ export const waitForCeremonyMetric = async ({
     label: string;
     page: Page;
     value: string;
-}): Promise<void> => {
-    await expect(
-        page.getByText(label, { exact: true }).locator('xpath=..'),
-    ).toContainText(value, { timeout: 60_000 });
+}): Promise<Page> => {
+    page = await syncPollPageForSharedState(page);
+    await waitForCeremonyMetricValue({
+        label,
+        page,
+        value,
+    });
+    return page;
 };
 
 export const waitForBlockingParticipants = async ({
@@ -354,12 +438,14 @@ export const waitForBlockingParticipants = async ({
 }: {
     page: Page;
     participantNames: readonly string[];
-}): Promise<void> => {
+}): Promise<Page> => {
+    page = await syncPollPageForSharedState(page);
     await expect(
         page.getByText(
             `Ceremony progress is waiting on ${participantNames.join(', ')}.`,
         ),
     ).toBeVisible({ timeout: 60_000 });
+    return page;
 };
 
 export const expectParticipantsVisible = async (
@@ -414,7 +500,7 @@ export const expectPostCloseVisible = async (page: Page): Promise<void> => {
 };
 
 export const reloadPollPage = async (page: Page): Promise<Page> =>
-    await reloadInteractablePage(page);
+    await syncPollPageForSharedState(page);
 
 const deletePoll = async (
     request: APIRequestContext,

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createExpectedVerifiedResults } from './pollFlow.ts';
+import {
+    createExpectedVerifiedResults,
+    parseSubmittedParticipantCount,
+    syncPollPageForSharedState,
+} from './pollFlow.ts';
 
 test('createExpectedVerifiedResults derives displayed tallies per choice', () => {
     assert.deepEqual(
@@ -45,4 +49,40 @@ test('createExpectedVerifiedResults rejects missing scores', () => {
             }),
         /Missing or invalid score/u,
     );
+});
+
+test('parseSubmittedParticipantCount extracts the ceremony progress count', () => {
+    assert.equal(
+        parseSubmittedParticipantCount('Submitted participants\n5'),
+        5,
+    );
+});
+
+test('parseSubmittedParticipantCount ignores unrelated text', () => {
+    assert.equal(
+        parseSubmittedParticipantCount('5 submitted before close'),
+        null,
+    );
+});
+
+test('syncPollPageForSharedState brings the page forward before reloading', async () => {
+    const calls: string[] = [];
+    const pageDouble = {
+        bringToFront: async () => {
+            calls.push('front');
+        },
+    };
+    const reloadedPage = {};
+
+    const syncedPage = await syncPollPageForSharedState(
+        pageDouble as never,
+        async (page) => {
+            assert.equal(page, pageDouble);
+            calls.push('reload');
+            return reloadedPage as never;
+        },
+    );
+
+    assert.deepEqual(calls, ['front', 'reload']);
+    assert.equal(syncedPage, reloadedPage);
 });
