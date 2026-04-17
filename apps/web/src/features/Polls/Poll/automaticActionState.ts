@@ -4,6 +4,17 @@ import type { PreparedCeremonyAction } from '../pollBoardActions';
 import type { StoredPollDeviceState } from '../pollDeviceStorage';
 import type { StoredVoterSession } from '../pollSessionStorage';
 
+export type RecoverableAutomaticActionRetryState = {
+    actionKey: string | null;
+    attemptCount: number;
+};
+
+export const createEmptyRecoverableAutomaticActionRetryState =
+    (): RecoverableAutomaticActionRetryState => ({
+        actionKey: null,
+        attemptCount: 0,
+    });
+
 const findRosterEntryForDevice = ({
     deviceState,
     poll,
@@ -135,4 +146,42 @@ export const isRecoverableAutomaticActionSubmissionError = (
         message === ERROR_MESSAGES.boardMessageSessionMismatch ||
         message === ERROR_MESSAGES.boardMessageSkippedParticipant
     );
+};
+
+const createRecoverableAutomaticActionRetryKey = (
+    action: PreparedCeremonyAction,
+): string =>
+    [
+        action.kind,
+        action.slotKey,
+        action.signedPayload.payload.sessionId,
+        action.signedPayload.payload.manifestHash,
+        action.signedPayload.payload.participantIndex,
+    ].join(':');
+
+export const getRecoverableAutomaticActionRetryDecision = ({
+    action,
+    maxAutomaticRetries,
+    previousState,
+}: {
+    action: PreparedCeremonyAction;
+    maxAutomaticRetries: number;
+    previousState: RecoverableAutomaticActionRetryState;
+}): {
+    nextState: RecoverableAutomaticActionRetryState;
+    shouldRetryAutomatically: boolean;
+} => {
+    const actionKey = createRecoverableAutomaticActionRetryKey(action);
+    const attemptCount =
+        previousState.actionKey === actionKey
+            ? previousState.attemptCount + 1
+            : 1;
+
+    return {
+        nextState: {
+            actionKey,
+            attemptCount,
+        },
+        shouldRetryAutomatically: attemptCount <= maxAutomaticRetries,
+    };
 };

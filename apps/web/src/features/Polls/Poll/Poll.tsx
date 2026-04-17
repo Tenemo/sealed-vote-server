@@ -9,6 +9,8 @@ import { Spinner } from '@/components/ui/spinner';
 import LoadingButton from 'components/LoadingButton/LoadingButton';
 import NotFound from 'components/NotFound/NotFound';
 import {
+    createEmptyRecoverableAutomaticActionRetryState,
+    getRecoverableAutomaticActionRetryDecision,
     getLocalCeremonyState,
     isRecoverableAutomaticActionSubmissionError,
     isPreparedAutomaticActionCurrent,
@@ -47,6 +49,9 @@ import { renderError } from 'utils/networkErrors';
 
 const minimumScore = fixedScoreRange.min;
 const maximumScore = fixedScoreRange.max;
+const automaticActionRecoverableRetryLimit = 2;
+const automaticActionRecoverableRetryError =
+    'Automatic ceremony progress is still out of sync with the active board state. Retry ceremony from this browser to try again.';
 const boardConfirmationDelayMs = 250;
 const boardConfirmationMaxAttempts = 6;
 const steadyStatePollingIntervalMs = 5_000;
@@ -246,6 +251,10 @@ const PollPage = (): React.JSX.Element => {
         React.useState(false);
     const [automaticResolutionAttempt, setAutomaticResolutionAttempt] =
         React.useState(0);
+    const [
+        recoverableAutomaticActionRetryState,
+        setRecoverableAutomaticActionRetryState,
+    ] = React.useState(() => createEmptyRecoverableAutomaticActionRetryState());
     const [activeActionSlotKey, setActiveActionSlotKey] = React.useState<
         string | null
     >(null);
@@ -547,6 +556,8 @@ const PollPage = (): React.JSX.Element => {
             setAutomaticActionDescription(null);
             setActiveActionSlotKey(action.slotKey);
 
+            let actionToSubmit: PreparedCeremonyAction | null = null;
+
             try {
                 const latestPoll = await fetchLatestPoll(poll.slug).unwrap();
                 const latestDeviceState =
@@ -608,7 +619,7 @@ const PollPage = (): React.JSX.Element => {
                     return;
                 }
 
-                const actionToSubmit = latestAction;
+                actionToSubmit = latestAction;
 
                 if (actionToSubmit.slotKey !== action.slotKey) {
                     setActiveActionSlotKey(actionToSubmit.slotKey);
@@ -621,6 +632,9 @@ const PollPage = (): React.JSX.Element => {
                         voterToken: submissionVoterSession.voterToken,
                     },
                 }).unwrap();
+                setRecoverableAutomaticActionRetryState(
+                    createEmptyRecoverableAutomaticActionRetryState(),
+                );
                 setAwaitingBoardConfirmationAction(actionToSubmit);
 
                 // Keep the saved payload until poll state confirms the slot was
@@ -712,9 +726,32 @@ const PollPage = (): React.JSX.Element => {
                 if (
                     isRecoverableAutomaticActionSubmissionError(submissionError)
                 ) {
+                    if (!actionToSubmit) {
+                        setAutomationError(renderError(submissionError));
+                        return;
+                    }
+
+                    const retryDecision =
+                        getRecoverableAutomaticActionRetryDecision({
+                            action: actionToSubmit,
+                            maxAutomaticRetries:
+                                automaticActionRecoverableRetryLimit,
+                            previousState: recoverableAutomaticActionRetryState,
+                        });
+
+                    setRecoverableAutomaticActionRetryState(
+                        retryDecision.nextState,
+                    );
                     setAwaitingBoardConfirmationAction(null);
                     setAutomaticAction(null);
                     setAutomaticActionDescription(null);
+                    if (!retryDecision.shouldRetryAutomatically) {
+                        setAutomationError(
+                            automaticActionRecoverableRetryError,
+                        );
+                        return;
+                    }
+
                     setAutomationError(null);
                     await refetch();
                     setAutomaticResolutionAttempt((attempt) => attempt + 1);
@@ -733,6 +770,7 @@ const PollPage = (): React.JSX.Element => {
             poll,
             postBoardMessage,
             refetch,
+            recoverableAutomaticActionRetryState,
             restartState.isLoading,
             voterSession,
         ],
@@ -1344,6 +1382,9 @@ const PollPage = (): React.JSX.Element => {
                                 <Button
                                     className="w-full sm:w-auto"
                                     onClick={() => {
+                                        setRecoverableAutomaticActionRetryState(
+                                            createEmptyRecoverableAutomaticActionRetryState(),
+                                        );
                                         setAutomationError(null);
                                         setAutomaticResolutionAttempt(
                                             (currentAttempt) =>
