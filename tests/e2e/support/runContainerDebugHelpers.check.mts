@@ -37,7 +37,7 @@ test('parseDebugContainerCliArgs strips the forwarded separator after the mode',
 test('parseDebugContainerCliArgs rejects unknown modes', () => {
     assert.throws(
         () => parseDebugContainerCliArgs(['not-a-mode']),
-        /Unsupported e2e debug mode "not-a-mode"./u,
+        /Unsupported e2e debug mode "not-a-mode"\./u,
     );
 });
 

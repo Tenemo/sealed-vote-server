@@ -33,7 +33,7 @@ import {
 
 const continueWithoutMissingParticipants = async (
     page: Page,
-) : Promise<Page> => {
+): Promise<Page> => {
     page = await reloadPollPage(page);
     const continueButton = page.getByRole('button', {
         name: 'Continue without missing participants',
