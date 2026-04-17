@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
     bringPollPagesToFront,
     createExpectedVerifiedResults,
+    parseCeremonyMetricValue,
     parseSubmittedParticipantCount,
     syncPollPagesForSharedState,
     syncPollPageForSharedState,
@@ -63,6 +64,26 @@ test('parseSubmittedParticipantCount extracts the ceremony progress count', () =
 test('parseSubmittedParticipantCount ignores unrelated text', () => {
     assert.equal(
         parseSubmittedParticipantCount('5 submitted before close'),
+        null,
+    );
+});
+
+test('parseCeremonyMetricValue extracts the exact metric value', () => {
+    assert.equal(
+        parseCeremonyMetricValue({
+            label: 'Board registrations',
+            rowText: 'Board registrations16',
+        }),
+        '16',
+    );
+});
+
+test('parseCeremonyMetricValue ignores unrelated text', () => {
+    assert.equal(
+        parseCeremonyMetricValue({
+            label: 'Board registrations',
+            rowText: 'Submitted participants 16',
+        }),
         null,
     );
 });

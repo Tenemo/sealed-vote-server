@@ -90,6 +90,31 @@ const getCeremonyMetricRow = (page: Page, label: string): Locator =>
 const normalizePollFlowText = (value: string): string =>
     value.replaceAll(/\s+/gu, ' ').trim();
 
+export const parseCeremonyMetricValue = ({
+    label,
+    rowText,
+}: {
+    label: string;
+    rowText: string;
+}): string | null => {
+    const normalizedLabel = normalizePollFlowText(label);
+    const normalizedRowText = normalizePollFlowText(rowText);
+
+    if (normalizedRowText.startsWith(normalizedLabel)) {
+        const metricValue = normalizedRowText.slice(normalizedLabel.length).trim();
+        return metricValue === '' ? null : metricValue;
+    }
+
+    if (normalizedRowText.endsWith(normalizedLabel)) {
+        const metricValue = normalizedRowText
+            .slice(0, -normalizedLabel.length)
+            .trim();
+        return metricValue === '' ? null : metricValue;
+    }
+
+    return null;
+};
+
 export const parseSubmittedParticipantCount = (value: string): number | null => {
     const match = normalizePollFlowText(value).match(
         /^Submitted participants\s+(\d+)/u,
@@ -175,9 +200,23 @@ const waitForCeremonyMetricValue = async ({
     timeout?: number;
     value: string;
 }): Promise<void> => {
-    await expect(getCeremonyMetricRow(page, label)).toContainText(value, {
+    const metricRow = getCeremonyMetricRow(page, label);
+
+    await expect(metricRow).toBeVisible({
         timeout,
     });
+    await expect
+        .poll(
+            async () =>
+                parseCeremonyMetricValue({
+                    label,
+                    rowText: await metricRow.innerText(),
+                }),
+            {
+                timeout,
+            },
+        )
+        .toBe(value);
 };
 
 const waitForAnyVisibleText = async ({

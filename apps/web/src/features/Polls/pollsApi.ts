@@ -15,8 +15,6 @@ import {
 import { resolveBrowserApiBaseUrl } from './apiBaseUrl';
 
 const apiBaseUrl = resolveBrowserApiBaseUrl({
-    browserOrigin:
-        typeof window === 'undefined' ? undefined : window.location.origin,
     configuredApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
 });
 // Production ceremony pages keep polling in the background. A wedged poll

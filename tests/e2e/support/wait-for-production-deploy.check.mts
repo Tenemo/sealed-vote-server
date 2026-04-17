@@ -55,7 +55,7 @@ const createReadinessStatus = (
         url: 'https://api.sealed.vote/api/health-check?t=1',
     }),
     browserApiHealth: createJsonStatus({
-        url: 'https://sealed.vote/api/health-check?t=1',
+        url: 'https://api.sealed.vote/api/health-check?t=1',
     }),
     homepage: createHtmlStatus({
         url: 'https://sealed.vote/?t=1',
@@ -99,7 +99,7 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
             createReadinessStatus({
                 browserApiHealth: createJsonStatus({
                     commitSha: 'e715a02987075c168f6e88c54488a3708096664a',
-                    url: 'https://sealed.vote/api/health-check?t=1',
+                    url: 'https://api.sealed.vote/api/health-check?t=1',
                 }),
             }),
             expectedCommitSha,
@@ -129,7 +129,7 @@ test('formatReadinessStatus reports unreachable, missing, and unknown HTML marke
                     commitSha: null,
                     ok: false,
                     statusCode: null,
-                    url: 'https://sealed.vote/api/health-check?t=1',
+                    url: 'https://api.sealed.vote/api/health-check?t=1',
                 }),
             }),
         ),
