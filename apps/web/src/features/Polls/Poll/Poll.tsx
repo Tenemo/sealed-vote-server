@@ -1114,11 +1114,15 @@ const PollPage = (): React.JSX.Element => {
                                 <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm break-all">
                                     {shareUrl}
                                 </div>
-                                {copyNotice ? (
-                                    <p className="field-note">{copyNotice}</p>
-                                ) : null}
+                                <p
+                                    aria-live="polite"
+                                    className="field-note min-h-6"
+                                >
+                                    {copyNotice}
+                                </p>
                             </div>
                             <Button
+                                data-testid="copy-link-button"
                                 disabled={!canCopyShareUrl}
                                 onClick={() => {
                                     void onCopyShareUrl();
@@ -1434,7 +1438,10 @@ const PollPage = (): React.JSX.Element => {
                                         >
                                             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                                                 <div className="space-y-1">
-                                                    <div className="text-sm font-medium text-foreground">
+                                                    <div
+                                                        className="text-sm font-medium text-foreground"
+                                                        data-testid="verified-result-choice"
+                                                    >
                                                         {
                                                             poll.choices[
                                                                 result.optionIndex -

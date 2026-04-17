@@ -41,6 +41,10 @@ export type ReadinessCheckResult =
           message: string;
       };
 
+type ReadinessProcessError = Error & {
+    code?: string;
+};
+
 const fail = (message: string): never => {
     throw new Error(message);
 };
@@ -189,6 +193,45 @@ export const detectFatalReadinessFailureMessage = (
     return null;
 };
 
+export const classifyReadinessProcessFailure = ({
+    error,
+    output,
+}: {
+    error: ReadinessProcessError | undefined;
+    output: string;
+}): ReadinessCheckResult | null => {
+    if (!error) {
+        return null;
+    }
+
+    if (error.code === 'ETIMEDOUT') {
+        return {
+            kind: 'retry',
+        };
+    }
+
+    if (
+        error.code === 'ENOBUFS' ||
+        error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ||
+        error.message.includes('maxBuffer')
+    ) {
+        const fatalFailureMessage = detectFatalReadinessFailureMessage(output);
+
+        if (fatalFailureMessage) {
+            return {
+                kind: 'fatal',
+                message: fatalFailureMessage,
+            };
+        }
+
+        return {
+            kind: 'retry',
+        };
+    }
+
+    throw error;
+};
+
 const resolvePnpmInvocation = (): {
     command: string;
     args: string[];
@@ -249,14 +292,16 @@ const runReadinessCheck = (
     writeCapturedOutput(result.stdout, process.stdout);
     writeCapturedOutput(result.stderr, process.stderr);
 
-    if (result.error) {
-        if ((result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
-            return {
-                kind: 'retry',
-            };
-        }
+    const capturedOutput = [result.stdout, result.stderr]
+        .filter(Boolean)
+        .join('\n');
+    const processFailure = classifyReadinessProcessFailure({
+        error: result.error as ReadinessProcessError | undefined,
+        output: capturedOutput,
+    });
 
-        throw result.error;
+    if (processFailure) {
+        return processFailure;
     }
 
     if (result.status === 0) {
@@ -266,7 +311,7 @@ const runReadinessCheck = (
     }
 
     const fatalFailureMessage = detectFatalReadinessFailureMessage(
-        [result.stdout, result.stderr].filter(Boolean).join('\n'),
+        capturedOutput,
     );
 
     if (fatalFailureMessage) {

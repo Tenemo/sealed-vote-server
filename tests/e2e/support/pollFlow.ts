@@ -387,26 +387,39 @@ export const createExpectedVerifiedResults = ({
         throw new Error('Expected at least one scorecard.');
     }
 
-    return choices.map((choice, choiceIndex) => {
-        const tally = scorecards.reduce((sum, scorecard) => {
-            const score = scorecard[choiceIndex];
+    return choices
+        .map((choice, choiceIndex) => {
+            const tally = scorecards.reduce((sum, scorecard) => {
+                const score = scorecard[choiceIndex];
 
-            if (!Number.isInteger(score)) {
-                throw new Error(
-                    `Missing or invalid score for choice index ${choiceIndex}.`,
-                );
+                if (!Number.isInteger(score)) {
+                    throw new Error(
+                        `Missing or invalid score for choice index ${choiceIndex}.`,
+                    );
+                }
+
+                return sum + score;
+            }, 0);
+
+            return {
+                acceptedBallotCount: scorecards.length,
+                choice,
+                choiceIndex,
+                displayedMean: (tally / scorecards.length).toFixed(2),
+                tally: String(tally),
+            };
+        })
+        .sort((left, right) => {
+            const meanDifference =
+                Number(right.displayedMean) - Number(left.displayedMean);
+
+            if (meanDifference !== 0) {
+                return meanDifference;
             }
 
-            return sum + score;
-        }, 0);
-
-        return {
-            acceptedBallotCount: scorecards.length,
-            choice,
-            displayedMean: (tally / scorecards.length).toFixed(2),
-            tally: String(tally),
-        };
-    });
+            return left.choiceIndex - right.choiceIndex;
+        })
+        .map(({ choiceIndex: _choiceIndex, ...result }) => result);
 };
 
 export const registerParticipant = async (
@@ -500,6 +513,11 @@ export const waitForVerifiedResults = async ({
             timeout: 90_000,
         },
     );
+    await expect(
+        resultsPanel.getByTestId('verified-result-choice'),
+    ).toHaveText(resultsToAssert.map((result) => result.choice), {
+        timeout: 90_000,
+    });
 
     for (const result of resultsToAssert) {
         const resultCard = getResultCard(page, result.choice);

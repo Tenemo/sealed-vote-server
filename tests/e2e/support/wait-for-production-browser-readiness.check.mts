@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+    classifyReadinessProcessFailure,
     detectFatalReadinessFailureMessage,
     parsePositiveInteger,
     parseWaitCliArgs,
@@ -201,5 +202,52 @@ test('detectFatalReadinessFailureMessage recognizes Firefox HOME ownership launc
             ].join('\n'),
         ) ?? '',
         /Set HOME=\/root/u,
+    );
+});
+
+test('classifyReadinessProcessFailure retries timed out readiness checks', () => {
+    assert.deepEqual(
+        classifyReadinessProcessFailure({
+            error: Object.assign(new Error('timed out'), {
+                code: 'ETIMEDOUT',
+            }),
+            output: '',
+        }),
+        {
+            kind: 'retry',
+        },
+    );
+});
+
+test('classifyReadinessProcessFailure preserves fatal browser launch classification on buffer overflow', () => {
+    assert.deepEqual(
+        classifyReadinessProcessFailure({
+            error: Object.assign(new Error('maxBuffer length exceeded'), {
+                code: 'ENOBUFS',
+            }),
+            output: [
+                'Error: browserType.launch: Failed to launch the browser process.',
+                'extra output',
+            ].join('\n'),
+        }),
+        {
+            kind: 'fatal',
+            message:
+                'The Playwright browser could not launch inside the readiness job, so retrying will not make production become ready.',
+        },
+    );
+});
+
+test('classifyReadinessProcessFailure retries non-fatal capture buffer overflows', () => {
+    assert.deepEqual(
+        classifyReadinessProcessFailure({
+            error: Object.assign(new Error('maxBuffer length exceeded'), {
+                code: 'ENOBUFS',
+            }),
+            output: 'transient output',
+        }),
+        {
+            kind: 'retry',
+        },
     );
 });

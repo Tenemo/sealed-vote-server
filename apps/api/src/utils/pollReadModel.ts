@@ -1,4 +1,8 @@
-import { isUuid, type PollResponse } from '@sealed-vote/contracts';
+import {
+    isUuid,
+    orderVerifiedOptionTallies,
+    type PollResponse,
+} from '@sealed-vote/contracts';
 import { sortProtocolPayloads } from '@sealed-vote/protocol';
 import { eq } from 'drizzle-orm';
 import {
@@ -436,19 +440,23 @@ const buildVerifiedVerification = ({
     status: 'verified',
     reason: null,
     qualParticipantIndices: [...qualParticipantIndices],
-    verifiedOptionTallies: tallies.map(({ optionIndex, tally }) => {
-        const acceptedBallotCount = acceptedCounts.get(optionIndex) ?? 0;
+    verifiedOptionTallies: orderVerifiedOptionTallies(
+        tallies.map(({ optionIndex, tally }) => {
+            const acceptedBallotCount = acceptedCounts.get(optionIndex) ?? 0;
 
-        return {
-            optionIndex,
-            tally: tally.toString(),
-            mean:
-                acceptedBallotCount > 0
-                    ? Number((Number(tally) / acceptedBallotCount).toFixed(6))
-                    : 0,
-            acceptedBallotCount,
-        };
-    }),
+            return {
+                optionIndex,
+                tally: tally.toString(),
+                mean:
+                    acceptedBallotCount > 0
+                        ? Number(
+                              (Number(tally) / acceptedBallotCount).toFixed(6),
+                          )
+                        : 0,
+                acceptedBallotCount,
+            };
+        }),
+    ),
 });
 
 const buildVerificationSummary = async ({

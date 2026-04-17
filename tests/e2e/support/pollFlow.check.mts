@@ -10,7 +10,7 @@ import {
     syncPollPageForSharedState,
 } from './pollFlow.ts';
 
-test('createExpectedVerifiedResults derives displayed tallies per choice', () => {
+test('createExpectedVerifiedResults derives displayed tallies in score order', () => {
     assert.deepEqual(
         createExpectedVerifiedResults({
             choices: ['Apples', 'Bananas', 'Cherries'],
@@ -29,15 +29,15 @@ test('createExpectedVerifiedResults derives displayed tallies per choice', () =>
             },
             {
                 acceptedBallotCount: 3,
-                choice: 'Bananas',
-                displayedMean: '6.00',
-                tally: '18',
-            },
-            {
-                acceptedBallotCount: 3,
                 choice: 'Cherries',
                 displayedMean: '7.00',
                 tally: '21',
+            },
+            {
+                acceptedBallotCount: 3,
+                choice: 'Bananas',
+                displayedMean: '6.00',
+                tally: '18',
             },
         ],
     );

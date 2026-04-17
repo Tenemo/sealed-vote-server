@@ -12,6 +12,7 @@ const safeApiHosts = new Set(['localhost', '127.0.0.1', '::1']);
 const requiredDatabaseName = 'sv-db';
 const pnpmExecPath = process.env.npm_execpath;
 const pnpmCaptureMaxBufferBytes = 16 * 1024 * 1024;
+export const observedOutputTailMaxLength = 4 * 1024 * 1024;
 
 export const repoRoot = path.resolve(currentDirectory, '../../..');
 const apiWorkspaceRoot = path.resolve(repoRoot, 'apps', 'api');
@@ -152,19 +153,22 @@ export const runPnpmObserved = async (
 
         childProcess.stdout?.on('data', (chunk: Buffer | string) => {
             const text = chunk.toString();
-            combinedOutput += text;
+            combinedOutput = appendOutputTail(combinedOutput, text);
             process.stdout.write(text);
         });
 
         childProcess.stderr?.on('data', (chunk: Buffer | string) => {
             const text = chunk.toString();
-            combinedOutput += text;
+            combinedOutput = appendOutputTail(combinedOutput, text);
             process.stderr.write(text);
         });
 
         childProcess.on('error', (error: Error) => {
             console.error(error);
-            combinedOutput += `${error.stack ?? error.message}\n`;
+            combinedOutput = appendOutputTail(
+                combinedOutput,
+                `${error.stack ?? error.message}\n`,
+            );
             settle(1);
         });
 
@@ -215,6 +219,18 @@ export const getForwardedCliArgs = (): string[] => {
     }
 
     return args;
+};
+
+export const appendOutputTail = (
+    output: string,
+    chunk: string,
+    maxLength: number = observedOutputTailMaxLength,
+): string => {
+    const nextOutput = output + chunk;
+
+    return nextOutput.length <= maxLength
+        ? nextOutput
+        : nextOutput.slice(-maxLength);
 };
 
 export const configureLocalE2EEnv = ({
