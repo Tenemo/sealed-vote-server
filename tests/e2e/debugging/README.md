@@ -45,7 +45,7 @@ pnpm e2e:debug:command -- pnpm test
 The compose setup defaults to:
 
 - `CI=true`
-- `HOME=/root`
+- `HOME=/github/home`
 - `PLAYWRIGHT_BASE_URL=https://sealed.vote`
 - `PLAYWRIGHT_BLOB_REPORT=true`
 - `PLAYWRIGHT_CI_WORKERS=1`
