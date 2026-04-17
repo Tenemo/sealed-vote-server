@@ -110,7 +110,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             participantOneName,
             participantTwoName,
         ]);
-        await closeVoting(page);
+        page = attachCreatorTracking(await closeVoting(page));
         page = attachCreatorTracking(await reloadPollPage(page));
         participantOne.page = attachParticipantOneTracking(
             await reloadPollPage(participantOne.page),
@@ -122,17 +122,23 @@ test('completes the full vote-to-results ceremony across three live sessions', a
         await expectPostCloseVisible(participantOne.page);
         await expectPostCloseVisible(participantTwo.page);
 
-        await waitForAutomaticReveal(page);
+        page = attachCreatorTracking(await waitForAutomaticReveal(page));
 
-        await waitForVerifiedResults({ expectedResults, page });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantOne.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantTwo.page,
-        });
+        page = attachCreatorTracking(
+            await waitForVerifiedResults({ expectedResults, page }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantOne.page,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantTwo.page,
+            }),
+        );
 
         await expectNoAxeViolations(page, 'full vote results page');
         await expectNoUnexpectedErrors(tracker);

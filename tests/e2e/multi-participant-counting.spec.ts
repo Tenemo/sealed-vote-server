@@ -129,28 +129,36 @@ test('counts every honest ballot when four participants complete the ceremony', 
             participantTwoName,
             participantThreeName,
         ]);
-        await closeVoting(page);
+        page = attachCreatorTracking(await closeVoting(page));
 
         await expectPostCloseVisible(page);
         await expectPostCloseVisible(participantOne.page);
         await expectPostCloseVisible(participantTwo.page);
         await expectPostCloseVisible(participantThree.page);
 
-        await waitForAutomaticReveal(page);
+        page = attachCreatorTracking(await waitForAutomaticReveal(page));
 
-        await waitForVerifiedResults({ expectedResults, page });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantOne.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantTwo.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantThree.page,
-        });
+        page = attachCreatorTracking(
+            await waitForVerifiedResults({ expectedResults, page }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantOne.page,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantTwo.page,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantThree.page,
+            }),
+        );
         await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);

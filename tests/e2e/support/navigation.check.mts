@@ -934,6 +934,55 @@ test('gotoInteractablePage appends page diagnostics when recovery is exhausted',
     }
 });
 
+test('gotoInteractablePage keeps the original failure when diagnostics cannot read the current url', async () => {
+    const page = createPageDouble({
+        currentUrl: 'https://sealed.vote/',
+        documentTitle: 'Sealed vote',
+        htmlContent:
+            '<main><h1>Vote name</h1><button>Create vote</button></main>',
+        isInteractable: false,
+        readyState: 'loading',
+    });
+    let urlReadCount = 0;
+
+    page.goto = async () => {
+        throw new Error('Synthetic navigation failure.');
+    };
+    page.url = () => {
+        urlReadCount += 1;
+
+        if (urlReadCount > 1) {
+            throw new Error('page.url failed unexpectedly.');
+        }
+
+        return 'https://sealed.vote/';
+    };
+
+    await assert.rejects(
+        async () =>
+            await gotoInteractablePage(
+                page,
+                'https://sealed.vote/votes/example--1234',
+            ),
+        (error) => {
+            assert.ok(error instanceof Error);
+            assert.match(error.message, /Synthetic navigation failure\./u);
+            assert.doesNotMatch(
+                error.message,
+                /page\.url failed unexpectedly\./u,
+            );
+            assert.match(error.message, /navigation diagnostics:/u);
+            assert.match(error.message, /currentUrl=<empty>/u);
+            assert.match(
+                error.message,
+                /expectedUrl=https:\/\/sealed\.vote\/votes\/example--1234/u,
+            );
+
+            return true;
+        },
+    );
+});
+
 test('reloadInteractablePage uses the same navigation policy', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble({
@@ -1175,6 +1224,78 @@ test('reloadInteractablePage replaces the page after a transient reload timeout'
     assert.equal(page.isClosed(), true);
     assert.deepEqual(retryDelays, [1_000]);
     assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
+test('reloadInteractablePage bootstraps a blank replacement page before deep-link navigation', async () => {
+    const retryDelays: number[] = [];
+    const replacementGotoUrls: string[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    const replacementState: PageDoubleState = {
+        currentUrl: 'about:blank',
+        isInteractable: true,
+        readyState: 'complete',
+    };
+    const replacementPage = createPageDouble(replacementState);
+    const currentPageUrl = 'https://sealed.vote/votes/example--1234';
+    const page = createPageDouble(
+        {
+            currentUrl: currentPageUrl,
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+
+    page.reload = async () => {
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    replacementPage.goto = async (
+        url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoUrls.push(url);
+        replacementGotoCalls.push(options as NavigationOptions);
+        replacementState.currentUrl = url;
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(replacementGotoUrls, [
+        'https://sealed.vote/',
+        currentPageUrl,
+    ]);
+    assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
         {
             timeout: 15_000,
             waitUntil: 'commit',

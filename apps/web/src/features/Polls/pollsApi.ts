@@ -15,9 +15,22 @@ import {
 import { resolveBrowserApiBaseUrl } from './apiBaseUrl';
 
 const apiBaseUrl = resolveBrowserApiBaseUrl({
-    browserOrigin:
-        typeof window === 'undefined' ? undefined : window.location.origin,
     configuredApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+});
+// Production ceremony pages keep polling in the background. A wedged poll
+// fetch must time out so later polls can recover instead of stalling the
+// participant indefinitely.
+export const pollQueryTimeoutMs = 10_000;
+export const buildGetPollQuery = (
+    pollRef: string,
+): {
+    method: 'GET';
+    timeout: number;
+    url: string;
+} => ({
+    url: POLL_ROUTES.poll(pollRef),
+    method: 'GET' as const,
+    timeout: pollQueryTimeoutMs,
 });
 
 export const pollsApi = createApi({
@@ -36,10 +49,7 @@ export const pollsApi = createApi({
             invalidatesTags: ['Poll'],
         }),
         getPoll: build.query<PollResponse, string>({
-            query: (pollRef) => ({
-                url: POLL_ROUTES.poll(pollRef),
-                method: 'GET',
-            }),
+            query: buildGetPollQuery,
             providesTags: (result) =>
                 result ? [{ type: 'Poll', id: result.id }] : [],
         }),

@@ -385,7 +385,7 @@ export const loadReadinessStatus = async (
                 options.requestTimeoutMs,
             ),
             loadJsonProbeStatus(
-                options.webBaseUrl,
+                options.apiBaseUrl,
                 '/api/health-check',
                 options.requestTimeoutMs,
             ),

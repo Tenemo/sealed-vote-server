@@ -349,6 +349,14 @@ const getNavigationTargetContentSnippet = async (
     }
 };
 
+const getNavigationTargetUrl = (page: NavigationTarget): string => {
+    try {
+        return page.url();
+    } catch {
+        return '';
+    }
+};
+
 const formatNavigationFailureDiagnostics = async ({
     expectedUrl,
     navigationTimeoutMs,
@@ -358,7 +366,7 @@ const formatNavigationFailureDiagnostics = async ({
     navigationTimeoutMs: number;
     page: NavigationTarget;
 }): Promise<string> => {
-    const currentUrl = page.url();
+    const currentUrl = getNavigationTargetUrl(page);
     const readyState = await getNavigationTargetReadyState(page);
     const title = await getNavigationTargetTitle(page);
     const contentSnippet = await getNavigationTargetContentSnippet(page);
@@ -790,8 +798,25 @@ export const reloadInteractablePage = async <T extends NavigationTarget>(
             throw error;
         }
 
+        let fallbackPage = replacementPage;
+        const bootstrapUrl = resolveNavigationBootstrapUrl({
+            currentUrl: fallbackPage.url(),
+            targetUrl: currentPageUrl,
+        });
+
+        // When reload recovery has to replace the page, the new target starts
+        // from about:blank again. Mobile Firefox production runs showed that
+        // deep-linking straight from that blank page can abort, while first
+        // re-establishing the origin on "/" stays stable.
+        if (bootstrapUrl) {
+            fallbackPage = await gotoInteractablePage(
+                fallbackPage,
+                bootstrapUrl,
+            );
+        }
+
         return await navigateOnTarget(
-            replacementPage,
+            fallbackPage,
             async (target) => {
                 await runNavigationAction(
                     'page.goto',

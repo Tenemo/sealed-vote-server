@@ -2,14 +2,17 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
+    bringPollPagesToFront,
     closeVoting,
     createExpectedVerifiedResults,
     createPoll,
     deletePolls,
+    reloadPollPage,
     submitVote,
     waitForBlockingParticipants,
     waitForCeremonyMetric,
     waitForVerifiedResults,
+    syncPollPagesForSharedState,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -30,7 +33,8 @@ import {
 
 const continueWithoutMissingParticipants = async (
     page: Page,
-): Promise<void> => {
+): Promise<Page> => {
+    page = await reloadPollPage(page);
     const continueButton = page.getByRole('button', {
         name: 'Continue without missing participants',
     });
@@ -47,6 +51,7 @@ const continueWithoutMissingParticipants = async (
     });
     await continueButton.click();
     await restartResponsePromise;
+    return page;
 };
 
 test('automatically resumes a stored vote after a participant closes the browser before voting closes', async ({
@@ -155,12 +160,20 @@ test('automatically resumes a stored vote after a participant closes the browser
             await participantOne.context.storageState();
         await closeParticipant(participantOne);
 
-        await closeVoting(page);
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(await closeVoting(page));
+        [participantTwo.page, participantThree.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantTwoTracking,
+                    attachParticipantThreeTracking,
+                ],
+                pages: [participantTwo.page, participantThree.page],
+            });
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '3/4',
-        });
+        }));
 
         participantOne = await reopenProjectParticipant({
             browser,
@@ -173,25 +186,37 @@ test('automatically resumes a stored vote after a participant closes the browser
         participantOne.page = attachParticipantOneRestoredTracking(
             await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
-        await waitForCeremonyMetric({
+        [participantOne.page] = await syncPollPagesForSharedState({
+            attachPages: [attachParticipantOneRestoredTracking],
+            pages: [participantOne.page],
+        });
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '4/4',
-        });
+        }));
 
-        await waitForVerifiedResults({ expectedResults, page });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantOne.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantTwo.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantThree.page,
-        });
+        page = attachCreatorTracking(
+            await waitForVerifiedResults({ expectedResults, page }),
+        );
+        participantOne.page = attachParticipantOneRestoredTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantOne.page,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantTwo.page,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantThree.page,
+            }),
+        );
 
         await expectNoUnexpectedErrors(tracker);
     } finally {
@@ -330,24 +355,50 @@ test('automatically republishes a stored vote after a participant rejoins during
         const missingParticipantStorageState =
             await missingParticipant.context.storageState();
         await closeParticipant(missingParticipant);
-        await closeVoting(page);
+        page = attachCreatorTracking(await closeVoting(page));
+        [
+            participantOne.page,
+            participantTwo.page,
+            participantThree.page,
+        ] = await bringPollPagesToFront({
+            attachPages: [
+                attachParticipantOneTracking,
+                attachParticipantTwoTracking,
+                attachParticipantThreeTracking,
+            ],
+            pages: [
+                participantOne.page,
+                participantTwo.page,
+                participantThree.page,
+            ],
+        });
 
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '4/5',
-        });
+        }));
 
         const participantOneStorageState =
             await participantOne.context.storageState();
         await closeParticipant(participantOne);
 
-        await continueWithoutMissingParticipants(page);
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await continueWithoutMissingParticipants(page),
+        );
+        [participantTwo.page, participantThree.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantTwoTracking,
+                    attachParticipantThreeTracking,
+                ],
+                pages: [participantTwo.page, participantThree.page],
+            });
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '3/4',
-        });
+        }));
 
         participantOne = await reopenProjectParticipant({
             browser,
@@ -360,25 +411,52 @@ test('automatically republishes a stored vote after a participant rejoins during
         participantOne.page = attachParticipantOneRestoredTracking(
             await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
+        [participantOne.page] = await syncPollPagesForSharedState({
+            attachPages: [
+                attachParticipantOneRestoredTracking,
+            ],
+            pages: [
+                participantOne.page,
+            ],
+        });
+        [participantTwo.page, participantThree.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantTwoTracking,
+                    attachParticipantThreeTracking,
+                ],
+                pages: [
+                    participantTwo.page,
+                    participantThree.page,
+                ],
+            });
 
-        await waitForVerifiedResults({ expectedResults, page });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantOne.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantTwo.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantThree.page,
-        });
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await waitForVerifiedResults({ expectedResults, page }),
+        );
+        participantOne.page = attachParticipantOneRestoredTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantOne.page,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantTwo.page,
+            }),
+        );
+        participantThree.page = attachParticipantThreeTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantThree.page,
+            }),
+        );
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Ceremony restarts',
             page,
             value: '1',
-        });
+        }));
 
         missingParticipant = await reopenProjectParticipant({
             browser,
@@ -527,36 +605,60 @@ test('lets the organizer rescue multiple missing participants and finish with th
 
         await closeParticipant(missingParticipantOne);
         await closeParticipant(missingParticipantTwo);
-        await closeVoting(page);
-        await waitForBlockingParticipants({
+        page = attachCreatorTracking(await closeVoting(page));
+        [participantOne.page, participantTwo.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantOneTracking,
+                    attachParticipantTwoTracking,
+                ],
+                pages: [participantOne.page, participantTwo.page],
+            });
+        page = attachCreatorTracking(await waitForBlockingParticipants({
             page,
             participantNames: [
                 missingParticipantOneName,
                 missingParticipantTwoName,
             ],
-        });
+        }));
 
-        await continueWithoutMissingParticipants(page);
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await continueWithoutMissingParticipants(page),
+        );
+        [participantOne.page, participantTwo.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantOneTracking,
+                    attachParticipantTwoTracking,
+                ],
+                pages: [participantOne.page, participantTwo.page],
+            });
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '3/3',
-        });
+        }));
 
-        await waitForVerifiedResults({ expectedResults, page });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantOne.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantTwo.page,
-        });
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await waitForVerifiedResults({ expectedResults, page }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantOne.page,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantTwo.page,
+            }),
+        );
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Active ceremony roster',
             page,
             value: '3',
-        });
+        }));
 
         await expectNoUnexpectedErrors(tracker);
     } finally {
@@ -684,45 +786,103 @@ test('supports repeated organizer rescues at different securing steps', async ({
         );
 
         await closeParticipant(missingParticipant);
-        await closeVoting(page);
-        await waitForBlockingParticipants({
+        page = attachCreatorTracking(await closeVoting(page));
+        [
+            participantOne.page,
+            participantTwo.page,
+            participantThree.page,
+        ] = await bringPollPagesToFront({
+            attachPages: [
+                attachParticipantOneTracking,
+                attachParticipantTwoTracking,
+                attachParticipantThreeTracking,
+            ],
+            pages: [
+                participantOne.page,
+                participantTwo.page,
+                participantThree.page,
+            ],
+        });
+        page = attachCreatorTracking(await waitForBlockingParticipants({
             page,
             participantNames: [missingParticipantName],
-        });
+        }));
 
-        await continueWithoutMissingParticipants(page);
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await continueWithoutMissingParticipants(page),
+        );
+        [
+            participantOne.page,
+            participantTwo.page,
+            participantThree.page,
+        ] = await bringPollPagesToFront({
+            attachPages: [
+                attachParticipantOneTracking,
+                attachParticipantTwoTracking,
+                attachParticipantThreeTracking,
+            ],
+            pages: [
+                participantOne.page,
+                participantTwo.page,
+                participantThree.page,
+            ],
+        });
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '4/4',
-        });
+        }));
         await closeParticipant(participantThree);
-        await waitForBlockingParticipants({
+        [participantOne.page, participantTwo.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantOneTracking,
+                    attachParticipantTwoTracking,
+                ],
+                pages: [participantOne.page, participantTwo.page],
+            });
+        page = attachCreatorTracking(await waitForBlockingParticipants({
             page,
             participantNames: [participantThreeName],
-        });
+        }));
 
-        await continueWithoutMissingParticipants(page);
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await continueWithoutMissingParticipants(page),
+        );
+        [participantOne.page, participantTwo.page] =
+            await bringPollPagesToFront({
+                attachPages: [
+                    attachParticipantOneTracking,
+                    attachParticipantTwoTracking,
+                ],
+                pages: [participantOne.page, participantTwo.page],
+            });
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Board registrations',
             page,
             value: '3/3',
-        });
+        }));
 
-        await waitForVerifiedResults({ expectedResults, page });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantOne.page,
-        });
-        await waitForVerifiedResults({
-            expectedResults,
-            page: participantTwo.page,
-        });
-        await waitForCeremonyMetric({
+        page = attachCreatorTracking(
+            await waitForVerifiedResults({ expectedResults, page }),
+        );
+        participantOne.page = attachParticipantOneTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantOne.page,
+            }),
+        );
+        participantTwo.page = attachParticipantTwoTracking(
+            await waitForVerifiedResults({
+                expectedResults,
+                page: participantTwo.page,
+            }),
+        );
+        page = attachCreatorTracking(await waitForCeremonyMetric({
             label: 'Ceremony restarts',
             page,
             value: '2',
-        });
+        }));
 
         await expectNoUnexpectedErrors(tracker);
     } finally {

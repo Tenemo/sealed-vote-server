@@ -47,8 +47,9 @@
   [headers.values]
     Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
 
-# Keep browser API traffic same-origin on Netlify so transient upstream errors
-# stay visible as normal HTTP failures instead of getting masked by CORS.
+# Legacy passthrough for explicit /api requests. The production browser now
+# talks directly to VITE_API_BASE_URL so poll traffic avoids Netlify edge
+# security challenges on the /api path.
 [[redirects]]
   from = "/api/*"
   to = "https://api.sealed.vote/api/:splat"
