@@ -72,6 +72,7 @@ jobs:
                       ci_workers: '1'
 
         env:
+            HOME: /root
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
             PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS: 'true'
@@ -143,6 +144,7 @@ jobs:
                       ci_workers: '1'
 
         env:
+            HOME: /root
             PLAYWRIGHT_BASE_URL: https://sealed.vote
             PLAYWRIGHT_BLOB_REPORT: 'true'
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}

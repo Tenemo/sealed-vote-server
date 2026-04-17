@@ -15,16 +15,30 @@ type WaitDependencies = {
     runReadinessCheck?: (
         forwardedCliArgs: string[],
         timeoutMs: number,
-    ) => boolean;
+    ) => ReadinessCheckResult;
     sleep?: (delayMs: number) => Promise<void>;
 };
 
 const defaultIntervalMs = 15_000;
 const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 20 * 60 * 1000;
+const firefoxHomeOwnershipFailureMessage =
+    'Firefox cannot launch in the Playwright container because HOME is not owned by the current user. Set HOME=/root or run the container as a non-root user.';
 const currentFilePath = fileURLToPath(import.meta.url);
 const pnpmExecPath = process.env.npm_execpath;
 const repoRoot = path.resolve(path.dirname(currentFilePath), '../../..');
+
+export type ReadinessCheckResult =
+    | {
+          kind: 'success';
+      }
+    | {
+          kind: 'retry';
+      }
+    | {
+          kind: 'fatal';
+          message: string;
+      };
 
 const fail = (message: string): never => {
     throw new Error(message);
@@ -137,6 +151,43 @@ const sleep = async (delayMs: number): Promise<void> => {
     });
 };
 
+const writeCapturedOutput = (
+    output: string | null | undefined,
+    stream: NodeJS.WriteStream,
+): void => {
+    if (!output) {
+        return;
+    }
+
+    stream.write(output);
+};
+
+export const detectFatalReadinessFailureMessage = (
+    output: string,
+): string | null => {
+    if (
+        output.includes(
+            "Firefox is unable to launch if the $HOME folder isn't owned by the current user.",
+        ) ||
+        output.includes(
+            'Running Nightly as root in a regular user\'s session is not supported.',
+        )
+    ) {
+        return firefoxHomeOwnershipFailureMessage;
+    }
+
+    if (
+        output.includes(
+            'browserType.launch: Failed to launch the browser process.',
+        ) ||
+        output.includes('Error: browserType.launch: Failed to launch the browser process.')
+    ) {
+        return 'The Playwright browser could not launch inside the readiness job, so retrying will not make production become ready.';
+    }
+
+    return null;
+};
+
 const resolvePnpmInvocation = (): {
     command: string;
     args: string[];
@@ -164,7 +215,7 @@ const resolvePnpmInvocation = (): {
 const runReadinessCheck = (
     forwardedCliArgs: string[],
     timeoutMs: number,
-): boolean => {
+): ReadinessCheckResult => {
     const pnpmInvocation = resolvePnpmInvocation();
 
     const result = spawnSync(
@@ -183,21 +234,46 @@ const runReadinessCheck = (
         ],
         {
             cwd: repoRoot,
+            encoding: 'utf8',
             env: process.env,
-            stdio: 'inherit',
+            stdio: 'pipe',
             timeout: timeoutMs,
         },
     );
 
+    writeCapturedOutput(result.stdout, process.stdout);
+    writeCapturedOutput(result.stderr, process.stderr);
+
     if (result.error) {
         if ((result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
-            return false;
+            return {
+                kind: 'retry',
+            };
         }
 
         throw result.error;
     }
 
-    return result.status === 0;
+    if (result.status === 0) {
+        return {
+            kind: 'success',
+        };
+    }
+
+    const fatalFailureMessage = detectFatalReadinessFailureMessage(
+        [result.stdout, result.stderr].filter(Boolean).join('\n'),
+    );
+
+    if (fatalFailureMessage) {
+        return {
+            kind: 'fatal',
+            message: fatalFailureMessage,
+        };
+    }
+
+    return {
+        kind: 'retry',
+    };
 };
 
 const formatForwardedCliArgs = (forwardedCliArgs: string[]): string =>
@@ -221,12 +297,12 @@ export const waitForProductionBrowserReadiness = async (
             break;
         }
 
-        const isSuccessful = runCheck(
+        const checkResult = runCheck(
             options.forwardedCliArgs,
             remainingCheckBudgetMs,
         );
 
-        if (isSuccessful) {
+        if (checkResult.kind === 'success') {
             stableChecks += 1;
             log(
                 `Browser readiness check ${stableChecks}/${options.requiredStableChecks} succeeded for ${formatForwardedCliArgs(options.forwardedCliArgs)}.`,
@@ -238,10 +314,14 @@ export const waitForProductionBrowserReadiness = async (
                 );
                 return;
             }
-        } else {
+        } else if (checkResult.kind === 'retry') {
             stableChecks = 0;
             log(
                 `Waiting for stable production browser readiness for ${formatForwardedCliArgs(options.forwardedCliArgs)}.`,
+            );
+        } else {
+            fail(
+                `Fatal production browser readiness failure for ${formatForwardedCliArgs(options.forwardedCliArgs)}. ${checkResult.message}`,
             );
         }
 
