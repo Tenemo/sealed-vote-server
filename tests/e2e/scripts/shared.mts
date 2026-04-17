@@ -121,6 +121,59 @@ export const runPnpmStatusSync = (args: string[]): number => {
     return result.status ?? 1;
 };
 
+export const runPnpmObserved = async (
+    args: string[],
+): Promise<{
+    output: string;
+    status: number;
+}> => {
+    const [command, commandPrefix] = getPnpmCommand();
+
+    return await new Promise((resolve) => {
+        const childProcess = spawn(command, [...commandPrefix, ...args], {
+            cwd: repoRoot,
+            env: process.env,
+            stdio: ['inherit', 'pipe', 'pipe'],
+        });
+        let combinedOutput = '';
+        let isSettled = false;
+
+        const settle = (status: number): void => {
+            if (isSettled) {
+                return;
+            }
+
+            isSettled = true;
+            resolve({
+                output: combinedOutput,
+                status,
+            });
+        };
+
+        childProcess.stdout?.on('data', (chunk: Buffer | string) => {
+            const text = chunk.toString();
+            combinedOutput += text;
+            process.stdout.write(text);
+        });
+
+        childProcess.stderr?.on('data', (chunk: Buffer | string) => {
+            const text = chunk.toString();
+            combinedOutput += text;
+            process.stderr.write(text);
+        });
+
+        childProcess.on('error', (error: Error) => {
+            console.error(error);
+            combinedOutput += `${error.stack ?? error.message}\n`;
+            settle(1);
+        });
+
+        childProcess.on('close', (code: number | null) => {
+            settle(code ?? 1);
+        });
+    });
+};
+
 export const runPnpmCaptureSync = (args: string[]): string => {
     const [command, commandPrefix] = getPnpmCommand();
     const result = spawnSync(command, [...commandPrefix, ...args], {

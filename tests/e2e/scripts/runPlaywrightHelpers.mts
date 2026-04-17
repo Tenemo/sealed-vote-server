@@ -2,6 +2,10 @@ const listedSpecPattern =
     /^\s*\[[^\]]+\]\s+\u203a\s+(.+):\d+:\d+\s+\u203a\s+/u;
 export const productionBrowserReadinessListedFile =
     '00-production-browser-readiness.spec.ts';
+const productionReadinessTestTitle =
+    'browser can commit the homepage and a real production vote page';
+const productionReadinessGotoTimeoutPattern =
+    /Error:\s+page\.goto: Timeout \d+ms exceeded\./u;
 
 const normalizeListedSpecFile = (listedFile: string): string =>
     listedFile.replaceAll('\\', '/');
@@ -55,37 +59,61 @@ export const resolveProductionIsolatedInvocationArgs = (
     '1',
 ];
 
-export const runProductionIsolatedInvocations = ({
+export const isRecoverableProductionReadinessFailure = (
+    output: string,
+): boolean =>
+    output.includes(productionBrowserReadinessListedFile) &&
+    output.includes(productionReadinessTestTitle) &&
+    productionReadinessGotoTimeoutPattern.test(output);
+
+export const runProductionIsolatedInvocations = async ({
+    logRetry = () => undefined,
     forwardedCliArgs,
     listedFiles,
     onInvocationStart = () => undefined,
     runInvocation,
 }: {
+    logRetry?: (listedFile: string) => void;
     forwardedCliArgs: string[];
     listedFiles: readonly string[];
     onInvocationStart?: (listedFile: string) => void;
-    runInvocation: (invocationArgs: string[]) => number;
-}): {
+    runInvocation: (invocationArgs: string[]) => Promise<{
+        exitCode: number;
+        output: string;
+    }>;
+}): Promise<{
     exitCode: number;
     failedFiles: string[];
-} => {
+}> => {
     const failedFiles: string[] = [];
     let exitCode = 0;
 
     for (const listedFile of listedFiles) {
         onInvocationStart(listedFile);
-        const invocationStatus = runInvocation(
-            resolveProductionIsolatedInvocationArgs(
-                listedFile,
-                forwardedCliArgs,
-            ),
+        const invocationArgs = resolveProductionIsolatedInvocationArgs(
+            listedFile,
+            forwardedCliArgs,
         );
+        let invocationResult = await runInvocation(invocationArgs);
 
-        if (invocationStatus !== 0) {
+        // GitHub production artifacts showed Firefox sometimes timing out on
+        // the paired readiness spec before any app page loaded, while curl in
+        // the same container still reached the site. That failure survived the
+        // page-level recovery inside a single Playwright process, so recover by
+        // restarting the isolated invocation once in a fresh process.
+        if (
+            invocationResult.exitCode !== 0 &&
+            isRecoverableProductionReadinessFailure(invocationResult.output)
+        ) {
+            logRetry(listedFile);
+            invocationResult = await runInvocation(invocationArgs);
+        }
+
+        if (invocationResult.exitCode !== 0) {
             failedFiles.push(listedFile);
 
             if (exitCode === 0) {
-                exitCode = invocationStatus;
+                exitCode = invocationResult.exitCode;
             }
         }
     }

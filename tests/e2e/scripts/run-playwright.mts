@@ -5,7 +5,7 @@ import {
 import {
     getForwardedCliArgs,
     runPnpmCaptureSync,
-    runPnpmStatusSync,
+    runPnpmObserved,
     runPnpmSync,
 } from './shared.mts';
 
@@ -56,7 +56,7 @@ if (!shouldIsolateProductionByFile) {
         );
     }
 
-    const isolatedRunResult = runProductionIsolatedInvocations({
+    const isolatedRunResult = await runProductionIsolatedInvocations({
         forwardedCliArgs,
         listedFiles,
         onInvocationStart: (listedFile) => {
@@ -64,15 +64,26 @@ if (!shouldIsolateProductionByFile) {
                 `Running production Playwright file in isolation: ${listedFile}`,
             );
         },
-        runInvocation: (invocationArgs) =>
-            runPnpmStatusSync([
+        logRetry: (listedFile) => {
+            console.warn(
+                `Re-running production Playwright file after readiness startup timeout: ${listedFile}`,
+            );
+        },
+        runInvocation: async (invocationArgs) => {
+            const result = await runPnpmObserved([
                 'exec',
                 'playwright',
                 'test',
                 '--config',
                 configPath,
                 ...invocationArgs,
-            ]),
+            ]);
+
+            return {
+                exitCode: result.status,
+                output: result.output,
+            };
+        },
     });
 
     if (isolatedRunResult.exitCode !== 0) {

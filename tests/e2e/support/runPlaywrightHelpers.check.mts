@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
     collectListedSpecFiles,
+    isRecoverableProductionReadinessFailure,
     resolveProductionIsolatedInvocationArgs,
     resolveProductionIsolatedInvocationFiles,
     runProductionIsolatedInvocations,
@@ -93,11 +94,37 @@ test('resolveProductionIsolatedInvocationArgs forces a single worker for isolate
     );
 });
 
-test('runProductionIsolatedInvocations continues after failures and reports every failed file', () => {
+test('isRecoverableProductionReadinessFailure matches the GitHub readiness timeout signature', () => {
+    assert.equal(
+        isRecoverableProductionReadinessFailure(`Running 2 tests using 1 worker
+F°
+
+  1) [firefox-desktop] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`),
+        true,
+    );
+});
+
+test('isRecoverableProductionReadinessFailure ignores target-spec failures', () => {
+    assert.equal(
+        isRecoverableProductionReadinessFailure(`Running 2 tests using 1 worker
+F
+
+  1) [firefox-desktop] › tests/e2e/recovery-network-cuts.spec.ts:31:5 › retries network cuts
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`),
+        false,
+    );
+});
+
+test('runProductionIsolatedInvocations continues after failures and reports every failed file', async () => {
     const startedFiles: string[] = [];
     const invocationArgs: string[][] = [];
 
-    const result = runProductionIsolatedInvocations({
+    const result = await runProductionIsolatedInvocations({
         forwardedCliArgs: ['--project', 'firefox-desktop'],
         listedFiles: [
             '00-production-browser-readiness.spec.ts',
@@ -107,12 +134,16 @@ test('runProductionIsolatedInvocations continues after failures and reports ever
         onInvocationStart: (listedFile) => {
             startedFiles.push(listedFile);
         },
-        runInvocation: (args) => {
+        runInvocation: async (args) => {
             invocationArgs.push(args);
-            return args.includes('ceremony-persistence.spec.ts') ||
-                args.includes('share-link.spec.ts')
-                ? 1
-                : 0;
+            return {
+                exitCode:
+                    args.includes('ceremony-persistence.spec.ts') ||
+                    args.includes('share-link.spec.ts')
+                        ? 1
+                        : 0,
+                output: '',
+            };
         },
     });
 
@@ -149,5 +180,87 @@ test('runProductionIsolatedInvocations continues after failures and reports ever
     assert.deepEqual(result, {
         exitCode: 1,
         failedFiles: ['ceremony-persistence.spec.ts', 'share-link.spec.ts'],
+    });
+});
+
+test('runProductionIsolatedInvocations re-runs a readiness-timeout failure once', async () => {
+    const invocationArgs: string[][] = [];
+    const retriedFiles: string[] = [];
+    let invocationCount = 0;
+
+    const result = await runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'firefox-desktop'],
+        listedFiles: ['recovery-network-cuts.spec.ts'],
+        logRetry: (listedFile) => {
+            retriedFiles.push(listedFile);
+        },
+        runInvocation: async (args) => {
+            invocationArgs.push(args);
+            invocationCount += 1;
+
+            if (invocationCount === 1) {
+                return {
+                    exitCode: 1,
+                    output: `  1) [firefox-desktop] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+                };
+            }
+
+            return {
+                exitCode: 0,
+                output: '',
+            };
+        },
+    });
+
+    assert.deepEqual(retriedFiles, ['recovery-network-cuts.spec.ts']);
+    assert.deepEqual(invocationArgs, [
+        [
+            '00-production-browser-readiness.spec.ts',
+            'recovery-network-cuts.spec.ts',
+            '--project',
+            'firefox-desktop',
+            '--workers',
+            '1',
+        ],
+        [
+            '00-production-browser-readiness.spec.ts',
+            'recovery-network-cuts.spec.ts',
+            '--project',
+            'firefox-desktop',
+            '--workers',
+            '1',
+        ],
+    ]);
+    assert.deepEqual(result, {
+        exitCode: 0,
+        failedFiles: [],
+    });
+});
+
+test('runProductionIsolatedInvocations still fails when the readiness-timeout retry also fails', async () => {
+    const retriedFiles: string[] = [];
+
+    const result = await runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'firefox-desktop'],
+        listedFiles: ['recovery-network-cuts.spec.ts'],
+        logRetry: (listedFile) => {
+            retriedFiles.push(listedFile);
+        },
+        runInvocation: async () => ({
+            exitCode: 1,
+            output: `  1) [firefox-desktop] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+        }),
+    });
+
+    assert.deepEqual(retriedFiles, ['recovery-network-cuts.spec.ts']);
+    assert.deepEqual(result, {
+        exitCode: 1,
+        failedFiles: ['recovery-network-cuts.spec.ts'],
     });
 });
