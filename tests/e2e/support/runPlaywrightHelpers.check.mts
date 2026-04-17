@@ -7,6 +7,7 @@ import {
     resolveProductionIsolatedInvocationArgs,
     resolveProductionIsolatedInvocationFiles,
     runProductionIsolatedInvocations,
+    stripPlaywrightPositionalTestSelectors,
 } from '../scripts/runPlaywrightHelpers.mts';
 
 const listedSpecSeparator = '\u203a';
@@ -88,6 +89,54 @@ test('resolveProductionIsolatedInvocationArgs forces a single worker for isolate
             'share-link.spec.ts',
             '--project',
             'mobile-firefox-android',
+            '--workers',
+            '1',
+        ],
+    );
+});
+
+test('stripPlaywrightPositionalTestSelectors removes explicit spec selectors while preserving option values', () => {
+    assert.deepEqual(
+        stripPlaywrightPositionalTestSelectors([
+            'tests/e2e/ceremony-persistence.spec.ts',
+            'tests/e2e/share-link.spec.ts',
+            '--project',
+            'mobile-firefox-android',
+            '--grep',
+            'happy path',
+            '--reporter=line',
+            '--trace',
+            'retain-on-failure',
+        ]),
+        [
+            '--project',
+            'mobile-firefox-android',
+            '--grep',
+            'happy path',
+            '--reporter=line',
+            '--trace',
+            'retain-on-failure',
+        ],
+    );
+});
+
+test('resolveProductionIsolatedInvocationArgs ignores forwarded spec filters from the original selection', () => {
+    assert.deepEqual(
+        resolveProductionIsolatedInvocationArgs('share-link.spec.ts', [
+            'tests/e2e/ceremony-persistence.spec.ts',
+            'tests/e2e/share-link.spec.ts',
+            '--project',
+            'mobile-firefox-android',
+            '--grep',
+            'happy path',
+        ]),
+        [
+            '00-production-browser-readiness.spec.ts',
+            'share-link.spec.ts',
+            '--project',
+            'mobile-firefox-android',
+            '--grep',
+            'happy path',
             '--workers',
             '1',
         ],

@@ -6,6 +6,29 @@ const productionReadinessTestTitle =
     'browser can commit the homepage and a real production vote page';
 const productionReadinessGotoTimeoutPattern =
     /Error:\s+page\.goto: Timeout \d+ms exceeded\./u;
+const playwrightOptionsWithSeparateValues = new Set([
+    '-c',
+    '-g',
+    '-j',
+    '--browser',
+    '--config',
+    '--global-timeout',
+    '--grep',
+    '--grep-invert',
+    '--max-failures',
+    '--output',
+    '--project',
+    '--repeat-each',
+    '--reporter',
+    '--retries',
+    '--shard',
+    '--timeout',
+    '--trace',
+    '--tsconfig',
+    '--ui-host',
+    '--ui-port',
+    '--workers',
+]);
 
 const normalizeListedSpecFile = (listedFile: string): string =>
     listedFile.replaceAll('\\', '/');
@@ -47,12 +70,46 @@ export const resolveProductionIsolatedInvocationFiles = (
         ? [listedFile]
         : [productionBrowserReadinessListedFile, listedFile];
 
+export const stripPlaywrightPositionalTestSelectors = (
+    forwardedCliArgs: readonly string[],
+): string[] => {
+    const sanitizedArgs: string[] = [];
+    let nextArgIsOptionValue = false;
+
+    for (const arg of forwardedCliArgs) {
+        if (nextArgIsOptionValue) {
+            sanitizedArgs.push(arg);
+            nextArgIsOptionValue = false;
+            continue;
+        }
+
+        if (arg === '--') {
+            continue;
+        }
+
+        if (arg.startsWith('-')) {
+            sanitizedArgs.push(arg);
+
+            if (
+                !arg.includes('=') &&
+                playwrightOptionsWithSeparateValues.has(arg)
+            ) {
+                nextArgIsOptionValue = true;
+            }
+
+            continue;
+        }
+    }
+
+    return sanitizedArgs;
+};
+
 export const resolveProductionIsolatedInvocationArgs = (
     listedFile: string,
     forwardedCliArgs: string[],
 ): string[] => [
     ...resolveProductionIsolatedInvocationFiles(listedFile),
-    ...forwardedCliArgs,
+    ...stripPlaywrightPositionalTestSelectors(forwardedCliArgs),
     // Keep the paired readiness file and target file on the same worker so
     // they share a single browser startup path.
     '--workers',
