@@ -124,6 +124,46 @@ export const syncPollPageForSharedState = async (
     return await reloadPage(page);
 };
 
+export const syncPollPagesForSharedState = async ({
+    attachPages = [],
+    pages,
+    reloadPage = reloadInteractablePage,
+}: {
+    attachPages?: Array<PageAttacher | undefined>;
+    pages: readonly Page[];
+    reloadPage?: (page: Page) => Promise<Page>;
+}): Promise<Page[]> => {
+    const syncedPages: Page[] = [];
+
+    for (const [index, page] of pages.entries()) {
+        // Production ceremony flows keep several participant pages alive in
+        // the background. If one background page loses its poll loop after a
+        // transient network failure, foregrounding and reloading it here keeps
+        // shared ceremony assertions deterministic on CI runners.
+        const syncedPage = await syncPollPageForSharedState(page, reloadPage);
+        syncedPages.push(attachPollFlowPage(syncedPage, attachPages[index]));
+    }
+
+    return syncedPages;
+};
+
+export const bringPollPagesToFront = async ({
+    attachPages = [],
+    pages,
+}: {
+    attachPages?: Array<PageAttacher | undefined>;
+    pages: readonly Page[];
+}): Promise<Page[]> => {
+    const focusedPages: Page[] = [];
+
+    for (const [index, page] of pages.entries()) {
+        await page.bringToFront();
+        focusedPages.push(attachPollFlowPage(page, attachPages[index]));
+    }
+
+    return focusedPages;
+};
+
 const waitForCeremonyMetricValue = async ({
     label,
     page,

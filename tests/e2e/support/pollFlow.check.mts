@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+    bringPollPagesToFront,
     createExpectedVerifiedResults,
     parseSubmittedParticipantCount,
+    syncPollPagesForSharedState,
     syncPollPageForSharedState,
 } from './pollFlow.ts';
 
@@ -85,4 +87,79 @@ test('syncPollPageForSharedState brings the page forward before reloading', asyn
 
     assert.deepEqual(calls, ['front', 'reload']);
     assert.equal(syncedPage, reloadedPage);
+});
+
+test('syncPollPagesForSharedState reloads each page and reapplies attachers', async () => {
+    const calls: string[] = [];
+    const pageOne = {
+        bringToFront: async () => {
+            calls.push('front-one');
+        },
+    };
+    const pageTwo = {
+        bringToFront: async () => {
+            calls.push('front-two');
+        },
+    };
+    const reloadedPageOne = { label: 'page-one' };
+    const reloadedPageTwo = { label: 'page-two' };
+
+    const syncedPages = await syncPollPagesForSharedState({
+        attachPages: [
+            (page) => {
+                calls.push(
+                    `attach-${(page as unknown as typeof reloadedPageOne).label}`,
+                );
+                return page;
+            },
+            undefined,
+        ],
+        pages: [pageOne as never, pageTwo as never],
+        reloadPage: async (page) => {
+            if (page === pageOne) {
+                calls.push('reload-one');
+                return reloadedPageOne as never;
+            }
+
+            calls.push('reload-two');
+            return reloadedPageTwo as never;
+        },
+    });
+
+    assert.deepEqual(calls, [
+        'front-one',
+        'reload-one',
+        'attach-page-one',
+        'front-two',
+        'reload-two',
+    ]);
+    assert.deepEqual(syncedPages, [reloadedPageOne, reloadedPageTwo]);
+});
+
+test('bringPollPagesToFront focuses each page and reapplies attachers', async () => {
+    const calls: string[] = [];
+    const pageOne = {
+        bringToFront: async () => {
+            calls.push('front-one');
+        },
+    };
+    const pageTwo = {
+        bringToFront: async () => {
+            calls.push('front-two');
+        },
+    };
+
+    const focusedPages = await bringPollPagesToFront({
+        attachPages: [
+            (page) => {
+                calls.push('attach-one');
+                return page;
+            },
+            undefined,
+        ],
+        pages: [pageOne as never, pageTwo as never],
+    });
+
+    assert.deepEqual(calls, ['front-one', 'attach-one', 'front-two']);
+    assert.deepEqual(focusedPages, [pageOne, pageTwo]);
 });
