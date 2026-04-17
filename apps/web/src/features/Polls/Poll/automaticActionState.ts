@@ -1,4 +1,4 @@
-import type { PollResponse } from '@sealed-vote/contracts';
+import { ERROR_MESSAGES, type PollResponse } from '@sealed-vote/contracts';
 
 import type { PreparedCeremonyAction } from '../pollBoardActions';
 import type { StoredPollDeviceState } from '../pollDeviceStorage';
@@ -87,5 +87,52 @@ export const isPreparedAutomaticActionCurrent = ({
         action.signedPayload.payload.manifestHash === poll.manifestHash &&
         action.signedPayload.payload.participantIndex ===
             rosterEntry.participantIndex
+    );
+};
+
+const extractAutomaticActionErrorMessage = (error: unknown): string | null => {
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    if (!error || typeof error !== 'object') {
+        return null;
+    }
+
+    if ('data' in error) {
+        const dataField = (error as { data?: unknown }).data;
+
+        if (typeof dataField === 'string') {
+            return dataField;
+        }
+
+        if (
+            dataField &&
+            typeof dataField === 'object' &&
+            'message' in dataField
+        ) {
+            const messageField = (dataField as { message?: unknown }).message;
+
+            return typeof messageField === 'string' ? messageField : null;
+        }
+    }
+
+    if ('message' in error) {
+        const messageField = (error as { message?: unknown }).message;
+
+        return typeof messageField === 'string' ? messageField : null;
+    }
+
+    return null;
+};
+
+export const isRecoverableAutomaticActionSubmissionError = (
+    error: unknown,
+): boolean => {
+    const message = extractAutomaticActionErrorMessage(error);
+
+    return (
+        message === ERROR_MESSAGES.boardMessageSessionMismatch ||
+        message === ERROR_MESSAGES.boardMessageSkippedParticipant
     );
 };

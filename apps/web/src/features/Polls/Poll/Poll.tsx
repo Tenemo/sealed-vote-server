@@ -10,6 +10,7 @@ import LoadingButton from 'components/LoadingButton/LoadingButton';
 import NotFound from 'components/NotFound/NotFound';
 import {
     getLocalCeremonyState,
+    isRecoverableAutomaticActionSubmissionError,
     isPreparedAutomaticActionCurrent,
 } from 'features/Polls/Poll/automaticActionState';
 import {
@@ -708,6 +709,18 @@ const PollPage = (): React.JSX.Element => {
                     }
                 }
             } catch (submissionError) {
+                if (
+                    isRecoverableAutomaticActionSubmissionError(submissionError)
+                ) {
+                    setAwaitingBoardConfirmationAction(null);
+                    setAutomaticAction(null);
+                    setAutomaticActionDescription(null);
+                    setAutomationError(null);
+                    await refetch();
+                    setAutomaticResolutionAttempt((attempt) => attempt + 1);
+                    return;
+                }
+
                 setAutomationError(renderError(submissionError));
             } finally {
                 setActiveActionSlotKey(null);

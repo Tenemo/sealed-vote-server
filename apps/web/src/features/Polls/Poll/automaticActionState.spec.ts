@@ -2,6 +2,7 @@ import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 
 import {
     getLocalCeremonyState,
+    isRecoverableAutomaticActionSubmissionError,
     isPreparedAutomaticActionCurrent,
 } from './automaticActionState';
 
@@ -268,5 +269,40 @@ describe('automaticActionState', () => {
                 voterSession: createVoterSession(),
             }),
         ).toBe('skipped');
+    });
+
+    it('treats a restarted-session submission error as recoverable', () => {
+        expect(
+            isRecoverableAutomaticActionSubmissionError({
+                data: {
+                    message:
+                        'The submitted payload does not match the active ceremony session.',
+                },
+                status: 400,
+            }),
+        ).toBe(true);
+    });
+
+    it('treats a skipped-participant submission error as recoverable', () => {
+        expect(
+            isRecoverableAutomaticActionSubmissionError({
+                data: {
+                    message:
+                        'This participant is no longer part of the active ceremony.',
+                },
+                status: 400,
+            }),
+        ).toBe(true);
+    });
+
+    it('does not treat unrelated submission errors as recoverable', () => {
+        expect(
+            isRecoverableAutomaticActionSubmissionError({
+                data: {
+                    message: 'The server exploded.',
+                },
+                status: 500,
+            }),
+        ).toBe(false);
     });
 });
