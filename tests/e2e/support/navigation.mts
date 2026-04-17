@@ -1,3 +1,5 @@
+import { isLocalLoopbackHostname } from './localOrigin.mts';
+
 type NavigationWaitUntil =
     | 'commit'
     | 'domcontentloaded'
@@ -64,7 +66,6 @@ const transientNavigationTimeoutPattern = /Timeout \d+ms exceeded/u;
 const relativeUrlBase = 'https://playwright-navigation-check.invalid';
 const navigationDiagnosticSnippetLength = 240;
 const blankNavigationContentPattern = /<body[^>]*><\/body>/u;
-const localNavigationHostnames = new Set(['127.0.0.1', '::1', 'localhost']);
 const loadingNavigationTitlePatterns = [
     /^loading\s+https?:\/\//iu,
     /^connecting\s+to\s+/iu,
@@ -163,7 +164,7 @@ const isBlankNavigationStartUrl = (value: string): boolean =>
     !value || value === 'about:blank';
 
 const isLocalNavigationOrigin = (url: URL): boolean =>
-    localNavigationHostnames.has(url.hostname);
+    isLocalLoopbackHostname(url.hostname);
 
 const resolveNavigationBootstrapUrl = ({
     currentUrl,

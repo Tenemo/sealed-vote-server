@@ -6,6 +6,7 @@ import {
 } from '@playwright/test';
 
 import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
+import { isLocalLoopbackHostname } from './localOrigin.mts';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
@@ -15,7 +16,6 @@ const postClosePhaseLabels = [
     'Revealing results',
     'Verified results',
 ] as const;
-const localPollPageHostnames = new Set(['127.0.0.1', '::1', 'localhost']);
 const voteStoredNoticeText =
     'Vote stored on this device. You can close the app and come back after voting closes.';
 
@@ -116,7 +116,7 @@ const shouldHardResyncPollPage = (page: Page): boolean => {
         return true;
     }
 
-    return !localPollPageHostnames.has(parsedPageUrl.hostname);
+    return !isLocalLoopbackHostname(parsedPageUrl.hostname);
 };
 
 export const parseCeremonyMetricValue = ({

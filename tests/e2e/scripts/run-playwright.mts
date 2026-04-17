@@ -1,10 +1,11 @@
 import {
     collectListedSpecFiles,
-    resolveProductionIsolatedInvocationArgs,
+    runProductionIsolatedInvocations,
 } from './runPlaywrightHelpers.mts';
 import {
     getForwardedCliArgs,
     runPnpmCaptureSync,
+    runPnpmStatusSync,
     runPnpmSync,
 } from './shared.mts';
 
@@ -55,18 +56,32 @@ if (!shouldIsolateProductionByFile) {
         );
     }
 
-    for (const listedFile of listedFiles) {
-        console.log(`Running production Playwright file in isolation: ${listedFile}`);
-        runPnpmSync([
-            'exec',
-            'playwright',
-            'test',
-            '--config',
-            configPath,
-            ...resolveProductionIsolatedInvocationArgs(
-                listedFile,
-                forwardedCliArgs,
-            ),
-        ]);
+    const isolatedRunResult = runProductionIsolatedInvocations({
+        forwardedCliArgs,
+        listedFiles,
+        onInvocationStart: (listedFile) => {
+            console.log(
+                `Running production Playwright file in isolation: ${listedFile}`,
+            );
+        },
+        runInvocation: (invocationArgs) =>
+            runPnpmStatusSync([
+                'exec',
+                'playwright',
+                'test',
+                '--config',
+                configPath,
+                ...invocationArgs,
+            ]),
+    });
+
+    if (isolatedRunResult.exitCode !== 0) {
+        console.error('\nProduction Playwright isolated failures:');
+
+        for (const failedFile of isolatedRunResult.failedFiles) {
+            console.error(`- ${failedFile}`);
+        }
+
+        process.exit(isolatedRunResult.exitCode);
     }
 }

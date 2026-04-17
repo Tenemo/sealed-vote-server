@@ -5,6 +5,7 @@ import {
     collectListedSpecFiles,
     resolveProductionIsolatedInvocationArgs,
     resolveProductionIsolatedInvocationFiles,
+    runProductionIsolatedInvocations,
 } from '../scripts/runPlaywrightHelpers.mts';
 
 const listedSpecSeparator = '\u203a';
@@ -90,4 +91,63 @@ test('resolveProductionIsolatedInvocationArgs forces a single worker for isolate
             '1',
         ],
     );
+});
+
+test('runProductionIsolatedInvocations continues after failures and reports every failed file', () => {
+    const startedFiles: string[] = [];
+    const invocationArgs: string[][] = [];
+
+    const result = runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'firefox-desktop'],
+        listedFiles: [
+            '00-production-browser-readiness.spec.ts',
+            'ceremony-persistence.spec.ts',
+            'share-link.spec.ts',
+        ],
+        onInvocationStart: (listedFile) => {
+            startedFiles.push(listedFile);
+        },
+        runInvocation: (args) => {
+            invocationArgs.push(args);
+            return args.includes('ceremony-persistence.spec.ts') ||
+                args.includes('share-link.spec.ts')
+                ? 1
+                : 0;
+        },
+    });
+
+    assert.deepEqual(startedFiles, [
+        '00-production-browser-readiness.spec.ts',
+        'ceremony-persistence.spec.ts',
+        'share-link.spec.ts',
+    ]);
+    assert.deepEqual(invocationArgs, [
+        [
+            '00-production-browser-readiness.spec.ts',
+            '--project',
+            'firefox-desktop',
+            '--workers',
+            '1',
+        ],
+        [
+            '00-production-browser-readiness.spec.ts',
+            'ceremony-persistence.spec.ts',
+            '--project',
+            'firefox-desktop',
+            '--workers',
+            '1',
+        ],
+        [
+            '00-production-browser-readiness.spec.ts',
+            'share-link.spec.ts',
+            '--project',
+            'firefox-desktop',
+            '--workers',
+            '1',
+        ],
+    ]);
+    assert.deepEqual(result, {
+        exitCode: 1,
+        failedFiles: ['ceremony-persistence.spec.ts', 'share-link.spec.ts'],
+    });
 });

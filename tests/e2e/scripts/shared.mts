@@ -98,6 +98,14 @@ export const assertSafeE2EEnv = (): void => {
 };
 
 export const runPnpmSync = (args: string[]): void => {
+    const status = runPnpmStatusSync(args);
+
+    if (status !== 0) {
+        process.exit(status);
+    }
+};
+
+export const runPnpmStatusSync = (args: string[]): number => {
     const [command, commandPrefix] = getPnpmCommand();
     const result = spawnSync(command, [...commandPrefix, ...args], {
         cwd: repoRoot,
@@ -110,9 +118,7 @@ export const runPnpmSync = (args: string[]): void => {
         process.exit(1);
     }
 
-    if (result.status !== 0) {
-        process.exit(result.status ?? 1);
-    }
+    return result.status ?? 1;
 };
 
 export const runPnpmCaptureSync = (args: string[]): string => {

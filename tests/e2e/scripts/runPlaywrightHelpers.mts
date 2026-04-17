@@ -54,3 +54,44 @@ export const resolveProductionIsolatedInvocationArgs = (
     '--workers',
     '1',
 ];
+
+export const runProductionIsolatedInvocations = ({
+    forwardedCliArgs,
+    listedFiles,
+    onInvocationStart = () => undefined,
+    runInvocation,
+}: {
+    forwardedCliArgs: string[];
+    listedFiles: readonly string[];
+    onInvocationStart?: (listedFile: string) => void;
+    runInvocation: (invocationArgs: string[]) => number;
+}): {
+    exitCode: number;
+    failedFiles: string[];
+} => {
+    const failedFiles: string[] = [];
+    let exitCode = 0;
+
+    for (const listedFile of listedFiles) {
+        onInvocationStart(listedFile);
+        const invocationStatus = runInvocation(
+            resolveProductionIsolatedInvocationArgs(
+                listedFile,
+                forwardedCliArgs,
+            ),
+        );
+
+        if (invocationStatus !== 0) {
+            failedFiles.push(listedFile);
+
+            if (exitCode === 0) {
+                exitCode = invocationStatus;
+            }
+        }
+    }
+
+    return {
+        exitCode,
+        failedFiles,
+    };
+};
