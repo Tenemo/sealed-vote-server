@@ -22,6 +22,7 @@ type WaitDependencies = {
 const defaultIntervalMs = 15_000;
 const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 20 * 60 * 1000;
+const readinessCaptureMaxBufferBytes = 16 * 1024 * 1024;
 const firefoxHomeOwnershipFailureMessage =
     'Firefox cannot launch in the Playwright container because HOME is not owned by the current user. Set HOME=/root or run the container as a non-root user.';
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -236,6 +237,10 @@ const runReadinessCheck = (
             cwd: repoRoot,
             encoding: 'utf8',
             env: process.env,
+            // Playwright failures can emit enough trace and reporter output to
+            // overflow Node's default sync capture buffer before we can inspect
+            // the real launch error and classify it correctly.
+            maxBuffer: readinessCaptureMaxBufferBytes,
             stdio: 'pipe',
             timeout: timeoutMs,
         },
