@@ -15,6 +15,7 @@ const postClosePhaseLabels = [
     'Revealing results',
     'Verified results',
 ] as const;
+const localPollPageHostnames = new Set(['127.0.0.1', '::1', 'localhost']);
 const voteStoredNoticeText =
     'Vote stored on this device. You can close the app and come back after voting closes.';
 
@@ -90,6 +91,34 @@ const getCeremonyMetricRow = (page: Page, label: string): Locator =>
 const normalizePollFlowText = (value: string): string =>
     value.replaceAll(/\s+/gu, ' ').trim();
 
+const shouldHardResyncPollPage = (page: Page): boolean => {
+    let currentPageUrl = '';
+
+    try {
+        currentPageUrl = page.url();
+    } catch {
+        return true;
+    }
+
+    if (!currentPageUrl || currentPageUrl === 'about:blank') {
+        return true;
+    }
+
+    let parsedPageUrl: URL;
+
+    try {
+        parsedPageUrl = new URL(currentPageUrl);
+    } catch {
+        return true;
+    }
+
+    if (parsedPageUrl.protocol !== 'http:' && parsedPageUrl.protocol !== 'https:') {
+        return true;
+    }
+
+    return !localPollPageHostnames.has(parsedPageUrl.hostname);
+};
+
 export const parseCeremonyMetricValue = ({
     label,
     rowText,
@@ -142,10 +171,15 @@ export const syncPollPageForSharedState = async (
     page: Page,
     reloadPage: (page: Page) => Promise<Page> = reloadInteractablePage,
 ): Promise<Page> => {
-    // Live production e2e keeps several browser contexts active at once.
-    // Background pages can lag behind the server state, so shared-state
-    // assertions should first bring the page forward and resync it.
+    // Only live remote runs need a hard reload here. On local CI origins that
+    // reload aborts in-flight poll fetches on mobile Firefox and can surface
+    // spurious React console errors even though the local app itself is fine.
     await page.bringToFront();
+
+    if (!shouldHardResyncPollPage(page)) {
+        return page;
+    }
+
     return await reloadPage(page);
 };
 

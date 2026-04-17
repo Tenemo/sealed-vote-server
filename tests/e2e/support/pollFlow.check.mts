@@ -88,12 +88,13 @@ test('parseCeremonyMetricValue ignores unrelated text', () => {
     );
 });
 
-test('syncPollPageForSharedState brings the page forward before reloading', async () => {
+test('syncPollPageForSharedState brings a live remote page forward before reloading', async () => {
     const calls: string[] = [];
     const pageDouble = {
         bringToFront: async () => {
             calls.push('front');
         },
+        url: () => 'https://sealed.vote/votes/example--1234',
     };
     const reloadedPage = {};
 
@@ -110,20 +111,42 @@ test('syncPollPageForSharedState brings the page forward before reloading', asyn
     assert.equal(syncedPage, reloadedPage);
 });
 
-test('syncPollPagesForSharedState reloads each page and reapplies attachers', async () => {
+test('syncPollPageForSharedState skips the hard reload on local ci origins', async () => {
+    const calls: string[] = [];
+    const pageDouble = {
+        bringToFront: async () => {
+            calls.push('front');
+        },
+        url: () => 'http://127.0.0.1:3000/votes/example--1234',
+    };
+
+    const syncedPage = await syncPollPageForSharedState(
+        pageDouble as never,
+        async () => {
+            calls.push('reload');
+            throw new Error('reload should not be called for local ci pages');
+        },
+    );
+
+    assert.deepEqual(calls, ['front']);
+    assert.equal(syncedPage, pageDouble);
+});
+
+test('syncPollPagesForSharedState reloads only live remote pages and reapplies attachers', async () => {
     const calls: string[] = [];
     const pageOne = {
         bringToFront: async () => {
             calls.push('front-one');
         },
+        url: () => 'https://sealed.vote/votes/page-one',
     };
     const pageTwo = {
         bringToFront: async () => {
             calls.push('front-two');
         },
+        url: () => 'http://127.0.0.1:3000/votes/page-two',
     };
     const reloadedPageOne = { label: 'page-one' };
-    const reloadedPageTwo = { label: 'page-two' };
 
     const syncedPages = await syncPollPagesForSharedState({
         attachPages: [
@@ -143,7 +166,7 @@ test('syncPollPagesForSharedState reloads each page and reapplies attachers', as
             }
 
             calls.push('reload-two');
-            return reloadedPageTwo as never;
+            throw new Error('local ci pages should not be hard reloaded');
         },
     });
 
@@ -152,9 +175,8 @@ test('syncPollPagesForSharedState reloads each page and reapplies attachers', as
         'reload-one',
         'attach-page-one',
         'front-two',
-        'reload-two',
     ]);
-    assert.deepEqual(syncedPages, [reloadedPageOne, reloadedPageTwo]);
+    assert.deepEqual(syncedPages, [reloadedPageOne, pageTwo]);
 });
 
 test('bringPollPagesToFront focuses each page and reapplies attachers', async () => {
