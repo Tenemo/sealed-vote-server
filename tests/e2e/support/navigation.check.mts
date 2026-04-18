@@ -196,6 +196,30 @@ test('gotoInteractablePage bootstraps a blank page before deep-link navigation',
     ]);
 });
 
+test('gotoInteractablePage skips the origin bootstrap for local deep links', async () => {
+    const urls: string[] = [];
+    const optionsCalls: NavigationOptions[] = [];
+    const page = createPageDouble();
+
+    page.goto = async (url: string, options?: NavigationOptions) => {
+        urls.push(url);
+        optionsCalls.push(options as NavigationOptions);
+    };
+
+    await gotoInteractablePage(
+        page,
+        'http://127.0.0.1:3000/votes/example--1234',
+    );
+
+    assert.deepEqual(urls, ['http://127.0.0.1:3000/votes/example--1234']);
+    assert.deepEqual(optionsCalls, [
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
 test('gotoInteractablePage replaces the page after a transient Firefox navigation error', async () => {
     const originalGotoCalls: NavigationOptions[] = [];
     const replacementGotoCalls: NavigationOptions[] = [];
@@ -1296,6 +1320,71 @@ test('reloadInteractablePage bootstraps a blank replacement page before deep-lin
             timeout: 15_000,
             waitUntil: 'commit',
         },
+        {
+            timeout: 15_000,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
+test('reloadInteractablePage skips the origin bootstrap for local replacement pages', async () => {
+    const retryDelays: number[] = [];
+    const replacementGotoUrls: string[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    const replacementState: PageDoubleState = {
+        currentUrl: 'about:blank',
+        isInteractable: true,
+        readyState: 'complete',
+    };
+    const replacementPage = createPageDouble(replacementState);
+    const currentPageUrl = 'http://127.0.0.1:3000/votes/example--1234';
+    const page = createPageDouble(
+        {
+            currentUrl: currentPageUrl,
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+
+    page.reload = async () => {
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
+    };
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    replacementPage.goto = async (
+        url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoUrls.push(url);
+        replacementGotoCalls.push(options as NavigationOptions);
+        replacementState.currentUrl = url;
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(replacementGotoUrls, [currentPageUrl]);
+    assert.deepEqual(replacementGotoCalls, [
         {
             timeout: 15_000,
             waitUntil: 'commit',

@@ -1,10 +1,11 @@
 import {
     collectListedSpecFiles,
-    resolveProductionIsolatedInvocationArgs,
+    runProductionIsolatedInvocations,
 } from './runPlaywrightHelpers.mts';
 import {
     getForwardedCliArgs,
     runPnpmCaptureSync,
+    runPnpmObserved,
     runPnpmSync,
 } from './shared.mts';
 
@@ -55,18 +56,43 @@ if (!shouldIsolateProductionByFile) {
         );
     }
 
-    for (const listedFile of listedFiles) {
-        console.log(`Running production Playwright file in isolation: ${listedFile}`);
-        runPnpmSync([
-            'exec',
-            'playwright',
-            'test',
-            '--config',
-            configPath,
-            ...resolveProductionIsolatedInvocationArgs(
-                listedFile,
-                forwardedCliArgs,
-            ),
-        ]);
+    const isolatedRunResult = await runProductionIsolatedInvocations({
+        forwardedCliArgs,
+        listedFiles,
+        onInvocationStart: (listedFile) => {
+            console.log(
+                `Running production Playwright file in isolation: ${listedFile}`,
+            );
+        },
+        logRetry: (listedFile) => {
+            console.warn(
+                `Re-running production Playwright file after readiness startup timeout: ${listedFile}`,
+            );
+        },
+        runInvocation: async (invocationArgs) => {
+            const result = await runPnpmObserved([
+                'exec',
+                'playwright',
+                'test',
+                '--config',
+                configPath,
+                ...invocationArgs,
+            ]);
+
+            return {
+                exitCode: result.status,
+                output: result.output,
+            };
+        },
+    });
+
+    if (isolatedRunResult.exitCode !== 0) {
+        console.error('\nProduction Playwright isolated failures:');
+
+        for (const failedFile of isolatedRunResult.failedFiles) {
+            console.error(`- ${failedFile}`);
+        }
+
+        process.exit(isolatedRunResult.exitCode);
     }
 }

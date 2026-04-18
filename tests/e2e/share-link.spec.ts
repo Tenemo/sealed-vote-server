@@ -81,3 +81,51 @@ test('keeps slug-based poll links shareable in a separate participant context', 
         await deletePolls(request, createdPolls);
     }
 });
+
+test('keeps the copy-link button vertically stable while copy feedback is visible', async ({
+    page,
+    request,
+}, testInfo) => {
+    const createdPolls: CreatedPoll[] = [];
+    const namespace = createTestNamespace(testInfo);
+
+    await page.setViewportSize({ height: 900, width: 1280 });
+    await page.addInitScript(() => {
+        Object.defineProperty(window.navigator, 'clipboard', {
+            configurable: true,
+            value: {
+                writeText: async () => undefined,
+            },
+        });
+    });
+
+    const createdPollResult = await createPoll({
+        page,
+        pollName: createPollName('Copy link layout', namespace),
+    });
+    page = createdPollResult.page;
+    const createdPoll = createdPollResult.createdPoll;
+    createdPolls.push(createdPoll);
+
+    try {
+        const copyButton = page.getByRole('button', {
+            name: 'Copy link',
+        });
+        await expect(copyButton).toBeVisible();
+
+        const beforeBox = await copyButton.boundingBox();
+        expect(beforeBox).not.toBeNull();
+
+        await copyButton.click();
+        await expect(page.getByText('Link copied.', { exact: true })).toBeVisible();
+
+        const afterBox = await copyButton.boundingBox();
+        expect(afterBox).not.toBeNull();
+
+        expect(Math.abs((afterBox?.y ?? 0) - (beforeBox?.y ?? 0))).toBeLessThanOrEqual(
+            1,
+        );
+    } finally {
+        await deletePolls(request, createdPolls);
+    }
+});

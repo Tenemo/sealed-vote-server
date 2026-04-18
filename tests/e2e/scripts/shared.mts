@@ -12,6 +12,7 @@ const safeApiHosts = new Set(['localhost', '127.0.0.1', '::1']);
 const requiredDatabaseName = 'sv-db';
 const pnpmExecPath = process.env.npm_execpath;
 const pnpmCaptureMaxBufferBytes = 16 * 1024 * 1024;
+export const observedOutputTailMaxLength = 4 * 1024 * 1024;
 
 export const repoRoot = path.resolve(currentDirectory, '../../..');
 const apiWorkspaceRoot = path.resolve(repoRoot, 'apps', 'api');
@@ -98,6 +99,14 @@ export const assertSafeE2EEnv = (): void => {
 };
 
 export const runPnpmSync = (args: string[]): void => {
+    const status = runPnpmStatusSync(args);
+
+    if (status !== 0) {
+        process.exit(status);
+    }
+};
+
+export const runPnpmStatusSync = (args: string[]): number => {
     const [command, commandPrefix] = getPnpmCommand();
     const result = spawnSync(command, [...commandPrefix, ...args], {
         cwd: repoRoot,
@@ -110,9 +119,63 @@ export const runPnpmSync = (args: string[]): void => {
         process.exit(1);
     }
 
-    if (result.status !== 0) {
-        process.exit(result.status ?? 1);
-    }
+    return result.status ?? 1;
+};
+
+export const runPnpmObserved = async (
+    args: string[],
+): Promise<{
+    output: string;
+    status: number;
+}> => {
+    const [command, commandPrefix] = getPnpmCommand();
+
+    return await new Promise((resolve) => {
+        const childProcess = spawn(command, [...commandPrefix, ...args], {
+            cwd: repoRoot,
+            env: process.env,
+            stdio: ['inherit', 'pipe', 'pipe'],
+        });
+        let combinedOutput = '';
+        let isSettled = false;
+
+        const settle = (status: number): void => {
+            if (isSettled) {
+                return;
+            }
+
+            isSettled = true;
+            resolve({
+                output: combinedOutput,
+                status,
+            });
+        };
+
+        childProcess.stdout?.on('data', (chunk: Buffer | string) => {
+            const text = chunk.toString();
+            combinedOutput = appendOutputTail(combinedOutput, text);
+            process.stdout.write(text);
+        });
+
+        childProcess.stderr?.on('data', (chunk: Buffer | string) => {
+            const text = chunk.toString();
+            combinedOutput = appendOutputTail(combinedOutput, text);
+            process.stderr.write(text);
+        });
+
+        childProcess.on('error', (error: Error) => {
+            console.error(error);
+            combinedOutput = appendOutputTail(
+                combinedOutput,
+                `${error.stack ?? error.message}\n`,
+            );
+            settle(1);
+        });
+
+        childProcess.on('close', (code: number | null) => {
+            settle(code ?? 1);
+        });
+    });
 };
 
 export const runPnpmCaptureSync = (args: string[]): string => {
@@ -156,6 +219,18 @@ export const getForwardedCliArgs = (): string[] => {
     }
 
     return args;
+};
+
+export const appendOutputTail = (
+    output: string,
+    chunk: string,
+    maxLength: number = observedOutputTailMaxLength,
+): string => {
+    const nextOutput = output + chunk;
+
+    return nextOutput.length <= maxLength
+        ? nextOutput
+        : nextOutput.slice(-maxLength);
 };
 
 export const configureLocalE2EEnv = ({

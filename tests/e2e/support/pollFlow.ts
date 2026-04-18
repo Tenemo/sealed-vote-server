@@ -6,6 +6,7 @@ import {
 } from '@playwright/test';
 
 import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
+import { isLocalLoopbackHostname } from './localOrigin.mts';
 
 const pollSlugPattern = /\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
@@ -90,6 +91,34 @@ const getCeremonyMetricRow = (page: Page, label: string): Locator =>
 const normalizePollFlowText = (value: string): string =>
     value.replaceAll(/\s+/gu, ' ').trim();
 
+const shouldHardResyncPollPage = (page: Page): boolean => {
+    let currentPageUrl = '';
+
+    try {
+        currentPageUrl = page.url();
+    } catch {
+        return true;
+    }
+
+    if (!currentPageUrl || currentPageUrl === 'about:blank') {
+        return true;
+    }
+
+    let parsedPageUrl: URL;
+
+    try {
+        parsedPageUrl = new URL(currentPageUrl);
+    } catch {
+        return true;
+    }
+
+    if (parsedPageUrl.protocol !== 'http:' && parsedPageUrl.protocol !== 'https:') {
+        return true;
+    }
+
+    return !isLocalLoopbackHostname(parsedPageUrl.hostname);
+};
+
 export const parseCeremonyMetricValue = ({
     label,
     rowText,
@@ -142,10 +171,15 @@ export const syncPollPageForSharedState = async (
     page: Page,
     reloadPage: (page: Page) => Promise<Page> = reloadInteractablePage,
 ): Promise<Page> => {
-    // Live production e2e keeps several browser contexts active at once.
-    // Background pages can lag behind the server state, so shared-state
-    // assertions should first bring the page forward and resync it.
+    // Only live remote runs need a hard reload here. On local CI origins that
+    // reload aborts in-flight poll fetches on mobile Firefox and can surface
+    // spurious React console errors even though the local app itself is fine.
     await page.bringToFront();
+
+    if (!shouldHardResyncPollPage(page)) {
+        return page;
+    }
+
     return await reloadPage(page);
 };
 
@@ -353,26 +387,39 @@ export const createExpectedVerifiedResults = ({
         throw new Error('Expected at least one scorecard.');
     }
 
-    return choices.map((choice, choiceIndex) => {
-        const tally = scorecards.reduce((sum, scorecard) => {
-            const score = scorecard[choiceIndex];
+    return choices
+        .map((choice, choiceIndex) => {
+            const tally = scorecards.reduce((sum, scorecard) => {
+                const score = scorecard[choiceIndex];
 
-            if (!Number.isInteger(score)) {
-                throw new Error(
-                    `Missing or invalid score for choice index ${choiceIndex}.`,
-                );
+                if (!Number.isInteger(score)) {
+                    throw new Error(
+                        `Missing or invalid score for choice index ${choiceIndex}.`,
+                    );
+                }
+
+                return sum + score;
+            }, 0);
+
+            return {
+                acceptedBallotCount: scorecards.length,
+                choice,
+                choiceIndex,
+                displayedMean: (tally / scorecards.length).toFixed(2),
+                tally: String(tally),
+            };
+        })
+        .sort((left, right) => {
+            const meanDifference =
+                Number(right.displayedMean) - Number(left.displayedMean);
+
+            if (meanDifference !== 0) {
+                return meanDifference;
             }
 
-            return sum + score;
-        }, 0);
-
-        return {
-            acceptedBallotCount: scorecards.length,
-            choice,
-            displayedMean: (tally / scorecards.length).toFixed(2),
-            tally: String(tally),
-        };
-    });
+            return left.choiceIndex - right.choiceIndex;
+        })
+        .map(({ choiceIndex: _choiceIndex, ...result }) => result);
 };
 
 export const registerParticipant = async (
@@ -469,6 +516,10 @@ export const waitForVerifiedResults = async ({
 
     for (const result of resultsToAssert) {
         const resultCard = getResultCard(page, result.choice);
+
+        await expect(resultCard).toHaveCount(1, {
+            timeout: 90_000,
+        });
 
         await expect(resultCard).toContainText(result.choice, {
             timeout: 90_000,

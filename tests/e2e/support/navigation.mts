@@ -1,3 +1,5 @@
+import { isLocalLoopbackHostname } from './localOrigin.mts';
+
 type NavigationWaitUntil =
     | 'commit'
     | 'domcontentloaded'
@@ -161,6 +163,9 @@ const normalizeNavigationHtml = (value: string): string =>
 const isBlankNavigationStartUrl = (value: string): boolean =>
     !value || value === 'about:blank';
 
+const isLocalNavigationOrigin = (url: URL): boolean =>
+    isLocalLoopbackHostname(url.hostname);
+
 const resolveNavigationBootstrapUrl = ({
     currentUrl,
     targetUrl,
@@ -179,6 +184,14 @@ const resolveNavigationBootstrapUrl = ({
             parsedAbsoluteTargetUrl.protocol !== 'http:' &&
             parsedAbsoluteTargetUrl.protocol !== 'https:'
         ) {
+            return null;
+        }
+
+        // The origin bootstrap exists for live production deep links. On local
+        // CI origins it only loads the homepage briefly, which aborts
+        // VersionBadge's /version.json fetch and surfaces a bogus WebKit
+        // pageerror before the real deep-link navigation starts.
+        if (isLocalNavigationOrigin(parsedAbsoluteTargetUrl)) {
             return null;
         }
 

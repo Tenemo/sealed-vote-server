@@ -37,6 +37,29 @@ describe('CORS configuration', () => {
         );
     });
 
+    test('handles sealed.vote preflight requests for direct api access', async () => {
+        const response = await fastify.inject({
+            method: 'OPTIONS',
+            url: '/api/polls/create',
+            headers: {
+                origin: 'https://sealed.vote',
+                'access-control-request-method': 'POST',
+                'access-control-request-headers': 'content-type',
+            },
+        });
+
+        expect(response.statusCode).toBe(204);
+        expect(response.headers['access-control-allow-origin']).toBe(
+            'https://sealed.vote',
+        );
+        expect(response.headers['access-control-allow-methods']).toBe(
+            'GET, HEAD, POST, DELETE, OPTIONS',
+        );
+        expect(
+            response.headers['access-control-allow-headers']?.toLowerCase(),
+        ).toContain('content-type');
+    });
+
     test('allows localhost development origins', async () => {
         const response = await fastify.inject({
             method: 'GET',

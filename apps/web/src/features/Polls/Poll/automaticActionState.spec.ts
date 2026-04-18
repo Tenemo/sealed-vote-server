@@ -1,7 +1,10 @@
 import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 
 import {
+    createEmptyRecoverableAutomaticActionRetryState,
+    getRecoverableAutomaticActionRetryDecision,
     getLocalCeremonyState,
+    isRecoverableAutomaticActionSubmissionError,
     isPreparedAutomaticActionCurrent,
 } from './automaticActionState';
 
@@ -268,5 +271,109 @@ describe('automaticActionState', () => {
                 voterSession: createVoterSession(),
             }),
         ).toBe('skipped');
+    });
+
+    it('treats a restarted-session submission error as recoverable', () => {
+        expect(
+            isRecoverableAutomaticActionSubmissionError({
+                data: {
+                    message:
+                        'The submitted payload does not match the active ceremony session.',
+                },
+                status: 400,
+            }),
+        ).toBe(true);
+    });
+
+    it('treats a skipped-participant submission error as recoverable', () => {
+        expect(
+            isRecoverableAutomaticActionSubmissionError({
+                data: {
+                    message:
+                        'This participant is no longer part of the active ceremony.',
+                },
+                status: 400,
+            }),
+        ).toBe(true);
+    });
+
+    it('does not treat unrelated submission errors as recoverable', () => {
+        expect(
+            isRecoverableAutomaticActionSubmissionError({
+                data: {
+                    message: 'The server exploded.',
+                },
+                status: 500,
+            }),
+        ).toBe(false);
+    });
+
+    it('caps automatic recoverable retries for the same logical action', () => {
+        const firstAction = createAction();
+        const sameLogicalAction = {
+            ...firstAction,
+            signedPayload: {
+                ...firstAction.signedPayload,
+                signature: 'e'.repeat(128),
+            },
+        };
+        const firstDecision = getRecoverableAutomaticActionRetryDecision({
+            action: firstAction,
+            maxAutomaticRetries: 2,
+            previousState: createEmptyRecoverableAutomaticActionRetryState(),
+        });
+        const secondDecision = getRecoverableAutomaticActionRetryDecision({
+            action: sameLogicalAction,
+            maxAutomaticRetries: 2,
+            previousState: firstDecision.nextState,
+        });
+        const thirdDecision = getRecoverableAutomaticActionRetryDecision({
+            action: firstAction,
+            maxAutomaticRetries: 2,
+            previousState: secondDecision.nextState,
+        });
+
+        expect(firstDecision).toMatchObject({
+            nextState: {
+                attemptCount: 1,
+            },
+            shouldRetryAutomatically: true,
+        });
+        expect(secondDecision).toMatchObject({
+            nextState: {
+                attemptCount: 2,
+            },
+            shouldRetryAutomatically: true,
+        });
+        expect(thirdDecision).toMatchObject({
+            nextState: {
+                attemptCount: 3,
+            },
+            shouldRetryAutomatically: false,
+        });
+    });
+
+    it('resets recoverable retry tracking when the action changes', () => {
+        const firstDecision = getRecoverableAutomaticActionRetryDecision({
+            action: createAction(),
+            maxAutomaticRetries: 2,
+            previousState: createEmptyRecoverableAutomaticActionRetryState(),
+        });
+        const nextAction = {
+            ...createAction(),
+            slotKey: 'slot-2',
+        };
+        const secondDecision = getRecoverableAutomaticActionRetryDecision({
+            action: nextAction,
+            maxAutomaticRetries: 2,
+            previousState: firstDecision.nextState,
+        });
+
+        expect(secondDecision).toMatchObject({
+            nextState: {
+                attemptCount: 1,
+            },
+            shouldRetryAutomatically: true,
+        });
     });
 });

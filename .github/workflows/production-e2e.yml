@@ -41,77 +41,12 @@ jobs:
                   --request-timeout-ms 10000
                   --required-stable-checks 2
 
-    wait-for-production-browser-readiness:
-        name: wait for production browser readiness (${{ matrix.project.name }})
-        needs: wait-for-production-deploy
-        if: >-
-            ${{
-                always() &&
-                (
-                    github.event_name == 'workflow_dispatch' ||
-                    needs.wait-for-production-deploy.result == 'success'
-                )
-            }}
-        runs-on: ubuntu-latest
-        container:
-            image: mcr.microsoft.com/playwright:v1.59.1-noble
-            options: --ipc=host
-        timeout-minutes: 30
-        strategy:
-            fail-fast: false
-            max-parallel: 4
-            matrix:
-                project:
-                    - name: chromium-desktop
-                      ci_workers: '1'
-                    - name: firefox-desktop
-                      ci_workers: '1'
-                    - name: webkit-desktop
-                      ci_workers: '1'
-                    - name: mobile-firefox-android
-                      ci_workers: '1'
-
-        env:
-            HOME: /root
-            PLAYWRIGHT_BASE_URL: https://sealed.vote
-            PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
-            PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS: 'true'
-            PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
-
-        steps:
-            - uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0
-
-            - uses: pnpm/action-setup@v5
-              with:
-                  version: 10.33.0
-
-            - uses: actions/setup-node@v6
-              with:
-                  node-version-file: '.nvmrc'
-                  cache: pnpm
-
-            - name: install dependencies
-              run: pnpm install --frozen-lockfile
-
-            - name: wait for browser production readiness
-              run: >-
-                  node --experimental-strip-types tests/e2e/scripts/wait-for-production-browser-readiness.mts
-                  --timeout-ms 1200000
-                  --interval-ms 15000
-                  --required-stable-checks 2
-                  --
-                  --project ${{ matrix.project.name }}
-
     production-e2e-matrix:
         name: production e2e (${{ matrix.project.name }})
-        needs:
-            [wait-for-production-deploy, wait-for-production-browser-readiness]
+        needs: [wait-for-production-deploy]
         if: >-
             ${{
                 always() &&
-                needs.wait-for-production-browser-readiness.result == 'success' &&
                 (
                     github.event_name == 'workflow_dispatch' ||
                     needs.wait-for-production-deploy.result == 'success'
@@ -125,9 +60,9 @@ jobs:
         strategy:
             fail-fast: false
             # Keep one Playwright worker per browser job for determinism, but
-            # run the browser families in parallel so production e2e does not
-            # serialize into an hour-long workflow.
-            max-parallel: 4
+            # cap the live browser matrix at two concurrent jobs to reduce
+            # burst pressure against the public frontend and API origins.
+            max-parallel: 2
             matrix:
                 project:
                     - name: chromium-desktop
@@ -169,6 +104,15 @@ jobs:
             - name: install dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: wait for browser production readiness
+              run: >-
+                  node --experimental-strip-types tests/e2e/scripts/wait-for-production-browser-readiness.mts
+                  --timeout-ms 1200000
+                  --interval-ms 15000
+                  --required-stable-checks 2
+                  --
+                  --project ${{ matrix.project.name }}
+
             - name: run production browser e2e
               # Intentional: production coverage stays full-suite against the
               # live site instead of falling back to smoke-only checks.
@@ -178,9 +122,54 @@ jobs:
               if: failure()
               shell: bash
               run: |
+                  set -uo pipefail
                   mkdir -p production-diagnostics
-                  curl -sS -D production-diagnostics/homepage.headers.txt -o /dev/null https://sealed.vote/ || true
-                  curl -sS -D production-diagnostics/version.headers.txt -o /dev/null https://sealed.vote/version.json || true
+
+                  capture_response() {
+                    local slug="$1"
+                    local url="$2"
+
+                    curl -sS --location \
+                      -D "production-diagnostics/${slug}.headers.txt" \
+                      -o "production-diagnostics/${slug}.body.txt" \
+                      "$url" || true
+                  }
+
+                  capture_response "homepage" "https://sealed.vote/"
+                  capture_response "version" "https://sealed.vote/version.json"
+                  capture_response "api-health" "https://api.sealed.vote/api/health-check"
+
+                  curl -sS --location \
+                    -X OPTIONS \
+                    -H 'Origin: https://sealed.vote' \
+                    -H 'Access-Control-Request-Method: POST' \
+                    -H 'Access-Control-Request-Headers: content-type' \
+                    -D production-diagnostics/api-preflight.headers.txt \
+                    -o production-diagnostics/api-preflight.body.txt \
+                    https://api.sealed.vote/api/polls/create || true
+
+                  {
+                    echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                    echo "github_run_id=${GITHUB_RUN_ID:-}"
+                    echo "github_run_attempt=${GITHUB_RUN_ATTEMPT:-}"
+                    echo "github_job=${GITHUB_JOB:-}"
+                    echo "matrix_project=${{ matrix.project.name }}"
+                    echo "runner_os=${RUNNER_OS:-}"
+                    echo "runner_arch=${RUNNER_ARCH:-}"
+                    printenv | sort | grep '^PLAYWRIGHT_' || true
+                  } > production-diagnostics/env.txt
+
+                  {
+                    if command -v getent >/dev/null 2>&1; then
+                      echo "sealed.vote"
+                      getent ahostsv4 sealed.vote || true
+                      echo
+                      echo "api.sealed.vote"
+                      getent ahostsv4 api.sealed.vote || true
+                    else
+                      echo "getent is unavailable in this container."
+                    fi
+                  } > production-diagnostics/dns.ipv4.txt
 
             - name: upload production diagnostics
               if: failure()
@@ -264,7 +253,6 @@ jobs:
         needs:
             [
                 wait-for-production-deploy,
-                wait-for-production-browser-readiness,
                 production-e2e-matrix,
                 production-e2e-report,
             ]
@@ -275,11 +263,6 @@ jobs:
               run: |
                   if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
                     echo "wait-for-production-deploy result: ${{ needs.wait-for-production-deploy.result }}"
-                    exit 1
-                  fi
-
-                  if [ "${{ needs.wait-for-production-browser-readiness.result }}" != "success" ]; then
-                    echo "wait-for-production-browser-readiness result: ${{ needs.wait-for-production-browser-readiness.result }}"
                     exit 1
                   fi
 

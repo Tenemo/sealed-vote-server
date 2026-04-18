@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+    classifyReadinessProcessFailure,
+    detectFatalReadinessFailureMessage,
     parsePositiveInteger,
     parseWaitCliArgs,
     waitForProductionBrowserReadiness,
@@ -77,7 +79,9 @@ test('waitForProductionBrowserReadiness requires consecutive stable checks befor
                     throw new Error('Unexpected extra readiness attempt.');
                 }
 
-                return result;
+                return {
+                    kind: result ? 'success' : 'retry',
+                };
             },
             sleep: async (delayMs) => {
                 sleeps.push(delayMs);
@@ -111,7 +115,9 @@ test('waitForProductionBrowserReadiness times out when browser readiness never s
                 },
                 {
                     now: () => nowMs,
-                    runReadinessCheck: () => false,
+                    runReadinessCheck: () => ({
+                        kind: 'retry',
+                    }),
                     sleep: async (delayMs) => {
                         nowMs += delayMs;
                     },
@@ -140,7 +146,9 @@ test('waitForProductionBrowserReadiness caps each check timeout and the final sl
                     runReadinessCheck: (...args) => {
                         const timeoutMs = args[1];
                         checkTimeouts.push(timeoutMs);
-                        return false;
+                        return {
+                            kind: 'retry',
+                        };
                     },
                     sleep: async (delayMs) => {
                         sleeps.push(delayMs);
@@ -153,4 +161,93 @@ test('waitForProductionBrowserReadiness caps each check timeout and the final sl
 
     assert.deepEqual(checkTimeouts, [3_000, 1_000]);
     assert.deepEqual(sleeps, [2_000, 1_000]);
+});
+
+test('waitForProductionBrowserReadiness fails immediately on fatal browser launch errors', async () => {
+    const sleeps: number[] = [];
+
+    await assert.rejects(
+        async () =>
+            await waitForProductionBrowserReadiness(
+                {
+                    forwardedCliArgs: ['--project', 'firefox-desktop'],
+                    intervalMs: 2_000,
+                    requiredStableChecks: 2,
+                    timeoutMs: 20_000,
+                },
+                {
+                    runReadinessCheck: () => ({
+                        kind: 'fatal',
+                        message:
+                            'The Playwright browser could not launch inside the readiness job, so retrying will not make production become ready.',
+                    }),
+                    sleep: async (delayMs) => {
+                        sleeps.push(delayMs);
+                    },
+                },
+            ),
+        /Fatal production browser readiness failure for --project firefox-desktop./u,
+    );
+
+    assert.deepEqual(sleeps, []);
+});
+
+test('detectFatalReadinessFailureMessage recognizes Firefox HOME ownership launch failures', () => {
+    assert.match(
+        detectFatalReadinessFailureMessage(
+            [
+                'browserType.launch: Failed to launch the browser process.',
+                "Firefox is unable to launch if the $HOME folder isn't owned by the current user.",
+                'Running Nightly as root in a regular user\'s session is not supported.  ($HOME is /github/home which is owned by pwuser.)',
+            ].join('\n'),
+        ) ?? '',
+        /Set HOME=\/root/u,
+    );
+});
+
+test('classifyReadinessProcessFailure retries timed out readiness checks', () => {
+    assert.deepEqual(
+        classifyReadinessProcessFailure({
+            error: Object.assign(new Error('timed out'), {
+                code: 'ETIMEDOUT',
+            }),
+            output: '',
+        }),
+        {
+            kind: 'retry',
+        },
+    );
+});
+
+test('classifyReadinessProcessFailure preserves fatal browser launch classification on buffer overflow', () => {
+    assert.deepEqual(
+        classifyReadinessProcessFailure({
+            error: Object.assign(new Error('maxBuffer length exceeded'), {
+                code: 'ENOBUFS',
+            }),
+            output: [
+                'Error: browserType.launch: Failed to launch the browser process.',
+                'extra output',
+            ].join('\n'),
+        }),
+        {
+            kind: 'fatal',
+            message:
+                'The Playwright browser could not launch inside the readiness job, so retrying will not make production become ready.',
+        },
+    );
+});
+
+test('classifyReadinessProcessFailure retries non-fatal capture buffer overflows', () => {
+    assert.deepEqual(
+        classifyReadinessProcessFailure({
+            error: Object.assign(new Error('maxBuffer length exceeded'), {
+                code: 'ENOBUFS',
+            }),
+            output: 'transient output',
+        }),
+        {
+            kind: 'retry',
+        },
+    );
 });

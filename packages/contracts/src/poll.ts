@@ -58,6 +58,17 @@ export type PollVerificationSummary = {
     }[];
 };
 
+export const orderVerifiedOptionTallies = (
+    tallies: readonly PollVerificationSummary['verifiedOptionTallies'][number][],
+): PollVerificationSummary['verifiedOptionTallies'] =>
+    [...tallies].sort((left, right) => {
+        if (right.mean !== left.mean) {
+            return right.mean - left.mean;
+        }
+
+        return left.optionIndex - right.optionIndex;
+    });
+
 export type PollPhase =
     | 'open'
     | 'securing'
