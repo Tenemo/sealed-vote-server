@@ -64,9 +64,9 @@ if (!shouldIsolateProductionByFile) {
                 `Running production Playwright file in isolation: ${listedFile}`,
             );
         },
-        logRetry: (listedFile) => {
-            console.warn(
-                `Re-running production Playwright file after readiness startup timeout: ${listedFile}`,
+        onNavigationStall: (listedFile) => {
+            console.error(
+                `Production navigation stalled in ${listedFile}; skipping remaining isolated files for this project.`,
             );
         },
         runInvocation: async (invocationArgs) => {

@@ -1,10 +1,6 @@
 const listedSpecPattern =
     /^\s*\[[^\]]+\]\s+\u203a\s+(.+):\d+:\d+\s+\u203a\s+/u;
-export const productionBrowserReadinessListedFile =
-    '00-production-browser-readiness.spec.ts';
-const productionReadinessTestTitle =
-    'browser can commit the homepage and a real production vote page';
-const productionReadinessGotoTimeoutPattern =
+const productionNavigationStallPattern =
     /Error:\s+page\.goto: Timeout \d+ms exceeded\./u;
 const playwrightOptionsWithSeparateValues = new Set([
     '-c',
@@ -30,20 +26,6 @@ const playwrightOptionsWithSeparateValues = new Set([
     '--workers',
 ]);
 
-const normalizeListedSpecFile = (listedFile: string): string =>
-    listedFile.replaceAll('\\', '/');
-
-const isProductionReadinessListedFile = (listedFile: string): boolean => {
-    const normalizedListedFile = normalizeListedSpecFile(listedFile);
-
-    return (
-        normalizedListedFile === productionBrowserReadinessListedFile ||
-        normalizedListedFile.endsWith(
-            `/${productionBrowserReadinessListedFile}`,
-        )
-    );
-};
-
 export const collectListedSpecFiles = (listOutput: string): string[] => {
     const listedFiles = new Set<string>();
 
@@ -59,16 +41,6 @@ export const collectListedSpecFiles = (listOutput: string): string[] => {
 
     return [...listedFiles];
 };
-
-export const resolveProductionIsolatedInvocationFiles = (
-    listedFile: string,
-): string[] =>
-    // Production file isolation launches a fresh Playwright process per file,
-    // so each non-readiness file needs the readiness spec in the same
-    // invocation to validate that exact worker/browser startup path.
-    isProductionReadinessListedFile(listedFile)
-        ? [listedFile]
-        : [productionBrowserReadinessListedFile, listedFile];
 
 export const stripPlaywrightPositionalTestSelectors = (
     forwardedCliArgs: readonly string[],
@@ -108,34 +80,26 @@ export const resolveProductionIsolatedInvocationArgs = (
     listedFile: string,
     forwardedCliArgs: string[],
 ): string[] => [
-    ...resolveProductionIsolatedInvocationFiles(listedFile),
+    listedFile,
     ...stripPlaywrightPositionalTestSelectors(forwardedCliArgs),
-    // Keep the paired readiness file and target file on the same worker so
-    // they share a single browser startup path.
     '--workers',
     '1',
 ];
 
-export const isRecoverableProductionReadinessFailure = (
-    output: string,
-): boolean =>
-    output.includes(productionBrowserReadinessListedFile) &&
-    output.includes(productionReadinessTestTitle) &&
-    productionReadinessGotoTimeoutPattern.test(output);
+export const isProductionNavigationStall = (output: string): boolean =>
+    productionNavigationStallPattern.test(output);
 
 export const runProductionIsolatedInvocations = async ({
-    logRetry = () => undefined,
     forwardedCliArgs,
     listedFiles,
-    maxRecoverableRetries = 1,
     onInvocationStart = () => undefined,
+    onNavigationStall = () => undefined,
     runInvocation,
 }: {
-    logRetry?: (listedFile: string) => void;
     forwardedCliArgs: string[];
     listedFiles: readonly string[];
-    maxRecoverableRetries?: number;
     onInvocationStart?: (listedFile: string) => void;
+    onNavigationStall?: (listedFile: string) => void;
     runInvocation: (invocationArgs: string[]) => Promise<{
         exitCode: number;
         output: string;
@@ -143,10 +107,11 @@ export const runProductionIsolatedInvocations = async ({
 }): Promise<{
     exitCode: number;
     failedFiles: string[];
+    stalledFile: string | null;
 }> => {
     const failedFiles: string[] = [];
     let exitCode = 0;
-    let recoverableRetryCount = 0;
+    let stalledFile: string | null = null;
 
     for (const listedFile of listedFiles) {
         onInvocationStart(listedFile);
@@ -154,37 +119,33 @@ export const runProductionIsolatedInvocations = async ({
             listedFile,
             forwardedCliArgs,
         );
-        let invocationResult = await runInvocation(invocationArgs);
+        const invocationResult = await runInvocation(invocationArgs);
 
-        // GitHub production artifacts showed Firefox sometimes timing out on
-        // the paired readiness spec before any app page loaded, while curl in
-        // the same container still reached the site. That failure survived the
-        // page-level recovery inside a single Playwright process, so recover by
-        // restarting an isolated invocation in a fresh process. Keep the retry
-        // budget global for the whole browser job so repeated startup retries
-        // cannot consume the GitHub Actions timeout and downgrade a real test
-        // failure into a cancelled job.
-        if (
-            recoverableRetryCount < maxRecoverableRetries &&
-            invocationResult.exitCode !== 0 &&
-            isRecoverableProductionReadinessFailure(invocationResult.output)
-        ) {
-            logRetry(listedFile);
-            recoverableRetryCount += 1;
-            invocationResult = await runInvocation(invocationArgs);
+        if (invocationResult.exitCode === 0) {
+            continue;
         }
 
-        if (invocationResult.exitCode !== 0) {
-            failedFiles.push(listedFile);
+        failedFiles.push(listedFile);
 
-            if (exitCode === 0) {
-                exitCode = invocationResult.exitCode;
-            }
+        if (exitCode === 0) {
+            exitCode = invocationResult.exitCode;
+        }
+
+        // Once a production goto stalls at the edge (same signature as
+        // readiness hitting the 45s timeout with no response bytes), every
+        // remaining spec in this project will fail the same way. Stop now so
+        // the job surfaces a real failure instead of burning the GitHub
+        // Actions timeout and getting cancelled.
+        if (isProductionNavigationStall(invocationResult.output)) {
+            stalledFile = listedFile;
+            onNavigationStall(listedFile);
+            break;
         }
     }
 
     return {
         exitCode,
         failedFiles,
+        stalledFile,
     };
 };

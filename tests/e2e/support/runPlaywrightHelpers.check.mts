@@ -3,9 +3,8 @@ import test from 'node:test';
 
 import {
     collectListedSpecFiles,
-    isRecoverableProductionReadinessFailure,
+    isProductionNavigationStall,
     resolveProductionIsolatedInvocationArgs,
-    resolveProductionIsolatedInvocationFiles,
     runProductionIsolatedInvocations,
     stripPlaywrightPositionalTestSelectors,
 } from '../scripts/runPlaywrightHelpers.mts';
@@ -53,39 +52,13 @@ Total: 1 test in 1 file
     ]);
 });
 
-test('resolveProductionIsolatedInvocationFiles prepends readiness for non-readiness files', () => {
-    assert.deepEqual(
-        resolveProductionIsolatedInvocationFiles('share-link.spec.ts'),
-        ['00-production-browser-readiness.spec.ts', 'share-link.spec.ts'],
-    );
-});
-
-test('resolveProductionIsolatedInvocationFiles keeps the readiness file standalone', () => {
-    assert.deepEqual(
-        resolveProductionIsolatedInvocationFiles(
-            '00-production-browser-readiness.spec.ts',
-        ),
-        ['00-production-browser-readiness.spec.ts'],
-    );
-});
-
-test('resolveProductionIsolatedInvocationFiles recognizes absolute readiness paths', () => {
-    assert.deepEqual(
-        resolveProductionIsolatedInvocationFiles(
-            'C:\\work\\sealed-vote\\tests\\e2e\\00-production-browser-readiness.spec.ts',
-        ),
-        ['C:\\work\\sealed-vote\\tests\\e2e\\00-production-browser-readiness.spec.ts'],
-    );
-});
-
-test('resolveProductionIsolatedInvocationArgs forces a single worker for isolated production runs', () => {
+test('resolveProductionIsolatedInvocationArgs runs a single file with one worker and forwarded args', () => {
     assert.deepEqual(
         resolveProductionIsolatedInvocationArgs('share-link.spec.ts', [
             '--project',
             'mobile-firefox-android',
         ]),
         [
-            '00-production-browser-readiness.spec.ts',
             'share-link.spec.ts',
             '--project',
             'mobile-firefox-android',
@@ -131,7 +104,6 @@ test('resolveProductionIsolatedInvocationArgs ignores forwarded spec filters fro
             'happy path',
         ]),
         [
-            '00-production-browser-readiness.spec.ts',
             'share-link.spec.ts',
             '--project',
             'mobile-firefox-android',
@@ -143,12 +115,12 @@ test('resolveProductionIsolatedInvocationArgs ignores forwarded spec filters fro
     );
 });
 
-test('isRecoverableProductionReadinessFailure matches the GitHub readiness timeout signature', () => {
+test('isProductionNavigationStall matches the page.goto timeout signature', () => {
     assert.equal(
-        isRecoverableProductionReadinessFailure(`Running 2 tests using 1 worker
-F°
+        isProductionNavigationStall(`Running 1 test using 1 worker
+F
 
-  1) [firefox-desktop] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
+  1) [mobile-firefox-android] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
 
     Error: page.goto: Timeout 45000ms exceeded.
 `),
@@ -156,20 +128,20 @@ F°
     );
 });
 
-test('isRecoverableProductionReadinessFailure ignores target-spec failures', () => {
+test('isProductionNavigationStall ignores output without a goto timeout', () => {
     assert.equal(
-        isRecoverableProductionReadinessFailure(`Running 2 tests using 1 worker
+        isProductionNavigationStall(`Running 1 test using 1 worker
 F
 
-  1) [firefox-desktop] › tests/e2e/recovery-network-cuts.spec.ts:31:5 › retries network cuts
+  1) [firefox-desktop] › tests/e2e/share-link.spec.ts:12:5 › copies the share link
 
-    Error: page.goto: Timeout 45000ms exceeded.
+    Error: expect(received).toBe(expected)
 `),
         false,
     );
 });
 
-test('runProductionIsolatedInvocations continues after failures and reports every failed file', async () => {
+test('runProductionIsolatedInvocations runs each listed file alone and continues after unrelated failures', async () => {
     const startedFiles: string[] = [];
     const invocationArgs: string[][] = [];
 
@@ -185,12 +157,16 @@ test('runProductionIsolatedInvocations continues after failures and reports ever
         },
         runInvocation: async (args) => {
             invocationArgs.push(args);
+
+            if (args.includes('ceremony-persistence.spec.ts')) {
+                return {
+                    exitCode: 1,
+                    output: 'Error: expected 3 votes, received 2',
+                };
+            }
+
             return {
-                exitCode:
-                    args.includes('ceremony-persistence.spec.ts') ||
-                    args.includes('share-link.spec.ts')
-                        ? 1
-                        : 0,
+                exitCode: 0,
                 output: '',
             };
         },
@@ -210,7 +186,6 @@ test('runProductionIsolatedInvocations continues after failures and reports ever
             '1',
         ],
         [
-            '00-production-browser-readiness.spec.ts',
             'ceremony-persistence.spec.ts',
             '--project',
             'firefox-desktop',
@@ -218,7 +193,6 @@ test('runProductionIsolatedInvocations continues after failures and reports ever
             '1',
         ],
         [
-            '00-production-browser-readiness.spec.ts',
             'share-link.spec.ts',
             '--project',
             'firefox-desktop',
@@ -228,127 +202,33 @@ test('runProductionIsolatedInvocations continues after failures and reports ever
     ]);
     assert.deepEqual(result, {
         exitCode: 1,
-        failedFiles: ['ceremony-persistence.spec.ts', 'share-link.spec.ts'],
+        failedFiles: ['ceremony-persistence.spec.ts'],
+        stalledFile: null,
     });
 });
 
-test('runProductionIsolatedInvocations re-runs a readiness-timeout failure once', async () => {
-    const invocationArgs: string[][] = [];
-    const retriedFiles: string[] = [];
-    let invocationCount = 0;
-
-    const result = await runProductionIsolatedInvocations({
-        forwardedCliArgs: ['--project', 'firefox-desktop'],
-        listedFiles: ['recovery-network-cuts.spec.ts'],
-        logRetry: (listedFile) => {
-            retriedFiles.push(listedFile);
-        },
-        runInvocation: async (args) => {
-            invocationArgs.push(args);
-            invocationCount += 1;
-
-            if (invocationCount === 1) {
-                return {
-                    exitCode: 1,
-                    output: `  1) [firefox-desktop] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
-
-    Error: page.goto: Timeout 45000ms exceeded.
-`,
-                };
-            }
-
-            return {
-                exitCode: 0,
-                output: '',
-            };
-        },
-    });
-
-    assert.deepEqual(retriedFiles, ['recovery-network-cuts.spec.ts']);
-    assert.deepEqual(invocationArgs, [
-        [
-            '00-production-browser-readiness.spec.ts',
-            'recovery-network-cuts.spec.ts',
-            '--project',
-            'firefox-desktop',
-            '--workers',
-            '1',
-        ],
-        [
-            '00-production-browser-readiness.spec.ts',
-            'recovery-network-cuts.spec.ts',
-            '--project',
-            'firefox-desktop',
-            '--workers',
-            '1',
-        ],
-    ]);
-    assert.deepEqual(result, {
-        exitCode: 0,
-        failedFiles: [],
-    });
-});
-
-test('runProductionIsolatedInvocations still fails when the readiness-timeout retry also fails', async () => {
-    const retriedFiles: string[] = [];
-
-    const result = await runProductionIsolatedInvocations({
-        forwardedCliArgs: ['--project', 'firefox-desktop'],
-        listedFiles: ['recovery-network-cuts.spec.ts'],
-        logRetry: (listedFile) => {
-            retriedFiles.push(listedFile);
-        },
-        runInvocation: async () => ({
-            exitCode: 1,
-            output: `  1) [firefox-desktop] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
-
-    Error: page.goto: Timeout 45000ms exceeded.
-`,
-        }),
-    });
-
-    assert.deepEqual(retriedFiles, ['recovery-network-cuts.spec.ts']);
-    assert.deepEqual(result, {
-        exitCode: 1,
-        failedFiles: ['recovery-network-cuts.spec.ts'],
-    });
-});
-
-test('runProductionIsolatedInvocations caps recoverable readiness retries across the whole browser run', async () => {
-    const retriedFiles: string[] = [];
-    const invocationArgs: string[][] = [];
-    const invocationAttempts = new Map<string, number>();
+test('runProductionIsolatedInvocations stops after a navigation stall and skips remaining files', async () => {
+    const startedFiles: string[] = [];
+    const stalledFiles: string[] = [];
 
     const result = await runProductionIsolatedInvocations({
         forwardedCliArgs: ['--project', 'mobile-firefox-android'],
-        listedFiles: ['duplicate-title-polls.spec.ts', 'mobile-layout.spec.ts'],
-        logRetry: (listedFile) => {
-            retriedFiles.push(listedFile);
+        listedFiles: [
+            '00-production-browser-readiness.spec.ts',
+            'ceremony-persistence.spec.ts',
+            'share-link.spec.ts',
+        ],
+        onInvocationStart: (listedFile) => {
+            startedFiles.push(listedFile);
+        },
+        onNavigationStall: (listedFile) => {
+            stalledFiles.push(listedFile);
         },
         runInvocation: async (args) => {
-            invocationArgs.push(args);
-            const targetFile = args.at(1) ?? args[0];
-            const attempt = (invocationAttempts.get(targetFile) ?? 0) + 1;
-
-            invocationAttempts.set(targetFile, attempt);
-
-            if (
-                targetFile === 'duplicate-title-polls.spec.ts' &&
-                attempt === 1
-            ) {
+            if (args.includes('00-production-browser-readiness.spec.ts')) {
                 return {
                     exitCode: 1,
-                    output: `  1) [mobile-firefox-android] â€º tests/e2e/00-production-browser-readiness.spec.ts:46:5 â€º browser can commit the homepage and a real production vote page
-
-    Error: page.goto: Timeout 45000ms exceeded.
-`,
-                };
-            }
-
-            if (targetFile === 'mobile-layout.spec.ts') {
-                return {
-                    exitCode: 1,
-                    output: `  1) [mobile-firefox-android] â€º tests/e2e/00-production-browser-readiness.spec.ts:46:5 â€º browser can commit the homepage and a real production vote page
+                    output: `  1) [mobile-firefox-android] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production vote page
 
     Error: page.goto: Timeout 45000ms exceeded.
 `,
@@ -362,35 +242,70 @@ test('runProductionIsolatedInvocations caps recoverable readiness retries across
         },
     });
 
-    assert.deepEqual(retriedFiles, ['duplicate-title-polls.spec.ts']);
-    assert.deepEqual(invocationArgs, [
-        [
-            '00-production-browser-readiness.spec.ts',
-            'duplicate-title-polls.spec.ts',
-            '--project',
-            'mobile-firefox-android',
-            '--workers',
-            '1',
-        ],
-        [
-            '00-production-browser-readiness.spec.ts',
-            'duplicate-title-polls.spec.ts',
-            '--project',
-            'mobile-firefox-android',
-            '--workers',
-            '1',
-        ],
-        [
-            '00-production-browser-readiness.spec.ts',
-            'mobile-layout.spec.ts',
-            '--project',
-            'mobile-firefox-android',
-            '--workers',
-            '1',
-        ],
+    assert.deepEqual(startedFiles, [
+        '00-production-browser-readiness.spec.ts',
+    ]);
+    assert.deepEqual(stalledFiles, [
+        '00-production-browser-readiness.spec.ts',
     ]);
     assert.deepEqual(result, {
         exitCode: 1,
-        failedFiles: ['mobile-layout.spec.ts'],
+        failedFiles: ['00-production-browser-readiness.spec.ts'],
+        stalledFile: '00-production-browser-readiness.spec.ts',
+    });
+});
+
+test('runProductionIsolatedInvocations stops at the first navigation stall even after earlier non-stall failures', async () => {
+    const startedFiles: string[] = [];
+    const stalledFiles: string[] = [];
+
+    const result = await runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'mobile-firefox-android'],
+        listedFiles: [
+            '00-production-browser-readiness.spec.ts',
+            'ceremony-persistence.spec.ts',
+            'share-link.spec.ts',
+        ],
+        onInvocationStart: (listedFile) => {
+            startedFiles.push(listedFile);
+        },
+        onNavigationStall: (listedFile) => {
+            stalledFiles.push(listedFile);
+        },
+        runInvocation: async (args) => {
+            if (args.includes('ceremony-persistence.spec.ts')) {
+                return {
+                    exitCode: 1,
+                    output: 'Error: expected 3 votes, received 2',
+                };
+            }
+
+            if (args.includes('share-link.spec.ts')) {
+                return {
+                    exitCode: 1,
+                    output: `  1) [mobile-firefox-android] › tests/e2e/share-link.spec.ts:12:5 › copies the share link
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+                };
+            }
+
+            return {
+                exitCode: 0,
+                output: '',
+            };
+        },
+    });
+
+    assert.deepEqual(startedFiles, [
+        '00-production-browser-readiness.spec.ts',
+        'ceremony-persistence.spec.ts',
+        'share-link.spec.ts',
+    ]);
+    assert.deepEqual(stalledFiles, ['share-link.spec.ts']);
+    assert.deepEqual(result, {
+        exitCode: 1,
+        failedFiles: ['ceremony-persistence.spec.ts', 'share-link.spec.ts'],
+        stalledFile: 'share-link.spec.ts',
     });
 });
