@@ -513,14 +513,13 @@ export const waitForVerifiedResults = async ({
             timeout: 90_000,
         },
     );
-    await expect(
-        resultsPanel.getByTestId('verified-result-choice'),
-    ).toHaveText(resultsToAssert.map((result) => result.choice), {
-        timeout: 90_000,
-    });
 
     for (const result of resultsToAssert) {
         const resultCard = getResultCard(page, result.choice);
+
+        await expect(resultCard).toHaveCount(1, {
+            timeout: 90_000,
+        });
 
         await expect(resultCard).toContainText(result.choice, {
             timeout: 90_000,

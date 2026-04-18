@@ -108,7 +108,9 @@ test('keeps the copy-link button vertically stable while copy feedback is visibl
     createdPolls.push(createdPoll);
 
     try {
-        const copyButton = page.getByTestId('copy-link-button');
+        const copyButton = page.getByRole('button', {
+            name: 'Copy link',
+        });
         await expect(copyButton).toBeVisible();
 
         const beforeBox = await copyButton.boundingBox();
