@@ -120,56 +120,14 @@ jobs:
 
             - name: capture same-container endpoint diagnostics
               if: failure()
-              shell: bash
-              run: |
-                  set -uo pipefail
-                  mkdir -p production-diagnostics
-
-                  capture_response() {
-                    local slug="$1"
-                    local url="$2"
-
-                    curl -sS --location \
-                      -D "production-diagnostics/${slug}.headers.txt" \
-                      -o "production-diagnostics/${slug}.body.txt" \
-                      "$url" || true
-                  }
-
-                  capture_response "homepage" "https://sealed.vote/"
-                  capture_response "version" "https://sealed.vote/version.json"
-                  capture_response "api-health" "https://api.sealed.vote/api/health-check"
-
-                  curl -sS --location \
-                    -X OPTIONS \
-                    -H 'Origin: https://sealed.vote' \
-                    -H 'Access-Control-Request-Method: POST' \
-                    -H 'Access-Control-Request-Headers: content-type' \
-                    -D production-diagnostics/api-preflight.headers.txt \
-                    -o production-diagnostics/api-preflight.body.txt \
-                    https://api.sealed.vote/api/polls/create || true
-
-                  {
-                    echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-                    echo "github_run_id=${GITHUB_RUN_ID:-}"
-                    echo "github_run_attempt=${GITHUB_RUN_ATTEMPT:-}"
-                    echo "github_job=${GITHUB_JOB:-}"
-                    echo "matrix_project=${{ matrix.project.name }}"
-                    echo "runner_os=${RUNNER_OS:-}"
-                    echo "runner_arch=${RUNNER_ARCH:-}"
-                    printenv | sort | grep '^PLAYWRIGHT_' || true
-                  } > production-diagnostics/env.txt
-
-                  {
-                    if command -v getent >/dev/null 2>&1; then
-                      echo "sealed.vote"
-                      getent ahostsv4 sealed.vote || true
-                      echo
-                      echo "api.sealed.vote"
-                      getent ahostsv4 api.sealed.vote || true
-                    else
-                      echo "getent is unavailable in this container."
-                    fi
-                  } > production-diagnostics/dns.ipv4.txt
+              run: >-
+                  pnpm e2e:production:diagnostics --
+                  --output-dir production-diagnostics
+                  --web-base-url https://sealed.vote
+                  --api-base-url https://api.sealed.vote
+                  --repeat 3
+                  --interval-ms 5000
+                  --request-timeout-ms 15000
 
             - name: upload production diagnostics
               if: failure()

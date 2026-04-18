@@ -58,6 +58,10 @@ const trackedRequestFailureResourceTypes = new Set([
     'stylesheet',
     'xhr',
 ]);
+const recoverableBoardMessageResponseMessages = new Set([
+    'The submitted payload does not match the active ceremony session.',
+    'This participant is no longer part of the active ceremony.',
+]);
 
 export const createUnexpectedErrorTracker = ({
     testInfo,
@@ -178,64 +182,95 @@ const formatConsoleError = ({
     return `${details}: ${message.text()}`;
 };
 
-const extractResponseBodySummary = (bodyText: string): string | null => {
-    const normalizedBodyText = normalizeTrackedText(bodyText);
-
-    if (!normalizedBodyText) {
+const parseTrackedResponseBody = (
+    bodyText: string,
+):
+    | {
+          error?: unknown;
+          message?: unknown;
+      }
+    | null => {
+    if (!bodyText) {
         return null;
     }
 
-    let parsedBody:
-        | {
-              error?: unknown;
-              message?: unknown;
-          }
-        | undefined;
-
     try {
-        parsedBody = JSON.parse(bodyText) as {
+        return JSON.parse(bodyText) as {
             error?: unknown;
             message?: unknown;
         };
     } catch {
-        parsedBody = undefined;
+        return null;
+    }
+};
+
+const getTrackedResponseBodyDetails = (
+    bodyText: string,
+): {
+    bodyMessage: string | null;
+    bodySummary: string | null;
+} => {
+    const normalizedBodyText = normalizeTrackedText(bodyText);
+
+    if (!normalizedBodyText) {
+        return {
+            bodyMessage: null,
+            bodySummary: null,
+        };
     }
 
+    const parsedBody = parseTrackedResponseBody(bodyText);
+
     if (typeof parsedBody?.message === 'string') {
-        return `message=${truncateTrackedText(
-            normalizeTrackedText(parsedBody.message),
-        )}`;
+        const bodyMessage = normalizeTrackedText(parsedBody.message);
+
+        return {
+            bodyMessage,
+            bodySummary: `message=${truncateTrackedText(bodyMessage)}`,
+        };
     }
 
     if (typeof parsedBody?.error === 'string') {
-        return `error=${truncateTrackedText(
-            normalizeTrackedText(parsedBody.error),
-        )}`;
+        const bodyMessage = normalizeTrackedText(parsedBody.error);
+
+        return {
+            bodyMessage,
+            bodySummary: `error=${truncateTrackedText(bodyMessage)}`,
+        };
     }
 
-    return `body=${truncateTrackedText(normalizedBodyText)}`;
+    return {
+        bodyMessage: null,
+        bodySummary: `body=${truncateTrackedText(normalizedBodyText)}`,
+    };
 };
 
-const formatTrackedResponseError = async ({
+const isRecoverableBoardMessageResponse = ({
+    bodyMessage,
+    responseUrl,
+}: {
+    bodyMessage: string | null;
+    responseUrl: URL;
+}): boolean =>
+    responseUrl.pathname.endsWith('/board/messages') &&
+    bodyMessage !== null &&
+    recoverableBoardMessageResponseMessages.has(bodyMessage);
+
+const formatTrackedResponseError = ({
+    bodySummary,
     label,
     page,
     response,
     responseUrl,
 }: {
+    bodySummary: string | null;
     label: string;
     page: Page;
     response: Response;
     responseUrl: URL;
-}): Promise<string> => {
+}): string => {
     const method = response.request().method();
     const pageUrl = formatTrackedPageUrl(page);
-    let bodySummary: string | null;
-
-    try {
-        bodySummary = extractResponseBodySummary(await response.text());
-    } catch {
-        bodySummary = null;
-    }
 
     return [
         `[${label}] response: ${method} ${response.status()} ${responseUrl.toString()}`,
@@ -616,14 +651,37 @@ export const attachErrorTracking = (
         }
 
         const pendingCheck = (async () => {
+            let bodyText = '';
+
+            try {
+                bodyText = await response.text();
+            } catch {
+                bodyText = '';
+            }
+
+            const { bodyMessage, bodySummary } =
+                getTrackedResponseBodyDetails(bodyText);
+            const trackedResponseError = formatTrackedResponseError({
+                bodySummary,
+                label,
+                page,
+                response,
+                responseUrl,
+            });
+
+            if (
+                isRecoverableBoardMessageResponse({
+                    bodyMessage,
+                    responseUrl,
+                })
+            ) {
+                pushTrackerEvent(tracker, trackedResponseError);
+                return;
+            }
+
             recordTrackedError(
                 tracker,
-                await formatTrackedResponseError({
-                    label,
-                    page,
-                    response,
-                    responseUrl,
-                }),
+                trackedResponseError,
             );
         })();
 

@@ -6,6 +6,7 @@ import {
     detectFatalReadinessFailureMessage,
     parsePositiveInteger,
     parseWaitCliArgs,
+    shouldAbortTimedOutReadinessProcess,
     waitForProductionBrowserReadiness,
 } from '../scripts/wait-for-production-browser-readiness.mts';
 
@@ -250,4 +251,68 @@ test('classifyReadinessProcessFailure retries non-fatal capture buffer overflows
             kind: 'retry',
         },
     );
+});
+
+test('shouldAbortTimedOutReadinessProcess only aborts a still-running unsettled child', () => {
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: null,
+            childSignalCode: null,
+            settled: false,
+        }),
+        true,
+    );
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: 0,
+            childSignalCode: null,
+            settled: false,
+        }),
+        false,
+    );
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: null,
+            childSignalCode: 'SIGTERM',
+            settled: false,
+        }),
+        false,
+    );
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: null,
+            childSignalCode: null,
+            settled: true,
+        }),
+        false,
+    );
+});
+
+test('waitForProductionBrowserReadiness awaits asynchronous readiness checks', async () => {
+    const checksStarted: number[] = [];
+    let nowMs = 50_000;
+
+    await waitForProductionBrowserReadiness(
+        {
+            forwardedCliArgs: ['--project', 'chromium-desktop'],
+            intervalMs: 1_000,
+            requiredStableChecks: 2,
+            timeoutMs: 10_000,
+        },
+        {
+            now: () => nowMs,
+            runReadinessCheck: async (_forwardedCliArgs, timeoutMs) => {
+                checksStarted.push(timeoutMs);
+                await Promise.resolve();
+                return {
+                    kind: 'success',
+                };
+            },
+            sleep: async (delayMs) => {
+                nowMs += delayMs;
+            },
+        },
+    );
+
+    assert.deepEqual(checksStarted, [10_000, 9_000]);
 });

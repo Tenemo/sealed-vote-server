@@ -178,7 +178,33 @@ test('attachErrorTracking records console source locations when available', () =
     ]);
 });
 
-test('attachErrorTracking records response method, page url, and API message', async () => {
+test('attachErrorTracking records unrecoverable API responses with the method, page url, and API message', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage();
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const responseListener = listeners.get('response');
+    assert.ok(responseListener);
+
+    responseListener(
+        createMockResponse({
+            bodyText: JSON.stringify({
+                message: 'Protocol payload signature is invalid.',
+            }),
+            status: 400,
+            url: 'https://api.sealed.vote/api/board/messages',
+        }),
+    );
+
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    assert.deepEqual(tracker.errors, [
+        '[page] response: POST 400 https://api.sealed.vote/api/board/messages (page https://sealed.vote/votes/mock-poll) message=Protocol payload signature is invalid.',
+    ]);
+});
+
+test('attachErrorTracking treats recoverable board-message session mismatches as recent activity instead of unexpected errors', async () => {
     const tracker = createUnexpectedErrorTracker();
     const { listeners, page } = createMockPage();
 
@@ -193,15 +219,16 @@ test('attachErrorTracking records response method, page url, and API message', a
                 message:
                     'The submitted payload does not match the active ceremony session.',
             }),
-            status: 409,
-            url: 'https://api.sealed.vote/api/board/messages',
+            status: 400,
+            url: 'https://api.sealed.vote/api/polls/mock-poll/board/messages',
         }),
     );
 
     await Promise.allSettled([...tracker.pendingChecks]);
 
-    assert.deepEqual(tracker.errors, [
-        '[page] response: POST 409 https://api.sealed.vote/api/board/messages (page https://sealed.vote/votes/mock-poll) message=The submitted payload does not match the active ceremony session.',
+    assert.deepEqual(tracker.errors, []);
+    assert.deepEqual(tracker.recentEvents, [
+        '[page] response: POST 400 https://api.sealed.vote/api/polls/mock-poll/board/messages (page https://sealed.vote/votes/mock-poll) message=The submitted payload does not match the active ceremony session.',
     ]);
 });
 
