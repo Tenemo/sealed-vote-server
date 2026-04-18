@@ -1,4 +1,4 @@
-import { isLocalLoopbackHostname } from './localOrigin.mts';
+import { isLocalLoopbackHostname } from './local-origin.mts';
 
 type NavigationWaitUntil =
     | 'commit'

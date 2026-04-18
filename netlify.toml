@@ -15,8 +15,8 @@
   included_files = ["netlify/functions/assets/fonts/**"]
 
 [[edge_functions]]
-  function = "vote-seo"
-  path = "/votes/*"
+  function = "poll-seo"
+  path = "/polls/*"
 
 [[headers]]
   for = "/*"
@@ -54,6 +54,16 @@
   from = "/api/*"
   to = "https://api.sealed.vote/api/:splat"
   status = 200
+
+[[redirects]]
+  from = "/social/votes/*"
+  to = "/social/polls/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/votes/*"
+  to = "/polls/:splat"
+  status = 301
 
 [[redirects]]
   from = "/*"

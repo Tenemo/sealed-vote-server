@@ -13,7 +13,7 @@ import {
     waitForCeremonyMetric,
     waitForVerifiedResults,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -23,12 +23,12 @@ import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/testData';
+} from './support/test-data';
 
 const continueWithoutMissingParticipants = async (
     page: Page,

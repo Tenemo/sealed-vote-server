@@ -5,7 +5,7 @@ import { repoRoot } from '../scripts/shared.mts';
 import {
     buildDebugContainerCommand,
     parseDebugContainerCliArgs,
-} from './runContainerDebugHelpers.mts';
+} from './run-container-debug-helpers.mts';
 
 const composeFilePath = path.resolve(
     repoRoot,

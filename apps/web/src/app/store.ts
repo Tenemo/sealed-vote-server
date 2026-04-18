@@ -1,7 +1,7 @@
 import { combineSlices, configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 
-import { pollsApi } from 'features/Polls/pollsApi';
+import { pollsApi } from 'features/polls/polls-api';
 
 const rootReducer = combineSlices(pollsApi);
 

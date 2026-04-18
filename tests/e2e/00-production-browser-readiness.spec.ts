@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { gotoInteractablePage } from './support/navigation.mts';
-import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
+import { createPoll, deletePolls, type CreatedPoll } from './support/poll-flow';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 
 // Keep this file first in the production suite so browser-commit failures show
 // up before the heavier multi-page ceremony specs start.
@@ -14,22 +14,22 @@ const readinessChoices = ['Readiness alpha', 'Readiness beta'];
 const readinessUiTimeoutMs = 30_000;
 
 const expectHomepageReady = async (page: Page): Promise<void> => {
-    await expect(page.getByLabel('Vote name')).toBeVisible({
+    await expect(page.getByLabel('Poll name')).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
     await expect(
-        page.getByLabel('Choice to vote for'),
+        page.getByLabel('Choice name'),
     ).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
     await expect(
-        page.getByRole('button', { name: 'Create vote' }),
+        page.getByRole('button', { name: 'Create poll' }),
     ).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
 };
 
-const expectVotePageReady = async (page: Page): Promise<void> => {
+const expectPollPageReady = async (page: Page): Promise<void> => {
     await expect(page.getByLabel('Your public name')).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
@@ -43,7 +43,7 @@ const expectVotePageReady = async (page: Page): Promise<void> => {
     });
 };
 
-test('browser can commit the homepage and a real production vote page', async ({
+test('browser can commit the homepage and a real production poll page', async ({
     page,
     request,
 }, testInfo) => {
@@ -80,7 +80,7 @@ test('browser can commit the homepage and a real production vote page', async ({
         participantPage = attachParticipantTracking(
             await gotoInteractablePage(participantPage, createdPoll.pollUrl),
         );
-        await expectVotePageReady(participantPage);
+        await expectPollPageReady(participantPage);
         await expectNoUnexpectedErrors(tracker);
     } finally {
         if (participantPage && !participantPage.isClosed()) {

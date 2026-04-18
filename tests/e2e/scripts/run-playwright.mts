@@ -1,7 +1,7 @@
 import {
     collectListedSpecFiles,
     runProductionIsolatedInvocations,
-} from './runPlaywrightHelpers.mts';
+} from './run-playwright-helpers.mts';
 import {
     getForwardedCliArgs,
     runPnpmCaptureSync,

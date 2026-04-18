@@ -11,7 +11,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { buildServer } from '../buildServer';
+import { buildServer } from '../build-server';
 
 import { PollResponseSchema } from './fetch';
 

@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoAxeViolations } from './support/a11y';
+import { expectNoAccessibilityViolations } from './support/accessibility';
 import { gotoInteractablePage } from './support/navigation.mts';
-import { createPoll, deletePolls, type CreatedPoll } from './support/pollFlow';
+import { createPoll, deletePolls, type CreatedPoll } from './support/poll-flow';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
-import { createPollName, createTestNamespace } from './support/testData';
+} from './support/error-tracking';
+import { createPollName, createTestNamespace } from './support/test-data';
 
 const mobileViewport = {
     width: 320,
@@ -39,17 +39,17 @@ test('keeps the home page readable and accessible at 320 pixels wide', async ({
     page = attachMobileHomeTracking(await gotoInteractablePage(page, '/'));
 
     await expect(
-        page.getByRole('heading', { name: 'Create a new vote' }),
+        page.getByRole('heading', { name: 'Create a new poll' }),
     ).toBeVisible();
-    await expect(page.getByLabel('Vote name')).toBeVisible();
+    await expect(page.getByLabel('Poll name')).toBeVisible();
     await expect(
         page.getByRole('button', { name: 'Add new choice' }),
     ).toBeVisible();
     await expect(
-        page.getByRole('button', { name: 'Create vote' }),
+        page.getByRole('button', { name: 'Create poll' }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await expectNoAxeViolations(page, 'mobile home page');
+    await expectNoAccessibilityViolations(page, 'mobile home page');
     await expectNoUnexpectedErrors(tracker);
 });
 
@@ -94,7 +94,7 @@ test('keeps the poll page usable at 320 pixels wide before voting closes', async
             page.getByRole('heading', { name: 'Audit and verification' }),
         ).toBeVisible();
         await expectNoHorizontalOverflow(page);
-        await expectNoAxeViolations(page, 'mobile poll page');
+        await expectNoAccessibilityViolations(page, 'mobile poll page');
         await expectNoUnexpectedErrors(tracker);
     } finally {
         await deletePolls(request, createdPolls);

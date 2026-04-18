@@ -37,7 +37,7 @@ Closed polls publish a frozen manifest with `rosterHash`, `optionList`, and the 
 
 ## How it works
 
-1. A poll creator opens a score vote and shares its slug-based URL.
+1. A poll creator opens a score poll and shares its slug-based URL.
 2. Voters join the waiting room with public names and receive voter-specific tokens.
 3. Once at least three participants are registered, the creator starts voting and the roster becomes fixed.
 4. The client signs and appends protocol payloads to the board log behind guided UI actions. The board is append-only and every message is classified as accepted, idempotent, or equivocation.

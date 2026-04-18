@@ -3,7 +3,7 @@ import { createPoll, deletePoll } from '@sealed-vote/testkit';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { buildServer } from '../buildServer';
+import { buildServer } from '../build-server';
 
 describe('DELETE /polls/:pollId', () => {
     let fastify: FastifyInstance;

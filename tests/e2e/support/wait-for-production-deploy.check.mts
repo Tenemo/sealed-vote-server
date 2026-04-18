@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-    createSyntheticVotePath,
+    createSyntheticPollPath,
     formatReadinessStatus,
     isReadinessStatusSuccessful,
     waitForProductionDeploy,
@@ -47,7 +47,7 @@ const createReadinessStatus = (
         apiHealth: ReturnType<typeof createJsonStatus>;
         browserApiHealth: ReturnType<typeof createJsonStatus>;
         homepage: ReturnType<typeof createHtmlStatus>;
-        votePage: ReturnType<typeof createHtmlStatus>;
+    pollPage: ReturnType<typeof createHtmlStatus>;
         webVersion: ReturnType<typeof createJsonStatus>;
     }> = {},
 ) => ({
@@ -60,8 +60,8 @@ const createReadinessStatus = (
     homepage: createHtmlStatus({
         url: 'https://sealed.vote/?t=1',
     }),
-    votePage: createHtmlStatus({
-        url: 'https://sealed.vote/votes/production-readiness-ac15a2795b53?t=1',
+    pollPage: createHtmlStatus({
+        url: 'https://sealed.vote/polls/production-readiness-ac15a2795b53?t=1',
     }),
     webVersion: createJsonStatus({
         url: 'https://sealed.vote/version.json?t=1',
@@ -69,10 +69,10 @@ const createReadinessStatus = (
     ...overrides,
 });
 
-test('createSyntheticVotePath uses the commit prefix in the synthetic vote slug', () => {
+test('createSyntheticPollPath uses the commit prefix in the synthetic poll slug', () => {
     assert.equal(
-        createSyntheticVotePath(expectedCommitSha),
-        '/votes/production-readiness-ac15a2795b53',
+        createSyntheticPollPath(expectedCommitSha),
+        '/polls/production-readiness-ac15a2795b53',
     );
 });
 
@@ -110,8 +110,8 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
     assert.equal(
         isReadinessStatusSuccessful(
             createReadinessStatus({
-                votePage: createHtmlStatus({
-                    missingSnippetLabel: 'vote page canonical',
+        pollPage: createHtmlStatus({
+            missingSnippetLabel: 'poll page canonical',
                     ok: false,
                 }),
             }),
@@ -152,14 +152,14 @@ test('formatReadinessStatus reports unreachable, missing, and unknown HTML marke
     assert.match(
         formatReadinessStatus(
             createReadinessStatus({
-                votePage: createHtmlStatus({
-                    missingSnippetLabel: 'vote page canonical',
+        pollPage: createHtmlStatus({
+            missingSnippetLabel: 'poll page canonical',
                     ok: false,
                     statusCode: 200,
                 }),
             }),
         ),
-        /vote page: status=200, contentType=text\/html; charset=utf-8, markers=missing vote page canonical/u,
+            /poll page: status=200, contentType=text\/html; charset=utf-8, markers=missing poll page canonical/u,
     );
 
     assert.match(
@@ -251,8 +251,8 @@ test('waitForProductionDeploy times out when readiness never stabilizes', async 
                 {
                     loadReadinessStatus: async () =>
                         createReadinessStatus({
-                            votePage: createHtmlStatus({
-                                missingSnippetLabel: 'vote page canonical',
+        pollPage: createHtmlStatus({
+            missingSnippetLabel: 'poll page canonical',
                                 ok: false,
                             }),
                         }),

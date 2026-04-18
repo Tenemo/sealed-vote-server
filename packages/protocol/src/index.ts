@@ -1,2 +1,2 @@
-export * from './messageTypes.js';
-export * from './protocolPayloads.js';
+export * from './message-types.js';
+export * from './protocol-payloads.js';

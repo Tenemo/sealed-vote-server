@@ -14,11 +14,11 @@ The public poll read model exposes these phases:
 - `aborted`
 
 They are derived from accepted board payloads plus local ceremony verification.
-The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
+The API read model derives them in `apps/api/src/utils/poll-read-model.ts`.
 
 ## Product flow
 
-1. The organizer creates a vote and lands on the live public page immediately.
+1. The organizer creates a poll and lands on the live public page immediately.
 2. Each participant opens the link, scores every option from `1` to `10`, and submits one final vote.
 3. The browser stores those plaintext scores locally on-device and registers the participant with the backend for the later ceremony.
 4. The organizer closes voting once at least three submitted participants exist. That freezes the roster.

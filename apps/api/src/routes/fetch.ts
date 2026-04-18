@@ -6,7 +6,7 @@ import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { getPollFetchReadModel } from '../utils/pollReadModel.js';
+import { getPollFetchReadModel } from '../utils/poll-read-model.js';
 
 import {
     BoardMessageRecordSchema,
@@ -142,17 +142,17 @@ export const fetch = async (fastify: FastifyInstance): Promise<void> => {
         '/polls/:pollRef',
         { schema },
         async (
-            req: FastifyRequest<{ Params: PollRefParams }>,
+            request: FastifyRequest<{ Params: PollRefParams }>,
         ): Promise<PollResponse> => {
             const poll = await getPollFetchReadModel(
-                fastify.db,
-                req.params.pollRef,
+                fastify.database,
+                request.params.pollRef,
             );
 
             if (!poll) {
                 throw createError(
                     404,
-                    `Poll ${req.params.pollRef} does not exist.`,
+                    `Poll ${request.params.pollRef} does not exist.`,
                 );
             }
 

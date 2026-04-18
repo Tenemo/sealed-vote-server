@@ -14,7 +14,7 @@ import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createExpectedVerifiedResults,
@@ -24,7 +24,7 @@ import {
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -37,7 +37,7 @@ import {
     type ReadmeDemoAddressPhase,
     type ReadmeDemoManifest,
     type ReadmeDemoPanelId,
-} from './support/readmeDemo.mts';
+} from './support/readme-demo.mts';
 
 const demoBeatPausesMs = {
     closeStarted: 2_400,
@@ -313,13 +313,13 @@ const createPollWithDemoMotion = async ({
         });
     }
 
-    const voteNameInput = page.getByLabel('Vote name');
-    const choiceInput = page.getByLabel('Choice to vote for');
+    const voteNameInput = page.getByLabel('Poll name');
+    const choiceInput = page.getByLabel('Choice name');
     const addChoiceButton = page.getByRole('button', {
         name: 'Add new choice',
     });
     const createVoteButton = page.getByRole('button', {
-        name: 'Create vote',
+        name: 'Create poll',
     });
 
     await typeWithDemoMotion({
@@ -563,7 +563,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
             gotoBlankDemoPage(participantOne.page),
             gotoBlankDemoPage(participantTwo.page),
         ]);
-        await expect(creator.page.getByLabel('Vote name')).toBeVisible({
+        await expect(creator.page.getByLabel('Poll name')).toBeVisible({
             timeout: 30_000,
         });
         creatorHomeVisibleAtMs = getElapsedMs(recordingStartedAtMs);

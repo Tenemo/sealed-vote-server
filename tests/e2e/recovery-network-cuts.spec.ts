@@ -4,9 +4,9 @@ import { gotoInteractablePage } from './support/navigation.mts';
 import {
     deletePolls,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import { dropNextPostResponseAfterServerCommit } from './support/network';
-import { createPollName, createTestNamespace } from './support/testData';
+import { createPollName, createTestNamespace } from './support/test-data';
 
 const localSyntheticDropHosts = new Set(['127.0.0.1', 'localhost']);
 const createPollApiPath = '/api/polls/create';
@@ -90,10 +90,10 @@ test('retries poll creation safely after the initial response is lost', async ({
     try {
         page = await gotoInteractablePage(page, '/');
         page.on('request', captureCreateRequest);
-        await page.getByLabel('Vote name').fill(pollName);
+        await page.getByLabel('Poll name').fill(pollName);
 
         for (const choice of ['Apples', 'Bananas']) {
-            await page.getByLabel('Choice to vote for').fill(choice);
+            await page.getByLabel('Choice name').fill(choice);
             await page.getByRole('button', { name: 'Add new choice' }).click();
         }
 
@@ -102,7 +102,7 @@ test('retries poll creation safely after the initial response is lost', async ({
             url: /\/api\/polls\/create$/,
         });
 
-        await page.getByRole('button', { name: 'Create vote' }).click();
+        await page.getByRole('button', { name: 'Create poll' }).click();
         await droppedCreate.waitForDrop();
 
         await expect(page).toHaveURL('/');
@@ -114,7 +114,7 @@ test('retries poll creation safely after the initial response is lost', async ({
                 response.ok(),
         );
 
-        await page.getByRole('button', { name: 'Create vote' }).click();
+        await page.getByRole('button', { name: 'Create poll' }).click();
 
         const createPollResponse = await createPollResponsePromise;
         const createdPoll = (await createPollResponse.json()) as CreatePollResponse;
@@ -128,7 +128,7 @@ test('retries poll creation safely after the initial response is lost', async ({
             pollUrl: page.url(),
         });
 
-        await expect(page).toHaveURL(new RegExp(`/votes/${createdPoll.slug}$`));
+        await expect(page).toHaveURL(new RegExp(`/polls/${createdPoll.slug}$`));
         expect(capturedCreateRequests).toHaveLength(2);
         expect(capturedCreateRequests[0]).toEqual(capturedCreateRequests[1]);
 

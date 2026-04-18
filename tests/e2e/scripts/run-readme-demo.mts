@@ -12,7 +12,7 @@ import {
     readmeDemoManifestPath,
     readmeDemoOutputDir,
     type ReadmeDemoManifest,
-} from '../support/readmeDemo.mts';
+} from '../support/readme-demo.mts';
 
 const expectedPanelIds = ['creator', 'participant-one', 'participant-two'];
 const panelLabelHeight = 52;

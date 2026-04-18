@@ -11,7 +11,7 @@ import {
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -20,12 +20,12 @@ import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/testData';
+} from './support/test-data';
 
 test('counts every honest ballot when four participants complete the ceremony', async ({
     browser,

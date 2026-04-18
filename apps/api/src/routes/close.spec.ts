@@ -4,8 +4,8 @@ import { eq } from 'drizzle-orm';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { buildServer } from '../buildServer';
-import { publicKeyShares } from '../db/schema.js';
+import { buildServer } from '../build-server';
+import { publicKeyShares } from '../database/schema.js';
 
 type CloseVotingResponse = {
     message: string;
@@ -134,7 +134,7 @@ describe('POST /polls/:pollId/close', () => {
         await registerVoter(fastify, pollId, 'Voter2');
         await registerVoter(fastify, pollId, 'Voter3');
 
-        await fastify.db
+        await fastify.database
             .update(publicKeyShares)
             .set({
                 publicKeyShare: '{"transportSuite":"X25519"}',

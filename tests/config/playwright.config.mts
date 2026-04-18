@@ -4,7 +4,7 @@ import {
     createLocalE2EConfig,
     createProductionE2EConfig,
     createReadmeDemoConfig,
-} from '../e2e/playwrightConfig.mts';
+} from '../e2e/playwright-config.mts';
 
 const resolvePlaywrightConfigProfile = (): 'local' | 'production' | 'readme-demo' => {
     const rawProfile = process.env.PLAYWRIGHT_CONFIG_PROFILE?.trim();

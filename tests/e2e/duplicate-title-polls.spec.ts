@@ -12,13 +12,13 @@ import {
     expectParticipantsVisible,
     registerParticipant,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
-import { createTestNamespace, createVoterName } from './support/testData';
+} from './support/error-tracking';
+import { createTestNamespace, createVoterName } from './support/test-data';
 
 test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', async ({
     browser,

@@ -8,15 +8,15 @@ import { and, eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import type { DatabaseTransaction } from '../db/client.js';
-import { polls, publicKeyShares, voters } from '../db/schema.js';
-import { withTransaction } from '../utils/db.js';
-import { parseParticipantDeviceRecord } from '../utils/participantDevices.js';
-import { insertPollCeremonySession } from '../utils/pollCeremonySessions.js';
-import { lockPollById } from '../utils/pollLocks.js';
-import { minimumPollParticipantsToClose } from '../utils/pollLimits.js';
+import type { DatabaseTransaction } from '../database/client.js';
+import { polls, publicKeyShares, voters } from '../database/schema.js';
+import { withTransaction } from '../utils/database.js';
+import { parseParticipantDeviceRecord } from '../utils/participant-devices.js';
+import { insertPollCeremonySession } from '../utils/poll-ceremony-sessions.js';
+import { lockPollById } from '../utils/poll-locks.js';
+import { minimumPollParticipantsToClose } from '../utils/poll-limits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
-import { hashSecureToken } from '../utils/voterAuth.js';
+import { hashSecureToken } from '../utils/voter-auth.js';
 
 import {
     MessageResponseSchema,
@@ -85,7 +85,7 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
         '/polls/:pollId/close',
         { schema },
         async (
-            req: FastifyRequest<{
+            request: FastifyRequest<{
                 Params: PollIdParams;
                 Body: CloseVotingBody;
             }>,
@@ -94,18 +94,21 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
             const response = await withTransaction(
                 fastify,
                 async (client): Promise<CloseVotingResponse> => {
-                    const poll = await lockPollById(client, req.params.pollId);
+                    const poll = await lockPollById(
+                        client,
+                        request.params.pollId,
+                    );
 
                     if (!poll) {
                         throw createError(
                             404,
-                            `Poll with ID ${req.params.pollId} does not exist.`,
+                            `Poll with ID ${request.params.pollId} does not exist.`,
                         );
                     }
 
                     if (
                         poll.creatorTokenHash !==
-                        hashSecureToken(req.body.creatorToken)
+                        hashSecureToken(request.body.creatorToken)
                     ) {
                         throw createError(
                             403,
@@ -120,7 +123,7 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
                     const activeParticipantIndices =
                         await validateParticipantDeviceReadiness(
                             client,
-                            req.params.pollId,
+                            request.params.pollId,
                         );
 
                     await client
@@ -128,12 +131,12 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
                         .set({
                             isOpen: false,
                         })
-                        .where(eq(polls.id, req.params.pollId));
+                        .where(eq(polls.id, request.params.pollId));
 
                     await insertPollCeremonySession({
                         activeParticipantIndices,
-                        pollId: req.params.pollId,
-                        tx: client,
+                        pollId: request.params.pollId,
+                        databaseTransaction: client,
                     });
 
                     return { message: 'Voting closed successfully.' };
@@ -142,7 +145,7 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
 
             void maybeDropTestResponseAfterCommit({
                 reply,
-                request: req,
+                request: request,
             });
 
             return response;

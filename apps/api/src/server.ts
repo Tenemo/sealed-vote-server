@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 
-import { buildServer } from './buildServer.js';
+import { buildServer } from './build-server.js';
 import { getDatabaseUrl, isDefaultDatabaseUrl } from './config.js';
 
 config();

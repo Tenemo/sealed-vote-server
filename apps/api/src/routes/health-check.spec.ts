@@ -9,7 +9,7 @@ import {
     vi,
 } from 'vitest';
 
-import { buildServer } from '../buildServer';
+import { buildServer } from '../build-server';
 
 describe('GET /health-check', () => {
     let fastify: FastifyInstance;
@@ -73,7 +73,7 @@ describe('GET /health-check', () => {
         delete process.env.RAILWAY_GIT_COMMIT_SHA;
         delete process.env.COMMIT_REF;
         delete process.env.GITHUB_SHA;
-        vi.spyOn(fastify.db, 'select').mockImplementation(() => {
+        vi.spyOn(fastify.database, 'select').mockImplementation(() => {
             throw new Error('database unavailable');
         });
 

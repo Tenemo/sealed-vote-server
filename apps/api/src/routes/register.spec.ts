@@ -18,8 +18,8 @@ import {
     generateTransportKeyPair,
 } from 'threshold-elgamal';
 
-import { buildServer } from '../buildServer';
-import { publicKeyShares } from '../db/schema.js';
+import { buildServer } from '../build-server';
+import { publicKeyShares } from '../database/schema.js';
 
 const generateToken = (): string => randomBytes(32).toString('hex');
 
@@ -234,7 +234,7 @@ describe('Register voter endpoint', () => {
 
         expect(firstResponse.statusCode).toBe(201);
 
-        await fastify.db
+        await fastify.database
             .update(publicKeyShares)
             .set({
                 publicKeyShare: '{"transportSuite":"X25519"}',

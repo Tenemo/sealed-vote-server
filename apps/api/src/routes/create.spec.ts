@@ -13,7 +13,7 @@ import {
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { buildServer } from '../buildServer';
+import { buildServer } from '../build-server';
 
 const generateToken = (): string => randomBytes(32).toString('hex');
 

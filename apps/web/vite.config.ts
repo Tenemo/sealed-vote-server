@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-import { createDeploymentVersionPlugin } from './config/deploymentVersion';
+import { createDeploymentVersionPlugin } from './config/deployment-version';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 const repoRootDir = path.resolve(rootDir, '..', '..');
