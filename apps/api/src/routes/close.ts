@@ -41,7 +41,7 @@ const schema = {
 };
 
 type CloseVotingBody = CloseVotingRequestContract;
-export type CloseVotingResponse = MessageResponse;
+type CloseVotingResponse = MessageResponse;
 
 const validateParticipantDeviceReadiness = async (
     client: DatabaseTransaction,

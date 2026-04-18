@@ -35,7 +35,7 @@ if (!fs.existsSync(builtServerPath)) {
     process.exit(1);
 }
 
-runApiTsxSync(['scripts/resetDb.ts']);
+runApiTsxSync(['scripts/db.ts', 'reset']);
 
 wireChildProcess(
     spawn(process.execPath, [builtServerPath], {

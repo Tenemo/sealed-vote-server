@@ -1,5 +1,6 @@
 import { FormatRegistry } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
+import type { PollResponse } from '@sealed-vote/contracts';
 import {
     closePoll,
     createPoll,
@@ -12,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
 
-import { PollResponseSchema, type PollResponse } from './fetch';
+import { PollResponseSchema } from './fetch';
 
 const clonePoll = (poll: PollResponse): PollResponse => structuredClone(poll);
 const uuidPattern =

@@ -20,8 +20,14 @@ const forwardedCliArgs =
         : getForwardedCliArgs();
 const configPath =
     mode === 'production'
-        ? 'tests/config/playwright.production.config.mts'
+        ? 'tests/config/playwright.config.mts'
         : 'tests/config/playwright.compat.config.mts';
+
+if (mode === 'production') {
+    process.env.PLAYWRIGHT_CONFIG_PROFILE = 'production';
+} else {
+    delete process.env.PLAYWRIGHT_CONFIG_PROFILE;
+}
 
 const shouldIsolateProductionByFile =
     mode === 'production' &&

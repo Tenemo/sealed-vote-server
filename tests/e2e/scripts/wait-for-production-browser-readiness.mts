@@ -278,7 +278,7 @@ const runReadinessCheck = async (
                 'playwright',
                 'test',
                 '--config',
-                'tests/config/playwright.production.config.mts',
+                'tests/config/playwright.config.mts',
                 'tests/e2e/00-production-browser-readiness.spec.ts',
                 '--workers',
                 '1',
@@ -286,7 +286,10 @@ const runReadinessCheck = async (
             ],
             {
                 cwd: repoRoot,
-                env: process.env,
+                env: {
+                    ...process.env,
+                    PLAYWRIGHT_CONFIG_PROFILE: 'production',
+                },
                 stdio: ['ignore', 'pipe', 'pipe'],
             },
         );

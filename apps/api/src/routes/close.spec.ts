@@ -1,4 +1,4 @@
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { ERROR_MESSAGES, type PollResponse } from '@sealed-vote/contracts';
 import { createPoll, deletePoll, registerVoter } from '@sealed-vote/testkit';
 import { eq } from 'drizzle-orm';
 import { FastifyInstance } from 'fastify';
@@ -6,8 +6,6 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
 import { publicKeyShares } from '../db/schema.js';
-
-import { PollResponse } from './fetch';
 
 type CloseVotingResponse = {
     message: string;

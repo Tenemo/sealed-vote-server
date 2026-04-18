@@ -331,6 +331,7 @@ const main = (): void => {
     configureLocalE2EEnv({
         useBuiltServers: true,
     });
+    process.env.PLAYWRIGHT_CONFIG_PROFILE = 'readme-demo';
     ensureFfmpegAvailable();
     cleanDemoOutputDir();
 
@@ -340,7 +341,7 @@ const main = (): void => {
         'playwright',
         'test',
         '--config',
-        'tests/config/playwright.readme-demo.config.mts',
+        'tests/config/playwright.config.mts',
         ...getForwardedCliArgs(),
     ]);
 

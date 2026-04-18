@@ -1,6 +1,5 @@
 import * as React from 'react';
 
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type OutlinedInputFieldProps = Omit<React.ComponentProps<'input'>, 'size'> & {
@@ -15,6 +14,9 @@ type OutlinedInputFieldProps = Omit<React.ComponentProps<'input'>, 'size'> & {
 const isInvalidInput = (
     ariaInvalid: React.AriaAttributes['aria-invalid'],
 ): boolean => ariaInvalid === true || ariaInvalid === 'true';
+
+const outlinedInputClassName =
+    'h-12 w-full min-w-0 rounded-[var(--radius-md)] border border-input bg-background px-4 py-3 text-base text-foreground transition-[background-color,border-color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/25 focus-visible:border-foreground focus-visible:ring-2 focus-visible:ring-foreground/55';
 
 const Field = ({
     className,
@@ -86,11 +88,15 @@ const OutlinedInputField = ({
             >
                 {label}
             </label>
-            <Input
+            <input
                 {...props}
                 aria-describedby={describedBy || undefined}
                 aria-invalid={isInvalid || undefined}
-                className={cn(className, inputClassName)}
+                className={cn(
+                    outlinedInputClassName,
+                    className,
+                    inputClassName,
+                )}
                 data-slot="outlined-input-field"
                 id={inputId}
             />

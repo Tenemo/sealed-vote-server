@@ -1,6 +1,10 @@
 import { randomBytes } from 'node:crypto';
 
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import {
+    ERROR_MESSAGES,
+    type CreatePollResponse,
+    type PollResponse,
+} from '@sealed-vote/contracts';
 import {
     createPoll,
     deletePoll,
@@ -10,9 +14,6 @@ import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { buildServer } from '../buildServer';
-
-import { CreatePollResponse } from './create';
-import { PollResponse } from './fetch';
 
 const generateToken = (): string => randomBytes(32).toString('hex');
 

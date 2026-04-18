@@ -51,7 +51,7 @@ const schema = {
 };
 
 type CreatePollRequest = CreatePollRequestContract;
-export type CreatePollResponse = CreatePollResponseContract;
+type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
 const supportedProtocolVersion = 'v1' as const;
 const areStringArraysEqual = (

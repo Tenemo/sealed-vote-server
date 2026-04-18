@@ -241,6 +241,7 @@ export const configureLocalE2EEnv = ({
     useBuiltServers?: boolean;
 } = {}): void => {
     process.env.NODE_ENV = 'test';
+    process.env.PLAYWRIGHT_CONFIG_PROFILE = 'local';
 
     if (turbo) {
         process.env.PLAYWRIGHT_LOCAL_TURBO = 'true';
@@ -294,7 +295,7 @@ export const runLocalE2E = ({
         'playwright',
         'test',
         '--config',
-        'tests/config/playwright.local.config.mts',
+        'tests/config/playwright.config.mts',
         ...forwardedCliArgs,
     ]);
 };

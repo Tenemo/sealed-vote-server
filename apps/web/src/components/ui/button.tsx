@@ -13,15 +13,12 @@ const buttonVariants = cva(
                     'bg-primary text-primary-foreground hover:bg-primary/85 disabled:bg-white/18 disabled:text-foreground/82 disabled:opacity-100',
                 outline:
                     'border-border bg-background text-foreground hover:bg-accent hover:text-foreground disabled:border-border/45 disabled:bg-black/20 disabled:text-muted-foreground disabled:opacity-100',
-                secondary:
-                    'border-border bg-card text-foreground hover:bg-accent hover:text-foreground disabled:border-border/45 disabled:bg-black/20 disabled:text-muted-foreground disabled:opacity-100',
                 ghost: 'border-transparent bg-transparent text-foreground hover:bg-accent hover:text-foreground disabled:text-muted-foreground',
             },
             size: {
                 default: 'h-10 px-4 py-2',
                 lg: 'h-12 gap-2.5 px-5 py-2.5 text-base',
                 'icon-sm': 'size-9',
-                'icon-lg': 'size-10',
             },
         },
         defaultVariants: {

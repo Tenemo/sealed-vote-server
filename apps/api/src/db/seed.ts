@@ -27,12 +27,7 @@ type SeedManifest = {
 
 const openSampleName = 'Seed open sample';
 const securingSampleName = 'Seed securing sample';
-const experimentalSampleName = 'Seed experimental sample';
-const seedPollNames = [
-    openSampleName,
-    securingSampleName,
-    experimentalSampleName,
-];
+const seedPollNames = [openSampleName, securingSampleName];
 
 const toManifestPoll = (
     name: string,
@@ -79,21 +74,6 @@ const buildSecuringSample = async (
     return builder.getContext();
 };
 
-const buildExperimentalSample = async (
-    fastify: FastifyInstance,
-): Promise<TestPollContext> => {
-    const builder = new TestPollBuilder(fastify)
-        .withPollName(experimentalSampleName)
-        .withChoices(['Red', 'Green', 'Blue', 'Yellow'])
-        .withVoters(['Ada', 'Grace', 'Linus', 'Ken']);
-
-    await builder.create();
-    await builder.registerVoters();
-    await builder.close();
-
-    return builder.getContext();
-};
-
 export const seedDatabase = async (
     fastify: FastifyInstance,
 ): Promise<SeedManifest> => {
@@ -103,18 +83,12 @@ export const seedDatabase = async (
 
     const openSample = await buildOpenSample(fastify);
     const securingSample = await buildSecuringSample(fastify);
-    const experimentalSample = await buildExperimentalSample(fastify);
 
     return {
         generatedAt: new Date().toISOString(),
         polls: [
             toManifestPoll(openSampleName, 'open', openSample),
             toManifestPoll(securingSampleName, 'securing', securingSample),
-            toManifestPoll(
-                experimentalSampleName,
-                'securing',
-                experimentalSample,
-            ),
         ],
     };
 };
