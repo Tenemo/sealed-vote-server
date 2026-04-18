@@ -127,12 +127,14 @@ export const runProductionIsolatedInvocations = async ({
     logRetry = () => undefined,
     forwardedCliArgs,
     listedFiles,
+    maxRecoverableRetries = 1,
     onInvocationStart = () => undefined,
     runInvocation,
 }: {
     logRetry?: (listedFile: string) => void;
     forwardedCliArgs: string[];
     listedFiles: readonly string[];
+    maxRecoverableRetries?: number;
     onInvocationStart?: (listedFile: string) => void;
     runInvocation: (invocationArgs: string[]) => Promise<{
         exitCode: number;
@@ -144,6 +146,7 @@ export const runProductionIsolatedInvocations = async ({
 }> => {
     const failedFiles: string[] = [];
     let exitCode = 0;
+    let recoverableRetryCount = 0;
 
     for (const listedFile of listedFiles) {
         onInvocationStart(listedFile);
@@ -157,12 +160,17 @@ export const runProductionIsolatedInvocations = async ({
         // the paired readiness spec before any app page loaded, while curl in
         // the same container still reached the site. That failure survived the
         // page-level recovery inside a single Playwright process, so recover by
-        // restarting the isolated invocation once in a fresh process.
+        // restarting an isolated invocation in a fresh process. Keep the retry
+        // budget global for the whole browser job so repeated startup retries
+        // cannot consume the GitHub Actions timeout and downgrade a real test
+        // failure into a cancelled job.
         if (
+            recoverableRetryCount < maxRecoverableRetries &&
             invocationResult.exitCode !== 0 &&
             isRecoverableProductionReadinessFailure(invocationResult.output)
         ) {
             logRetry(listedFile);
+            recoverableRetryCount += 1;
             invocationResult = await runInvocation(invocationArgs);
         }
 

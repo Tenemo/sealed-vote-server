@@ -313,3 +313,84 @@ test('runProductionIsolatedInvocations still fails when the readiness-timeout re
         failedFiles: ['recovery-network-cuts.spec.ts'],
     });
 });
+
+test('runProductionIsolatedInvocations caps recoverable readiness retries across the whole browser run', async () => {
+    const retriedFiles: string[] = [];
+    const invocationArgs: string[][] = [];
+    const invocationAttempts = new Map<string, number>();
+
+    const result = await runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'mobile-firefox-android'],
+        listedFiles: ['duplicate-title-polls.spec.ts', 'mobile-layout.spec.ts'],
+        logRetry: (listedFile) => {
+            retriedFiles.push(listedFile);
+        },
+        runInvocation: async (args) => {
+            invocationArgs.push(args);
+            const targetFile = args.at(1) ?? args[0];
+            const attempt = (invocationAttempts.get(targetFile) ?? 0) + 1;
+
+            invocationAttempts.set(targetFile, attempt);
+
+            if (
+                targetFile === 'duplicate-title-polls.spec.ts' &&
+                attempt === 1
+            ) {
+                return {
+                    exitCode: 1,
+                    output: `  1) [mobile-firefox-android] â€º tests/e2e/00-production-browser-readiness.spec.ts:46:5 â€º browser can commit the homepage and a real production vote page
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+                };
+            }
+
+            if (targetFile === 'mobile-layout.spec.ts') {
+                return {
+                    exitCode: 1,
+                    output: `  1) [mobile-firefox-android] â€º tests/e2e/00-production-browser-readiness.spec.ts:46:5 â€º browser can commit the homepage and a real production vote page
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+                };
+            }
+
+            return {
+                exitCode: 0,
+                output: '',
+            };
+        },
+    });
+
+    assert.deepEqual(retriedFiles, ['duplicate-title-polls.spec.ts']);
+    assert.deepEqual(invocationArgs, [
+        [
+            '00-production-browser-readiness.spec.ts',
+            'duplicate-title-polls.spec.ts',
+            '--project',
+            'mobile-firefox-android',
+            '--workers',
+            '1',
+        ],
+        [
+            '00-production-browser-readiness.spec.ts',
+            'duplicate-title-polls.spec.ts',
+            '--project',
+            'mobile-firefox-android',
+            '--workers',
+            '1',
+        ],
+        [
+            '00-production-browser-readiness.spec.ts',
+            'mobile-layout.spec.ts',
+            '--project',
+            'mobile-firefox-android',
+            '--workers',
+            '1',
+        ],
+    ]);
+    assert.deepEqual(result, {
+        exitCode: 1,
+        failedFiles: ['mobile-layout.spec.ts'],
+    });
+});
