@@ -168,9 +168,11 @@ const readSubmittedParticipantCount = async (
     return parseSubmittedParticipantCount(metricText);
 };
 
+type PollPageReloader = (page: Page) => Promise<Page>;
+
 export const syncPollPageForSharedState = async (
     page: Page,
-    reloadPage: (page: Page) => Promise<Page> = reloadInteractablePage,
+    reloadPage: PollPageReloader = reloadInteractablePage,
 ): Promise<Page> => {
     // Only live remote runs need a hard reload here. On local CI origins that
     // reload aborts in-flight poll fetches on mobile Firefox and can surface
@@ -184,12 +186,14 @@ export const syncPollPageForSharedState = async (
     return await reloadPage(page);
 };
 
-const waitForPollPageState = async ({
+export const waitForPollPageState = async ({
     page,
+    reloadPage = reloadInteractablePage,
     timeout,
     waitForState,
 }: {
     page: Page;
+    reloadPage?: PollPageReloader;
     timeout: number;
     waitForState: (page: Page, timeout: number) => Promise<void>;
 }): Promise<Page> => {
@@ -210,7 +214,7 @@ const waitForPollPageState = async ({
         }
     }
 
-    page = await reloadInteractablePage(page);
+    page = await reloadPage(page);
     await page.bringToFront();
     await waitForState(page, timeout);
     return page;

@@ -8,6 +8,7 @@ import {
     parseSubmittedParticipantCount,
     syncPollPagesForSharedState,
     syncPollPageForSharedState,
+    waitForPollPageState,
 } from './pollFlow.ts';
 
 test('createExpectedVerifiedResults derives displayed tallies in score order', () => {
@@ -177,6 +178,84 @@ test('syncPollPagesForSharedState reloads only live remote pages and reapplies a
         'front-two',
     ]);
     assert.deepEqual(syncedPages, [reloadedPageOne, pageTwo]);
+});
+
+test('waitForPollPageState retries with a hard reload for live remote pages', async () => {
+    const calls: string[] = [];
+    const pageDouble = {
+        bringToFront: async () => {
+            calls.push('front-original');
+        },
+        url: () => 'https://sealed.vote/votes/example--1234',
+    };
+    const reloadedPage = {
+        bringToFront: async () => {
+            calls.push('front-reloaded');
+        },
+        url: () => 'https://sealed.vote/votes/example--1234',
+    };
+
+    const resolvedPage = await waitForPollPageState({
+        page: pageDouble as never,
+        reloadPage: async (page) => {
+            assert.equal(page, pageDouble);
+            calls.push('reload');
+            return reloadedPage as never;
+        },
+        timeout: 60_000,
+        waitForState: async (page, timeout) => {
+            if (page === pageDouble) {
+                calls.push(`wait-original-${timeout}`);
+                throw new Error('stale shared state');
+            }
+
+            assert.equal(page, reloadedPage);
+            calls.push(`wait-reloaded-${timeout}`);
+        },
+    });
+
+    assert.deepEqual(calls, [
+        'front-original',
+        'wait-original-30000',
+        'reload',
+        'front-reloaded',
+        'wait-reloaded-60000',
+    ]);
+    assert.equal(resolvedPage, reloadedPage);
+});
+
+test('waitForPollPageState rethrows the original failure on local loopback pages', async () => {
+    const calls: string[] = [];
+    const pageDouble = {
+        bringToFront: async () => {
+            calls.push('front');
+        },
+        url: () => 'http://127.0.0.1:3000/votes/example--1234',
+    };
+    const expectedError = new Error('missing ceremony metric');
+
+    await assert.rejects(
+        async () =>
+            await waitForPollPageState({
+                page: pageDouble as never,
+                reloadPage: async () => {
+                    calls.push('reload');
+                    throw new Error('local loopback pages should not reload');
+                },
+                timeout: 60_000,
+                waitForState: async (page, timeout) => {
+                    assert.equal(page, pageDouble);
+                    calls.push(`wait-${timeout}`);
+                    throw expectedError;
+                },
+            }),
+        (error) => {
+            assert.equal(error, expectedError);
+            return true;
+        },
+    );
+
+    assert.deepEqual(calls, ['front', 'wait-60000']);
 });
 
 test('bringPollPagesToFront focuses each page and reapplies attachers', async () => {

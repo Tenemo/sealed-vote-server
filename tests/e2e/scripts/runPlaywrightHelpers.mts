@@ -1,5 +1,9 @@
 const listedSpecPattern =
     /^\s*\[[^\]]+\]\s+\u203a\s+(.+):\d+:\d+\s+\u203a\s+/u;
+const productionBrowserReadinessListedFile =
+    '00-production-browser-readiness.spec.ts';
+const productionReadinessTestTitle =
+    'browser can commit the homepage and a real production vote page';
 const productionNavigationStallPattern =
     /Error:\s+page\.goto: Timeout \d+ms exceeded\./u;
 const playwrightOptionsWithSeparateValues = new Set([
@@ -87,6 +91,8 @@ export const resolveProductionIsolatedInvocationArgs = (
 ];
 
 export const isProductionNavigationStall = (output: string): boolean =>
+    output.includes(productionBrowserReadinessListedFile) &&
+    output.includes(productionReadinessTestTitle) &&
     productionNavigationStallPattern.test(output);
 
 export const runProductionIsolatedInvocations = async ({
@@ -131,11 +137,10 @@ export const runProductionIsolatedInvocations = async ({
             exitCode = invocationResult.exitCode;
         }
 
-        // Once a production goto stalls at the edge (same signature as
-        // readiness hitting the 45s timeout with no response bytes), every
-        // remaining spec in this project will fail the same way. Stop now so
-        // the job surfaces a real failure instead of burning the GitHub
-        // Actions timeout and getting cancelled.
+        // Once the standalone production readiness spec hits the known 45s
+        // goto-timeout stall, every remaining spec in this project is likely
+        // to fail the same way. Stop now so the job surfaces that shared
+        // infrastructure failure instead of burning the GitHub Actions timeout.
         if (isProductionNavigationStall(invocationResult.output)) {
             stalledFile = listedFile;
             onNavigationStall(listedFile);

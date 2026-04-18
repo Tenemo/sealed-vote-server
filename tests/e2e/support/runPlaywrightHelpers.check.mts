@@ -141,6 +141,19 @@ F
     );
 });
 
+test('isProductionNavigationStall ignores goto timeouts outside the readiness spec', () => {
+    assert.equal(
+        isProductionNavigationStall(`Running 1 test using 1 worker
+F
+
+  1) [firefox-desktop] â€º tests/e2e/share-link.spec.ts:12:5 â€º copies the share link
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`),
+        false,
+    );
+});
+
 test('runProductionIsolatedInvocations runs each listed file alone and continues after unrelated failures', async () => {
     const startedFiles: string[] = [];
     const invocationArgs: string[][] = [];
@@ -255,7 +268,7 @@ test('runProductionIsolatedInvocations stops after a navigation stall and skips 
     });
 });
 
-test('runProductionIsolatedInvocations stops at the first navigation stall even after earlier non-stall failures', async () => {
+test('runProductionIsolatedInvocations keeps going after a generic goto timeout in a non-readiness spec', async () => {
     const startedFiles: string[] = [];
     const stalledFiles: string[] = [];
 
@@ -302,10 +315,10 @@ test('runProductionIsolatedInvocations stops at the first navigation stall even 
         'ceremony-persistence.spec.ts',
         'share-link.spec.ts',
     ]);
-    assert.deepEqual(stalledFiles, ['share-link.spec.ts']);
+    assert.deepEqual(stalledFiles, []);
     assert.deepEqual(result, {
         exitCode: 1,
         failedFiles: ['ceremony-persistence.spec.ts', 'share-link.spec.ts'],
-        stalledFile: 'share-link.spec.ts',
+        stalledFile: null,
     });
 });
