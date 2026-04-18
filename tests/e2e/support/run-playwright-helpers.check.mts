@@ -120,7 +120,7 @@ test('isProductionNavigationStall matches the page.goto timeout signature', () =
         isProductionNavigationStall(`Running 1 test using 1 worker
 F
 
-  1) [mobile-firefox-android] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production poll page
+  1) [mobile-firefox-android] ${listedSpecSeparator} tests/e2e/00-production-browser-readiness.spec.ts:46:5 ${listedSpecSeparator} browser can commit the homepage and a real production poll page
 
     Error: page.goto: Timeout 45000ms exceeded.
 `),
@@ -133,7 +133,7 @@ test('isProductionNavigationStall ignores output without a goto timeout', () => 
         isProductionNavigationStall(`Running 1 test using 1 worker
 F
 
-  1) [firefox-desktop] › tests/e2e/share-link.spec.ts:12:5 › copies the share link
+  1) [firefox-desktop] ${listedSpecSeparator} tests/e2e/share-link.spec.ts:12:5 ${listedSpecSeparator} copies the share link
 
     Error: expect(received).toBe(expected)
 `),
@@ -146,7 +146,7 @@ test('isProductionNavigationStall ignores goto timeouts outside the readiness sp
         isProductionNavigationStall(`Running 1 test using 1 worker
 F
 
-  1) [firefox-desktop] â€º tests/e2e/share-link.spec.ts:12:5 â€º copies the share link
+  1) [firefox-desktop] ${listedSpecSeparator} tests/e2e/share-link.spec.ts:12:5 ${listedSpecSeparator} copies the share link
 
     Error: page.goto: Timeout 45000ms exceeded.
 `),
@@ -241,7 +241,7 @@ test('runProductionIsolatedInvocations stops after a navigation stall and skips 
             if (args.includes('00-production-browser-readiness.spec.ts')) {
                 return {
                     exitCode: 1,
-                    output: `  1) [mobile-firefox-android] › tests/e2e/00-production-browser-readiness.spec.ts:46:5 › browser can commit the homepage and a real production poll page
+                    output: `  1) [mobile-firefox-android] ${listedSpecSeparator} tests/e2e/00-production-browser-readiness.spec.ts:46:5 ${listedSpecSeparator} browser can commit the homepage and a real production poll page
 
     Error: page.goto: Timeout 45000ms exceeded.
 `,
@@ -296,7 +296,7 @@ test('runProductionIsolatedInvocations keeps going after a generic goto timeout 
             if (args.includes('share-link.spec.ts')) {
                 return {
                     exitCode: 1,
-                    output: `  1) [mobile-firefox-android] › tests/e2e/share-link.spec.ts:12:5 › copies the share link
+                    output: `  1) [mobile-firefox-android] ${listedSpecSeparator} tests/e2e/share-link.spec.ts:12:5 ${listedSpecSeparator} copies the share link
 
     Error: page.goto: Timeout 45000ms exceeded.
 `,
