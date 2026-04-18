@@ -312,6 +312,14 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
         );
     }
 
+    if (!process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS?.trim()) {
+        // Live production occasionally serves a page that eventually becomes
+        // interactable after Playwright times out the initial goto. Production
+        // e2e should enable the navigation helper's recovery path by default,
+        // while still allowing an explicit env override for debugging.
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+    }
+
     // Production e2e intentionally runs the full browser suite against the live
     // production URL. Manual production dispatches from test-fix branches are
     // also intentional, because production-only navigation behavior is part of
