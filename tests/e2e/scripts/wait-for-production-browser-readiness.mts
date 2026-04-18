@@ -336,11 +336,13 @@ const runReadinessCheck = async (
 
         childProcess.on('error', (error: Error) => {
             processError = error as ReadinessProcessError;
+            const errorText = `${error.stack ?? error.message}\n`;
             capturedOutput = appendOutputTail(
                 capturedOutput,
-                `${error.stack ?? error.message}\n`,
+                errorText,
                 readinessOutputTailMaxLength,
             );
+            process.stderr.write(errorText);
             settle(1);
         });
 

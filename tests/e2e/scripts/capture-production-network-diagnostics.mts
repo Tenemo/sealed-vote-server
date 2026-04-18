@@ -471,16 +471,18 @@ const run = async (): Promise<void> => {
         publicIpResults,
     );
     await writeJsonFile(path.join(options.outputDir, 'dns.json'), dnsResults);
+    const environmentSummary = captureEnvironmentSummary();
+
     await writeJsonFile(
         path.join(options.outputDir, 'env.json'),
-        captureEnvironmentSummary(),
+        environmentSummary,
     );
 
     await writeJsonFile(path.join(options.outputDir, 'summary.json'), {
         apiBaseUrl: options.apiBaseUrl,
         capturedAt: new Date().toISOString(),
         dns: dnsResults,
-        env: captureEnvironmentSummary(),
+        env: environmentSummary,
         probes: probeResults.map((result) => ({
             attempts: result.attempts.map((attempt) => ({
                 durationMs: attempt.durationMs,

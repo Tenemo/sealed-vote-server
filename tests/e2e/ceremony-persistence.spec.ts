@@ -12,7 +12,6 @@ import {
     waitForBlockingParticipants,
     waitForCeremonyMetric,
     waitForVerifiedResults,
-    syncPollPagesForSharedState,
     type CreatedPoll,
 } from './support/pollFlow';
 import {
@@ -34,12 +33,30 @@ import {
 const continueWithoutMissingParticipants = async (
     page: Page,
 ): Promise<Page> => {
-    page = await reloadPollPage(page);
+    const waitForContinueButton = async (
+        candidatePage: Page,
+        timeout: number,
+    ): Promise<void> => {
+        await expect(
+            candidatePage.getByRole('button', {
+                name: 'Continue without missing participants',
+            }),
+        ).toBeVisible({ timeout });
+    };
+
+    await page.bringToFront();
+
+    try {
+        await waitForContinueButton(page, 30_000);
+    } catch {
+        page = await reloadPollPage(page);
+        await waitForContinueButton(page, 60_000);
+    }
+
     const continueButton = page.getByRole('button', {
         name: 'Continue without missing participants',
     });
 
-    await expect(continueButton).toBeVisible({ timeout: 60_000 });
     const restartResponsePromise = page.waitForResponse(
         (response) =>
             response.request().method() === 'POST' &&
@@ -186,7 +203,7 @@ test('automatically resumes a stored vote after a participant closes the browser
         participantOne.page = attachParticipantOneRestoredTracking(
             await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
-        [participantOne.page] = await syncPollPagesForSharedState({
+        [participantOne.page] = await bringPollPagesToFront({
             attachPages: [attachParticipantOneRestoredTracking],
             pages: [participantOne.page],
         });
@@ -411,7 +428,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         participantOne.page = attachParticipantOneRestoredTracking(
             await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
-        [participantOne.page] = await syncPollPagesForSharedState({
+        [participantOne.page] = await bringPollPagesToFront({
             attachPages: [
                 attachParticipantOneRestoredTracking,
             ],

@@ -18,6 +18,7 @@ const postClosePhaseLabels = [
 ] as const;
 const voteStoredNoticeText =
     'Vote stored on this device. You can close the app and come back after voting closes.';
+const sharedStateSoftSyncTimeoutMs = 30_000;
 
 const escapeRegExp = (value: string): string =>
     value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -181,6 +182,37 @@ export const syncPollPageForSharedState = async (
     }
 
     return await reloadPage(page);
+};
+
+const waitForPollPageState = async ({
+    page,
+    timeout,
+    waitForState,
+}: {
+    page: Page;
+    timeout: number;
+    waitForState: (page: Page, timeout: number) => Promise<void>;
+}): Promise<Page> => {
+    await page.bringToFront();
+    const shouldHardReload = shouldHardResyncPollPage(page);
+
+    try {
+        await waitForState(
+            page,
+            shouldHardReload
+                ? Math.min(timeout, sharedStateSoftSyncTimeoutMs)
+                : timeout,
+        );
+        return page;
+    } catch (error) {
+        if (!shouldHardReload) {
+            throw error;
+        }
+    }
+
+    page = await reloadInteractablePage(page);
+    await waitForState(page, timeout);
+    return page;
 };
 
 export const syncPollPagesForSharedState = async ({
@@ -431,13 +463,22 @@ export const registerParticipant = async (
 };
 
 export const closeVoting = async (page: Page): Promise<Page> => {
-    page = await syncPollPageForSharedState(page);
+    page = await waitForPollPageState({
+        page,
+        timeout: 30_000,
+        waitForState: async (candidatePage, timeout) => {
+            const closeButton = candidatePage.getByRole('button', {
+                name: 'Close voting',
+            });
+
+            await expect(closeButton).toBeVisible({ timeout });
+            await expect(closeButton).toBeEnabled({ timeout });
+        },
+    });
     const closeButton = page.getByRole('button', {
         name: 'Close voting',
     });
 
-    await expect(closeButton).toBeVisible({ timeout: 30_000 });
-    await expect(closeButton).toBeEnabled({ timeout: 30_000 });
     await closeButton.click();
     await waitForAnyVisibleText({
         page,
@@ -553,13 +594,18 @@ export const waitForCeremonyMetric = async ({
     page: Page;
     value: string;
 }): Promise<Page> => {
-    page = await syncPollPageForSharedState(page);
-    await waitForCeremonyMetricValue({
-        label,
+    return await waitForPollPageState({
         page,
-        value,
+        timeout: 60_000,
+        waitForState: async (candidatePage, timeout) => {
+            await waitForCeremonyMetricValue({
+                label,
+                page: candidatePage,
+                timeout,
+                value,
+            });
+        },
     });
-    return page;
 };
 
 export const waitForBlockingParticipants = async ({
@@ -569,13 +615,17 @@ export const waitForBlockingParticipants = async ({
     page: Page;
     participantNames: readonly string[];
 }): Promise<Page> => {
-    page = await syncPollPageForSharedState(page);
-    await expect(
-        page.getByText(
-            `Ceremony progress is waiting on ${participantNames.join(', ')}.`,
-        ),
-    ).toBeVisible({ timeout: 60_000 });
-    return page;
+    return await waitForPollPageState({
+        page,
+        timeout: 60_000,
+        waitForState: async (candidatePage, timeout) => {
+            await expect(
+                candidatePage.getByText(
+                    `Ceremony progress is waiting on ${participantNames.join(', ')}.`,
+                ),
+            ).toBeVisible({ timeout });
+        },
+    });
 };
 
 export const expectParticipantsVisible = async (
