@@ -40,6 +40,10 @@
         "db:setup": "pnpm --filter @sealed-vote/api db:setup",
         "prepare": "husky"
     },
+    "dependencies": {
+        "@resvg/resvg-js": "^2.6.2",
+        "tslib": "^2.8.1"
+    },
     "devDependencies": {
         "@axe-core/playwright": "^4.11.1",
         "@eslint/compat": "^2.0.5",
@@ -70,9 +74,5 @@
             "multiline-ts",
             "unrs-resolver"
         ]
-    },
-    "dependencies": {
-        "@resvg/resvg-js": "^2.6.2",
-        "tslib": "^2.8.1"
     }
 }

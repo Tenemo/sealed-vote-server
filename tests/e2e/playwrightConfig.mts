@@ -34,6 +34,20 @@ const webkitUnsupportedModernCryptoSpecs =
               '**/voting-flow.spec.ts',
           ];
 
+// The mobile-firefox-android project exists to cover mobile UA, viewport, and
+// touch behavior. The specs below exercise browser-agnostic application logic
+// that firefox-desktop already covers, and each one issues many production
+// page.goto / reload calls. Running them on mobile-firefox-android compounds
+// edge-stall risk against the live site without adding mobile-specific signal.
+const mobileFirefoxAndroidNonMobileSpecs = [
+    '**/ceremony-persistence.spec.ts',
+    '**/duplicate-title-polls.spec.ts',
+    '**/duplicate-voter-name.spec.ts',
+    '**/multi-participant-counting.spec.ts',
+    '**/refresh-resume.spec.ts',
+    '**/voting-flow.spec.ts',
+];
+
 const isCi = Boolean(process.env.CI);
 const isLocalTurbo = process.env.PLAYWRIGHT_LOCAL_TURBO === 'true';
 const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
@@ -166,6 +180,7 @@ const projects: Project[] = [
     },
     {
         name: 'mobile-firefox-android',
+        testIgnore: mobileFirefoxAndroidNonMobileSpecs,
         use: {
             browserName: 'firefox',
             ...mobileFirefoxAndroidContextOptions,
