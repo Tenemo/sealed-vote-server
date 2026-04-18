@@ -251,3 +251,32 @@ test('classifyReadinessProcessFailure retries non-fatal capture buffer overflows
         },
     );
 });
+
+test('waitForProductionBrowserReadiness awaits asynchronous readiness checks', async () => {
+    const checksStarted: number[] = [];
+    let nowMs = 50_000;
+
+    await waitForProductionBrowserReadiness(
+        {
+            forwardedCliArgs: ['--project', 'chromium-desktop'],
+            intervalMs: 1_000,
+            requiredStableChecks: 2,
+            timeoutMs: 10_000,
+        },
+        {
+            now: () => nowMs,
+            runReadinessCheck: async (_forwardedCliArgs, timeoutMs) => {
+                checksStarted.push(timeoutMs);
+                await Promise.resolve();
+                return {
+                    kind: 'success',
+                };
+            },
+            sleep: async (delayMs) => {
+                nowMs += delayMs;
+            },
+        },
+    );
+
+    assert.deepEqual(checksStarted, [10_000, 9_000]);
+});

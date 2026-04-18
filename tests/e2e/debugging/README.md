@@ -22,6 +22,12 @@ Run the production-targeted browser flow in the debug container:
 pnpm e2e:debug:production -- tests/e2e/ceremony-persistence.spec.ts --project firefox-desktop
 ```
 
+Capture production edge diagnostics without launching Playwright:
+
+```bash
+pnpm e2e:production:diagnostics -- --output-dir production-diagnostics
+```
+
 Repeat a narrowed production repro:
 
 ```bash
@@ -54,6 +60,14 @@ The compose setup defaults to:
 - `PLAYWRIGHT_NAVIGATION_TIMEOUT_MS=45000`
 
 Override them from the host shell if needed before running the debug command.
+
+The diagnostics script records:
+
+- repeated GET and OPTIONS probes for `sealed.vote` and `api.sealed.vote`
+- response headers and truncated response bodies
+- DNS lookup results for the production hosts
+- best-effort public IP discovery from common external echo services
+- GitHub Actions and runner environment metadata when invoked in CI
 
 ## Artifacts
 

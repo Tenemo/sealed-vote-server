@@ -1,6 +1,8 @@
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { appendOutputTail } from './shared.mts';
 
 type WaitOptions = {
     forwardedCliArgs: string[];
@@ -15,14 +17,14 @@ type WaitDependencies = {
     runReadinessCheck?: (
         forwardedCliArgs: string[],
         timeoutMs: number,
-    ) => ReadinessCheckResult;
+    ) => ReadinessCheckResult | Promise<ReadinessCheckResult>;
     sleep?: (delayMs: number) => Promise<void>;
 };
 
 const defaultIntervalMs = 15_000;
 const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 20 * 60 * 1000;
-const readinessCaptureMaxBufferBytes = 16 * 1024 * 1024;
+const readinessOutputTailMaxLength = 16 * 1024 * 1024;
 const firefoxHomeOwnershipFailureMessage =
     'Firefox cannot launch in the Playwright container because HOME is not owned by the current user. Set HOME=/root or run the container as a non-root user.';
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -156,17 +158,6 @@ const sleep = async (delayMs: number): Promise<void> => {
     });
 };
 
-const writeCapturedOutput = (
-    output: string | null | undefined,
-    stream: NodeJS.WriteStream,
-): void => {
-    if (!output) {
-        return;
-    }
-
-    stream.write(output);
-};
-
 export const detectFatalReadinessFailureMessage = (
     output: string,
 ): string | null => {
@@ -256,48 +247,117 @@ const resolvePnpmInvocation = (): {
     };
 };
 
-const runReadinessCheck = (
+const runReadinessCheck = async (
     forwardedCliArgs: string[],
     timeoutMs: number,
-): ReadinessCheckResult => {
+): Promise<ReadinessCheckResult> => {
     const pnpmInvocation = resolvePnpmInvocation();
+    const result = await new Promise<{
+        error: ReadinessProcessError | undefined;
+        output: string;
+        status: number;
+    }>((resolve) => {
+        const childProcess = spawn(
+            pnpmInvocation.command,
+            [
+                ...pnpmInvocation.args,
+                'exec',
+                'playwright',
+                'test',
+                '--config',
+                'tests/config/playwright.production.config.mts',
+                'tests/e2e/00-production-browser-readiness.spec.ts',
+                '--workers',
+                '1',
+                ...forwardedCliArgs,
+            ],
+            {
+                cwd: repoRoot,
+                env: process.env,
+                stdio: ['ignore', 'pipe', 'pipe'],
+            },
+        );
+        let capturedOutput = '';
+        let processError: ReadinessProcessError | undefined;
+        let settled = false;
+        let killTimer: NodeJS.Timeout | undefined;
 
-    const result = spawnSync(
-        pnpmInvocation.command,
-        [
-            ...pnpmInvocation.args,
-            'exec',
-            'playwright',
-            'test',
-            '--config',
-            'tests/config/playwright.production.config.mts',
-            'tests/e2e/00-production-browser-readiness.spec.ts',
-            '--workers',
-            '1',
-            ...forwardedCliArgs,
-        ],
-        {
-            cwd: repoRoot,
-            encoding: 'utf8',
-            env: process.env,
-            // Playwright failures can emit enough trace and reporter output to
-            // overflow Node's default sync capture buffer before we can inspect
-            // the real launch error and classify it correctly.
-            maxBuffer: readinessCaptureMaxBufferBytes,
-            stdio: 'pipe',
-            timeout: timeoutMs,
-        },
-    );
+        const settle = (status: number): void => {
+            if (settled) {
+                return;
+            }
 
-    writeCapturedOutput(result.stdout, process.stdout);
-    writeCapturedOutput(result.stderr, process.stderr);
+            settled = true;
 
-    const capturedOutput = [result.stdout, result.stderr]
-        .filter(Boolean)
-        .join('\n');
+            if (killTimer) {
+                clearTimeout(killTimer);
+            }
+
+            resolve({
+                error: processError,
+                output: capturedOutput,
+                status,
+            });
+        };
+
+        const observeChunk = (
+            chunk: Buffer | string,
+            stream: NodeJS.WriteStream,
+        ): void => {
+            const text = chunk.toString();
+            capturedOutput = appendOutputTail(
+                capturedOutput,
+                text,
+                readinessOutputTailMaxLength,
+            );
+            stream.write(text);
+        };
+
+        childProcess.stdout?.on('data', (chunk: Buffer | string) => {
+            observeChunk(chunk, process.stdout);
+        });
+
+        childProcess.stderr?.on('data', (chunk: Buffer | string) => {
+            observeChunk(chunk, process.stderr);
+        });
+
+        childProcess.on('error', (error: Error) => {
+            processError = error as ReadinessProcessError;
+            capturedOutput = appendOutputTail(
+                capturedOutput,
+                `${error.stack ?? error.message}\n`,
+                readinessOutputTailMaxLength,
+            );
+            settle(1);
+        });
+
+        childProcess.on('close', (code: number | null) => {
+            settle(code ?? 1);
+        });
+
+        killTimer = setTimeout(() => {
+            const timeoutError = Object.assign(
+                new Error(
+                    `Production browser readiness check timed out after ${timeoutMs}ms.`,
+                ),
+                {
+                    code: 'ETIMEDOUT',
+                },
+            ) as ReadinessProcessError;
+
+            processError = timeoutError;
+            childProcess.kill('SIGTERM');
+
+            setTimeout(() => {
+                if (!settled) {
+                    childProcess.kill('SIGKILL');
+                }
+            }, 5_000).unref();
+        }, timeoutMs);
+    });
     const processFailure = classifyReadinessProcessFailure({
-        error: result.error as ReadinessProcessError | undefined,
-        output: capturedOutput,
+        error: result.error,
+        output: result.output,
     });
 
     if (processFailure) {
@@ -311,7 +371,7 @@ const runReadinessCheck = (
     }
 
     const fatalFailureMessage = detectFatalReadinessFailureMessage(
-        capturedOutput,
+        result.output,
     );
 
     if (fatalFailureMessage) {
@@ -347,7 +407,7 @@ export const waitForProductionBrowserReadiness = async (
             break;
         }
 
-        const checkResult = runCheck(
+        const checkResult = await runCheck(
             options.forwardedCliArgs,
             remainingCheckBudgetMs,
         );

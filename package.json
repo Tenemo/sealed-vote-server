@@ -24,6 +24,7 @@
         "e2e:ci:test": "node --experimental-strip-types tests/e2e/scripts/run-e2e.mts ci",
         "e2e:ci:serve:web": "node --experimental-strip-types tests/e2e/scripts/run-e2e-ci-web.mts",
         "e2e:production:test": "node --experimental-strip-types tests/e2e/scripts/run-playwright.mts production",
+        "e2e:production:diagnostics": "node --experimental-strip-types tests/e2e/scripts/capture-production-network-diagnostics.mts",
         "e2e:debug:production": "node --experimental-strip-types tests/e2e/debugging/run-container-debug.mts production",
         "e2e:debug:shell": "node --experimental-strip-types tests/e2e/debugging/run-container-debug.mts shell",
         "e2e:debug:command": "node --experimental-strip-types tests/e2e/debugging/run-container-debug.mts command",
