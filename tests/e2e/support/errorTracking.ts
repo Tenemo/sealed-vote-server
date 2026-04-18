@@ -182,74 +182,67 @@ const formatConsoleError = ({
     return `${details}: ${message.text()}`;
 };
 
-const extractResponseBodySummary = (bodyText: string): string | null => {
-    const normalizedBodyText = normalizeTrackedText(bodyText);
-
-    if (!normalizedBodyText) {
-        return null;
-    }
-
-    let parsedBody:
-        | {
-              error?: unknown;
-              message?: unknown;
-          }
-        | undefined;
-
-    try {
-        parsedBody = JSON.parse(bodyText) as {
-            error?: unknown;
-            message?: unknown;
-        };
-    } catch {
-        parsedBody = undefined;
-    }
-
-    if (typeof parsedBody?.message === 'string') {
-        return `message=${truncateTrackedText(
-            normalizeTrackedText(parsedBody.message),
-        )}`;
-    }
-
-    if (typeof parsedBody?.error === 'string') {
-        return `error=${truncateTrackedText(
-            normalizeTrackedText(parsedBody.error),
-        )}`;
-    }
-
-    return `body=${truncateTrackedText(normalizedBodyText)}`;
-};
-
-const extractResponseBodyMessage = (bodyText: string): string | null => {
+const parseTrackedResponseBody = (
+    bodyText: string,
+):
+    | {
+          error?: unknown;
+          message?: unknown;
+      }
+    | null => {
     if (!bodyText) {
         return null;
     }
 
-    let parsedBody:
-        | {
-              error?: unknown;
-              message?: unknown;
-          }
-        | undefined;
-
     try {
-        parsedBody = JSON.parse(bodyText) as {
+        return JSON.parse(bodyText) as {
             error?: unknown;
             message?: unknown;
         };
     } catch {
-        parsedBody = undefined;
+        return null;
+    }
+};
+
+const getTrackedResponseBodyDetails = (
+    bodyText: string,
+): {
+    bodyMessage: string | null;
+    bodySummary: string | null;
+} => {
+    const normalizedBodyText = normalizeTrackedText(bodyText);
+
+    if (!normalizedBodyText) {
+        return {
+            bodyMessage: null,
+            bodySummary: null,
+        };
     }
 
+    const parsedBody = parseTrackedResponseBody(bodyText);
+
     if (typeof parsedBody?.message === 'string') {
-        return normalizeTrackedText(parsedBody.message);
+        const bodyMessage = normalizeTrackedText(parsedBody.message);
+
+        return {
+            bodyMessage,
+            bodySummary: `message=${truncateTrackedText(bodyMessage)}`,
+        };
     }
 
     if (typeof parsedBody?.error === 'string') {
-        return normalizeTrackedText(parsedBody.error);
+        const bodyMessage = normalizeTrackedText(parsedBody.error);
+
+        return {
+            bodyMessage,
+            bodySummary: `error=${truncateTrackedText(bodyMessage)}`,
+        };
     }
 
-    return null;
+    return {
+        bodyMessage: null,
+        bodySummary: `body=${truncateTrackedText(normalizedBodyText)}`,
+    };
 };
 
 const isRecoverableBoardMessageResponse = ({
@@ -666,8 +659,8 @@ export const attachErrorTracking = (
                 bodyText = '';
             }
 
-            const bodyMessage = extractResponseBodyMessage(bodyText);
-            const bodySummary = extractResponseBodySummary(bodyText);
+            const { bodyMessage, bodySummary } =
+                getTrackedResponseBodyDetails(bodyText);
             const trackedResponseError = formatTrackedResponseError({
                 bodySummary,
                 label,

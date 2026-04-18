@@ -119,7 +119,7 @@ const parsePositiveInteger = (
 };
 
 const parseArgs = (args: string[]): DiagnosticsOptions => {
-    const pendingArgs = [...args];
+    const pendingArgs = args[0] === '--' ? [...args.slice(1)] : [...args];
     let rawApiBaseUrl: string | undefined;
     let rawIntervalMs: string | undefined;
     let rawOutputDir: string | undefined;
@@ -205,6 +205,30 @@ const headersToObject = (headers: Headers): Record<string, string> =>
     Object.fromEntries([...headers.entries()].sort(([left], [right]) =>
         left.localeCompare(right),
     ));
+
+const extractPublicIpValue = (responseText: string): string | null => {
+    const trimmedResponseText = responseText.trim();
+
+    if (!trimmedResponseText) {
+        return null;
+    }
+
+    try {
+        const parsedResponse = JSON.parse(trimmedResponseText) as {
+            ip?: unknown;
+        };
+
+        if (typeof parsedResponse.ip === 'string') {
+            const trimmedIp = parsedResponse.ip.trim();
+
+            return trimmedIp || null;
+        }
+    } catch {
+        return trimmedResponseText;
+    }
+
+    return trimmedResponseText;
+};
 
 const runProbeAttempt = async (
     probe: HttpProbe,
@@ -306,13 +330,13 @@ const capturePublicIp = async (
             redirect: 'follow',
             signal: AbortSignal.timeout(requestTimeoutMs),
         });
-        const responseText = (await response.text()).trim();
+        const responseText = await response.text();
 
         return {
             error: response.ok ? null : `HTTP ${response.status}`,
             service,
             statusCode: response.status,
-            value: responseText || null,
+            value: extractPublicIpValue(responseText),
         };
     } catch (error) {
         return {
