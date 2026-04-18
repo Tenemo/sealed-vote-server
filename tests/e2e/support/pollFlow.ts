@@ -211,6 +211,7 @@ const waitForPollPageState = async ({
     }
 
     page = await reloadInteractablePage(page);
+    await page.bringToFront();
     await waitForState(page, timeout);
     return page;
 };
