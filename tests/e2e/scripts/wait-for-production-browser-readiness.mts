@@ -47,9 +47,22 @@ type ReadinessProcessError = Error & {
     code?: string;
 };
 
+type TimedOutReadinessProcessState = {
+    childExitCode: number | null;
+    childSignalCode: NodeJS.Signals | null;
+    settled: boolean;
+};
+
 const fail = (message: string): never => {
     throw new Error(message);
 };
+
+export const shouldAbortTimedOutReadinessProcess = ({
+    childExitCode,
+    childSignalCode,
+    settled,
+}: TimedOutReadinessProcessState): boolean =>
+    !settled && childExitCode === null && childSignalCode === null;
 
 export const parsePositiveInteger = (
     rawValue: string | undefined,
@@ -336,6 +349,16 @@ const runReadinessCheck = async (
         });
 
         killTimer = setTimeout(() => {
+            if (
+                !shouldAbortTimedOutReadinessProcess({
+                    childExitCode: childProcess.exitCode,
+                    childSignalCode: childProcess.signalCode,
+                    settled,
+                })
+            ) {
+                return;
+            }
+
             const timeoutError = Object.assign(
                 new Error(
                     `Production browser readiness check timed out after ${timeoutMs}ms.`,

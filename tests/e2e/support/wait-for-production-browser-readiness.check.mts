@@ -6,6 +6,7 @@ import {
     detectFatalReadinessFailureMessage,
     parsePositiveInteger,
     parseWaitCliArgs,
+    shouldAbortTimedOutReadinessProcess,
     waitForProductionBrowserReadiness,
 } from '../scripts/wait-for-production-browser-readiness.mts';
 
@@ -249,6 +250,41 @@ test('classifyReadinessProcessFailure retries non-fatal capture buffer overflows
         {
             kind: 'retry',
         },
+    );
+});
+
+test('shouldAbortTimedOutReadinessProcess only aborts a still-running unsettled child', () => {
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: null,
+            childSignalCode: null,
+            settled: false,
+        }),
+        true,
+    );
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: 0,
+            childSignalCode: null,
+            settled: false,
+        }),
+        false,
+    );
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: null,
+            childSignalCode: 'SIGTERM',
+            settled: false,
+        }),
+        false,
+    );
+    assert.equal(
+        shouldAbortTimedOutReadinessProcess({
+            childExitCode: null,
+            childSignalCode: null,
+            settled: true,
+        }),
+        false,
     );
 });
 
