@@ -65,6 +65,8 @@ const transientNavigationErrorPatterns = [
 const transientNavigationTimeoutPattern = /Timeout \d+ms exceeded/u;
 const relativeUrlBase = 'https://playwright-navigation-check.invalid';
 const navigationDiagnosticSnippetLength = 240;
+const maximumNavigationProbeTimeoutMs = 2_000;
+const minimumNavigationProbeTimeoutMs = 250;
 const blankNavigationContentPattern = /<body[^>]*><\/body>/u;
 const loadingNavigationTitlePatterns = [
     /^loading\s+https?:\/\//iu,
@@ -215,24 +217,62 @@ const resolveNavigationBootstrapUrl = ({
     return targetUrl === '/' ? null : '/';
 };
 
-const hasMeaningfulNavigationDocument = async (
-    page: NavigationTarget,
-): Promise<boolean | null> => {
+// Recovery probes must never consume the whole test budget. When a live page
+// gets stuck mid-navigation we need these reads to give up quickly so the
+// caller can continue with fallback recovery.
+const runNavigationProbe = async <Result,>(
+    probe: () => Promise<Result>,
+    timeoutMs: number,
+): Promise<Result | null> => {
+    let didTimeOut = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+    const probePromise = probe().catch(() => null as Result | null);
+    const timedProbePromise = probePromise.then((result) =>
+        didTimeOut ? null : result,
+    );
+
+    try {
+        return await Promise.race([
+            timedProbePromise,
+            new Promise<null>((resolve) => {
+                timeoutHandle = setTimeout(() => {
+                    didTimeOut = true;
+                    resolve(null);
+                }, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutHandle !== null) {
+            clearTimeout(timeoutHandle);
+        }
+    }
+};
+
+const hasMeaningfulNavigationDocument = async ({
+    page,
+    probeTimeoutMs,
+}: {
+    page: NavigationTarget;
+    probeTimeoutMs: number;
+}): Promise<boolean | null> => {
     if (typeof page.content !== 'function') {
         return null;
     }
 
-    try {
-        const normalizedHtml = normalizeNavigationHtml(await page.content());
+    const html = await runNavigationProbe(() => page.content!(), probeTimeoutMs);
 
-        if (!normalizedHtml) {
-            return false;
-        }
-
-        return !blankNavigationContentPattern.test(normalizedHtml);
-    } catch {
+    if (html === null) {
         return null;
     }
+
+    const normalizedHtml = normalizeNavigationHtml(html);
+
+    if (!normalizedHtml) {
+        return false;
+    }
+
+    return !blankNavigationContentPattern.test(normalizedHtml);
 };
 
 const isLoadingNavigationTitle = (title: string): boolean =>
@@ -291,6 +331,17 @@ const resolveNavigationLateRecoveryTimeoutMs = (
 ): number =>
     Math.min(30_000, Math.max(5_000, Math.floor(navigationTimeoutMs / 2)));
 
+const resolveNavigationProbeTimeoutMs = (
+    navigationTimeoutMs: number,
+): number =>
+    Math.min(
+        maximumNavigationProbeTimeoutMs,
+        Math.max(
+            minimumNavigationProbeTimeoutMs,
+            Math.floor(navigationTimeoutMs / 10),
+        ),
+    );
+
 const doesPageMatchTargetUrl = (
     currentPageUrl: string,
     targetUrl: string,
@@ -324,42 +375,38 @@ const doesPageMatchTargetUrl = (
 
 const getNavigationTargetReadyState = async (
     page: NavigationTarget,
+    probeTimeoutMs: number,
 ): Promise<string | null> => {
-    try {
-        return await page.evaluate(() => document.readyState);
-    } catch {
-        return null;
-    }
+    return await runNavigationProbe(
+        () => page.evaluate(() => document.readyState),
+        probeTimeoutMs,
+    );
 };
 
 const getNavigationTargetTitle = async (
     page: NavigationTarget,
+    probeTimeoutMs: number,
 ): Promise<string | null> => {
     if (typeof page.title !== 'function') {
         return null;
     }
 
-    try {
-        const title = await page.title();
+    const title = await runNavigationProbe(() => page.title!(), probeTimeoutMs);
 
-        return title ? truncateNavigationText(normalizeNavigationText(title)) : null;
-    } catch {
-        return null;
-    }
+    return title ? truncateNavigationText(normalizeNavigationText(title)) : null;
 };
 
 const getNavigationTargetContentSnippet = async (
     page: NavigationTarget,
+    probeTimeoutMs: number,
 ): Promise<string | null> => {
     if (typeof page.content !== 'function') {
         return null;
     }
 
-    try {
-        return extractNavigationContentSnippet(await page.content());
-    } catch {
-        return null;
-    }
+    const html = await runNavigationProbe(() => page.content!(), probeTimeoutMs);
+
+    return html === null ? null : extractNavigationContentSnippet(html);
 };
 
 const getNavigationTargetUrl = (page: NavigationTarget): string => {
@@ -380,9 +427,16 @@ const formatNavigationFailureDiagnostics = async ({
     page: NavigationTarget;
 }): Promise<string> => {
     const currentUrl = getNavigationTargetUrl(page);
-    const readyState = await getNavigationTargetReadyState(page);
-    const title = await getNavigationTargetTitle(page);
-    const contentSnippet = await getNavigationTargetContentSnippet(page);
+    const probeTimeoutMs = resolveNavigationProbeTimeoutMs(navigationTimeoutMs);
+    const readyState = await getNavigationTargetReadyState(
+        page,
+        probeTimeoutMs,
+    );
+    const title = await getNavigationTargetTitle(page, probeTimeoutMs);
+    const contentSnippet = await getNavigationTargetContentSnippet(
+        page,
+        probeTimeoutMs,
+    );
 
     return [
         'navigation diagnostics:',
@@ -399,6 +453,7 @@ const formatNavigationFailureDiagnostics = async ({
         `lateRecoveryWaitMs=${resolveNavigationLateRecoveryTimeoutMs(
             navigationTimeoutMs,
         )}`,
+        `probeTimeoutMs=${probeTimeoutMs}`,
         title ? `title=${JSON.stringify(title)}` : null,
         contentSnippet ? `content=${JSON.stringify(contentSnippet)}` : null,
     ]
@@ -450,21 +505,26 @@ const isTransientRecoveryProbeError = (error: unknown): boolean => {
 const isRecoveredTargetReady = async ({
     expectedUrl,
     page,
+    probeTimeoutMs,
 }: {
     expectedUrl: string;
     page: NavigationTarget;
+    probeTimeoutMs: number;
 }): Promise<boolean> => {
     if (!doesPageMatchTargetUrl(page.url(), expectedUrl)) {
         return false;
     }
 
-    const readyState = await getNavigationTargetReadyState(page);
+    const readyState = await getNavigationTargetReadyState(page, probeTimeoutMs);
 
     if (readyState !== 'interactive' && readyState !== 'complete') {
         return false;
     }
 
-    const hasMeaningfulDocument = await hasMeaningfulNavigationDocument(page);
+    const hasMeaningfulDocument = await hasMeaningfulNavigationDocument({
+        page,
+        probeTimeoutMs,
+    });
 
     if (hasMeaningfulDocument === false) {
         return false;
@@ -474,7 +534,7 @@ const isRecoveredTargetReady = async ({
         return true;
     }
 
-    const title = await getNavigationTargetTitle(page);
+    const title = await getNavigationTargetTitle(page, probeTimeoutMs);
 
     return Boolean(title && !isLoadingNavigationTitle(title));
 };
@@ -482,21 +542,26 @@ const isRecoveredTargetReady = async ({
 const isBlankOffTargetNavigationStall = async ({
     expectedUrl,
     page,
+    probeTimeoutMs,
 }: {
     expectedUrl: string;
     page: NavigationTarget;
+    probeTimeoutMs: number;
 }): Promise<boolean> => {
     if (doesPageMatchTargetUrl(page.url(), expectedUrl)) {
         return false;
     }
 
-    const readyState = await getNavigationTargetReadyState(page);
+    const readyState = await getNavigationTargetReadyState(page, probeTimeoutMs);
 
     if (readyState !== 'interactive' && readyState !== 'complete') {
         return false;
     }
 
-    const hasMeaningfulDocument = await hasMeaningfulNavigationDocument(page);
+    const hasMeaningfulDocument = await hasMeaningfulNavigationDocument({
+        page,
+        probeTimeoutMs,
+    });
 
     if (hasMeaningfulDocument === true) {
         return false;
@@ -506,7 +571,7 @@ const isBlankOffTargetNavigationStall = async ({
         return true;
     }
 
-    const title = await getNavigationTargetTitle(page);
+    const title = await getNavigationTargetTitle(page, probeTimeoutMs);
 
     return !title || isLoadingNavigationTitle(title);
 };
@@ -533,6 +598,9 @@ const waitForRecoveredTarget = async ({
         return await isRecoveredTargetReady({
             expectedUrl,
             page,
+            probeTimeoutMs: resolveNavigationProbeTimeoutMs(
+                navigationTimeoutMs,
+            ),
         });
     } catch (error) {
         if (!isTransientRecoveryProbeError(error)) {
@@ -575,6 +643,7 @@ const waitForLateRecoveredTarget = async ({
     return await isRecoveredTargetReady({
         expectedUrl,
         page,
+        probeTimeoutMs: resolveNavigationProbeTimeoutMs(navigationTimeoutMs),
     });
 };
 
@@ -630,6 +699,8 @@ const navigateOnTarget = async <T extends NavigationTarget>(
     navigationTimeoutMs: number,
     expectedUrl: string,
 ): Promise<T> => {
+    const probeTimeoutMs = resolveNavigationProbeTimeoutMs(navigationTimeoutMs);
+
     try {
         await navigate(page);
         return page;
@@ -649,6 +720,7 @@ const navigateOnTarget = async <T extends NavigationTarget>(
             await isRecoveredTargetReady({
                 expectedUrl,
                 page,
+                probeTimeoutMs,
             })
         ) {
             return page;
@@ -658,6 +730,7 @@ const navigateOnTarget = async <T extends NavigationTarget>(
             await isBlankOffTargetNavigationStall({
                 expectedUrl,
                 page,
+                probeTimeoutMs,
             })
         ) {
             throw error;
@@ -677,6 +750,7 @@ const navigateOnTarget = async <T extends NavigationTarget>(
             await isRecoveredTargetReady({
                 expectedUrl,
                 page,
+                probeTimeoutMs,
             })
         ) {
             return page;
@@ -686,6 +760,7 @@ const navigateOnTarget = async <T extends NavigationTarget>(
             await isBlankOffTargetNavigationStall({
                 expectedUrl,
                 page,
+                probeTimeoutMs,
             })
         ) {
             throw error;
