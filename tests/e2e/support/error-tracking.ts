@@ -38,10 +38,17 @@ type TrackedPageSnapshot = {
     visibilityState: string;
 };
 
+type PendingRecoverableConsoleErrorCorrelation = {
+    observedAt: number;
+    resolveClaimed: (claimed: boolean) => void;
+    timeoutHandle: ReturnType<typeof setTimeout>;
+};
+
 const maxTrackedDetailLength = 240;
 const maxTrackedRecentEvents = 40;
 const pageSnapshotBodyTextLength = 320;
 const pageSnapshotTimeoutMs = 5_000;
+const recoverableBoardMessageConsoleCorrelationWindowMs = 250;
 const unexpectedErrorReportAttachmentName =
     'unexpected-error-diagnostics.txt';
 
@@ -86,6 +93,21 @@ const truncateTrackedText = (
     value.length <= maxLength
         ? value
         : `${value.slice(0, maxLength - 3)}...`;
+
+const parseFailedToLoadResourceStatus = (
+    messageText: string,
+): number | null => {
+    const normalizedMessageText = normalizeTrackedText(messageText);
+    const matchedStatus = /^Failed to load resource: the server responded with a status of (\d{3})(?: \([^)]*\))?$/u.exec(
+        normalizedMessageText,
+    );
+
+    if (!matchedStatus) {
+        return null;
+    }
+
+    return Number(matchedStatus[1]);
+};
 
 const matchesAllowedConsoleError = (
     pattern: RegExp,
@@ -158,6 +180,16 @@ const recordTrackedError = (
 ): void => {
     tracker.errors.push(message);
     pushTrackerEvent(tracker, message);
+};
+
+const trackPendingCheck = (
+    tracker: UnexpectedErrorTracker,
+    pendingCheck: Promise<void>,
+): void => {
+    tracker.pendingChecks.add(pendingCheck);
+    void pendingCheck.finally(() => {
+        tracker.pendingChecks.delete(pendingCheck);
+    });
 };
 
 const formatConsoleError = ({
@@ -601,25 +633,140 @@ export const attachErrorTracking = (
 ): void => {
     const allowedApiStatuses = new Set(options.allowedApiStatuses ?? []);
     const allowedConsoleErrors = options.allowedConsoleErrors ?? [];
+    const pendingRecoverableBoardMessageConsoleErrors: PendingRecoverableConsoleErrorCorrelation[] =
+        [];
+    const recentRecoverableBoardMessageResponseTimes: number[] = [];
+
+    const consumeRecentRecoverableBoardMessageResponse = (
+        consoleObservedAt: number,
+    ): boolean => {
+        const minimumObservedAt =
+            consoleObservedAt -
+            recoverableBoardMessageConsoleCorrelationWindowMs;
+
+        while (
+            recentRecoverableBoardMessageResponseTimes.length > 0 &&
+            recentRecoverableBoardMessageResponseTimes[0] < minimumObservedAt
+        ) {
+            recentRecoverableBoardMessageResponseTimes.shift();
+        }
+
+        if (recentRecoverableBoardMessageResponseTimes.length === 0) {
+            return false;
+        }
+
+        recentRecoverableBoardMessageResponseTimes.shift();
+        return true;
+    };
+
+    const claimPendingRecoverableBoardMessageConsoleError = (
+        responseObservedAt: number,
+    ): boolean => {
+        const minimumObservedAt =
+            responseObservedAt -
+            recoverableBoardMessageConsoleCorrelationWindowMs;
+        const pendingConsoleErrorIndex =
+            pendingRecoverableBoardMessageConsoleErrors.findIndex(
+                ({ observedAt }) => observedAt >= minimumObservedAt,
+            );
+
+        if (pendingConsoleErrorIndex === -1) {
+            return false;
+        }
+
+        const [pendingConsoleError] =
+            pendingRecoverableBoardMessageConsoleErrors.splice(
+                pendingConsoleErrorIndex,
+                1,
+            );
+        clearTimeout(pendingConsoleError.timeoutHandle);
+        pendingConsoleError.resolveClaimed(true);
+        return true;
+    };
 
     tracker.trackedPages.set(page, label);
 
     page.on('console', (message) => {
+        const messageText = message.text();
+
         if (
-            message.type() === 'error' &&
-            !allowedConsoleErrors.some((pattern) =>
-                matchesAllowedConsoleError(pattern, message.text()),
+            message.type() !== 'error' ||
+            allowedConsoleErrors.some((pattern) =>
+                matchesAllowedConsoleError(pattern, messageText),
             )
         ) {
-            recordTrackedError(
-                tracker,
-                formatConsoleError({
-                    label,
-                    message,
-                    page,
-                }),
-            );
+            return;
         }
+
+        if (parseFailedToLoadResourceStatus(messageText) === 400) {
+            const consoleObservedAt = Date.now();
+
+            if (
+                consumeRecentRecoverableBoardMessageResponse(
+                    consoleObservedAt,
+                )
+            ) {
+                return;
+            }
+
+            const formattedConsoleError = formatConsoleError({
+                label,
+                message,
+                page,
+            });
+            let resolveClaimed: (claimed: boolean) => void = () => {};
+            const claimedPromise = new Promise<boolean>((resolve) => {
+                resolveClaimed = resolve;
+            });
+            const pendingConsoleError: PendingRecoverableConsoleErrorCorrelation =
+                {
+                    observedAt: consoleObservedAt,
+                    resolveClaimed,
+                    timeoutHandle: setTimeout(() => {
+                        const pendingConsoleErrorIndex =
+                            pendingRecoverableBoardMessageConsoleErrors.indexOf(
+                                pendingConsoleError,
+                            );
+
+                        if (pendingConsoleErrorIndex !== -1) {
+                            pendingRecoverableBoardMessageConsoleErrors.splice(
+                                pendingConsoleErrorIndex,
+                                1,
+                            );
+                        }
+
+                        resolveClaimed(false);
+                    }, recoverableBoardMessageConsoleCorrelationWindowMs),
+                };
+
+            pendingRecoverableBoardMessageConsoleErrors.push(
+                pendingConsoleError,
+            );
+
+            trackPendingCheck(
+                tracker,
+                (async () => {
+                    if (await claimedPromise) {
+                        return;
+                    }
+
+                    recordTrackedError(
+                        tracker,
+                        formattedConsoleError,
+                    );
+                })(),
+            );
+            return;
+        }
+
+        recordTrackedError(
+            tracker,
+            formatConsoleError({
+                label,
+                message,
+                page,
+            }),
+        );
     });
 
     page.on('pageerror', (error) => {
@@ -675,6 +822,18 @@ export const attachErrorTracking = (
                     responseUrl,
                 })
             ) {
+                const responseObservedAt = Date.now();
+
+                if (
+                    !claimPendingRecoverableBoardMessageConsoleError(
+                        responseObservedAt,
+                    )
+                ) {
+                    recentRecoverableBoardMessageResponseTimes.push(
+                        responseObservedAt,
+                    );
+                }
+
                 pushTrackerEvent(tracker, trackedResponseError);
                 return;
             }
@@ -685,10 +844,7 @@ export const attachErrorTracking = (
             );
         })();
 
-        tracker.pendingChecks.add(pendingCheck);
-        void pendingCheck.finally(() => {
-            tracker.pendingChecks.delete(pendingCheck);
-        });
+        trackPendingCheck(tracker, pendingCheck);
     });
 
     page.on('requestfailed', (request) => {

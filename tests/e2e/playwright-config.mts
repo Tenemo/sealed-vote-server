@@ -45,6 +45,7 @@ const mobileFirefoxAndroidNonMobileSpecs = [
     '**/duplicate-poll-name.spec.ts',
     '**/duplicate-voter-name.spec.ts',
     '**/multi-participant-counting.spec.ts',
+    '**/recovery-network-cuts.spec.ts',
     '**/refresh-resume.spec.ts',
     '**/voting-flow.spec.ts',
 ];

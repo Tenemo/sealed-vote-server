@@ -1,4 +1,4 @@
-export const API_PREFIX = '/api';
+const API_PREFIX = '/api';
 
 export const POLL_ROUTES = {
     createPoll: `${API_PREFIX}/polls/create`,

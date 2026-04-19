@@ -1,4 +1,4 @@
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { ERROR_MESSAGES, maximumPollVoterCount } from '@sealed-vote/contracts';
 import type {
     RegisterVoterRequest as RegisterVoterRequestContract,
     RegisterVoterResponse as RegisterVoterResponseContract,
@@ -11,7 +11,6 @@ import createError from 'http-errors';
 import type { DatabaseTransaction } from '../database/client.js';
 import { publicKeyShares, voters } from '../database/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/database.js';
-import { maximumPollVoterCount } from '../utils/poll-limits.js';
 import { lockPollById } from '../utils/poll-locks.js';
 import {
     parseVoterDeviceRecord,

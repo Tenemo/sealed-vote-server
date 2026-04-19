@@ -16,7 +16,7 @@
         }
     },
     "scripts": {
-        "build": "tsc -p tsconfig.json",
+        "build": "rimraf dist && tsc -p tsconfig.json",
         "typecheck": "tsc -p tsconfig.json --noEmit",
         "clean": "rimraf dist",
         "lint": "pnpm --workspace-root exec eslint packages/contracts",

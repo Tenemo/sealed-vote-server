@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { fixedScoreRange } from '@sealed-vote/contracts';
 import {
     createElectionManifest,
@@ -10,13 +10,11 @@ import {
     type ElectionManifest,
 } from 'threshold-elgamal';
 
-import type { Database, DatabaseTransaction } from '../database/client.js';
+import type { DatabaseTransaction } from '../database/client.js';
 import { pollCeremonySessions } from '../database/schema.js';
 
 import { normalizeDatabaseTimestamp } from './database.js';
 import { parseVoterDeviceRecord } from './voter-device-records.js';
-
-type ReadOnlyDatabase = Database | DatabaseTransaction;
 
 export type PollCeremonySessionRow = typeof pollCeremonySessions.$inferSelect;
 type PollCeremonySessionSnapshot = Pick<
@@ -88,16 +86,6 @@ export const normalizeCeremonyParticipantIndices = (
                 Number.isInteger(participantIndex) && participantIndex > 0,
         )
         .sort((left, right) => left - right);
-
-export const getPollCeremonySessions = async (
-    database: ReadOnlyDatabase,
-    pollId: string,
-): Promise<PollCeremonySessionRow[]> =>
-    await database
-        .select()
-        .from(pollCeremonySessions)
-        .where(eq(pollCeremonySessions.pollId, pollId))
-        .orderBy(asc(pollCeremonySessions.sequence));
 
 const mapActiveParticipants = ({
     activeParticipantIndices,

@@ -1,4 +1,7 @@
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import {
+    ERROR_MESSAGES,
+    minimumPollVotersToClose,
+} from '@sealed-vote/contracts';
 import type {
     MessageResponse,
     RestartCeremonyRequest as RestartCeremonyRequestContract,
@@ -10,7 +13,6 @@ import createError from 'http-errors';
 import { withTransaction } from '../utils/database.js';
 import { lockPollById } from '../utils/poll-locks.js';
 import { insertPollCeremonySession } from '../utils/poll-ceremony-sessions.js';
-import { minimumPollVotersToClose } from '../utils/poll-limits.js';
 import { getPollFetchReadModel } from '../utils/poll-read-model.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voter-auth.js';

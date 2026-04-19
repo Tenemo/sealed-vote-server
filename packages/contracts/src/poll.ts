@@ -7,6 +7,9 @@ export const fixedScoreRange = {
     max: 10,
 } as const satisfies ScoreRange;
 
+export const minimumPollVotersToClose = 3;
+export const maximumPollVoterCount = 51;
+
 export type CreatePollRequest = {
     choices: string[];
     creatorToken: string;

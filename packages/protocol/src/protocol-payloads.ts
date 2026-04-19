@@ -123,7 +123,7 @@ const compareStrings = (left: string, right: string): number => {
 const bytesToHex = (bytes: Uint8Array): string =>
     Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
-export const compareProtocolPayloads = (
+const compareProtocolPayloads = (
     left: ProtocolPayload,
     right: ProtocolPayload,
 ): number => {

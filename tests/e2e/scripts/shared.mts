@@ -106,7 +106,7 @@ export const runPnpmSync = (args: string[]): void => {
     }
 };
 
-export const runPnpmStatusSync = (args: string[]): number => {
+const runPnpmStatusSync = (args: string[]): number => {
     const [command, commandPrefix] = getPnpmCommand();
     const result = spawnSync(command, [...commandPrefix, ...args], {
         cwd: repositoryRoot,
