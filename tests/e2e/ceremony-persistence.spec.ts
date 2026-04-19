@@ -9,12 +9,11 @@ import {
     deletePolls,
     reloadPollPage,
     submitVote,
-    waitForBlockingParticipants,
+    waitForBlockingVoters,
     waitForCeremonyMetric,
     waitForVerifiedResults,
-    syncPollPagesForSharedState,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -24,22 +23,40 @@ import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/testData';
+} from './support/test-data';
 
-const continueWithoutMissingParticipants = async (
+const continueWithoutMissingVoters = async (
     page: Page,
 ): Promise<Page> => {
-    page = await reloadPollPage(page);
+    const waitForContinueButton = async (
+        candidatePage: Page,
+        timeout: number,
+    ): Promise<void> => {
+        await expect(
+            candidatePage.getByRole('button', {
+                name: 'Continue without missing participants',
+            }),
+        ).toBeVisible({ timeout });
+    };
+
+    await page.bringToFront();
+
+    try {
+        await waitForContinueButton(page, 30_000);
+    } catch {
+        page = await reloadPollPage(page);
+        await waitForContinueButton(page, 60_000);
+    }
+
     const continueButton = page.getByRole('button', {
         name: 'Continue without missing participants',
     });
 
-    await expect(continueButton).toBeVisible({ timeout: 60_000 });
     const restartResponsePromise = page.waitForResponse(
         (response) =>
             response.request().method() === 'POST' &&
@@ -186,7 +203,7 @@ test('automatically resumes a stored vote after a participant closes the browser
         participantOne.page = attachParticipantOneRestoredTracking(
             await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
-        [participantOne.page] = await syncPollPagesForSharedState({
+        [participantOne.page] = await bringPollPagesToFront({
             attachPages: [attachParticipantOneRestoredTracking],
             pages: [participantOne.page],
         });
@@ -384,7 +401,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         await closeParticipant(participantOne);
 
         page = attachCreatorTracking(
-            await continueWithoutMissingParticipants(page),
+            await continueWithoutMissingVoters(page),
         );
         [participantTwo.page, participantThree.page] =
             await bringPollPagesToFront({
@@ -411,7 +428,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         participantOne.page = attachParticipantOneRestoredTracking(
             await gotoInteractablePage(participantOne.page, createdPoll.pollUrl),
         );
-        [participantOne.page] = await syncPollPagesForSharedState({
+        [participantOne.page] = await bringPollPagesToFront({
             attachPages: [
                 attachParticipantOneRestoredTracking,
             ],
@@ -614,7 +631,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
                 ],
                 pages: [participantOne.page, participantTwo.page],
             });
-        page = attachCreatorTracking(await waitForBlockingParticipants({
+        page = attachCreatorTracking(await waitForBlockingVoters({
             page,
             participantNames: [
                 missingParticipantOneName,
@@ -623,7 +640,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
         }));
 
         page = attachCreatorTracking(
-            await continueWithoutMissingParticipants(page),
+            await continueWithoutMissingVoters(page),
         );
         [participantOne.page, participantTwo.page] =
             await bringPollPagesToFront({
@@ -803,13 +820,13 @@ test('supports repeated organizer rescues at different securing steps', async ({
                 participantThree.page,
             ],
         });
-        page = attachCreatorTracking(await waitForBlockingParticipants({
+        page = attachCreatorTracking(await waitForBlockingVoters({
             page,
             participantNames: [missingParticipantName],
         }));
 
         page = attachCreatorTracking(
-            await continueWithoutMissingParticipants(page),
+            await continueWithoutMissingVoters(page),
         );
         [
             participantOne.page,
@@ -841,13 +858,13 @@ test('supports repeated organizer rescues at different securing steps', async ({
                 ],
                 pages: [participantOne.page, participantTwo.page],
             });
-        page = attachCreatorTracking(await waitForBlockingParticipants({
+        page = attachCreatorTracking(await waitForBlockingVoters({
             page,
             participantNames: [participantThreeName],
         }));
 
         page = attachCreatorTracking(
-            await continueWithoutMissingParticipants(page),
+            await continueWithoutMissingVoters(page),
         );
         [participantOne.page, participantTwo.page] =
             await bringPollPagesToFront({

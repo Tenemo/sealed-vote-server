@@ -12,7 +12,7 @@ import {
     readmeDemoManifestPath,
     readmeDemoOutputDir,
     type ReadmeDemoManifest,
-} from '../support/readmeDemo.mts';
+} from '../support/readme-demo.mts';
 
 const expectedPanelIds = ['creator', 'participant-one', 'participant-two'];
 const panelLabelHeight = 52;
@@ -331,6 +331,7 @@ const main = (): void => {
     configureLocalE2EEnv({
         useBuiltServers: true,
     });
+    process.env.PLAYWRIGHT_CONFIG_PROFILE = 'readme-demo';
     ensureFfmpegAvailable();
     cleanDemoOutputDir();
 
@@ -340,7 +341,7 @@ const main = (): void => {
         'playwright',
         'test',
         '--config',
-        'tests/config/playwright.readme-demo.config.mts',
+        'tests/config/playwright.config.mts',
         ...getForwardedCliArgs(),
     ]);
 

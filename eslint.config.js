@@ -2,7 +2,7 @@ const { fixupConfigRules, fixupPluginRules } = require('@eslint/compat');
 const eslint = require('@eslint/js');
 const { defineConfig } = require('eslint/config');
 const { flatConfigs: importConfigs } = require('eslint-plugin-import');
-const jsxA11yPlugin = require('eslint-plugin-jsx-a11y');
+const jsxAccessibilityPlugin = require('eslint-plugin-jsx-a11y');
 const prettierPlugin = require('eslint-plugin-prettier');
 const prettierRecommended = require('eslint-plugin-prettier/recommended');
 const reactPlugin = require('eslint-plugin-react');
@@ -175,7 +175,7 @@ module.exports = defineConfig(
         files: frontendFiles,
     }),
     {
-        ...jsxA11yPlugin.flatConfigs.strict,
+    ...jsxAccessibilityPlugin.flatConfigs.strict,
         files: frontendFiles,
     },
     {

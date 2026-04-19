@@ -15,11 +15,11 @@ import { Type } from '@sinclair/typebox';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { choices as choicesTable, polls } from '../db/schema.js';
-import { isConstraintViolation, withTransaction } from '../utils/db.js';
-import { getCreatePollSlugAttempts } from '../utils/pollSlug.js';
+import { choices as choicesTable, polls } from '../database/schema.js';
+import { isConstraintViolation, withTransaction } from '../utils/database.js';
+import { getCreatePollSlugAttempts } from '../utils/poll-slug.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
-import { hashSecureToken } from '../utils/voterAuth.js';
+import { hashSecureToken } from '../utils/voter-auth.js';
 
 import { MessageResponseSchema, SecureTokenSchema } from './schemas.js';
 
@@ -51,7 +51,7 @@ const schema = {
 };
 
 type CreatePollRequest = CreatePollRequestContract;
-export type CreatePollResponse = CreatePollResponseContract;
+type CreatePollResponse = CreatePollResponseContract;
 const canonicalPollSlugRetryCount = 8;
 const supportedProtocolVersion = 'v1' as const;
 const areStringArraysEqual = (
@@ -74,7 +74,7 @@ const getExistingPollByCreatorTokenHash = async (
       }
     | undefined
 > => {
-    const poll = await fastify.db.query.polls.findFirst({
+    const poll = await fastify.database.query.polls.findFirst({
         where: (fields, { eq }) =>
             eq(fields.creatorTokenHash, creatorTokenHash),
         columns: {
@@ -133,14 +133,14 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
         '/polls/create',
         { schema },
         async (
-            req: FastifyRequest<{ Body: CreatePollRequest }>,
+            request: FastifyRequest<{ Body: CreatePollRequest }>,
             reply: FastifyReply,
         ): Promise<CreatePollResponse> => {
-            const { choices, creatorToken } = req.body;
-            const pollName = normalizeTrimmedString(req.body.pollName);
+            const { choices, creatorToken } = request.body;
+            const pollName = normalizeTrimmedString(request.body.pollName);
             const normalizedChoices = normalizeTrimmedStrings(choices);
             const protocolVersion =
-                req.body.protocolVersion ?? supportedProtocolVersion;
+                request.body.protocolVersion ?? supportedProtocolVersion;
 
             if (!pollName) {
                 throw createError(400, 'Poll name is required.');
@@ -175,7 +175,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                 void reply.code(201);
                 void maybeDropTestResponseAfterCommit({
                     reply,
-                    request: req,
+                    request: request,
                 });
                 return {
                     creatorToken,
@@ -192,8 +192,8 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                 try {
                     const createdPoll = await withTransaction(
                         fastify,
-                        async (tx) => {
-                            await tx.insert(polls).values({
+                        async (databaseTransaction) => {
+                            await databaseTransaction.insert(polls).values({
                                 id: pollId,
                                 creatorTokenHash,
                                 pollName,
@@ -201,13 +201,15 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                                 slug,
                             });
 
-                            await tx.insert(choicesTable).values(
-                                normalizedChoices.map((choice, index) => ({
-                                    choiceName: choice,
-                                    pollId,
-                                    choiceIndex: index,
-                                })),
-                            );
+                            await databaseTransaction
+                                .insert(choicesTable)
+                                .values(
+                                    normalizedChoices.map((choice, index) => ({
+                                        choiceName: choice,
+                                        pollId,
+                                        choiceIndex: index,
+                                    })),
+                                );
 
                             return {
                                 creatorToken,
@@ -220,7 +222,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                     void reply.code(201);
                     void maybeDropTestResponseAfterCommit({
                         reply,
-                        request: req,
+                        request: request,
                     });
                     return createdPoll;
                 } catch (error) {
@@ -247,7 +249,7 @@ export const create = async (fastify: FastifyInstance): Promise<void> => {
                             void reply.code(201);
                             void maybeDropTestResponseAfterCommit({
                                 reply,
-                                request: req,
+                                request: request,
                             });
                             return {
                                 creatorToken,

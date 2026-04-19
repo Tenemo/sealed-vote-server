@@ -5,10 +5,10 @@ import { eq } from 'drizzle-orm';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import createError from 'http-errors';
 
-import { polls } from '../db/schema.js';
-import { withTransaction } from '../utils/db.js';
-import { lockPollById } from '../utils/pollLocks.js';
-import { hashSecureToken } from '../utils/voterAuth.js';
+import { polls } from '../database/schema.js';
+import { withTransaction } from '../utils/database.js';
+import { lockPollById } from '../utils/poll-locks.js';
+import { hashSecureToken } from '../utils/voter-auth.js';
 
 import {
     MessageResponseSchema,
@@ -39,31 +39,44 @@ export const deletePoll = async (fastify: FastifyInstance): Promise<void> => {
         '/polls/:pollId',
         { schema },
         async (
-            req: FastifyRequest<{
+            request: FastifyRequest<{
                 Params: PollIdParams;
                 Body: DeletePollBody;
             }>,
         ) => {
-            const { pollId } = req.params;
-            const { creatorToken } = req.body;
+            const { pollId } = request.params;
+            const { creatorToken } = request.body;
 
-            return await withTransaction(fastify, async (tx) => {
-                const poll = await lockPollById(tx, pollId);
-                if (!poll) {
-                    throw createError(
-                        404,
-                        `Poll with ID ${pollId} does not exist.`,
+            return await withTransaction(
+                fastify,
+                async (databaseTransaction) => {
+                    const poll = await lockPollById(
+                        databaseTransaction,
+                        pollId,
                     );
-                }
+                    if (!poll) {
+                        throw createError(
+                            404,
+                            `Poll with ID ${pollId} does not exist.`,
+                        );
+                    }
 
-                if (poll.creatorTokenHash !== hashSecureToken(creatorToken)) {
-                    throw createError(403, ERROR_MESSAGES.invalidCreatorToken);
-                }
+                    if (
+                        poll.creatorTokenHash !== hashSecureToken(creatorToken)
+                    ) {
+                        throw createError(
+                            403,
+                            ERROR_MESSAGES.invalidCreatorToken,
+                        );
+                    }
 
-                await tx.delete(polls).where(eq(polls.id, pollId));
+                    await databaseTransaction
+                        .delete(polls)
+                        .where(eq(polls.id, pollId));
 
-                return { message: 'Poll deleted successfully' };
-            });
+                    return { message: 'Poll deleted successfully' };
+                },
+            );
         },
     );
 };

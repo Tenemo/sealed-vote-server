@@ -177,12 +177,12 @@ test('gotoInteractablePage bootstraps a blank page before deep-link navigation',
 
     await gotoInteractablePage(
         page,
-        'https://sealed.vote/votes/example--1234',
+        'https://sealed.vote/polls/example--1234',
     );
 
     assert.deepEqual(urls, [
         'https://sealed.vote/',
-        'https://sealed.vote/votes/example--1234',
+        'https://sealed.vote/polls/example--1234',
     ]);
     assert.deepEqual(optionsCalls, [
         {
@@ -208,10 +208,10 @@ test('gotoInteractablePage skips the origin bootstrap for local deep links', asy
 
     await gotoInteractablePage(
         page,
-        'http://127.0.0.1:3000/votes/example--1234',
+        'http://127.0.0.1:3000/polls/example--1234',
     );
 
-    assert.deepEqual(urls, ['http://127.0.0.1:3000/votes/example--1234']);
+    assert.deepEqual(urls, ['http://127.0.0.1:3000/polls/example--1234']);
     assert.deepEqual(optionsCalls, [
         {
             timeout: 15_000,
@@ -327,7 +327,7 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
 
     page.goto = async () => {
         callCount += 1;
-        state.currentUrl = 'https://sealed.vote/votes/example--1234';
+        state.currentUrl = 'https://sealed.vote/polls/example--1234';
         throw new Error('page.goto: Timeout 45000ms exceeded.');
     };
     page.waitForTimeout = async (timeout: number) => {
@@ -343,7 +343,7 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
         assert.equal(
             doesMatcherMatch(
                 matcher,
-                'https://sealed.vote/votes/example--1234',
+                'https://sealed.vote/polls/example--1234',
             ),
             true,
         );
@@ -355,7 +355,7 @@ test('gotoInteractablePage accepts a recovered target without a second navigate'
     try {
         await gotoInteractablePage(
             page,
-            'https://sealed.vote/votes/example--1234',
+            'https://sealed.vote/polls/example--1234',
         );
     } finally {
         if (previousNavigationTimeout === undefined) {
@@ -492,7 +492,7 @@ test('gotoInteractablePage replaces a blank off-target stall without waiting for
     try {
         const resolvedPage = await gotoInteractablePage(
             page,
-            'https://sealed.vote/votes/example--1234',
+            'https://sealed.vote/polls/example--1234',
         );
 
         assert.equal(resolvedPage, replacementPage);
@@ -596,7 +596,7 @@ test('gotoInteractablePage accepts a page that already loaded after the timeout'
 
     page.goto = async () => {
         callCount += 1;
-        state.currentUrl = 'https://sealed.vote/votes/example--1234';
+        state.currentUrl = 'https://sealed.vote/polls/example--1234';
         state.isInteractable = true;
         state.readyState = 'complete';
         throw new Error('page.goto: Timeout 45000ms exceeded.');
@@ -615,7 +615,7 @@ test('gotoInteractablePage accepts a page that already loaded after the timeout'
     try {
         await gotoInteractablePage(
             page,
-            'https://sealed.vote/votes/example--1234',
+            'https://sealed.vote/polls/example--1234',
         );
     } finally {
         if (previousNavigationTimeout === undefined) {
@@ -656,7 +656,7 @@ test('gotoInteractablePage accepts a page that becomes ready after the recovery 
 
     page.goto = async () => {
         callCount += 1;
-        state.currentUrl = 'https://sealed.vote/votes/example--1234';
+        state.currentUrl = 'https://sealed.vote/polls/example--1234';
         state.htmlContent = blankPlaceholderHtml;
         state.readyState = 'complete';
         throw new Error('page.goto: Timeout 45000ms exceeded.');
@@ -686,7 +686,7 @@ test('gotoInteractablePage accepts a page that becomes ready after the recovery 
     try {
         await gotoInteractablePage(
             page,
-            'https://sealed.vote/votes/example--1234',
+            'https://sealed.vote/polls/example--1234',
         );
     } finally {
         if (previousNavigationTimeout === undefined) {
@@ -832,8 +832,8 @@ test('gotoInteractablePage recovers when page.goto never returns but the page fi
 
     page.goto = async () => {
         callCount += 1;
-        state.currentUrl = 'https://sealed.vote/votes/example--1234';
-        state.documentTitle = 'Vote | sealed.vote';
+        state.currentUrl = 'https://sealed.vote/polls/example--1234';
+        state.documentTitle = 'Poll | sealed.vote';
         state.htmlContent = readyPageHtml;
         state.isInteractable = true;
         state.readyState = 'complete';
@@ -849,7 +849,7 @@ test('gotoInteractablePage recovers when page.goto never returns but the page fi
     try {
         await gotoInteractablePage(
             page,
-            'https://sealed.vote/votes/example--1234',
+            'https://sealed.vote/polls/example--1234',
         );
     } finally {
         if (previousNavigationTimeout === undefined) {
@@ -873,10 +873,10 @@ test('gotoInteractablePage recovers when page.goto never returns but the page fi
 
 test('gotoInteractablePage appends page diagnostics when recovery is exhausted', async () => {
     const replacementState: PageDoubleState = {
-        currentUrl: 'https://sealed.vote/votes/example--1234',
+        currentUrl: 'https://sealed.vote/polls/example--1234',
         documentTitle: 'Sealed vote',
         htmlContent:
-            '<main><h1>Vote name</h1><button>Create vote</button></main>',
+            '<main><h1>Poll name</h1><button>Create poll</button></main>',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -917,25 +917,25 @@ test('gotoInteractablePage appends page diagnostics when recovery is exhausted',
             async () =>
                 await gotoInteractablePage(
                     page,
-                    'https://sealed.vote/votes/example--1234',
+                    'https://sealed.vote/polls/example--1234',
                 ),
             (error) => {
                 assert.ok(error instanceof Error);
                 assert.match(error.message, /navigation diagnostics:/u);
                 assert.match(
                     error.message,
-                    /currentUrl=https:\/\/sealed\.vote\/votes\/example--1234/u,
+                    /currentUrl=https:\/\/sealed\.vote\/polls\/example--1234/u,
                 );
                 assert.match(
                     error.message,
-                    /expectedUrl=https:\/\/sealed\.vote\/votes\/example--1234/u,
+                    /expectedUrl=https:\/\/sealed\.vote\/polls\/example--1234/u,
                 );
                 assert.match(error.message, /matchesExpected=true/u);
                 assert.match(error.message, /readyState=loading/u);
                 assert.match(error.message, /title="Sealed vote"/u);
                 assert.match(
                     error.message,
-                    /content="Vote name Create vote"/u,
+                    /content="Poll name Create poll"/u,
                 );
 
                 return true;
@@ -963,7 +963,7 @@ test('gotoInteractablePage keeps the original failure when diagnostics cannot re
         currentUrl: 'https://sealed.vote/',
         documentTitle: 'Sealed vote',
         htmlContent:
-            '<main><h1>Vote name</h1><button>Create vote</button></main>',
+            '<main><h1>Poll name</h1><button>Create poll</button></main>',
         isInteractable: false,
         readyState: 'loading',
     });
@@ -986,7 +986,7 @@ test('gotoInteractablePage keeps the original failure when diagnostics cannot re
         async () =>
             await gotoInteractablePage(
                 page,
-                'https://sealed.vote/votes/example--1234',
+                'https://sealed.vote/polls/example--1234',
             ),
         (error) => {
             assert.ok(error instanceof Error);
@@ -999,7 +999,7 @@ test('gotoInteractablePage keeps the original failure when diagnostics cannot re
             assert.match(error.message, /currentUrl=<empty>/u);
             assert.match(
                 error.message,
-                /expectedUrl=https:\/\/sealed\.vote\/votes\/example--1234/u,
+                /expectedUrl=https:\/\/sealed\.vote\/polls\/example--1234/u,
             );
 
             return true;
@@ -1010,7 +1010,7 @@ test('gotoInteractablePage keeps the original failure when diagnostics cannot re
 test('reloadInteractablePage uses the same navigation policy', async () => {
     const calls: NavigationOptions[] = [];
     const page = createPageDouble({
-        currentUrl: 'https://sealed.vote/votes/example--1234',
+        currentUrl: 'https://sealed.vote/polls/example--1234',
         isInteractable: true,
         readyState: 'complete',
     });
@@ -1032,7 +1032,7 @@ test('reloadInteractablePage uses the same navigation policy', async () => {
 test('reloadInteractablePage accepts a recovered page without a second reload', async () => {
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'https://sealed.vote/votes/example--1234',
+        currentUrl: 'https://sealed.vote/polls/example--1234',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -1073,7 +1073,7 @@ test('reloadInteractablePage accepts a recovered page without a second reload', 
 test('reloadInteractablePage accepts a page that already reloaded after the timeout', async () => {
     const retryDelays: number[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'https://sealed.vote/votes/example--1234',
+        currentUrl: 'https://sealed.vote/polls/example--1234',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -1121,7 +1121,7 @@ test('reloadInteractablePage accepts a page that becomes ready after the recover
     const retryDelays: number[] = [];
     const recoveryWaits: NavigationOptions[] = [];
     const state: PageDoubleState = {
-        currentUrl: 'https://sealed.vote/votes/example--1234',
+        currentUrl: 'https://sealed.vote/polls/example--1234',
         isInteractable: false,
         readyState: 'loading',
     };
@@ -1202,13 +1202,13 @@ test('reloadInteractablePage replaces the page after a transient reload timeout'
     const previousRetrySetting =
         process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
     const replacementPage = createPageDouble({
-        currentUrl: 'https://sealed.vote/votes/example--1234',
+        currentUrl: 'https://sealed.vote/polls/example--1234',
         isInteractable: true,
         readyState: 'complete',
     });
     const page = createPageDouble(
         {
-            currentUrl: 'https://sealed.vote/votes/example--1234',
+            currentUrl: 'https://sealed.vote/polls/example--1234',
             isInteractable: false,
             readyState: 'loading',
         },
@@ -1267,7 +1267,7 @@ test('reloadInteractablePage bootstraps a blank replacement page before deep-lin
         readyState: 'complete',
     };
     const replacementPage = createPageDouble(replacementState);
-    const currentPageUrl = 'https://sealed.vote/votes/example--1234';
+    const currentPageUrl = 'https://sealed.vote/polls/example--1234';
     const page = createPageDouble(
         {
             currentUrl: currentPageUrl,
@@ -1339,7 +1339,7 @@ test('reloadInteractablePage skips the origin bootstrap for local replacement pa
         readyState: 'complete',
     };
     const replacementPage = createPageDouble(replacementState);
-    const currentPageUrl = 'http://127.0.0.1:3000/votes/example--1234';
+    const currentPageUrl = 'http://127.0.0.1:3000/polls/example--1234';
     const page = createPageDouble(
         {
             currentUrl: currentPageUrl,

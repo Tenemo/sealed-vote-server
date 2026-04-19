@@ -32,7 +32,7 @@ const NotFound = (): React.JSX.Element => {
                             onClick={onClick}
                             variant="outline"
                         >
-                            Go back to vote creation
+                            Go back to poll creation
                         </Button>
                     </div>
                 </div>

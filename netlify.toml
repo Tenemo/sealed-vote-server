@@ -15,8 +15,8 @@
   included_files = ["netlify/functions/assets/fonts/**"]
 
 [[edge_functions]]
-  function = "vote-seo"
-  path = "/votes/*"
+  function = "poll-seo"
+  path = "/polls/*"
 
 [[headers]]
   for = "/*"
@@ -46,14 +46,6 @@
   for = "/favicon/*"
   [headers.values]
     Cache-Control = "public, max-age=86400, stale-while-revalidate=604800"
-
-# Legacy passthrough for explicit /api requests. The production browser now
-# talks directly to VITE_API_BASE_URL so poll traffic avoids Netlify edge
-# security challenges on the /api path.
-[[redirects]]
-  from = "/api/*"
-  to = "https://api.sealed.vote/api/:splat"
-  status = 200
 
 [[redirects]]
   from = "/*"

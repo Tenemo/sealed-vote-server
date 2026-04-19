@@ -122,8 +122,8 @@ jobs:
             - name: run build
               run: pnpm build
 
-    browser-compat-webkit:
-        name: browser-compat (macOS WebKit)
+    browser-compatibility-webkit:
+        name: browser compatibility (macOS WebKit)
         runs-on: macos-latest
         timeout-minutes: 20
 
@@ -149,7 +149,7 @@ jobs:
 
             - name: run WebKit browser compatibility probe
               run: >-
-                  pnpm e2e:compat --
+                  pnpm e2e:browser-compatibility --
                   --project webkit-desktop
                   --project mobile-webkit-iphone
                   --project mobile-webkit-ipad
@@ -158,8 +158,8 @@ jobs:
               if: failure()
               uses: actions/upload-artifact@v7
               with:
-                  name: playwright-browser-compat-results
-                  path: test-results/browser-compat
+                  name: playwright-browser-compatibility-results
+                  path: test-results/browser-compatibility
                   if-no-files-found: ignore
 
     e2e-prepare:

@@ -1,7 +1,7 @@
 import {
     collectListedSpecFiles,
     runProductionIsolatedInvocations,
-} from './runPlaywrightHelpers.mts';
+} from './run-playwright-helpers.mts';
 import {
     getForwardedCliArgs,
     runPnpmCaptureSync,
@@ -13,15 +13,22 @@ const cliArgs = process.argv.slice(2);
 const firstArg = cliArgs[0];
 const normalizeForwardedCliArgs = (args: string[]): string[] =>
     args[0] === '--' ? args.slice(1) : args;
-const mode = firstArg === 'production' ? 'production' : 'compat';
+const mode =
+    firstArg === 'production' ? 'production' : 'browser-compatibility';
 const forwardedCliArgs =
-    firstArg === 'compat' || firstArg === 'production'
+    firstArg === 'browser-compatibility' || firstArg === 'production'
         ? normalizeForwardedCliArgs(cliArgs.slice(1))
         : getForwardedCliArgs();
 const configPath =
     mode === 'production'
-        ? 'tests/config/playwright.production.config.mts'
-        : 'tests/config/playwright.compat.config.mts';
+        ? 'tests/config/playwright.config.mts'
+        : 'tests/config/playwright-browser-compatibility.config.mts';
+
+if (mode === 'production') {
+    process.env.PLAYWRIGHT_CONFIG_PROFILE = 'production';
+} else {
+    delete process.env.PLAYWRIGHT_CONFIG_PROFILE;
+}
 
 const shouldIsolateProductionByFile =
     mode === 'production' &&
@@ -64,9 +71,9 @@ if (!shouldIsolateProductionByFile) {
                 `Running production Playwright file in isolation: ${listedFile}`,
             );
         },
-        logRetry: (listedFile) => {
-            console.warn(
-                `Re-running production Playwright file after readiness startup timeout: ${listedFile}`,
+        onNavigationStall: (listedFile) => {
+            console.error(
+                `Production navigation stalled in ${listedFile}; skipping remaining isolated files for this project.`,
             );
         },
         runInvocation: async (invocationArgs) => {

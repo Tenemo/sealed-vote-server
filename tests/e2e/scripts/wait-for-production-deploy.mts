@@ -30,7 +30,7 @@ type ReadinessStatus = {
     apiHealth: JsonProbeStatus;
     browserApiHealth: JsonProbeStatus;
     homepage: HtmlProbeStatus;
-    votePage: HtmlProbeStatus;
+    pollPage: HtmlProbeStatus;
     webVersion: JsonProbeStatus;
 };
 
@@ -51,7 +51,7 @@ const defaultIntervalMs = 15_000;
 const defaultRequestTimeoutMs = 10_000;
 const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 30 * 60 * 1000;
-const syntheticVoteSlugPrefix = 'production-readiness-';
+const syntheticPollSlugPrefix = 'production-readiness-';
 const homepageExpectedTitle =
     '<title>sealed.vote | 1-10 score voting app</title>';
 const homepageExpectedSiteName =
@@ -113,10 +113,10 @@ export const parsePositiveInteger = (
     return parsedValue;
 };
 
-export const createSyntheticVotePath = (expectedCommitSha: string): string => {
+export const createSyntheticPollPath = (expectedCommitSha: string): string => {
     const normalizedCommitSha = normalizeCommitSha(expectedCommitSha);
     const readableCommitSha = normalizedCommitSha.slice(0, 12);
-    return `/votes/${syntheticVoteSlugPrefix}${readableCommitSha}`;
+    return `/polls/${syntheticPollSlugPrefix}${readableCommitSha}`;
 };
 
 const createHtmlProbeExpectations = (
@@ -124,11 +124,11 @@ const createHtmlProbeExpectations = (
     expectedCommitSha: string,
 ): {
     homepage: HtmlProbeExpectation[];
-    votePage: HtmlProbeExpectation[];
+    pollPage: HtmlProbeExpectation[];
 } => {
-    const syntheticVotePath = createSyntheticVotePath(expectedCommitSha);
-    const syntheticVoteCanonicalUrl = new URL(
-        syntheticVotePath,
+    const syntheticPollPath = createSyntheticPollPath(expectedCommitSha);
+    const syntheticPollCanonicalUrl = new URL(
+        syntheticPollPath,
         webBaseUrl,
     ).toString();
 
@@ -143,19 +143,19 @@ const createHtmlProbeExpectations = (
                 snippet: homepageExpectedSiteName,
             },
         ],
-        votePage: [
+        pollPage: [
             {
-                label: 'vote page canonical',
-                snippet: `<link data-rh="true" rel="canonical" href="${syntheticVoteCanonicalUrl}"`,
+                label: 'poll page canonical',
+                snippet: `<link data-rh="true" rel="canonical" href="${syntheticPollCanonicalUrl}"`,
             },
             {
-                label: 'vote page robots',
+                label: 'poll page robots',
                 snippet:
                     '<meta data-rh="true" name="robots" content="noindex, nofollow, noarchive, max-image-preview:large" />',
             },
             {
-                label: 'vote page title',
-                snippet: '<title data-rh="true">Vote | sealed.vote</title>',
+                label: 'poll page title',
+                snippet: '<title data-rh="true">Poll | sealed.vote</title>',
             },
         ],
     };
@@ -368,11 +368,11 @@ export const loadReadinessStatus = async (
         options.webBaseUrl,
         options.expectedCommitSha,
     );
-    const syntheticVotePath = createSyntheticVotePath(
+    const syntheticPollPath = createSyntheticPollPath(
         options.expectedCommitSha,
     );
 
-    const [webVersion, apiHealth, browserApiHealth, homepage, votePage] =
+    const [webVersion, apiHealth, browserApiHealth, homepage, pollPage] =
         await Promise.all([
             loadJsonProbeStatus(
                 options.webBaseUrl,
@@ -397,9 +397,9 @@ export const loadReadinessStatus = async (
             ),
             loadHtmlProbeStatus(
                 options.webBaseUrl,
-                syntheticVotePath,
+                syntheticPollPath,
                 options.requestTimeoutMs,
-                expectations.votePage,
+                expectations.pollPage,
             ),
         ]);
 
@@ -407,7 +407,7 @@ export const loadReadinessStatus = async (
         apiHealth,
         browserApiHealth,
         homepage,
-        votePage,
+        pollPage,
         webVersion,
     };
 };
@@ -420,7 +420,7 @@ export const isReadinessStatusSuccessful = (
     status.apiHealth.ok &&
     status.browserApiHealth.ok &&
     status.homepage.ok &&
-    status.votePage.ok &&
+    status.pollPage.ok &&
     status.webVersion.commitSha === expectedCommitSha &&
     status.apiHealth.commitSha === expectedCommitSha &&
     status.browserApiHealth.commitSha === expectedCommitSha;
@@ -454,7 +454,7 @@ export const formatReadinessStatus = (status: ReadinessStatus): string =>
         formatJsonStatus('api health', status.apiHealth),
         formatJsonStatus('browser api health', status.browserApiHealth),
         formatHtmlStatus('homepage', status.homepage),
-        formatHtmlStatus('vote page', status.votePage),
+        formatHtmlStatus('poll page', status.pollPage),
     ].join(' ');
 
 export const waitForProductionDeploy = async (

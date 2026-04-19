@@ -1,6 +1,6 @@
 import { beforeAll } from 'vitest';
 
-import { resetDatabase } from '../db/admin';
+import { resetDatabase } from '../database/admin';
 
 beforeAll(async () => {
     await resetDatabase();

@@ -1,13 +1,11 @@
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import { ERROR_MESSAGES, type PollResponse } from '@sealed-vote/contracts';
 import { createPoll, deletePoll, registerVoter } from '@sealed-vote/testkit';
 import { eq } from 'drizzle-orm';
 import { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { buildServer } from '../buildServer';
-import { publicKeyShares } from '../db/schema.js';
-
-import { PollResponse } from './fetch';
+import { buildServer } from '../build-server';
+import { publicKeyShares } from '../database/schema.js';
 
 type CloseVotingResponse = {
     message: string;
@@ -56,7 +54,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(poll.thresholds.minimumPublishedVoterCount).toBe(2);
         expect(poll.ceremony.activeParticipantCount).toBe(3);
         expect(poll.ceremony.restartCount).toBe(0);
-        expect(poll.ceremony.blockingParticipantIndices).toEqual([1, 2, 3]);
+        expect(poll.ceremony.blockingVoterIndices).toEqual([1, 2, 3]);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -76,7 +74,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(400);
         expect(
             (JSON.parse(closeResponse.body) as CloseVotingResponse).message,
-        ).toBe(ERROR_MESSAGES.notEnoughParticipantsToClose);
+        ).toBe(ERROR_MESSAGES.notEnoughVotersToClose);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -136,7 +134,7 @@ describe('POST /polls/:pollId/close', () => {
         await registerVoter(fastify, pollId, 'Voter2');
         await registerVoter(fastify, pollId, 'Voter3');
 
-        await fastify.db
+        await fastify.database
             .update(publicKeyShares)
             .set({
                 publicKeyShare: '{"transportSuite":"X25519"}',
@@ -154,7 +152,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(400);
         expect(
             (JSON.parse(closeResponse.body) as CloseVotingResponse).message,
-        ).toBe(ERROR_MESSAGES.participantDeviceKeysRequired);
+        ).toBe(ERROR_MESSAGES.voterDeviceKeysRequired);
 
         await deletePoll(fastify, pollId, creatorToken);
     });

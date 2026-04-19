@@ -1,5 +1,6 @@
 import { FormatRegistry } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
+import type { PollResponse } from '@sealed-vote/contracts';
 import {
     closePoll,
     createPoll,
@@ -10,9 +11,9 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { buildServer } from '../buildServer';
+import { buildServer } from '../build-server';
 
-import { PollResponseSchema, type PollResponse } from './fetch';
+import { PollResponseSchema } from './fetch';
 
 const clonePoll = (poll: PollResponse): PollResponse => structuredClone(poll);
 const uuidPattern =
@@ -22,7 +23,7 @@ if (!FormatRegistry.Has('uuid')) {
     FormatRegistry.Set('uuid', (value) => uuidPattern.test(value));
 }
 
-describe('GET /polls/:pollRef', () => {
+describe('GET /polls/:pollReference', () => {
     let fastify: FastifyInstance;
 
     beforeAll(async () => {
@@ -69,14 +70,14 @@ describe('GET /polls/:pollRef', () => {
                     description: 'fractional submitted participant counts',
                     poll: {
                         ...clonePoll(poll),
-                        submittedParticipantCount: 3.5,
+                        submittedVoterCount: 3.5,
                     },
                 },
                 {
                     description: 'non-positive close thresholds',
                     poll: {
                         ...clonePoll(poll),
-                        minimumCloseParticipantCount: 0,
+                        minimumCloseVoterCount: 0,
                     },
                 },
                 {

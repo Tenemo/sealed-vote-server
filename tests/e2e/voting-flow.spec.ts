@@ -1,19 +1,19 @@
 import { test } from '@playwright/test';
 
-import { expectNoAxeViolations } from './support/a11y';
+import { expectNoAccessibilityViolations } from './support/accessibility';
 import {
     closeVoting,
     createExpectedVerifiedResults,
     createPoll,
     deletePolls,
     expectPostCloseVisible,
-    expectParticipantsVisible,
+    expectVotersVisible,
     reloadPollPage,
     submitVote,
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     closeParticipant,
     openProjectParticipant,
@@ -22,12 +22,12 @@ import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/testData';
+} from './support/test-data';
 
 test('completes the full vote-to-results ceremony across three live sessions', async ({
     browser,
@@ -105,7 +105,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             }),
         );
 
-        await expectParticipantsVisible(page, [
+        await expectVotersVisible(page, [
             creatorName,
             participantOneName,
             participantTwoName,
@@ -140,7 +140,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             }),
         );
 
-        await expectNoAxeViolations(page, 'full vote results page');
+        await expectNoAccessibilityViolations(page, 'full vote results page');
         await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participantOne);

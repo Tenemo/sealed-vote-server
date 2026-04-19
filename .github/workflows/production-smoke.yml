@@ -90,5 +90,5 @@ jobs:
                   static_image_headers="$(curl --fail --silent --show-error --location --head "${base_url}/social/og-home.png")"
                   require_header "$static_image_headers" '^content-type: image/png' 'static social image content type'
 
-                  dynamic_image_headers="$(curl --fail --silent --show-error --location --head "${base_url}/social/votes/sealed-vote-seo-smoke--0000.png")"
+                  dynamic_image_headers="$(curl --fail --silent --show-error --location --head "${base_url}/social/polls/sealed-vote-seo-smoke--0000.png")"
                   require_header "$dynamic_image_headers" '^content-type: image/png' 'dynamic social image content type'

@@ -18,8 +18,8 @@ import {
     generateTransportKeyPair,
 } from 'threshold-elgamal';
 
-import { buildServer } from '../buildServer';
-import { publicKeyShares } from '../db/schema.js';
+import { buildServer } from '../build-server';
+import { publicKeyShares } from '../database/schema.js';
 
 const generateToken = (): string => randomBytes(32).toString('hex');
 
@@ -111,7 +111,7 @@ describe('Register voter endpoint', () => {
         );
         expect(secondRegistrationResult.success).toBeFalsy();
         expect(secondRegistrationResult.message).toBe(
-            'Voter name is already taken for this vote.',
+            'Voter name is already taken for this poll.',
         );
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
@@ -211,7 +211,7 @@ describe('Register voter endpoint', () => {
 
         expect(response.statusCode).toBe(400);
         expect((JSON.parse(response.body) as { message: string }).message).toBe(
-            ERROR_MESSAGES.maxParticipantsReached,
+            ERROR_MESSAGES.maximumVoterCountReached,
         );
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
@@ -234,7 +234,7 @@ describe('Register voter endpoint', () => {
 
         expect(firstResponse.statusCode).toBe(201);
 
-        await fastify.db
+        await fastify.database
             .update(publicKeyShares)
             .set({
                 publicKeyShare: '{"transportSuite":"X25519"}',

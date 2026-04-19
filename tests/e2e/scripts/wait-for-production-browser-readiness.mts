@@ -29,7 +29,10 @@ const firefoxHomeOwnershipFailureMessage =
     'Firefox cannot launch in the Playwright container because HOME is not owned by the current user. Set HOME=/root or run the container as a non-root user.';
 const currentFilePath = fileURLToPath(import.meta.url);
 const pnpmExecPath = process.env.npm_execpath;
-const repoRoot = path.resolve(path.dirname(currentFilePath), '../../..');
+const repositoryRoot = path.resolve(
+    path.dirname(currentFilePath),
+    '../../..',
+);
 
 export type ReadinessCheckResult =
     | {
@@ -278,15 +281,18 @@ const runReadinessCheck = async (
                 'playwright',
                 'test',
                 '--config',
-                'tests/config/playwright.production.config.mts',
+                'tests/config/playwright.config.mts',
                 'tests/e2e/00-production-browser-readiness.spec.ts',
                 '--workers',
                 '1',
                 ...forwardedCliArgs,
             ],
             {
-                cwd: repoRoot,
-                env: process.env,
+                cwd: repositoryRoot,
+                env: {
+                    ...process.env,
+                    PLAYWRIGHT_CONFIG_PROFILE: 'production',
+                },
                 stdio: ['ignore', 'pipe', 'pipe'],
             },
         );
@@ -336,11 +342,13 @@ const runReadinessCheck = async (
 
         childProcess.on('error', (error: Error) => {
             processError = error as ReadinessProcessError;
+            const errorText = `${error.stack ?? error.message}\n`;
             capturedOutput = appendOutputTail(
                 capturedOutput,
-                `${error.stack ?? error.message}\n`,
+                errorText,
                 readinessOutputTailMaxLength,
             );
+            process.stderr.write(errorText);
             settle(1);
         });
 

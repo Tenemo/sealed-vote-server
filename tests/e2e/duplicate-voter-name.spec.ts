@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { expectNoAxeViolations } from './support/a11y';
+import { expectNoAccessibilityViolations } from './support/accessibility';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     closeParticipant,
@@ -11,17 +11,17 @@ import {
     deletePolls,
     submitVote,
     type CreatedPoll,
-} from './support/pollFlow';
+} from './support/poll-flow';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/errorTracking';
+} from './support/error-tracking';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/testData';
+} from './support/test-data';
 
 test('shows the duplicate voter-name error and still allows a unique retry', async ({
     browser,
@@ -90,10 +90,10 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
 
         await expect(
             participant.page.getByText(
-                'Voter name is already taken for this vote.',
+                'Voter name is already taken for this poll.',
             ),
         ).toBeVisible();
-        await expectNoAxeViolations(
+        await expectNoAccessibilityViolations(
             participant.page,
             'duplicate voter name validation state',
         );

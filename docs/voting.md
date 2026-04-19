@@ -14,16 +14,16 @@ The public poll read model exposes these phases:
 - `aborted`
 
 They are derived from accepted board payloads plus local ceremony verification.
-The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
+The API read model derives them in `apps/api/src/utils/poll-read-model.ts`.
 
 ## Product flow
 
-1. The organizer creates a vote and lands on the live public page immediately.
-2. Each participant opens the link, scores every option from `1` to `10`, and submits one final vote.
-3. The browser stores those plaintext scores locally on-device and registers the participant with the backend for the later ceremony.
-4. The organizer closes voting once at least three submitted participants exist. That freezes the roster.
+1. The organizer creates a poll and lands on the live public page immediately.
+2. Each voter opens the link, scores every option from `1` to `10`, and submits one final vote.
+3. The browser stores those plaintext scores locally on-device and registers the voter with the backend for the later ceremony.
+4. The organizer closes voting once at least three submitted voters exist. That freezes the roster.
 5. After close, the app derives a frozen manifest `{ rosterHash, optionList, scoreRange }`, where `scoreRange` is fixed to `{ min: 1, max: 10 }` in this product, then automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
-6. Once every submitted participant has a complete encrypted ballot, the creator browser automatically publishes one `ballot-close` payload.
+6. Once every submitted voter has a complete encrypted ballot, the creator browser automatically publishes one `ballot-close` payload.
 7. Decryption shares and tally publications arrive asynchronously after the counted ballot set is frozen.
 8. Every client replays the ceremony from the board log and shows verified arithmetic means.
 
@@ -34,7 +34,7 @@ The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
 - Exact retransmissions are idempotent when the unsigned canonical payload bytes match.
 - Slot conflicts are treated as equivocation and remain visible in the board audit.
 - The cryptographic threshold is honest-majority only and is derived from the frozen roster with `majorityThreshold`.
-- The hard participant cap is `51`. The current validation target remains `15`.
+- The hard voter cap is `51`. The current validation target remains `15`.
 - Token-based enrollment makes the roster public and auditable, but this version does not claim strong identity binding or Sybil resistance.
 
 ## Privacy model
@@ -47,4 +47,4 @@ The API read model derives them in `apps/api/src/utils/pollReadModel.ts`.
 
 ## Shared helpers
 
-- `canonicalUnsignedPayloadBytes`, `protocolPayloadSlotKey`, and `sortProtocolPayloads` live in `packages/protocol/src/protocolPayloads.ts`
+- `canonicalUnsignedPayloadBytes`, `protocolPayloadSlotKey`, and `sortProtocolPayloads` live in `packages/protocol/src/protocol-payloads.ts`

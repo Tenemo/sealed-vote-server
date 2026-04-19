@@ -56,7 +56,6 @@ The compose setup defaults to:
 - `PLAYWRIGHT_BLOB_REPORT=true`
 - `PLAYWRIGHT_CI_WORKERS=1`
 - `PLAYWRIGHT_PRODUCTION_ISOLATE_BY_FILE=true`
-- `PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS=true`
 - `PLAYWRIGHT_NAVIGATION_TIMEOUT_MS=45000`
 
 Override them from the host shell if needed before running the debug command.

@@ -16,6 +16,6 @@ try {
     process.exit(1);
 }
 
-runApiTsxSync(['scripts/resetDb.ts']);
+    runApiTsxSync(['scripts/database.ts', 'reset']);
 
 wireChildProcess(spawnApiTsx(['src/server.ts']));
