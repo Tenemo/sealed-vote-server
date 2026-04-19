@@ -18,10 +18,10 @@ The API read model derives them in `apps/api/src/utils/poll-read-model.ts`.
 
 ## Product flow
 
-1. The organizer creates a poll and lands on the live public page immediately.
+1. The creator creates a poll and lands on the live public page immediately.
 2. Each voter opens the link, scores every option from `1` to `10`, and submits one final vote.
 3. The browser stores those plaintext scores locally on-device and registers the voter with the backend for the later ceremony.
-4. The organizer closes voting once at least three submitted voters exist. That freezes the roster.
+4. The creator closes voting once at least three submitted voters exist. That freezes the roster.
 5. After close, the app derives a frozen manifest `{ rosterHash, optionList, scoreRange }`, where `scoreRange` is fixed to `{ min: 1, max: 10 }` in this product, then automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
 6. Once every submitted voter has a complete encrypted ballot, the creator browser automatically publishes one `ballot-close` payload.
 7. Decryption shares and tally publications arrive asynchronously after the counted ballot set is frozen.

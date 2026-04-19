@@ -183,7 +183,9 @@ const reconcileExistingVoterDeviceRecord = async ({
         .where(eq(publicKeyShares.id, existingPublicKeyShare.id));
 };
 
-export const register = async (fastify: FastifyInstance): Promise<void> => {
+export const registerVoter = async (
+    fastify: FastifyInstance,
+): Promise<void> => {
     fastify.post(
         '/polls/:pollId/register',
         { schema },

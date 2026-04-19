@@ -14,7 +14,7 @@ const listedSpecSeparator = '\u203a';
 test('collectListedSpecFiles extracts unique spec files from Playwright list output', () => {
     const listedFiles = collectListedSpecFiles(
         `Listing tests:
-  [chromium-desktop] ${listedSpecSeparator} duplicate-title-polls.spec.ts:23:5 ${listedSpecSeparator} keeps duplicate-title polls on distinct slug URLs with isolated rosters
+  [chromium-desktop] ${listedSpecSeparator} duplicate-poll-name.spec.ts:23:5 ${listedSpecSeparator} keeps duplicate poll names on distinct slug URLs with isolated rosters
   [chromium-desktop] ${listedSpecSeparator} duplicate-voter-name.spec.ts:26:5 ${listedSpecSeparator} shows the duplicate voter-name error and still allows a unique retry
   [chromium-desktop] ${listedSpecSeparator} duplicate-voter-name.spec.ts:26:5 ${listedSpecSeparator} shows the duplicate voter-name error and still allows a unique retry
 Total: 3 tests in 2 files
@@ -22,7 +22,7 @@ Total: 3 tests in 2 files
     );
 
     assert.deepEqual(listedFiles, [
-        'duplicate-title-polls.spec.ts',
+        'duplicate-poll-name.spec.ts',
         'duplicate-voter-name.spec.ts',
     ]);
 });

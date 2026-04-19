@@ -18,11 +18,11 @@ export const ERROR_MESSAGES = {
     voterDeviceKeysRequired:
         'Every submitted voter must keep the same device keys for the ceremony.',
     ceremonyRestartUnavailable:
-        'The ceremony can only be restarted while the election is still being secured.',
+        'The ceremony can only be restarted while voting is still being secured.',
     ceremonyRestartNoBlockers:
-        'There are no currently blocking participants to skip.',
+        'There are no currently blocking voters to skip.',
     ceremonyRestartMinimumParticipants:
-        'At least 3 active participants are required to continue the ceremony.',
+        'At least 3 active voters are required to restart the ceremony.',
     maximumVoterCountReached: 'Poll has reached its maximum number of voters.',
     boardMessageSignatureRequired:
         'A signed protocol payload is required for board submission.',

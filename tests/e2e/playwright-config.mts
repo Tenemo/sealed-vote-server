@@ -17,7 +17,7 @@ import {
 
 const demoOnlySpecs = ['**/readme-demo.demo.ts'];
 const productionOnlySpecs = ['**/00-production-browser-readiness.spec.ts'];
-const localOnlySpecs = [...productionOnlySpecs, ...demoOnlySpecs];
+const localIgnoredSpecs = [...productionOnlySpecs, ...demoOnlySpecs];
 
 // The main e2e matrix runs WebKit on Linux, where Ed25519 and X25519 WebCrypto
 // support still lags the latest Apple WebKit stack. We probe that support on
@@ -28,7 +28,7 @@ const webkitUnsupportedModernCryptoSpecs =
         : [
               '**/browser-crypto-compatibility.spec.ts',
               '**/ceremony-persistence.spec.ts',
-              '**/duplicate-title-polls.spec.ts',
+              '**/duplicate-poll-name.spec.ts',
               '**/duplicate-voter-name.spec.ts',
               '**/multi-participant-counting.spec.ts',
               '**/share-link.spec.ts',
@@ -42,7 +42,7 @@ const webkitUnsupportedModernCryptoSpecs =
 // edge-stall risk against the live site without adding mobile-specific signal.
 const mobileFirefoxAndroidNonMobileSpecs = [
     '**/ceremony-persistence.spec.ts',
-    '**/duplicate-title-polls.spec.ts',
+    '**/duplicate-poll-name.spec.ts',
     '**/duplicate-voter-name.spec.ts',
     '**/multi-participant-counting.spec.ts',
     '**/refresh-resume.spec.ts',
@@ -312,7 +312,7 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
             : undefined,
     ),
     projects: projects.map((project) =>
-        mergeProjectTestIgnores(project, localOnlySpecs),
+        mergeProjectTestIgnores(project, localIgnoredSpecs),
     ),
     webServer: createLocalWebServers(),
 });

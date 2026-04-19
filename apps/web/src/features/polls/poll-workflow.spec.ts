@@ -468,7 +468,7 @@ describe('pollWorkflow', () => {
         },
     );
 
-    it('shows skipped when the organizer continues without this participant', () => {
+    it('shows skipped when the creator restarts the ceremony without this voter', () => {
         expect(
             derivePollWorkflow({
                 creatorSessionPollId: null,

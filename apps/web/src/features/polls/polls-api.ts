@@ -21,14 +21,14 @@ const apiBaseUrl = resolveBrowserApiBaseUrl({
 // fetch must time out so later polls can recover instead of stalling the
 // participant indefinitely.
 export const pollQueryTimeoutMs = 10_000;
-export const buildGetPollQuery = (
+export const buildFetchPollQuery = (
     pollReference: string,
 ): {
     method: 'GET';
     timeout: number;
     url: string;
 } => ({
-    url: POLL_ROUTES.poll(pollReference),
+    url: POLL_ROUTES.fetchPoll(pollReference),
     method: 'GET' as const,
     timeout: pollQueryTimeoutMs,
 });
@@ -42,14 +42,14 @@ export const pollsApi = createApi({
     endpoints: (build) => ({
         createPoll: build.mutation<CreatePollResponse, CreatePollRequest>({
             query: (pollData) => ({
-                url: POLL_ROUTES.create,
+                url: POLL_ROUTES.createPoll,
                 method: 'POST',
                 body: pollData,
             }),
             invalidatesTags: ['Poll'],
         }),
-        getPoll: build.query<PollResponse, string>({
-            query: buildGetPollQuery,
+        fetchPoll: build.query<PollResponse, string>({
+            query: buildFetchPollQuery,
             providesTags: (result) =>
                 result ? [{ type: 'Poll', id: result.id }] : [],
         }),
@@ -58,7 +58,7 @@ export const pollsApi = createApi({
             { pollId: string; voterData: RegisterVoterRequest }
         >({
             query: ({ pollId, voterData }) => ({
-                url: POLL_ROUTES.register(pollId),
+                url: POLL_ROUTES.registerVoter(pollId),
                 method: 'POST',
                 body: voterData,
             }),
@@ -71,7 +71,7 @@ export const pollsApi = createApi({
             { closeData: CloseVotingRequest; pollId: string }
         >({
             query: ({ closeData, pollId }) => ({
-                url: POLL_ROUTES.close(pollId),
+                url: POLL_ROUTES.closeVoting(pollId),
                 method: 'POST',
                 body: closeData,
             }),
@@ -112,8 +112,8 @@ export type { PollResponse };
 
 export const {
     useCreatePollMutation,
-    useGetPollQuery,
-    useLazyGetPollQuery,
+    useFetchPollQuery,
+    useLazyFetchPollQuery,
     usePostBoardMessageMutation,
     useCloseVotingMutation,
     useRegisterVoterMutation,

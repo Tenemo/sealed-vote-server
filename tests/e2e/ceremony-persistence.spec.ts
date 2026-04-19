@@ -30,16 +30,16 @@ import {
     createVoterName,
 } from './support/test-data';
 
-const continueWithoutMissingVoters = async (
+const restartCeremonyWithoutBlockingVoters = async (
     page: Page,
 ): Promise<Page> => {
-    const waitForContinueButton = async (
+    const waitForRestartButton = async (
         candidatePage: Page,
         timeout: number,
     ): Promise<void> => {
         await expect(
             candidatePage.getByRole('button', {
-                name: 'Continue without missing participants',
+                name: 'Restart ceremony without blocking voters',
             }),
         ).toBeVisible({ timeout });
     };
@@ -47,14 +47,14 @@ const continueWithoutMissingVoters = async (
     await page.bringToFront();
 
     try {
-        await waitForContinueButton(page, 30_000);
+        await waitForRestartButton(page, 30_000);
     } catch {
         page = await reloadPollPage(page);
-        await waitForContinueButton(page, 60_000);
+        await waitForRestartButton(page, 60_000);
     }
 
-    const continueButton = page.getByRole('button', {
-        name: 'Continue without missing participants',
+    const restartButton = page.getByRole('button', {
+        name: 'Restart ceremony without blocking voters',
     });
 
     const restartResponsePromise = page.waitForResponse(
@@ -66,7 +66,7 @@ const continueWithoutMissingVoters = async (
     page.once('dialog', (dialog) => {
         void dialog.accept();
     });
-    await continueButton.click();
+    await restartButton.click();
     await restartResponsePromise;
     return page;
 };
@@ -401,7 +401,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         await closeParticipant(participantOne);
 
         page = attachCreatorTracking(
-            await continueWithoutMissingVoters(page),
+            await restartCeremonyWithoutBlockingVoters(page),
         );
         [participantTwo.page, participantThree.page] =
             await bringPollPagesToFront({
@@ -491,7 +491,7 @@ test('automatically republishes a stored vote after a participant rejoins during
         );
         await expect(
             missingParticipant.page.getByText(
-                'The organizer continued without this device. Your locally stored vote was not counted for this closed vote.',
+                'The creator restarted the ceremony without this voter. Your locally stored vote was not counted for this closed vote.',
             ).first(),
         ).toBeVisible({ timeout: 30_000 });
 
@@ -505,7 +505,7 @@ test('automatically republishes a stored vote after a participant rejoins during
     }
 });
 
-test('lets the organizer rescue multiple missing participants and finish with the remaining stored votes', async ({
+test('lets the creator restart the ceremony without blocking voters and finish with the remaining stored votes', async ({
     browser,
     page,
     request,
@@ -555,7 +555,10 @@ test('lets the organizer rescue multiple missing participants and finish with th
     const createdPollResult = await createPoll({
         attachPage: attachCreatorTracking,
         page,
-        pollName: createPollName('Rescue multiple missing voters', namespace),
+        pollName: createPollName(
+            'Restart ceremony without blocking voters',
+            namespace,
+        ),
     });
     page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
@@ -633,14 +636,14 @@ test('lets the organizer rescue multiple missing participants and finish with th
             });
         page = attachCreatorTracking(await waitForBlockingVoters({
             page,
-            participantNames: [
+            voterNames: [
                 missingParticipantOneName,
                 missingParticipantTwoName,
             ],
         }));
 
         page = attachCreatorTracking(
-            await continueWithoutMissingVoters(page),
+            await restartCeremonyWithoutBlockingVoters(page),
         );
         [participantOne.page, participantTwo.page] =
             await bringPollPagesToFront({
@@ -687,7 +690,7 @@ test('lets the organizer rescue multiple missing participants and finish with th
     }
 });
 
-test('supports repeated organizer rescues at different securing steps', async ({
+test('supports repeated creator ceremony restarts without blocking voters at different securing steps', async ({
     browser,
     page,
     request,
@@ -737,7 +740,7 @@ test('supports repeated organizer rescues at different securing steps', async ({
     const createdPollResult = await createPoll({
         attachPage: attachCreatorTracking,
         page,
-        pollName: createPollName('Repeated rescue', namespace),
+        pollName: createPollName('Repeated ceremony restart', namespace),
     });
     page = attachCreatorTracking(createdPollResult.page);
     const createdPoll = createdPollResult.createdPoll;
@@ -822,11 +825,11 @@ test('supports repeated organizer rescues at different securing steps', async ({
         });
         page = attachCreatorTracking(await waitForBlockingVoters({
             page,
-            participantNames: [missingParticipantName],
+            voterNames: [missingParticipantName],
         }));
 
         page = attachCreatorTracking(
-            await continueWithoutMissingVoters(page),
+            await restartCeremonyWithoutBlockingVoters(page),
         );
         [
             participantOne.page,
@@ -860,11 +863,11 @@ test('supports repeated organizer rescues at different securing steps', async ({
             });
         page = attachCreatorTracking(await waitForBlockingVoters({
             page,
-            participantNames: [participantThreeName],
+            voterNames: [participantThreeName],
         }));
 
         page = attachCreatorTracking(
-            await continueWithoutMissingVoters(page),
+            await restartCeremonyWithoutBlockingVoters(page),
         );
         [participantOne.page, participantTwo.page] =
             await bringPollPagesToFront({

@@ -485,7 +485,7 @@ const buildVerificationSummary = async ({
             qualParticipantIndices: [],
             verification: buildNotReadyVerification(
                 [],
-                'Voting is still open. The ceremony transcript will begin after the organizer closes the vote.',
+                'Voting is still open. The ceremony transcript will begin after the creator closes the vote.',
             ),
         };
     }

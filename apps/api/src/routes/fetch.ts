@@ -137,7 +137,7 @@ const schema = {
 
 type PollResponse = PollResponseContract;
 
-export const fetch = async (fastify: FastifyInstance): Promise<void> => {
+export const fetchPoll = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get(
         '/polls/:pollReference',
         { schema },

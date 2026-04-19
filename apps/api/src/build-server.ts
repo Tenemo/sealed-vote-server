@@ -13,11 +13,11 @@ import { getConfiguredWebAppOrigin } from './config.js';
 import { databasePlugin } from './database/plugin.js';
 import { boardMessageRoutes } from './routes/board-messages.js';
 import { closeVoting } from './routes/close.js';
-import { create } from './routes/create.js';
+import { createPoll } from './routes/create.js';
 import { deletePoll } from './routes/delete.js';
-import { fetch } from './routes/fetch.js';
+import { fetchPoll } from './routes/fetch.js';
 import { healthCheck } from './routes/health-check.js';
-import { register } from './routes/register.js';
+import { registerVoter } from './routes/register.js';
 import { restartCeremony } from './routes/restart-ceremony.js';
 
 config();
@@ -173,10 +173,10 @@ export const buildServer = async (
     });
     await databasePlugin(fastify);
     await fastify.register(healthCheck, { prefix: '/api' });
-    await fastify.register(create, { prefix: '/api' });
-    await fastify.register(fetch, { prefix: '/api' });
+    await fastify.register(createPoll, { prefix: '/api' });
+    await fastify.register(fetchPoll, { prefix: '/api' });
     await fastify.register(deletePoll, { prefix: '/api' });
-    await fastify.register(register, { prefix: '/api' });
+    await fastify.register(registerVoter, { prefix: '/api' });
     await fastify.register(closeVoting, { prefix: '/api' });
     await fastify.register(restartCeremony, { prefix: '/api' });
     await fastify.register(boardMessageRoutes, { prefix: '/api' });

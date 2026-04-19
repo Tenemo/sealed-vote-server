@@ -182,14 +182,14 @@ const normalizeSeoPollPayload = (value: unknown): SeoPollPayload | null => {
         return null;
     }
 
-    const pollTitle = value.pollName.trim();
+    const normalizedPollName = value.pollName.trim();
 
-    if (!pollTitle) {
+    if (!normalizedPollName) {
         return null;
     }
 
     return {
-        pollName: pollTitle,
+        pollName: normalizedPollName,
         resultScores: normalizeNumberArray(value.resultScores),
     };
 };
