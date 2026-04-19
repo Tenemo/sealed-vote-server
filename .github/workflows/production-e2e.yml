@@ -4,12 +4,6 @@ on:
     push:
         branches: [master, main]
     workflow_dispatch:
-        inputs:
-            skip_deploy_validation:
-                description: Skip waiting for the selected commit to reach production and run the checked-out suite against the currently live site.
-                required: false
-                type: boolean
-                default: false
 
 permissions:
     contents: read
@@ -19,64 +13,11 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    validate-manual-production-mode:
-        name: validate manual production mode
-        runs-on: ubuntu-latest
-        outputs:
-            should_run_matrix: ${{ steps.resolve-run-mode.outputs.should_run_matrix }}
-            should_wait_for_deploy: ${{ steps.resolve-run-mode.outputs.should_wait_for_deploy }}
-            skip_reason: ${{ steps.resolve-run-mode.outputs.skip_reason }}
-
-        steps:
-            - id: resolve-run-mode
-              name: resolve production run mode
-              shell: bash
-              run: |
-                  set -euo pipefail
-
-                  event_name="${{ github.event_name }}"
-                  skip_deploy_validation="${{ github.event.inputs.skip_deploy_validation }}"
-                  selected_ref_name="${{ github.ref_name }}"
-                  should_run_matrix="false"
-                  should_wait_for_deploy="false"
-                  skip_reason=""
-
-                  if [ "$event_name" != "workflow_dispatch" ]; then
-                    should_run_matrix="true"
-                    should_wait_for_deploy="true"
-                  elif [ "$skip_deploy_validation" = "true" ]; then
-                    should_run_matrix="true"
-                  elif [ "$selected_ref_name" = "main" ] || [ "$selected_ref_name" = "master" ]; then
-                    should_run_matrix="true"
-                    should_wait_for_deploy="true"
-                  else
-                    skip_reason="Manual production e2e runs from non-production branches default to a no-op because the selected ref ${selected_ref_name} is not deployed to https://sealed.vote. Re-run with skip_deploy_validation=true to execute the checked-out suite against the currently live production site."
-                  fi
-
-                  {
-                    echo "should_run_matrix=${should_run_matrix}"
-                    echo "should_wait_for_deploy=${should_wait_for_deploy}"
-                    echo "skip_reason<<__PRODUCTION_E2E_SKIP_REASON__"
-                    echo "${skip_reason}"
-                    echo "__PRODUCTION_E2E_SKIP_REASON__"
-                  } >> "$GITHUB_OUTPUT"
-
-                  if [ -n "$skip_reason" ]; then
-                    echo "$skip_reason"
-                  elif [ "$should_wait_for_deploy" = "true" ]; then
-                    echo "Waiting for the selected commit to reach https://sealed.vote before running production e2e."
-                  else
-                    echo "Running the checked-out suite against the currently live production site without deploy validation."
-                  fi
-
     wait-for-production-deploy:
         name: wait for production deploy
-        needs: [validate-manual-production-mode]
         if: >-
             ${{
-                always() &&
-                needs.validate-manual-production-mode.result == 'success' &&
-                needs.validate-manual-production-mode.outputs.should_wait_for_deploy == 'true'
+                github.event_name != 'workflow_dispatch'
             }}
         runs-on: ubuntu-latest
         timeout-minutes: 40
@@ -103,14 +44,12 @@ jobs:
 
     production-e2e-matrix:
         name: production e2e (${{ matrix.project.name }})
-        needs: [validate-manual-production-mode, wait-for-production-deploy]
+        needs: [wait-for-production-deploy]
         if: >-
             ${{
                 always() &&
-                needs.validate-manual-production-mode.result == 'success' &&
-                needs.validate-manual-production-mode.outputs.should_run_matrix == 'true' &&
                 (
-                    needs.validate-manual-production-mode.outputs.should_wait_for_deploy != 'true' ||
+                    github.event_name == 'workflow_dispatch' ||
                     needs.wait-for-production-deploy.result == 'success'
                 )
             }}
@@ -217,33 +156,18 @@ jobs:
     production-e2e:
         name: production e2e
         if: always()
-        needs:
-            [
-                validate-manual-production-mode,
-                wait-for-production-deploy,
-                production-e2e-matrix,
-            ]
+        needs: [wait-for-production-deploy, production-e2e-matrix]
         runs-on: ubuntu-latest
 
         steps:
             - name: assert production e2e jobs passed
               run: |
-                  if [ "${{ needs.validate-manual-production-mode.result }}" != "success" ]; then
-                    echo "validate-manual-production-mode result: ${{ needs.validate-manual-production-mode.result }}"
-                    exit 1
-                  fi
-
-                  if [ -n "${{ needs.validate-manual-production-mode.outputs.skip_reason }}" ]; then
-                    echo "${{ needs.validate-manual-production-mode.outputs.skip_reason }}"
-                    exit 0
-                  fi
-
-                  if [ "${{ needs.validate-manual-production-mode.outputs.should_wait_for_deploy }}" = "true" ] && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
+                  if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
                     echo "wait-for-production-deploy result: ${{ needs.wait-for-production-deploy.result }}"
                     exit 1
                   fi
 
-                  if [ "${{ needs.validate-manual-production-mode.outputs.should_run_matrix }}" = "true" ] && [ "${{ needs.production-e2e-matrix.result }}" != "success" ]; then
+                  if [ "${{ needs.production-e2e-matrix.result }}" != "success" ]; then
                     echo "production-e2e-matrix result: ${{ needs.production-e2e-matrix.result }}"
                     exit 1
                   fi
