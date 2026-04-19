@@ -232,6 +232,101 @@ test('attachErrorTracking treats recoverable board-message session mismatches as
     ]);
 });
 
+test('attachErrorTracking suppresses generic failed-to-load-resource console noise when a recoverable board-message response arrives after the console event', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage();
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const consoleListener = listeners.get('console');
+    const responseListener = listeners.get('response');
+    assert.ok(consoleListener);
+    assert.ok(responseListener);
+
+    consoleListener(
+        createMockConsoleMessage(
+            'Failed to load resource: the server responded with a status of 400 (Bad Request)',
+        ),
+    );
+    responseListener(
+        createMockResponse({
+            bodyText: JSON.stringify({
+                message:
+                    'The submitted payload does not match the active ceremony session.',
+            }),
+            status: 400,
+            url: 'https://api.sealed.vote/api/polls/mock-poll/board/messages',
+        }),
+    );
+
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    assert.deepEqual(tracker.errors, []);
+    assert.deepEqual(tracker.recentEvents, [
+        '[page] response: POST 400 https://api.sealed.vote/api/polls/mock-poll/board/messages (page https://sealed.vote/polls/mock-poll) message=The submitted payload does not match the active ceremony session.',
+    ]);
+});
+
+test('attachErrorTracking suppresses generic failed-to-load-resource console noise when a recoverable board-message response arrives before the console event', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage();
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const consoleListener = listeners.get('console');
+    const responseListener = listeners.get('response');
+    assert.ok(consoleListener);
+    assert.ok(responseListener);
+
+    responseListener(
+        createMockResponse({
+            bodyText: JSON.stringify({
+                message:
+                    'The submitted payload does not match the active ceremony session.',
+            }),
+            status: 400,
+            url: 'https://api.sealed.vote/api/polls/mock-poll/board/messages',
+        }),
+    );
+
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    consoleListener(
+        createMockConsoleMessage(
+            'Failed to load resource: the server responded with a status of 400 (Bad Request)',
+        ),
+    );
+
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    assert.deepEqual(tracker.errors, []);
+    assert.deepEqual(tracker.recentEvents, [
+        '[page] response: POST 400 https://api.sealed.vote/api/polls/mock-poll/board/messages (page https://sealed.vote/polls/mock-poll) message=The submitted payload does not match the active ceremony session.',
+    ]);
+});
+
+test('attachErrorTracking still records generic failed-to-load-resource 400 console errors when no recoverable board-message response matches them', async () => {
+    const tracker = createUnexpectedErrorTracker();
+    const { listeners, page } = createMockPage();
+
+    attachErrorTracking(page as never, 'page', tracker);
+
+    const consoleListener = listeners.get('console');
+    assert.ok(consoleListener);
+
+    consoleListener(
+        createMockConsoleMessage(
+            'Failed to load resource: the server responded with a status of 400 (Bad Request)',
+        ),
+    );
+
+    await Promise.allSettled([...tracker.pendingChecks]);
+
+    assert.deepEqual(tracker.errors, [
+        '[page] console (page https://sealed.vote/polls/mock-poll): Failed to load resource: the server responded with a status of 400 (Bad Request)',
+    ]);
+});
+
 test('attachErrorTracking records page errors with page url and stack', () => {
     const tracker = createUnexpectedErrorTracker();
     const { listeners, page } = createMockPage();

@@ -75,7 +75,7 @@ Example response:
     },
     "verification": {
         "status": "not-ready",
-        "reason": "Voting is still open. The ceremony transcript will begin after the organizer closes the vote.",
+        "reason": "Voting is still open. The ceremony transcript will begin after the creator closes the vote.",
         "qualParticipantIndices": [],
         "verifiedOptionTallies": []
     },
@@ -146,7 +146,7 @@ Optional creator registration as a voter:
   - voter names are unique within a poll
   - registration is token-only in this version; there is no strong identity binding
   - the app uses this route when a voter submits their final pre-close vote
-  - registration closes permanently once the organizer closes voting
+  - registration closes permanently once the creator closes voting
   - the app stores the voter auth and transport public keys during submit so the post-close board ceremony can verify the frozen roster
 
 ## Close voting

@@ -39,8 +39,8 @@ import {
 import { derivePollWorkflow } from 'features/polls/poll-workflow';
 import {
     useCloseVotingMutation,
-    useGetPollQuery,
-    useLazyGetPollQuery,
+    useFetchPollQuery,
+    useLazyFetchPollQuery,
     usePostBoardMessageMutation,
     useRegisterVoterMutation,
     useRestartCeremonyMutation,
@@ -61,7 +61,7 @@ const scoreOptions = Array.from(
     (_value, offset) => minimumScore + offset,
 );
 
-type PollData = NonNullable<ReturnType<typeof useGetPollQuery>['data']>;
+type PollData = NonNullable<ReturnType<typeof useFetchPollQuery>['data']>;
 type PollBoardEntry = PollData['boardEntries'][number];
 const activeCeremonyPhases = new Set<PollData['phase']>([
     'ready-to-reveal',
@@ -230,7 +230,7 @@ const PollPage = (): React.JSX.Element => {
     const [registerVoter, registerState] = useRegisterVoterMutation();
     const [closeVoting, closeState] = useCloseVotingMutation();
     const [restartCeremony, restartState] = useRestartCeremonyMutation();
-    const [fetchLatestPoll] = useLazyGetPollQuery();
+    const [fetchLatestPoll] = useLazyFetchPollQuery();
     const [postBoardMessage] = usePostBoardMessageMutation();
     const [voterName, setVoterName] = React.useState('');
     const [draftScores, setDraftScores] = React.useState<(number | null)[]>([]);
@@ -273,7 +273,7 @@ const PollPage = (): React.JSX.Element => {
         isFetching,
         isLoading,
         refetch,
-    } = useGetPollQuery(pollSlug, {
+    } = useFetchPollQuery(pollSlug, {
         pollingInterval: pollingIntervalMs,
         refetchOnFocus: true,
         refetchOnReconnect: true,
@@ -1002,13 +1002,13 @@ const PollPage = (): React.JSX.Element => {
             return;
         }
 
-        const blockedNames = blockingVoters
-            .map((participant) => participant.voterName)
+        const blockingVoterNames = blockingVoters
+            .map((voter) => voter.voterName)
             .join(', ');
         const confirmed =
             typeof window === 'undefined' ||
             window.confirm(
-                `Continue without ${blockedNames}? Their locally stored votes will not be counted for this closed vote.`,
+                `Restart the ceremony without ${blockingVoterNames}? Their locally stored votes will not be counted for this closed vote.`,
             );
 
         if (!confirmed) {
@@ -1026,7 +1026,7 @@ const PollPage = (): React.JSX.Element => {
                 },
             }).unwrap();
             setLocalNotice(
-                `Continuing without ${blockedNames}. Those votes will not be counted unless those devices had already finished the active ceremony session.`,
+                `Restarted the ceremony without ${blockingVoterNames}. Those votes will not be counted unless those voters had already finished the active ceremony session before the restart.`,
             );
             await refetch();
         } catch (restartError) {
@@ -1036,13 +1036,13 @@ const PollPage = (): React.JSX.Element => {
 
     const primaryExplanation =
         workflow.currentStep === 'anonymous-ready-to-vote'
-            ? 'Score every option from 1 to 10, submit once, and come back after the organizer closes voting.'
+            ? 'Score every option from 1 to 10, submit once, and come back after the creator closes voting.'
             : workflow.currentStep === 'submitting-vote'
               ? 'Saving your final local vote and registering this device for the later ceremony.'
               : workflow.currentStep === 'creator-must-submit-first'
                 ? 'You still need to submit your own vote from this browser before you can close voting.'
                 : workflow.currentStep === 'vote-stored-waiting-for-close'
-                  ? 'Your plaintext scores are stored only on this device until the organizer closes voting.'
+                  ? 'Your plaintext scores are stored only on this device until the creator closes voting.'
                   : workflow.currentStep === 'creator-can-close'
                     ? 'Everyone who submitted before you close will be included. Everyone else stays out.'
                     : workflow.currentStep === 'securing-auto'
@@ -1054,7 +1054,7 @@ const PollPage = (): React.JSX.Element => {
                         : workflow.currentStep === 'securing-waiting'
                           ? 'Waiting for the rest of the group to finish the secure setup and encrypted ballot publication.'
                           : workflow.currentStep === 'skipped'
-                            ? 'The organizer continued without this device. Your locally stored vote was not counted for this closed vote.'
+                            ? 'The creator restarted the ceremony without this voter. Your locally stored vote was not counted for this closed vote.'
                             : workflow.currentStep === 'revealing-auto'
                               ? (currentAutomaticActionDescription ??
                                 'Starting the reveal and publishing decryption material in the background.')
@@ -1182,25 +1182,23 @@ const PollPage = (): React.JSX.Element => {
                                         <p>
                                             Ceremony progress is waiting on{' '}
                                             {blockingVoters
-                                                .map(
-                                                    (participant) =>
-                                                        participant.voterName,
-                                                )
+                                                .map((voter) => voter.voterName)
                                                 .join(', ')}
-                                            . If you continue without them, any
-                                            votes still trapped on those devices
+                                            . If you restart the ceremony
+                                            without them, any votes that those
+                                            voters have not already advanced
+                                            through the active ceremony session
                                             will be skipped for this closed
                                             vote.
                                         </p>
                                         {!canRestartCeremony ? (
                                             <p className="text-sm text-secondary">
-                                                A rescue becomes available only
-                                                once removing the currently
-                                                blocking devices would still
+                                                You can restart the ceremony
+                                                only when removing the current
+                                                blocking voters would still
                                                 leave at least{' '}
                                                 {poll.minimumCloseVoterCount}{' '}
-                                                active participants in the
-                                                ceremony.
+                                                active voters in the ceremony.
                                             </p>
                                         ) : null}
                                         {canRestartCeremony ? (
@@ -1210,15 +1208,15 @@ const PollPage = (): React.JSX.Element => {
                                                     loading={
                                                         restartState.isLoading
                                                     }
-                                                    loadingLabel="Continuing ceremony"
+                                                    loadingLabel="Restarting ceremony"
                                                     onClick={() => {
                                                         void onRestartCeremony();
                                                     }}
                                                     size="lg"
                                                     variant="outline"
                                                 >
-                                                    Continue without missing
-                                                    participants
+                                                    Restart ceremony without
+                                                    blocking voters
                                                 </LoadingButton>
                                             </div>
                                         ) : null}

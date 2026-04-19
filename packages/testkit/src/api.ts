@@ -56,7 +56,7 @@ export const createPoll = async (
     const creatorToken = generateClientToken();
     const createResponse = await fastify.inject({
         method: 'POST',
-        url: POLL_ROUTES.create,
+        url: POLL_ROUTES.createPoll,
         payload: {
             choices: requestedChoices,
             creatorToken,
@@ -82,7 +82,7 @@ export const fetchPoll = async (
 ): Promise<PollResponse> => {
     const response = await fastify.inject({
         method: 'GET',
-        url: POLL_ROUTES.poll(pollReference),
+        url: POLL_ROUTES.fetchPoll(pollReference),
     });
 
     return JSON.parse(response.body) as PollResponse;
@@ -132,7 +132,7 @@ export const deletePoll = async (
 ): Promise<{ success: boolean; message?: string }> => {
     const response = await fastify.inject({
         method: 'DELETE',
-        url: POLL_ROUTES.remove(pollId),
+        url: POLL_ROUTES.deletePoll(pollId),
         payload: {
             creatorToken,
         },
@@ -165,7 +165,7 @@ export const registerVoter = async (
     const transportKeyPair = await generateTransportKeyPair();
     const response = await fastify.inject({
         method: 'POST',
-        url: POLL_ROUTES.register(pollId),
+        url: POLL_ROUTES.registerVoter(pollId),
         payload: {
             authPublicKey: await exportAuthPublicKey(authKeyPair.publicKey),
             transportPublicKey: await exportTransportPublicKey(
@@ -198,7 +198,7 @@ export const closePoll = async (
 ): Promise<{ success: boolean; message?: string }> => {
     const response = await fastify.inject({
         method: 'POST',
-        url: POLL_ROUTES.close(pollId),
+        url: POLL_ROUTES.closeVoting(pollId),
         payload: {
             creatorToken,
         },

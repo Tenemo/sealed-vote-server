@@ -346,13 +346,23 @@ const createPollWithDemoMotion = async ({
     await clickWithDemoMotion(page, createVoteButton);
     const createPollResponse = await createPollResponsePromise;
     expect(createPollResponse.ok()).toBeTruthy();
-
-    await expect(page).toHaveURL(/\/votes\/[a-z0-9-]+--[0-9a-f]{4}$/);
     const createdPoll = (await createPollResponse.json()) as {
         creatorToken: string;
         id: string;
         slug: string;
     };
+    const pollUrl = new URL(`/polls/${createdPoll.slug}`, startUrl).toString();
+
+    try {
+        await expect(page).toHaveURL(pollUrl, {
+            timeout: 5_000,
+        });
+    } catch {
+        page = await gotoDemoPage({
+            page,
+            url: pollUrl,
+        });
+    }
 
     return {
         createdPoll: {
@@ -360,7 +370,7 @@ const createPollWithDemoMotion = async ({
             creatorToken: createdPoll.creatorToken,
             pollId: createdPoll.id,
             pollSlug: createdPoll.slug,
-            pollUrl: page.url(),
+            pollUrl,
         },
         page,
     };

@@ -8,7 +8,10 @@ import {
     submitVote,
     type CreatedPoll,
 } from './support/poll-flow';
-import { gotoInteractablePage } from './support/navigation.mts';
+import {
+    gotoInteractablePage,
+    reloadInteractablePage,
+} from './support/navigation.mts';
 import {
     closeParticipant,
     getProjectContextOptions,
@@ -119,8 +122,8 @@ test('restores the securing state after refresh once voting is closed', async ({
         label: 'participant-two',
         tracker,
     });
-    const attachRestoredTracking = createErrorTrackingAttacher({
-        label: 'creator-restored',
+    const attachRefreshedTracking = createErrorTrackingAttacher({
+        label: 'creator-refreshed',
         tracker,
     });
 
@@ -137,8 +140,6 @@ test('restores the securing state after refresh once voting is closed', async ({
 
     const participantOne = await openProjectParticipant(browser, testInfo);
     const participantTwo = await openProjectParticipant(browser, testInfo);
-    let restoredContext: BrowserContext | null = null;
-
     participantOne.page = attachParticipantOneTracking(participantOne.page);
     participantTwo.page = attachParticipantTwoTracking(participantTwo.page);
 
@@ -170,24 +171,11 @@ test('restores the securing state after refresh once voting is closed', async ({
         );
 
         page = attachCreatorTracking(await closeVoting(page));
+        page = attachRefreshedTracking(await reloadInteractablePage(page));
 
-        restoredContext = await browser.newContext({
-            ...(getProjectContextOptions(testInfo) ?? {}),
-            storageState: await page.context().storageState(),
-        });
-        const restoredPage = attachRestoredTracking(
-            await restoredContext.newPage(),
-        );
-        const resumedPage = attachRestoredTracking(
-            await gotoInteractablePage(restoredPage, createdPoll.pollUrl),
-        );
-
-        await expectPostCloseVisible(resumedPage);
+        await expectPostCloseVisible(page);
         await expectNoUnexpectedErrors(tracker);
     } finally {
-        if (restoredContext) {
-            await restoredContext.close();
-        }
         await closeParticipant(participantOne);
         await closeParticipant(participantTwo);
         await deletePolls(request, createdPolls);

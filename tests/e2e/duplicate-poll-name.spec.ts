@@ -20,7 +20,7 @@ import {
 } from './support/error-tracking';
 import { createTestNamespace, createVoterName } from './support/test-data';
 
-test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', async ({
+test('keeps duplicate poll names on distinct slug URLs with isolated rosters', async ({
     browser,
     page,
     request,
@@ -28,28 +28,22 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     const tracker = createUnexpectedErrorTracker({ testInfo });
     const createdPolls: CreatedPoll[] = [];
     const namespace = createTestNamespace(testInfo);
-    const pollTitle = `Duplicate title vote ${namespace}`.slice(0, 64);
+    const pollName = `Duplicate name vote ${namespace}`.slice(0, 64);
     const firstPollVoterName = createVoterName('alice', namespace);
     const secondPollVoterName = createVoterName('bob', namespace);
     const attachFirstPollTracking = createErrorTrackingAttacher({
         label: 'first-poll',
-        options: {
-            allowedConsoleErrors: [/^Error$/],
-        },
         tracker,
     });
     const attachSecondPollTracking = createErrorTrackingAttacher({
         label: 'second-poll',
-        options: {
-            allowedConsoleErrors: [/^Error$/],
-        },
         tracker,
     });
 
-    const createPollWithTitle = async (): Promise<CreatedPoll> => {
+    const createPollWithName = async (): Promise<CreatedPoll> => {
         const createdPollResult = await createPoll({
             page,
-            pollName: pollTitle,
+            pollName,
         });
         page = createdPollResult.page;
         const createdPoll = createdPollResult.createdPoll;
@@ -58,8 +52,8 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
         return createdPoll;
     };
 
-    const firstPoll = await createPollWithTitle();
-    const secondPoll = await createPollWithTitle();
+    const firstPoll = await createPollWithName();
+    const secondPoll = await createPollWithName();
 
     expect(secondPoll.pollUrl).not.toBe(firstPoll.pollUrl);
 

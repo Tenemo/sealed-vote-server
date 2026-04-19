@@ -1,16 +1,15 @@
 import {
     isUuid,
+    maximumPollVoterCount,
+    minimumPollVotersToClose,
     orderVerifiedOptionTallies,
     type PollResponse,
 } from '@sealed-vote/contracts';
 import { sortProtocolPayloads } from '@sealed-vote/protocol';
-import { eq } from 'drizzle-orm';
 import {
     hashProtocolTranscript,
     majorityThreshold,
     type ElectionManifest,
-    type ManifestPublicationPayload,
-    type RegistrationPayload,
     type SignedPayload,
     tryVerifyElectionCeremony,
     verifyDKGTranscript,
@@ -26,10 +25,6 @@ import {
 import { normalizeDatabaseTimestamp } from './database.js';
 import { parseVoterDeviceRecord } from './voter-device-records.js';
 import { derivePollCeremonySession } from './poll-ceremony-sessions.js';
-import {
-    maximumPollVoterCount,
-    minimumPollVotersToClose,
-} from './poll-limits.js';
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 type PollRow = Pick<
@@ -485,7 +480,7 @@ const buildVerificationSummary = async ({
             qualParticipantIndices: [],
             verification: buildNotReadyVerification(
                 [],
-                'Voting is still open. The ceremony transcript will begin after the organizer closes the vote.',
+                'Voting is still open. The ceremony transcript will begin after the creator closes the vote.',
             ),
         };
     }
@@ -974,56 +969,4 @@ export const getPollFetchReadModel = async (
         rosterEntries,
         thresholds,
     };
-};
-
-export const getPollById = async (
-    database: ReadOnlyDatabase,
-    pollId: string,
-): Promise<PollResponse | undefined> => {
-    const [poll] = await database
-        .select({
-            id: polls.id,
-        })
-        .from(polls)
-        .where(eq(polls.id, pollId));
-
-    if (!poll) {
-        return undefined;
-    }
-
-    return await getPollFetchReadModel(database, poll.id);
-};
-
-export const findAcceptedRegistrationPayload = async (
-    database: ReadOnlyDatabase,
-    pollId: string,
-    participantIndex: number,
-): Promise<SignedPayload<RegistrationPayload> | null> => {
-    const rows = await getBoardMessageRows(database, pollId);
-    const classifiedBoard = await classifyBoardMessages(rows);
-
-    const payload = classifiedBoard.acceptedPayloads.find(
-        (signedPayload) =>
-            signedPayload.payload.participantIndex === participantIndex &&
-            isSignedPayloadOfType(signedPayload, 'registration'),
-    );
-
-    return payload && isSignedPayloadOfType(payload, 'registration')
-        ? payload
-        : null;
-};
-
-export const getAcceptedManifestPublication = async (
-    database: ReadOnlyDatabase,
-    pollId: string,
-): Promise<SignedPayload<ManifestPublicationPayload> | null> => {
-    const rows = await getBoardMessageRows(database, pollId);
-    const classifiedBoard = await classifyBoardMessages(rows);
-    const payload = classifiedBoard.acceptedPayloads.find((signedPayload) =>
-        isSignedPayloadOfType(signedPayload, 'manifest-publication'),
-    );
-
-    return payload && isSignedPayloadOfType(payload, 'manifest-publication')
-        ? payload
-        : null;
 };

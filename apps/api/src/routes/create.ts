@@ -128,7 +128,7 @@ const assertMatchingCreateRequest = ({
     }
 };
 
-export const create = async (fastify: FastifyInstance): Promise<void> => {
+export const createPoll = async (fastify: FastifyInstance): Promise<void> => {
     fastify.post(
         '/polls/create',
         { schema },

@@ -621,10 +621,10 @@ export const waitForCeremonyMetric = async ({
 
 export const waitForBlockingVoters = async ({
     page,
-    participantNames,
+    voterNames,
 }: {
     page: Page;
-    participantNames: readonly string[];
+    voterNames: readonly string[];
 }): Promise<Page> => {
     return await waitForPollPageState({
         page,
@@ -632,7 +632,7 @@ export const waitForBlockingVoters = async ({
         waitForState: async (candidatePage, timeout) => {
             await expect(
                 candidatePage.getByText(
-                    `Ceremony progress is waiting on ${participantNames.join(', ')}.`,
+                    `Ceremony progress is waiting on ${voterNames.join(', ')}.`,
                 ),
             ).toBeVisible({ timeout });
         },
@@ -641,17 +641,17 @@ export const waitForBlockingVoters = async ({
 
 export const expectVotersVisible = async (
     page: Page,
-    participantNames: readonly string[],
+    voterNames: readonly string[],
 ): Promise<void> => {
     await expect(page.getByRole('heading', { name: 'Voters' })).toBeVisible();
     const votersList = page.getByRole('list', {
         name: 'Voters roster',
     });
 
-    for (const participantName of participantNames) {
+    for (const voterName of voterNames) {
         await expect(
             votersList.getByText(
-                new RegExp(`^\\d+\\.\\s+${escapeRegExp(participantName)}$`),
+                new RegExp(`^\\d+\\.\\s+${escapeRegExp(voterName)}$`),
             ),
         ).toBeVisible();
     }
@@ -659,16 +659,16 @@ export const expectVotersVisible = async (
 
 export const expectVotersHidden = async (
     page: Page,
-    participantNames: readonly string[],
+    voterNames: readonly string[],
 ): Promise<void> => {
     const votersList = page.getByRole('list', {
         name: 'Voters roster',
     });
 
-    for (const participantName of participantNames) {
+    for (const voterName of voterNames) {
         await expect(
             votersList.getByText(
-                new RegExp(`^\\d+\\.\\s+${escapeRegExp(participantName)}$`),
+                new RegExp(`^\\d+\\.\\s+${escapeRegExp(voterName)}$`),
             ),
         ).toHaveCount(0);
     }

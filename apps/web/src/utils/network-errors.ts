@@ -10,16 +10,14 @@ export const connectionLostMessage = 'The connection to the server was lost.';
 const isFetchBaseQueryError = (error: unknown): error is FetchBaseQueryError =>
     !!error && typeof error === 'object' && 'status' in error;
 
-export const isConnectionError = (
-    error: unknown,
-): error is FetchBaseQueryError =>
+const isConnectionError = (error: unknown): error is FetchBaseQueryError =>
     isFetchBaseQueryError(error) &&
     ((typeof error.status === 'string' &&
         connectionErrorStatuses.has(error.status)) ||
         (typeof error.status === 'number' &&
             connectionErrorHttpStatuses.has(error.status)));
 
-export const isConnectionErrorMessage = (message: string): boolean =>
+const isConnectionErrorMessage = (message: string): boolean =>
     connectionErrorPattern.test(message);
 
 export const renderError = (error: unknown): string => {

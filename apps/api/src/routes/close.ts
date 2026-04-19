@@ -1,4 +1,7 @@
-import { ERROR_MESSAGES } from '@sealed-vote/contracts';
+import {
+    ERROR_MESSAGES,
+    minimumPollVotersToClose,
+} from '@sealed-vote/contracts';
 import type {
     CloseVotingRequest as CloseVotingRequestContract,
     MessageResponse,
@@ -14,7 +17,6 @@ import { withTransaction } from '../utils/database.js';
 import { parseVoterDeviceRecord } from '../utils/voter-device-records.js';
 import { insertPollCeremonySession } from '../utils/poll-ceremony-sessions.js';
 import { lockPollById } from '../utils/poll-locks.js';
-import { minimumPollVotersToClose } from '../utils/poll-limits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voter-auth.js';
 

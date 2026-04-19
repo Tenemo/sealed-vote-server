@@ -1255,6 +1255,79 @@ test('reloadInteractablePage replaces the page after a transient reload timeout'
     ]);
 });
 
+test('reloadInteractablePage replaces the page when navigation probes stall', async () => {
+    const retryDelays: number[] = [];
+    const replacementGotoCalls: NavigationOptions[] = [];
+    const previousNavigationTimeout =
+        process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+    const previousRetrySetting =
+        process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+    const replacementPage = createPageDouble({
+        currentUrl: 'https://sealed.vote/polls/example--1234',
+        isInteractable: true,
+        readyState: 'complete',
+    });
+    const page = createPageDouble(
+        {
+            currentUrl: 'https://sealed.vote/polls/example--1234',
+            isInteractable: false,
+            readyState: 'loading',
+        },
+        {
+            createReplacement: () => replacementPage,
+        },
+    );
+    const stalledTextProbe = new Promise<string>(() => undefined);
+
+    page.reload = async () => {
+        throw new Error('page.reload: Timeout 45000ms exceeded.');
+    };
+    page.evaluate = async <Result,>() => (await stalledTextProbe) as Result;
+    page.title = async () => await stalledTextProbe;
+    page.content = async () => await stalledTextProbe;
+    page.waitForTimeout = async (timeout: number) => {
+        retryDelays.push(timeout);
+    };
+    replacementPage.goto = async (
+        _url: string,
+        options?: NavigationOptions,
+    ) => {
+        replacementGotoCalls.push(options as NavigationOptions);
+    };
+
+    process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS = '50';
+    process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS = 'true';
+
+    try {
+        const resolvedPage = await reloadInteractablePage(page);
+
+        assert.equal(resolvedPage, replacementPage);
+    } finally {
+        if (previousNavigationTimeout === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS =
+                previousNavigationTimeout;
+        }
+
+        if (previousRetrySetting === undefined) {
+            delete process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS;
+        } else {
+            process.env.PLAYWRIGHT_NAVIGATION_RETRY_TIMEOUTS =
+                previousRetrySetting;
+        }
+    }
+
+    assert.equal(page.isClosed(), true);
+    assert.deepEqual(retryDelays, [1_000]);
+    assert.deepEqual(replacementGotoCalls, [
+        {
+            timeout: 50,
+            waitUntil: 'commit',
+        },
+    ]);
+});
+
 test('reloadInteractablePage bootstraps a blank replacement page before deep-link navigation', async () => {
     const retryDelays: number[] = [];
     const replacementGotoUrls: string[] = [];

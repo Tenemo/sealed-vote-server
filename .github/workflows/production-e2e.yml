@@ -13,11 +13,35 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
+    validate-manual-production-mode:
+        name: validate manual production mode
+        if: >-
+            ${{
+                github.event_name == 'workflow_dispatch'
+            }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: reject misleading non-production manual runs
+              run: |
+                  case "${{ github.ref_name }}" in
+                    master|main)
+                      echo "Manual production e2e is allowed for production branch '${{ github.ref_name }}'."
+                      ;;
+                    *)
+                      echo "Manual production e2e always targets https://sealed.vote and https://api.sealed.vote."
+                      echo "Branch '${{ github.ref_name }}' is not a production branch, so its tests can disagree with the live deployment."
+                      echo "Run this workflow from master/main after the deploy you want to verify."
+                      exit 1
+                      ;;
+                  esac
+
     wait-for-production-deploy:
         name: wait for production deploy
         if: >-
             ${{
-                github.event_name != 'workflow_dispatch'
+                github.event_name != 'workflow_dispatch' ||
+                github.ref_name == 'master' ||
+                github.ref_name == 'main'
             }}
         runs-on: ubuntu-latest
         timeout-minutes: 40
@@ -44,13 +68,20 @@ jobs:
 
     production-e2e-matrix:
         name: production e2e (${{ matrix.project.name }})
-        needs: [wait-for-production-deploy]
+        needs: [validate-manual-production-mode, wait-for-production-deploy]
         if: >-
             ${{
                 always() &&
                 (
-                    github.event_name == 'workflow_dispatch' ||
-                    needs.wait-for-production-deploy.result == 'success'
+                    (
+                        github.event_name != 'workflow_dispatch' &&
+                        needs.wait-for-production-deploy.result == 'success'
+                    ) ||
+                    (
+                        github.event_name == 'workflow_dispatch' &&
+                        needs.validate-manual-production-mode.result == 'success' &&
+                        needs.wait-for-production-deploy.result == 'success'
+                    )
                 )
             }}
         runs-on: ubuntu-latest
@@ -156,13 +187,23 @@ jobs:
     production-e2e:
         name: production e2e
         if: always()
-        needs: [wait-for-production-deploy, production-e2e-matrix]
+        needs:
+            [
+                validate-manual-production-mode,
+                wait-for-production-deploy,
+                production-e2e-matrix,
+            ]
         runs-on: ubuntu-latest
 
         steps:
             - name: assert production e2e jobs passed
               run: |
-                  if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ needs.validate-manual-production-mode.result }}" != "success" ]; then
+                    echo "validate-manual-production-mode result: ${{ needs.validate-manual-production-mode.result }}"
+                    exit 1
+                  fi
+
+                  if [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
                     echo "wait-for-production-deploy result: ${{ needs.wait-for-production-deploy.result }}"
                     exit 1
                   fi
