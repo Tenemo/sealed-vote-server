@@ -20,7 +20,7 @@ export type CreatePollResponse = {
     creatorToken: string;
 };
 
-export type PollRosterParticipant = {
+export type PollRosterVoter = {
     ceremonyState: 'active' | 'blocking' | 'skipped';
     deviceReady: boolean;
     voterIndex: number;
@@ -82,7 +82,7 @@ export type PollCeremonySummary = {
     acceptedEncryptedBallotCount: number;
     acceptedRegistrationCount: number;
     activeParticipantCount: number;
-    blockingParticipantIndices: number[];
+    blockingVoterIndices: number[];
     completeEncryptedBallotParticipantCount: number;
     revealReady: boolean;
     restartCount: number;
@@ -95,14 +95,14 @@ export type PollResponse = {
     createdAt: string;
     isOpen: boolean;
     choices: string[];
-    voters: PollRosterParticipant[];
+    voters: PollRosterVoter[];
     manifest: ElectionManifest | null;
     manifestHash: string | null;
     sessionId: string | null;
     sessionFingerprint: string | null;
     phase: PollPhase;
-    submittedParticipantCount: number;
-    minimumCloseParticipantCount: number;
+    submittedVoterCount: number;
+    minimumCloseVoterCount: number;
     ceremony: PollCeremonySummary;
     boardAudit: PollBoardAudit;
     verification: PollVerificationSummary;
@@ -111,7 +111,7 @@ export type PollResponse = {
     thresholds: {
         reconstructionThreshold: number | null;
         minimumPublishedVoterCount: number | null;
-        maxParticipants: number;
+        maximumVoterCount: number;
         validationTarget: number;
     };
 };

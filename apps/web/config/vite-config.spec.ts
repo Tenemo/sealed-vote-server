@@ -33,10 +33,10 @@ const normalizeAliasEntries = (
 
 const require = createRequire(import.meta.url);
 const configDir = fileURLToPath(new URL('.', import.meta.url));
-const repoRootDir = path.resolve(configDir, '..', '..', '..');
+const repositoryRootDirectory = path.resolve(configDir, '..', '..', '..');
 const rootPackageJsonUrl = new URL('../../../package.json', import.meta.url);
 const rootTslibEntryPath = require.resolve('tslib/tslib.es6.mjs', {
-    paths: [repoRootDir],
+    paths: [repositoryRootDirectory],
 });
 
 describe('vite config', () => {
@@ -76,7 +76,9 @@ describe('vite config', () => {
 
         expect(rootTslibVersion).toBeDefined();
         expect(rootTslibEntryPath).toBe(
-            require.resolve('tslib/tslib.es6.mjs', { paths: [repoRootDir] }),
+            require.resolve('tslib/tslib.es6.mjs', {
+                paths: [repositoryRootDirectory],
+            }),
         );
     });
 });

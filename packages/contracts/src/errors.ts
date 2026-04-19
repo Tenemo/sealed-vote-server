@@ -7,8 +7,7 @@ export const ERROR_MESSAGES = {
     duplicateVoterName: 'Voter name is already taken for this vote.',
     pollClosed: 'Poll is closed for new registrations.',
     pollAlreadyClosed: 'Poll is already closed.',
-    notEnoughVotersToClose: 'Not enough voters to close the poll.',
-    notEnoughParticipantsToClose:
+    notEnoughVotersToClose:
         'At least 3 submitted voters are required before voting can close.',
     invalidCreatorToken: 'Invalid creator token.',
     invalidVoterToken: 'Invalid voter token.',
@@ -16,16 +15,15 @@ export const ERROR_MESSAGES = {
         'Creator token was already used for a different vote.',
     voterTokenConflict:
         'Voter token was already used for a different voter name.',
-    participantDeviceKeysRequired:
-        'Every submitted participant must keep the same device keys for the ceremony.',
+    voterDeviceKeysRequired:
+        'Every submitted voter must keep the same device keys for the ceremony.',
     ceremonyRestartUnavailable:
         'The ceremony can only be restarted while the election is still being secured.',
     ceremonyRestartNoBlockers:
         'There are no currently blocking participants to skip.',
     ceremonyRestartMinimumParticipants:
         'At least 3 active participants are required to continue the ceremony.',
-    maxParticipantsReached:
-        'Poll has reached its maximum number of participants.',
+    maximumVoterCountReached: 'Poll has reached its maximum number of voters.',
     boardMessageSignatureRequired:
         'A signed protocol payload is required for board submission.',
     boardMessagePayloadInvalid:

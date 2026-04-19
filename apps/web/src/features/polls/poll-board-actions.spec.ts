@@ -50,14 +50,14 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     sessionId: 'c'.repeat(64),
     sessionFingerprint: 'ABCD-EF12-3456-7890-ABCD-EF12-3456-7890',
     phase: 'securing',
-    submittedParticipantCount: 3,
-    minimumCloseParticipantCount: 3,
+    submittedVoterCount: 3,
+    minimumCloseVoterCount: 3,
     ceremony: {
         acceptedDecryptionShareCount: 0,
         acceptedEncryptedBallotCount: 0,
         acceptedRegistrationCount: 0,
         activeParticipantCount: 3,
-        blockingParticipantIndices: [],
+        blockingVoterIndices: [],
         completeEncryptedBallotParticipantCount: 0,
         revealReady: false,
         restartCount: 0,
@@ -102,7 +102,7 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     thresholds: {
         reconstructionThreshold: 2,
         minimumPublishedVoterCount: 2,
-        maxParticipants: 51,
+        maximumVoterCount: 51,
         validationTarget: 15,
     },
     ...overrides,
@@ -323,7 +323,7 @@ describe('pollBoardActions', () => {
             creatorSession: null,
             deviceState,
             poll: createPoll({
-                submittedParticipantCount: 4,
+                submittedVoterCount: 4,
                 voters: [
                     {
                         ceremonyState: 'active',
@@ -355,7 +355,7 @@ describe('pollBoardActions', () => {
                     acceptedEncryptedBallotCount: 0,
                     acceptedRegistrationCount: 0,
                     activeParticipantCount: 3,
-                    blockingParticipantIndices: [],
+                    blockingVoterIndices: [],
                     completeEncryptedBallotParticipantCount: 0,
                     revealReady: false,
                     restartCount: 1,

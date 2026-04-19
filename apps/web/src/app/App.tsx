@@ -1,12 +1,6 @@
 import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import {
-    Navigate,
-    Route,
-    Routes,
-    useLocation,
-    useParams,
-} from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 
 import { RenderErrorFallback } from './RenderErrorFallback';
 import VersionBadge from './VersionBadge';
@@ -15,18 +9,6 @@ import Header from 'components/Header/Header';
 import NotFound from 'components/NotFound/NotFound';
 import PollPage from 'features/polls/PollPage/PollPage';
 import PollCreationPage from 'features/polls/PollCreationPage/PollCreationPage';
-
-const LegacyPollRouteRedirect = (): React.JSX.Element => {
-    const location = useLocation();
-    const { pollSlug } = useParams();
-
-    return (
-        <Navigate
-            replace
-            to={`/polls/${pollSlug ?? ''}${location.search}${location.hash}`}
-        />
-    );
-};
 
 const App = (): React.JSX.Element => {
     const mainContentReference = React.useRef<HTMLElement>(null);
@@ -102,10 +84,6 @@ const App = (): React.JSX.Element => {
                             <Route
                                 element={<PollPage />}
                                 path="polls/:pollSlug"
-                            />
-                            <Route
-                                element={<LegacyPollRouteRedirect />}
-                                path="votes/:pollSlug"
                             />
                             <Route element={<NotFound />} path="*" />
                         </Routes>

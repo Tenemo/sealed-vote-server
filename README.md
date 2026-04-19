@@ -39,7 +39,7 @@ Closed polls publish a frozen manifest with `rosterHash`, `optionList`, and the 
 
 1. A poll creator opens a score poll and shares its slug-based URL.
 2. Voters join the waiting room with public names and receive voter-specific tokens.
-3. Once at least three participants are registered, the creator starts voting and the roster becomes fixed.
+3. Once at least three voters are registered, the creator starts voting and the roster becomes fixed.
 4. The client signs and appends protocol payloads to the board log behind guided UI actions. The board is append-only and every message is classified as accepted, idempotent, or equivocation.
 5. The public read model derives ceremony phase, digests, manifest state, and verification status only from the ordered board entries.
 6. After voting closes, the app completes the DKG, encrypted ballot publication, ballot-close, decryption-share, and tally-publication flow automatically in the browser, then verifies the final result from the public board log.

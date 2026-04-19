@@ -145,9 +145,9 @@ export const parseCeremonyMetricValue = ({
     return null;
 };
 
-export const parseSubmittedParticipantCount = (value: string): number | null => {
+export const parseSubmittedVoterCount = (value: string): number | null => {
     const match = normalizePollFlowText(value).match(
-        /^Submitted participants\s+(\d+)/u,
+        /^Submitted voters\s+(\d+)/u,
     );
 
     if (!match) {
@@ -157,15 +157,13 @@ export const parseSubmittedParticipantCount = (value: string): number | null => 
     return Number.parseInt(match[1], 10);
 };
 
-const readSubmittedParticipantCount = async (
+const readSubmittedVoterCount = async (
     page: Page,
 ): Promise<number | null> => {
-    const metricText = await getCeremonyMetricRow(
-        page,
-        'Submitted participants',
-    ).innerText();
+    const metricText = await getCeremonyMetricRow(page, 'Submitted voters')
+        .innerText();
 
-    return parseSubmittedParticipantCount(metricText);
+    return parseSubmittedVoterCount(metricText);
 };
 
 type PollPageReloader = (page: Page) => Promise<Page>;
@@ -391,8 +389,8 @@ export const submitVote = async ({
         );
     }
 
-    const submittedParticipantCountBeforeSubmit =
-        await readSubmittedParticipantCount(page);
+    const submittedVoterCountBeforeSubmit =
+        await readSubmittedVoterCount(page);
 
     await page.getByLabel('Your public name').fill(voterName);
 
@@ -410,11 +408,11 @@ export const submitVote = async ({
         timeout: 30_000,
     });
 
-    if (submittedParticipantCountBeforeSubmit !== null) {
+    if (submittedVoterCountBeforeSubmit !== null) {
         await waitForCeremonyMetricValue({
-            label: 'Submitted participants',
+            label: 'Submitted voters',
             page,
-            value: String(submittedParticipantCountBeforeSubmit + 1),
+            value: String(submittedVoterCountBeforeSubmit + 1),
         });
     }
 
@@ -621,7 +619,7 @@ export const waitForCeremonyMetric = async ({
     });
 };
 
-export const waitForBlockingParticipants = async ({
+export const waitForBlockingVoters = async ({
     page,
     participantNames,
 }: {
@@ -641,37 +639,35 @@ export const waitForBlockingParticipants = async ({
     });
 };
 
-export const expectParticipantsVisible = async (
+export const expectVotersVisible = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
-    await expect(
-        page.getByRole('heading', { name: 'Participants' }),
-    ).toBeVisible();
-    const participantsList = page.getByRole('list', {
-        name: 'Participants roster',
+    await expect(page.getByRole('heading', { name: 'Voters' })).toBeVisible();
+    const votersList = page.getByRole('list', {
+        name: 'Voters roster',
     });
 
     for (const participantName of participantNames) {
         await expect(
-            participantsList.getByText(
+            votersList.getByText(
                 new RegExp(`^\\d+\\.\\s+${escapeRegExp(participantName)}$`),
             ),
         ).toBeVisible();
     }
 };
 
-export const expectParticipantsHidden = async (
+export const expectVotersHidden = async (
     page: Page,
     participantNames: readonly string[],
 ): Promise<void> => {
-    const participantsList = page.getByRole('list', {
-        name: 'Participants roster',
+    const votersList = page.getByRole('list', {
+        name: 'Voters roster',
     });
 
     for (const participantName of participantNames) {
         await expect(
-            participantsList.getByText(
+            votersList.getByText(
                 new RegExp(`^\\d+\\.\\s+${escapeRegExp(participantName)}$`),
             ),
         ).toHaveCount(0);

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-    parseParticipantDeviceRecord,
-    serializeParticipantDeviceRecord,
-} from './participant-devices';
+    parseVoterDeviceRecord,
+    serializeVoterDeviceRecord,
+} from './voter-device-records';
 
 describe('participantDevices', () => {
     it('round-trips a valid participant device record', () => {
@@ -14,15 +14,13 @@ describe('participantDevices', () => {
         };
 
         expect(
-            parseParticipantDeviceRecord(
-                serializeParticipantDeviceRecord(record),
-            ),
+            parseVoterDeviceRecord(serializeVoterDeviceRecord(record)),
         ).toEqual(record);
     });
 
     it('rejects device records with missing required fields', () => {
         expect(
-            parseParticipantDeviceRecord(
+            parseVoterDeviceRecord(
                 JSON.stringify({
                     authPublicKey: 'auth-key',
                     transportSuite: 'X25519',
@@ -33,7 +31,7 @@ describe('participantDevices', () => {
 
     it('rejects device records with an unsupported transport suite', () => {
         expect(
-            parseParticipantDeviceRecord(
+            parseVoterDeviceRecord(
                 JSON.stringify({
                     authPublicKey: 'auth-key',
                     transportPublicKey: 'transport-key',
@@ -44,12 +42,12 @@ describe('participantDevices', () => {
     });
 
     it('rejects non-JSON values', () => {
-        expect(parseParticipantDeviceRecord('not json')).toBeNull();
+        expect(parseVoterDeviceRecord('not json')).toBeNull();
     });
 
     it('rejects valid JSON with wrong field types', () => {
         expect(
-            parseParticipantDeviceRecord(
+            parseVoterDeviceRecord(
                 JSON.stringify({
                     authPublicKey: 123,
                     transportPublicKey: ['transport-key'],

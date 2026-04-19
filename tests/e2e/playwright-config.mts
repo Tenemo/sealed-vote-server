@@ -25,7 +25,7 @@ const webkitUnsupportedModernCryptoSpecs =
     process.platform === 'darwin'
         ? []
         : [
-              '**/browser-crypto-compat.spec.ts',
+              '**/browser-crypto-compatibility.spec.ts',
               '**/ceremony-persistence.spec.ts',
               '**/duplicate-title-polls.spec.ts',
               '**/duplicate-voter-name.spec.ts',
@@ -48,13 +48,13 @@ const mobileFirefoxAndroidNonMobileSpecs = [
     '**/voting-flow.spec.ts',
 ];
 
-const isCi = Boolean(process.env.CI);
+const isContinuousIntegration = Boolean(process.env.CI);
 const isLocalTurbo = process.env.PLAYWRIGHT_LOCAL_TURBO === 'true';
 const shouldUseBlobReporter = process.env.PLAYWRIGHT_BLOB_REPORT === 'true';
 const shouldUseBuiltServers =
     process.env.PLAYWRIGHT_USE_BUILT_SERVERS === 'true';
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(currentDirectory, '..', '..');
+const repositoryRoot = path.resolve(currentDirectory, '..', '..');
 const localWorkers = Math.max(2, Math.min(availableParallelism(), 6));
 // Keep the turbo profile faster than the default local run without pushing
 // Firefox ceremony flows into scheduler starvation on high-core machines.
@@ -85,8 +85,14 @@ const parseWorkerCount = (
 };
 
 const reporters: ReporterDescription[] | 'list' = shouldUseBlobReporter
-    ? [['dot'], ['blob', { outputDir: path.resolve(repoRoot, 'blob-report') }]]
-    : isCi
+    ? [
+          ['dot'],
+          [
+              'blob',
+              { outputDir: path.resolve(repositoryRoot, 'blob-report') },
+          ],
+      ]
+    : isContinuousIntegration
       ? [['dot'], ['github'], ['html', { open: 'never' }]]
       : 'list';
 
@@ -201,20 +207,24 @@ const getCommonConfig = (
     expect: {
         timeout: 20_000,
     },
-    forbidOnly: isCi,
+    forbidOnly: isContinuousIntegration,
     fullyParallel: options?.fullyParallel ?? false,
-    outputDir: path.resolve(repoRoot, outputDir),
+    outputDir: path.resolve(repositoryRoot, outputDir),
     reporter: reporters,
     retries: 0,
     use: {
         baseURL,
         screenshot: 'only-on-failure' as const,
-        trace: isCi ? ('retain-on-failure' as const) : ('off' as const),
-        video: isCi ? ('retain-on-failure' as const) : ('off' as const),
+        trace: isContinuousIntegration
+            ? ('retain-on-failure' as const)
+            : ('off' as const),
+        video: isContinuousIntegration
+            ? ('retain-on-failure' as const)
+            : ('off' as const),
     },
     workers:
         options?.workers ??
-        (isCi
+        (isContinuousIntegration
             ? parseWorkerCount(
                   'PLAYWRIGHT_CI_WORKERS',
                   process.env.PLAYWRIGHT_CI_WORKERS,

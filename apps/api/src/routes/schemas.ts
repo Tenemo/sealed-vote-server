@@ -33,11 +33,11 @@ export const PollIdParamsSchema = Type.Object({
 
 export type PollIdParams = Static<typeof PollIdParamsSchema>;
 
-export const PollRefParamsSchema = Type.Object({
-    pollRef: Type.String({ minLength: 1 }),
+export const PollReferenceParamsSchema = Type.Object({
+    pollReference: Type.String({ minLength: 1 }),
 });
 
-export type PollRefParams = Static<typeof PollRefParamsSchema>;
+export type PollReferenceParams = Static<typeof PollReferenceParamsSchema>;
 
 export const SignedPayloadSchema = Type.Object(
     {

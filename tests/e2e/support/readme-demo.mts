@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(currentDirectory, '..', '..', '..');
+const repositoryRoot = path.resolve(currentDirectory, '..', '..', '..');
 
 export const readmeDemoPanelViewport = {
     width: 800,
@@ -11,7 +11,7 @@ export const readmeDemoPanelViewport = {
 
 export const readmeDemoPlaybackRate = 1;
 export const readmeDemoOutputDir = path.resolve(
-    repoRoot,
+    repositoryRoot,
     'test-results',
     'readme-demo',
 );

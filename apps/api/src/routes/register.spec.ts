@@ -211,7 +211,7 @@ describe('Register voter endpoint', () => {
 
         expect(response.statusCode).toBe(400);
         expect((JSON.parse(response.body) as { message: string }).message).toBe(
-            ERROR_MESSAGES.maxParticipantsReached,
+            ERROR_MESSAGES.maximumVoterCountReached,
         );
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);

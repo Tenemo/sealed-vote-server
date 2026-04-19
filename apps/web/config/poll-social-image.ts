@@ -98,7 +98,6 @@ const unavailableImageCachePolicy: PollSocialImageCachePolicy = {
     cdn: 'no-store',
     netlifyCdn: 'no-store',
 };
-const legacyPollSocialImagePathPrefix = '/social/votes/';
 
 const normalizeWhitespace = (value: string): string =>
     value.trim().replace(/\s+/g, ' ');
@@ -480,17 +479,12 @@ const normalizePollSocialImagePayload = (
 export const extractPollSocialImageSlugFromPathname = (
     pathname: string,
 ): string | null => {
-    const matchingPrefix = [
-        pollSocialImagePathPrefix,
-        legacyPollSocialImagePathPrefix,
-    ].find((prefix) => pathname.startsWith(prefix));
-
-    if (!matchingPrefix) {
+    if (!pathname.startsWith(pollSocialImagePathPrefix)) {
         return null;
     }
 
     const encodedSlug = pathname
-        .slice(matchingPrefix.length)
+        .slice(pollSocialImagePathPrefix.length)
         .replace(/\.png$/i, '');
 
     if (!encodedSlug || encodedSlug.includes('/')) {

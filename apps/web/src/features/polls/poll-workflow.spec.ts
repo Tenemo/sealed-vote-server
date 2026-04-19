@@ -18,14 +18,14 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     sessionId: null,
     sessionFingerprint: null,
     phase: 'open',
-    submittedParticipantCount: 0,
-    minimumCloseParticipantCount: 3,
+    submittedVoterCount: 0,
+    minimumCloseVoterCount: 3,
     ceremony: {
         acceptedDecryptionShareCount: 0,
         acceptedEncryptedBallotCount: 0,
         acceptedRegistrationCount: 0,
         activeParticipantCount: 0,
-        blockingParticipantIndices: [],
+        blockingVoterIndices: [],
         completeEncryptedBallotParticipantCount: 0,
         revealReady: false,
         restartCount: 0,
@@ -48,7 +48,7 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     thresholds: {
         reconstructionThreshold: null,
         minimumPublishedVoterCount: null,
-        maxParticipants: 51,
+        maximumVoterCount: 51,
         validationTarget: 15,
     },
     ...overrides,
@@ -67,7 +67,7 @@ const createClosedPoll = (
         manifestHash: 'b'.repeat(64),
         phase: 'securing',
         sessionId: 'c'.repeat(64),
-        submittedParticipantCount: 3,
+        submittedVoterCount: 3,
         ...overrides,
     });
 
@@ -147,7 +147,7 @@ describe('pollWorkflow', () => {
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
                 poll: createPoll({
-                    submittedParticipantCount: 2,
+                    submittedVoterCount: 2,
                 }),
                 voterSession: null,
             }),
@@ -199,7 +199,7 @@ describe('pollWorkflow', () => {
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
                 poll: createPoll({
-                    submittedParticipantCount: 3,
+                    submittedVoterCount: 3,
                     voters: [
                         {
                             ceremonyState: 'active',
@@ -259,7 +259,7 @@ describe('pollWorkflow', () => {
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
                 poll: createPoll({
-                    submittedParticipantCount: 3,
+                    submittedVoterCount: 3,
                     voters: [
                         {
                             ceremonyState: 'active',
@@ -365,7 +365,7 @@ describe('pollWorkflow', () => {
                         acceptedEncryptedBallotCount: 6,
                         acceptedRegistrationCount: 3,
                         activeParticipantCount: 3,
-                        blockingParticipantIndices: [],
+                        blockingVoterIndices: [],
                         completeEncryptedBallotParticipantCount: 3,
                         revealReady: true,
                         restartCount: 0,
@@ -373,7 +373,7 @@ describe('pollWorkflow', () => {
                     thresholds: {
                         reconstructionThreshold: 2,
                         minimumPublishedVoterCount: 2,
-                        maxParticipants: 51,
+                        maximumVoterCount: 51,
                         validationTarget: 15,
                     },
                 }),
@@ -477,7 +477,7 @@ describe('pollWorkflow', () => {
                 hasAutomationFailure: false,
                 isSubmittingVote: false,
                 poll: createClosedPoll({
-                    submittedParticipantCount: 4,
+                    submittedVoterCount: 4,
                     voters: [
                         {
                             ceremonyState: 'skipped',

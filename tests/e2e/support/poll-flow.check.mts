@@ -5,7 +5,7 @@ import {
     bringPollPagesToFront,
     createExpectedVerifiedResults,
     parseCeremonyMetricValue,
-    parseSubmittedParticipantCount,
+    parseSubmittedVoterCount,
     syncPollPagesForSharedState,
     syncPollPageForSharedState,
     waitForPollPageState,
@@ -55,18 +55,12 @@ test('createExpectedVerifiedResults rejects missing scores', () => {
     );
 });
 
-test('parseSubmittedParticipantCount extracts the ceremony progress count', () => {
-    assert.equal(
-        parseSubmittedParticipantCount('Submitted participants\n5'),
-        5,
-    );
+test('parseSubmittedVoterCount extracts the ceremony progress count', () => {
+    assert.equal(parseSubmittedVoterCount('Submitted voters\n5'), 5);
 });
 
-test('parseSubmittedParticipantCount ignores unrelated text', () => {
-    assert.equal(
-        parseSubmittedParticipantCount('5 submitted before close'),
-        null,
-    );
+test('parseSubmittedVoterCount ignores unrelated text', () => {
+    assert.equal(parseSubmittedVoterCount('5 submitted before close'), null);
 });
 
 test('parseCeremonyMetricValue extracts the exact metric value', () => {
@@ -83,7 +77,7 @@ test('parseCeremonyMetricValue ignores unrelated text', () => {
     assert.equal(
         parseCeremonyMetricValue({
             label: 'Board registrations',
-            rowText: 'Submitted participants 16',
+            rowText: 'Submitted voters 16',
         }),
         null,
     );

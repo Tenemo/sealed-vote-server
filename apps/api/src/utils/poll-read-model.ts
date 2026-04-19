@@ -24,11 +24,11 @@ import {
     getBoardMessageRows,
 } from './board-messages.js';
 import { normalizeDatabaseTimestamp } from './database.js';
-import { parseParticipantDeviceRecord } from './participant-devices.js';
+import { parseVoterDeviceRecord } from './voter-device-records.js';
 import { derivePollCeremonySession } from './poll-ceremony-sessions.js';
 import {
-    maxPollParticipants,
-    minimumPollParticipantsToClose,
+    maximumPollVoterCount,
+    minimumPollVotersToClose,
 } from './poll-limits.js';
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
@@ -275,7 +275,7 @@ const findMissingEncryptedShareDealers = ({
         .map((participant) => participant.originalParticipantIndex);
 };
 
-const findBlockingParticipantIndices = ({
+const findBlockingVoterIndices = ({
     acceptedPayloads,
     activeParticipants,
     optionCount,
@@ -390,20 +390,20 @@ const findBlockingParticipantIndices = ({
 
 const buildThresholdSummary = ({
     isOpen,
-    participantCount,
+    ceremonyParticipantCount,
 }: {
     isOpen: boolean;
-    participantCount: number;
+    ceremonyParticipantCount: number;
 }): PollResponse['thresholds'] => {
     const reconstructionThreshold =
-        !isOpen && participantCount >= minimumPollParticipantsToClose
-            ? majorityThreshold(participantCount)
+        !isOpen && ceremonyParticipantCount >= minimumPollVotersToClose
+            ? majorityThreshold(ceremonyParticipantCount)
             : null;
 
     return {
         reconstructionThreshold,
         minimumPublishedVoterCount: reconstructionThreshold,
-        maxParticipants: maxPollParticipants,
+        maximumVoterCount: maximumPollVoterCount,
         validationTarget,
     };
 };
@@ -738,7 +738,7 @@ const derivePollPhase = ({
 
 const getPollRow = async (
     database: ReadOnlyDatabase,
-    pollRef: string,
+    pollReference: string,
 ): Promise<
     | (PollRow & {
           choices: {
@@ -763,9 +763,9 @@ const getPollRow = async (
 > =>
     await database.query.polls.findFirst({
         where: (fields, { eq: isEqual }) =>
-            isUuid(pollRef)
-                ? isEqual(fields.id, pollRef)
-                : isEqual(fields.slug, pollRef),
+            isUuid(pollReference)
+                ? isEqual(fields.id, pollReference)
+                : isEqual(fields.slug, pollReference),
         columns: {
             createdAt: true,
             id: true,
@@ -813,9 +813,9 @@ const getPollRow = async (
 
 export const getPollFetchReadModel = async (
     database: ReadOnlyDatabase,
-    pollRef: string,
+    pollReference: string,
 ): Promise<PollResponse | undefined> => {
-    const poll = await getPollRow(database, pollRef);
+    const poll = await getPollRow(database, pollReference);
 
     if (!poll) {
         return undefined;
@@ -823,7 +823,7 @@ export const getPollFetchReadModel = async (
 
     const rows = await getBoardMessageRows(database, poll.id);
     const classifiedBoard = await classifyBoardMessages(rows);
-    const participantCount = poll.voters.length;
+    const submittedVoterCount = poll.voters.length;
     const ceremonySession = await derivePollCeremonySession({
         choices: poll.choices.map(({ choiceName }) => choiceName),
         isOpen: poll.isOpen,
@@ -834,17 +834,16 @@ export const getPollFetchReadModel = async (
         protocolVersion: poll.protocolVersion,
     });
     const activeParticipantCount = ceremonySession.activeParticipantCount;
-    const participantDeviceReadinessByIndex = new Map(
-        poll.voters.map((participant) => [
-            participant.voterIndex,
-            parseParticipantDeviceRecord(
-                participant.publicKeyShares[0]?.publicKeyShare,
-            ) !== null,
+    const voterDeviceReadinessByIndex = new Map(
+        poll.voters.map((voter) => [
+            voter.voterIndex,
+            parseVoterDeviceRecord(voter.publicKeyShares[0]?.publicKeyShare) !==
+                null,
         ]),
     );
     const thresholds = buildThresholdSummary({
         isOpen: poll.isOpen,
-        participantCount: activeParticipantCount,
+        ceremonyParticipantCount: activeParticipantCount,
     });
     const manifest = ceremonySession.manifest;
     const manifestHash = ceremonySession.manifestHash;
@@ -887,9 +886,9 @@ export const getPollFetchReadModel = async (
         reconstructionThreshold !== null &&
         completeEncryptedBallotParticipantCount === activeParticipantCount &&
         !hasBallotClose;
-    const blockingParticipantIndices =
+    const blockingVoterIndices =
         !poll.isOpen && !hasBallotClose
-            ? findBlockingParticipantIndices({
+            ? findBlockingVoterIndices({
                   acceptedPayloads,
                   activeParticipants: ceremonySession.activeParticipants.map(
                       ({
@@ -940,11 +939,10 @@ export const getPollFetchReadModel = async (
                 voterIndex,
             )
                 ? 'skipped'
-                : blockingParticipantIndices.includes(voterIndex)
+                : blockingVoterIndices.includes(voterIndex)
                   ? 'blocking'
                   : 'active',
-            deviceReady:
-                participantDeviceReadinessByIndex.get(voterIndex) ?? false,
+            deviceReady: voterDeviceReadinessByIndex.get(voterIndex) ?? false,
             voterIndex,
             voterName,
         })),
@@ -958,14 +956,14 @@ export const getPollFetchReadModel = async (
             revealReady,
             verification: verificationSummary.verification,
         }),
-        submittedParticipantCount: participantCount,
-        minimumCloseParticipantCount: minimumPollParticipantsToClose,
+        submittedVoterCount,
+        minimumCloseVoterCount: minimumPollVotersToClose,
         ceremony: {
             acceptedDecryptionShareCount,
             acceptedEncryptedBallotCount,
             acceptedRegistrationCount,
             activeParticipantCount,
-            blockingParticipantIndices,
+            blockingVoterIndices,
             completeEncryptedBallotParticipantCount,
             revealReady,
             restartCount: ceremonySession.restartCount,

@@ -31,7 +31,7 @@ type PollResponse = {
     slug: string;
 };
 
-const getPollApiPath = (pollRef: string): string => `/api/polls/${pollRef}`;
+const getPollApiPath = (pollReference: string): string => `/api/polls/${pollReference}`;
 
 const supportsSyntheticPostCommitDrops = (testInfo: TestInfo): boolean => {
     const baseUrl = testInfo.project.use.baseURL;

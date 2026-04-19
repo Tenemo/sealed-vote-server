@@ -8,8 +8,8 @@ import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createPoll,
     deletePolls,
-    expectParticipantsHidden,
-    expectParticipantsVisible,
+    expectVotersHidden,
+    expectVotersVisible,
     registerParticipant,
     type CreatedPoll,
 } from './support/poll-flow';
@@ -73,7 +73,7 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
             voterName: firstPollVoterName,
         }),
     );
-    await expectParticipantsVisible(page, [firstPollVoterName]);
+    await expectVotersVisible(page, [firstPollVoterName]);
 
     const participant = await openProjectParticipant(browser, testInfo);
     participant.page = attachSecondPollTracking(participant.page);
@@ -88,12 +88,12 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
             }),
         );
 
-        await expectParticipantsVisible(participant.page, [
+        await expectVotersVisible(participant.page, [
             secondPollVoterName,
         ]);
-        await expectParticipantsVisible(page, [firstPollVoterName]);
-        await expectParticipantsHidden(page, [secondPollVoterName]);
-        await expectParticipantsHidden(participant.page, [firstPollVoterName]);
+        await expectVotersVisible(page, [firstPollVoterName]);
+        await expectVotersHidden(page, [secondPollVoterName]);
+        await expectVotersHidden(participant.page, [firstPollVoterName]);
         await expectNoUnexpectedErrors(tracker);
     } finally {
         await closeParticipant(participant);

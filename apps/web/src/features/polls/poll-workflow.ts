@@ -31,7 +31,7 @@ export type DerivedPollWorkflow = {
     missingLocalState: boolean;
 };
 
-const isLocalParticipant = (
+const isLocalVoter = (
     deviceState: StoredPollDeviceState | null,
     voterSession: StoredVoterSession | null,
 ): boolean =>
@@ -58,25 +58,23 @@ export const derivePollWorkflow = ({
     voterSession: StoredVoterSession | null;
 }): DerivedPollWorkflow => {
     const isCreator = creatorSessionPollId === poll.id;
-    const localParticipant = isLocalParticipant(deviceState, voterSession);
+    const localVoter = isLocalVoter(deviceState, voterSession);
     const storedBallotScores = deviceState?.storedBallotScores ?? null;
-    const hasSubmittedVote = localParticipant;
+    const hasSubmittedVote = localVoter;
     const hasLocalVote =
-        localParticipant &&
+        localVoter &&
         Array.isArray(storedBallotScores) &&
         storedBallotScores.length === poll.choices.length;
-    const missingRecoverableLocalVote = localParticipant && !hasLocalVote;
-    const missingLocalState = !!voterSession && !localParticipant;
+    const missingRecoverableLocalVote = localVoter && !hasLocalVote;
+    const missingLocalState = !!voterSession && !localVoter;
     const localCeremonyState = voterSession
         ? (poll.voters.find(
               (participant) =>
                   participant.voterIndex === voterSession.voterIndex,
           )?.ceremonyState ?? null)
         : null;
-    const creatorHasLocalParticipant =
-        isCreator &&
-        localParticipant &&
-        deviceState?.isCreatorParticipant === true;
+    const creatorHasLocalVoter =
+        isCreator && localVoter && deviceState?.isCreatorParticipant === true;
 
     if (poll.phase === 'open') {
         if (missingLocalState) {
@@ -92,7 +90,7 @@ export const derivePollWorkflow = ({
             };
         }
 
-        if (!localParticipant) {
+        if (!localVoter) {
             return {
                 canCloseVoting: false,
                 canRetryAutomation: false,
@@ -124,15 +122,13 @@ export const derivePollWorkflow = ({
 
         return {
             canCloseVoting:
-                creatorHasLocalParticipant &&
-                poll.submittedParticipantCount >=
-                    poll.minimumCloseParticipantCount,
+                creatorHasLocalVoter &&
+                poll.submittedVoterCount >= poll.minimumCloseVoterCount,
             canRetryAutomation: false,
             canSubmitVote: false,
             currentStep:
-                creatorHasLocalParticipant &&
-                poll.submittedParticipantCount >=
-                    poll.minimumCloseParticipantCount
+                creatorHasLocalVoter &&
+                poll.submittedVoterCount >= poll.minimumCloseVoterCount
                     ? 'creator-can-close'
                     : 'vote-stored-waiting-for-close',
             hasLocalVote,

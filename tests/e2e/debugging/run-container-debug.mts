@@ -1,14 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-import { repoRoot } from '../scripts/shared.mts';
+import { repositoryRoot } from '../scripts/shared.mts';
 import {
     buildDebugContainerCommand,
     parseDebugContainerCliArgs,
 } from './run-container-debug-helpers.mts';
 
 const composeFilePath = path.resolve(
-    repoRoot,
+    repositoryRoot,
     'tests/e2e/debugging/docker-compose.yml',
 );
 
@@ -30,7 +30,7 @@ const result = spawnSync(
         ...debugCommand,
     ],
     {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         env: process.env,
         stdio: 'inherit',
     },

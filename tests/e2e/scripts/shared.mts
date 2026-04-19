@@ -14,8 +14,8 @@ const pnpmExecPath = process.env.npm_execpath;
 const pnpmCaptureMaxBufferBytes = 16 * 1024 * 1024;
 export const observedOutputTailMaxLength = 4 * 1024 * 1024;
 
-export const repoRoot = path.resolve(currentDirectory, '../../..');
-const apiWorkspaceRoot = path.resolve(repoRoot, 'apps', 'api');
+export const repositoryRoot = path.resolve(currentDirectory, '../../..');
+const apiWorkspaceRoot = path.resolve(repositoryRoot, 'apps', 'api');
 
 const apiTsxCliPath = path.resolve(
     apiWorkspaceRoot,
@@ -109,7 +109,7 @@ export const runPnpmSync = (args: string[]): void => {
 export const runPnpmStatusSync = (args: string[]): number => {
     const [command, commandPrefix] = getPnpmCommand();
     const result = spawnSync(command, [...commandPrefix, ...args], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         env: process.env,
         stdio: 'inherit',
     });
@@ -132,7 +132,7 @@ export const runPnpmObserved = async (
 
     return await new Promise((resolve) => {
         const childProcess = spawn(command, [...commandPrefix, ...args], {
-            cwd: repoRoot,
+            cwd: repositoryRoot,
             env: process.env,
             stdio: ['inherit', 'pipe', 'pipe'],
         });
@@ -181,7 +181,7 @@ export const runPnpmObserved = async (
 export const runPnpmCaptureSync = (args: string[]): string => {
     const [command, commandPrefix] = getPnpmCommand();
     const result = spawnSync(command, [...commandPrefix, ...args], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         env: process.env,
         encoding: 'utf8',
         // Playwright --list output grows with the suite and can exceed Node's
@@ -304,7 +304,7 @@ export const spawnPnpm = (args: string[]): ChildProcess => {
     const [command, commandPrefix] = getPnpmCommand();
 
     return spawn(command, [...commandPrefix, ...args], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         env: process.env,
         stdio: 'inherit',
     });

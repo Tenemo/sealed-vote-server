@@ -54,7 +54,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(poll.thresholds.minimumPublishedVoterCount).toBe(2);
         expect(poll.ceremony.activeParticipantCount).toBe(3);
         expect(poll.ceremony.restartCount).toBe(0);
-        expect(poll.ceremony.blockingParticipantIndices).toEqual([1, 2, 3]);
+        expect(poll.ceremony.blockingVoterIndices).toEqual([1, 2, 3]);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -74,7 +74,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(400);
         expect(
             (JSON.parse(closeResponse.body) as CloseVotingResponse).message,
-        ).toBe(ERROR_MESSAGES.notEnoughParticipantsToClose);
+        ).toBe(ERROR_MESSAGES.notEnoughVotersToClose);
 
         await deletePoll(fastify, pollId, creatorToken);
     });
@@ -152,7 +152,7 @@ describe('POST /polls/:pollId/close', () => {
         expect(closeResponse.statusCode).toBe(400);
         expect(
             (JSON.parse(closeResponse.body) as CloseVotingResponse).message,
-        ).toBe(ERROR_MESSAGES.participantDeviceKeysRequired);
+        ).toBe(ERROR_MESSAGES.voterDeviceKeysRequired);
 
         await deletePoll(fastify, pollId, creatorToken);
     });

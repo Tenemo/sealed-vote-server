@@ -27,7 +27,6 @@ export type PollSeoPayloadCache = Map<string, PollSeoPayloadCacheEntry>;
 const normalizePathname = (pathname: string): string =>
     pathname.startsWith('/') ? pathname : `/${pathname}`;
 const canonicalPollRouteSegment = 'polls';
-const legacyPollRouteSegment = 'votes';
 
 const openPollSeoCacheTtlMs = 5 * 1000;
 const completedPollSeoCacheTtlMs = 60 * 1000;
@@ -79,11 +78,7 @@ export const extractPollSlugFromPathname = (
 ): string | null => {
     const segments = normalizePathname(pathname).split('/').filter(Boolean);
 
-    if (
-        !segments[1] ||
-        (segments[0] !== canonicalPollRouteSegment &&
-            segments[0] !== legacyPollRouteSegment)
-    ) {
+    if (!segments[1] || segments[0] !== canonicalPollRouteSegment) {
         return null;
     }
 

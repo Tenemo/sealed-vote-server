@@ -4,13 +4,13 @@ import path from 'node:path';
 
 import {
     assertSafeE2EEnv,
-    repoRoot,
+    repositoryRoot,
     runApiTsxSync,
     wireChildProcess,
 } from './shared.mts';
 
 const builtServerPath = path.resolve(
-    repoRoot,
+    repositoryRoot,
     'apps',
     'api',
     'dist',
@@ -35,11 +35,11 @@ if (!fs.existsSync(builtServerPath)) {
     process.exit(1);
 }
 
-    runApiTsxSync(['scripts/database.ts', 'reset']);
+runApiTsxSync(['scripts/database.ts', 'reset']);
 
 wireChildProcess(
     spawn(process.execPath, [builtServerPath], {
-        cwd: repoRoot,
+        cwd: repositoryRoot,
         env: process.env,
         stdio: 'inherit',
     }),

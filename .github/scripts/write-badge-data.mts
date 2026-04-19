@@ -21,14 +21,30 @@ type BadgePayload = {
 };
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(currentDirectory, '..', '..');
-const badgeDataDirectory = path.resolve(repoRoot, '.github', 'badge-data');
+const repositoryRoot = path.resolve(currentDirectory, '..', '..');
+const badgeDataDirectory = path.resolve(
+    repositoryRoot,
+    '.github',
+    'badge-data',
+);
 
 const coverageSummaryPaths = [
-    path.resolve(repoRoot, 'apps', 'api', 'coverage', 'coverage-summary.json'),
-    path.resolve(repoRoot, 'apps', 'web', 'coverage', 'coverage-summary.json'),
     path.resolve(
-        repoRoot,
+        repositoryRoot,
+        'apps',
+        'api',
+        'coverage',
+        'coverage-summary.json',
+    ),
+    path.resolve(
+        repositoryRoot,
+        'apps',
+        'web',
+        'coverage',
+        'coverage-summary.json',
+    ),
+    path.resolve(
+        repositoryRoot,
         'packages',
         'protocol',
         'coverage',
@@ -107,7 +123,7 @@ const readCoveragePercent = async (): Promise<number> => {
 };
 
 const readNodeVersion = async (): Promise<string> => {
-    const nvmrcPath = path.resolve(repoRoot, '.nvmrc');
+    const nvmrcPath = path.resolve(repositoryRoot, '.nvmrc');
     const nodeVersion = (await fs.readFile(nvmrcPath, 'utf8')).trim();
 
     if (!nodeVersion) {

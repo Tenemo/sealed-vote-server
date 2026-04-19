@@ -22,13 +22,13 @@ const apiBaseUrl = resolveBrowserApiBaseUrl({
 // participant indefinitely.
 export const pollQueryTimeoutMs = 10_000;
 export const buildGetPollQuery = (
-    pollRef: string,
+    pollReference: string,
 ): {
     method: 'GET';
     timeout: number;
     url: string;
 } => ({
-    url: POLL_ROUTES.poll(pollRef),
+    url: POLL_ROUTES.poll(pollReference),
     method: 'GET' as const,
     timeout: pollQueryTimeoutMs,
 });

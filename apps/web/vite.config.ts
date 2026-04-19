@@ -9,9 +9,9 @@ import { defineConfig } from 'vite';
 import { createDeploymentVersionPlugin } from './config/deployment-version';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
-const repoRootDir = path.resolve(rootDir, '..', '..');
+const repositoryRootDirectory = path.resolve(rootDir, '..', '..');
 const requireFromRepoRoot = createRequire(
-    path.join(repoRootDir, 'package.json'),
+    path.join(repositoryRootDirectory, 'package.json'),
 );
 
 const resolveFromRoot = (...segments: string[]): string =>

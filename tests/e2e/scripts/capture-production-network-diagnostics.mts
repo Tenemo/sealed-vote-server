@@ -61,7 +61,7 @@ type DnsLookupResult = {
 };
 
 const currentFilePath = fileURLToPath(import.meta.url);
-const repoRoot = path.resolve(path.dirname(currentFilePath), '../../..');
+const repositoryRoot = path.resolve(path.dirname(currentFilePath), '../../..');
 const defaultApiBaseUrl = 'https://api.sealed.vote';
 const defaultIntervalMs = 5_000;
 const defaultOutputDir = 'production-diagnostics';
@@ -173,7 +173,10 @@ const parseArgs = (args: string[]): DiagnosticsOptions => {
             defaultIntervalMs,
             '--interval-ms',
         ),
-        outputDir: path.resolve(repoRoot, rawOutputDir ?? defaultOutputDir),
+        outputDir: path.resolve(
+            repositoryRoot,
+            rawOutputDir ?? defaultOutputDir,
+        ),
         repeat: parsePositiveInteger(rawRepeat, defaultRepeat, '--repeat'),
         requestTimeoutMs: parsePositiveInteger(
             rawRequestTimeoutMs,

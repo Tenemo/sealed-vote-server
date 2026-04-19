@@ -10,7 +10,7 @@ import createError from 'http-errors';
 import { withTransaction } from '../utils/database.js';
 import { lockPollById } from '../utils/poll-locks.js';
 import { insertPollCeremonySession } from '../utils/poll-ceremony-sessions.js';
-import { minimumPollParticipantsToClose } from '../utils/poll-limits.js';
+import { minimumPollVotersToClose } from '../utils/poll-limits.js';
 import { getPollFetchReadModel } from '../utils/poll-read-model.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voter-auth.js';
@@ -106,10 +106,10 @@ export const restartCeremony = async (
                         );
                     }
 
-                    const blockingParticipantIndices =
-                        pollReadModel.ceremony.blockingParticipantIndices;
+                    const blockingVoterIndices =
+                        pollReadModel.ceremony.blockingVoterIndices;
 
-                    if (blockingParticipantIndices.length === 0) {
+                    if (blockingVoterIndices.length === 0) {
                         throw createError(
                             400,
                             ERROR_MESSAGES.ceremonyRestartNoBlockers,
@@ -117,7 +117,7 @@ export const restartCeremony = async (
                     }
 
                     const blockingParticipantSet = new Set(
-                        blockingParticipantIndices,
+                        blockingVoterIndices,
                     );
                     const nextActiveParticipantIndices = pollReadModel.voters
                         .filter(
@@ -131,7 +131,7 @@ export const restartCeremony = async (
 
                     if (
                         nextActiveParticipantIndices.length <
-                        minimumPollParticipantsToClose
+                        minimumPollVotersToClose
                     ) {
                         throw createError(
                             400,

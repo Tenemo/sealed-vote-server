@@ -78,11 +78,11 @@ export const createPoll = async (
 
 export const fetchPoll = async (
     fastify: FastifyInstance,
-    pollRef: string,
+    pollReference: string,
 ): Promise<PollResponse> => {
     const response = await fastify.inject({
         method: 'GET',
-        url: POLL_ROUTES.poll(pollRef),
+        url: POLL_ROUTES.poll(pollReference),
     });
 
     return JSON.parse(response.body) as PollResponse;

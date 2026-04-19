@@ -133,33 +133,6 @@ describe('pollDeviceStorage', () => {
         );
     });
 
-    it('ignores incompatible device state stored under the previous v2 key', () => {
-        window.localStorage.setItem(
-            'sealed-vote.poll-device-state.v2',
-            JSON.stringify({
-                'poll-1': {
-                    authPrivateKeyPkcs8: 'auth-private-key',
-                    authPublicKey: 'auth-public-key',
-                    dkgBlindingSeed: 'dkg-blinding-seed',
-                    dkgSecretSeed: 'dkg-secret-seed',
-                    isCreatorParticipant: false,
-                    pendingPayloads: {},
-                    pollId: 'poll-1',
-                    pollSlug: 'best-fruit--1111',
-                    storedBallotScores: [8, 6],
-                    transportPrivateKeyPkcs8: 'transport-private-key',
-                    transportPublicKey: 'transport-public-key',
-                    transportSuite: 'X25519',
-                    voterIndex: 1,
-                    voterName: 'Alice',
-                    voterToken: 'token-1',
-                },
-            }),
-        );
-
-        expect(findPollDeviceStateByPollId('poll-1')).toBeNull();
-    });
-
     it('treats blocked local storage as unavailable instead of throwing', () => {
         const localStorageGetterSpy = vi
             .spyOn(window, 'localStorage', 'get')

@@ -13,15 +13,16 @@ const cliArgs = process.argv.slice(2);
 const firstArg = cliArgs[0];
 const normalizeForwardedCliArgs = (args: string[]): string[] =>
     args[0] === '--' ? args.slice(1) : args;
-const mode = firstArg === 'production' ? 'production' : 'compat';
+const mode =
+    firstArg === 'production' ? 'production' : 'browser-compatibility';
 const forwardedCliArgs =
-    firstArg === 'compat' || firstArg === 'production'
+    firstArg === 'browser-compatibility' || firstArg === 'production'
         ? normalizeForwardedCliArgs(cliArgs.slice(1))
         : getForwardedCliArgs();
 const configPath =
     mode === 'production'
         ? 'tests/config/playwright.config.mts'
-        : 'tests/config/playwright.compat.config.mts';
+        : 'tests/config/playwright-browser-compatibility.config.mts';
 
 if (mode === 'production') {
     process.env.PLAYWRIGHT_CONFIG_PROFILE = 'production';

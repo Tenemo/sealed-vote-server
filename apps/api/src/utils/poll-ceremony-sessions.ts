@@ -14,7 +14,7 @@ import type { Database, DatabaseTransaction } from '../database/client.js';
 import { pollCeremonySessions } from '../database/schema.js';
 
 import { normalizeDatabaseTimestamp } from './database.js';
-import { parseParticipantDeviceRecord } from './participant-devices.js';
+import { parseVoterDeviceRecord } from './voter-device-records.js';
 
 type ReadOnlyDatabase = Database | DatabaseTransaction;
 
@@ -126,7 +126,7 @@ const mapActiveParticipants = ({
                 return [];
             }
 
-            const deviceRecord = parseParticipantDeviceRecord(
+            const deviceRecord = parseVoterDeviceRecord(
                 participant.publicKeyShares[0]?.publicKeyShare,
             );
 

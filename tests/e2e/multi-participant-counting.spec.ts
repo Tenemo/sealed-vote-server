@@ -6,7 +6,7 @@ import {
     createPoll,
     deletePolls,
     expectPostCloseVisible,
-    expectParticipantsVisible,
+    expectVotersVisible,
     submitVote,
     waitForAutomaticReveal,
     waitForVerifiedResults,
@@ -123,7 +123,7 @@ test('counts every honest ballot when four participants complete the ceremony', 
             }),
         );
 
-        await expectParticipantsVisible(page, [
+        await expectVotersVisible(page, [
             creatorName,
             participantOneName,
             participantTwoName,

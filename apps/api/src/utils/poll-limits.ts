@@ -1,2 +1,2 @@
-export const minimumPollParticipantsToClose = 3;
-export const maxPollParticipants = 51;
+export const minimumPollVotersToClose = 3;
+export const maximumPollVoterCount = 51;

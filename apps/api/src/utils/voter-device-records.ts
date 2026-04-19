@@ -1,25 +1,24 @@
-export type ParticipantDeviceRecord = {
+export type VoterDeviceRecord = {
     authPublicKey: string;
     transportPublicKey: string;
     transportSuite: 'X25519';
 };
 
-export const serializeParticipantDeviceRecord = (
-    value: ParticipantDeviceRecord,
-): string => JSON.stringify(value);
+export const serializeVoterDeviceRecord = (value: VoterDeviceRecord): string =>
+    JSON.stringify(value);
 
 const isTransportSuite = (value: unknown): value is 'X25519' =>
     value === 'X25519';
 
-export const parseParticipantDeviceRecord = (
+export const parseVoterDeviceRecord = (
     value: string | null | undefined,
-): ParticipantDeviceRecord | null => {
+): VoterDeviceRecord | null => {
     if (!value) {
         return null;
     }
 
     try {
-        const parsed = JSON.parse(value) as Partial<ParticipantDeviceRecord>;
+        const parsed = JSON.parse(value) as Partial<VoterDeviceRecord>;
 
         if (
             typeof parsed.authPublicKey !== 'string' ||

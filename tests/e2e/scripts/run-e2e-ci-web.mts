@@ -3,13 +3,13 @@ import path from 'node:path';
 
 import {
     assertSafeE2EEnv,
-    repoRoot,
+    repositoryRoot,
     spawnPnpm,
     wireChildProcess,
 } from './shared.mts';
 
 const builtIndexPath = path.resolve(
-    repoRoot,
+    repositoryRoot,
     'apps',
     'web',
     'dist',

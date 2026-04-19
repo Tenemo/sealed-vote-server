@@ -160,7 +160,7 @@ const formatBoardEntryTitle = (
         typeof payload.recipientIndex === 'number' &&
         Number.isInteger(payload.recipientIndex)
     ) {
-        return `${baseTitle} for participant ${payload.recipientIndex}`;
+        return `${baseTitle} for voter ${payload.recipientIndex}`;
     }
 
     if (Array.isArray(payload.countedParticipantIndices)) {
@@ -204,7 +204,7 @@ const formatRevealStatus = (poll: PollData): string => {
         : 'Waiting for complete ballots';
 };
 
-const isPollParticipantLocal = ({
+const isPollVoterLocal = ({
     devicePollId,
     pollId,
     voterPollId,
@@ -214,7 +214,7 @@ const isPollParticipantLocal = ({
     voterPollId: string | null | undefined;
 }): boolean => devicePollId === pollId && voterPollId === pollId;
 
-const buildParticipantSummary = ({
+const buildSubmittedVoterSummary = ({
     count,
     minimum,
 }: {
@@ -829,15 +829,15 @@ const PollPage = (): React.JSX.Element => {
         );
     }
 
-    const submittedParticipantSummary = buildParticipantSummary({
-        count: poll.submittedParticipantCount,
-        minimum: poll.minimumCloseParticipantCount,
+    const submittedVoterSummary = buildSubmittedVoterSummary({
+        count: poll.submittedVoterCount,
+        minimum: poll.minimumCloseVoterCount,
     });
     const shareUrl =
         typeof window === 'undefined'
             ? `https://sealed.vote/polls/${poll.slug}`
             : window.location.href;
-    const localParticipant = isPollParticipantLocal({
+    const localVoter = isPollVoterLocal({
         devicePollId: deviceState?.pollId,
         pollId: poll.id,
         voterPollId: voterSession?.pollId,
@@ -870,15 +870,13 @@ const PollPage = (): React.JSX.Element => {
     const canCopyShareUrl =
         typeof navigator !== 'undefined' &&
         typeof navigator.clipboard?.writeText === 'function';
-    const blockingParticipants = poll.voters.filter((participant) =>
-        poll.ceremony.blockingParticipantIndices.includes(
-            participant.voterIndex,
-        ),
+    const blockingVoters = poll.voters.filter((participant) =>
+        poll.ceremony.blockingVoterIndices.includes(participant.voterIndex),
     );
     const canRestartCeremony =
         poll.phase === 'securing' &&
-        poll.ceremony.activeParticipantCount - blockingParticipants.length >=
-            poll.minimumCloseParticipantCount;
+        poll.ceremony.activeParticipantCount - blockingVoters.length >=
+            poll.minimumCloseVoterCount;
 
     const onScoreChange = (choiceIndex: number, score: number): void => {
         setDraftScores((currentScores) =>
@@ -998,13 +996,13 @@ const PollPage = (): React.JSX.Element => {
         if (
             !creatorSession ||
             poll.phase !== 'securing' ||
-            blockingParticipants.length === 0 ||
+            blockingVoters.length === 0 ||
             !canRestartCeremony
         ) {
             return;
         }
 
-        const blockedNames = blockingParticipants
+        const blockedNames = blockingVoters
             .map((participant) => participant.voterName)
             .join(', ');
         const confirmed =
@@ -1099,9 +1097,9 @@ const PollPage = (): React.JSX.Element => {
                                 </div>
                                 <div>
                                     <div className="font-medium text-foreground">
-                                        Submitted participants
+                                        Submitted voters
                                     </div>
-                                    <div>{submittedParticipantSummary}</div>
+                                    <div>{submittedVoterSummary}</div>
                                 </div>
                             </div>
                         </div>
@@ -1177,13 +1175,13 @@ const PollPage = (): React.JSX.Element => {
 
                         {creatorSession?.pollId === poll.id &&
                         poll.phase === 'securing' &&
-                        blockingParticipants.length > 0 ? (
+                        blockingVoters.length > 0 ? (
                             <Alert announcement="polite" variant="info">
                                 <AlertDescription>
                                     <div className="space-y-3">
                                         <p>
                                             Ceremony progress is waiting on{' '}
-                                            {blockingParticipants
+                                            {blockingVoters
                                                 .map(
                                                     (participant) =>
                                                         participant.voterName,
@@ -1200,11 +1198,8 @@ const PollPage = (): React.JSX.Element => {
                                                 once removing the currently
                                                 blocking devices would still
                                                 leave at least{' '}
-                                                {
-                                                    poll.minimumCloseParticipantCount
-                                                }{' '}
-                                                active participants in the
-                                                ceremony.
+                                                {poll.minimumCloseVoterCount}{' '}
+                                                active voters in the ceremony.
                                             </p>
                                         ) : null}
                                         {canRestartCeremony ? (
@@ -1231,7 +1226,7 @@ const PollPage = (): React.JSX.Element => {
                             </Alert>
                         ) : null}
 
-                        {poll.phase === 'open' && !localParticipant ? (
+                        {poll.phase === 'open' && !localVoter ? (
                             <form
                                 className="space-y-6"
                                 noValidate
@@ -1374,9 +1369,9 @@ const PollPage = (): React.JSX.Element => {
                                     </div>
                                 ) : isCreatorParticipant ? (
                                     <p className="field-note">
-                                        {poll.submittedParticipantCount <
-                                        poll.minimumCloseParticipantCount
-                                            ? `At least ${poll.minimumCloseParticipantCount} submitted participants are required before closing.`
+                                        {poll.submittedVoterCount <
+                                        poll.minimumCloseVoterCount
+                                            ? `At least ${poll.minimumCloseVoterCount} submitted voters are required before closing.`
                                             : 'Waiting for you to close the submitted roster.'}
                                     </p>
                                 ) : null}
@@ -1425,7 +1420,7 @@ const PollPage = (): React.JSX.Element => {
                                 </h2>
                                 <p className="field-note">
                                     Arithmetic means are shown in the same 1.0
-                                    to 10.0 range that each participant used.
+                                    to 10.0 range that each voter used.
                                 </p>
                             </div>
                             <div className="grid gap-3">
@@ -1542,9 +1537,9 @@ const PollPage = (): React.JSX.Element => {
                         <div className="grid gap-3 text-sm">
                             <div className="flex items-center justify-between gap-4">
                                 <span className="text-secondary">
-                                    Submitted participants
+                                    Submitted voters
                                 </span>
-                                <span>{poll.submittedParticipantCount}</span>
+                                <span>{poll.submittedVoterCount}</span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
                                 <span className="text-secondary">
@@ -1618,18 +1613,13 @@ const PollPage = (): React.JSX.Element => {
 
                     <Panel className="space-y-4">
                         <div className="space-y-2">
-                            <h2 className="text-xl font-semibold">
-                                Participants
-                            </h2>
+                            <h2 className="text-xl font-semibold">Voters</h2>
                             <p className="field-note">
                                 The pre-close roster is public and auditable.
                             </p>
                         </div>
 
-                        <ul
-                            aria-label="Participants roster"
-                            className="space-y-2"
-                        >
+                        <ul aria-label="Voters roster" className="space-y-2">
                             {poll.voters.map((participant) => (
                                 <li
                                     className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm"

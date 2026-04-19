@@ -40,7 +40,7 @@ import {
 import { withTransaction } from '../utils/database.js';
 import { lockPollById } from '../utils/poll-locks.js';
 import { derivePollCeremonySession } from '../utils/poll-ceremony-sessions.js';
-import { parseParticipantDeviceRecord } from '../utils/participant-devices.js';
+import { parseVoterDeviceRecord } from '../utils/voter-device-records.js';
 import { authenticateVoter } from '../utils/voter-auth.js';
 
 import {
@@ -268,7 +268,7 @@ const assertStoredRegistrationKeysMatchPayload = async ({
         },
     });
 
-    const deviceRecord = parseParticipantDeviceRecord(
+    const deviceRecord = parseVoterDeviceRecord(
         voterRecord?.publicKeyShares[0]?.publicKeyShare,
     );
 

@@ -7,7 +7,7 @@ import {
     createPoll,
     deletePolls,
     expectPostCloseVisible,
-    expectParticipantsVisible,
+    expectVotersVisible,
     reloadPollPage,
     submitVote,
     waitForAutomaticReveal,
@@ -105,7 +105,7 @@ test('completes the full vote-to-results ceremony across three live sessions', a
             }),
         );
 
-        await expectParticipantsVisible(page, [
+        await expectVotersVisible(page, [
             creatorName,
             participantOneName,
             participantTwoName,

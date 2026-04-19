@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixedScoreRange } from '@sealed-vote/contracts';
 
-import { serializeParticipantDeviceRecord } from './participant-devices.js';
+import { serializeVoterDeviceRecord } from './voter-device-records.js';
 import {
     derivePollCeremonySession,
     normalizeCeremonyParticipantIndices,
@@ -28,7 +28,7 @@ const createParticipant = ({
         authPublicKey && transportPublicKey
             ? [
                   {
-                      publicKeyShare: serializeParticipantDeviceRecord({
+                      publicKeyShare: serializeVoterDeviceRecord({
                           authPublicKey,
                           transportPublicKey,
                           transportSuite: 'X25519',

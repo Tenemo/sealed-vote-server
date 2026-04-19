@@ -20,7 +20,7 @@ import {
     createExpectedVerifiedResults,
     deletePolls,
     expectPostCloseVisible,
-    expectParticipantsVisible,
+    expectVotersVisible,
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
@@ -626,7 +626,7 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         );
         await sleep(demoBeatPausesMs.voteSubmitted);
 
-        await expectParticipantsVisible(creator.page, [
+        await expectVotersVisible(creator.page, [
             creatorName,
             participantOneName,
             participantTwoName,

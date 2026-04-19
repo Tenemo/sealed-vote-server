@@ -1,19 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const secureProbeUrl = 'https://compat.sealed.vote/';
+const browserCompatibilityProbeUrl = 'https://compat.sealed.vote/';
 const nonMacOsWebKitCryptoSkipReason =
     'Non-macOS Playwright WebKit does not expose the latest Apple WebKit WebCrypto support for Ed25519 and X25519. Run these checks on macOS.';
 
 const openSecureProbePage = async (page: Page): Promise<void> => {
-    await page.route(secureProbeUrl, async (route) => {
+    await page.route(browserCompatibilityProbeUrl, async (route) => {
         await route.fulfill({
-            body: '<!doctype html><title>browser crypto compat</title><main>browser crypto compat</main>',
+            body: '<!doctype html><title>browser crypto compatibility</title><main>browser crypto compatibility</main>',
             contentType: 'text/html',
             status: 200,
         });
     });
 
-    await page.goto(secureProbeUrl, {
+    await page.goto(browserCompatibilityProbeUrl, {
         waitUntil: 'domcontentloaded',
     });
 };

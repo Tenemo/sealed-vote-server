@@ -23,7 +23,7 @@ if (!FormatRegistry.Has('uuid')) {
     FormatRegistry.Set('uuid', (value) => uuidPattern.test(value));
 }
 
-describe('GET /polls/:pollRef', () => {
+describe('GET /polls/:pollReference', () => {
     let fastify: FastifyInstance;
 
     beforeAll(async () => {
@@ -70,14 +70,14 @@ describe('GET /polls/:pollRef', () => {
                     description: 'fractional submitted participant counts',
                     poll: {
                         ...clonePoll(poll),
-                        submittedParticipantCount: 3.5,
+                        submittedVoterCount: 3.5,
                     },
                 },
                 {
                     description: 'non-positive close thresholds',
                     poll: {
                         ...clonePoll(poll),
-                        minimumCloseParticipantCount: 0,
+                        minimumCloseVoterCount: 0,
                     },
                 },
                 {

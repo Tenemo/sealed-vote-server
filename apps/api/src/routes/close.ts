@@ -11,10 +11,10 @@ import createError from 'http-errors';
 import type { DatabaseTransaction } from '../database/client.js';
 import { polls, publicKeyShares, voters } from '../database/schema.js';
 import { withTransaction } from '../utils/database.js';
-import { parseParticipantDeviceRecord } from '../utils/participant-devices.js';
+import { parseVoterDeviceRecord } from '../utils/voter-device-records.js';
 import { insertPollCeremonySession } from '../utils/poll-ceremony-sessions.js';
 import { lockPollById } from '../utils/poll-locks.js';
-import { minimumPollParticipantsToClose } from '../utils/poll-limits.js';
+import { minimumPollVotersToClose } from '../utils/poll-limits.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voter-auth.js';
 
@@ -43,11 +43,11 @@ const schema = {
 type CloseVotingBody = CloseVotingRequestContract;
 type CloseVotingResponse = MessageResponse;
 
-const validateParticipantDeviceReadiness = async (
+const validateVoterDeviceReadiness = async (
     client: DatabaseTransaction,
     pollId: string,
 ): Promise<number[]> => {
-    const participants = await client
+    const registeredVoters = await client
         .select({
             publicKeyShare: publicKeyShares.publicKeyShare,
             voterId: voters.id,
@@ -64,20 +64,19 @@ const validateParticipantDeviceReadiness = async (
         .where(eq(voters.pollId, pollId))
         .orderBy(voters.voterIndex);
 
-    if (participants.length < minimumPollParticipantsToClose) {
-        throw createError(400, ERROR_MESSAGES.notEnoughParticipantsToClose);
+    if (registeredVoters.length < minimumPollVotersToClose) {
+        throw createError(400, ERROR_MESSAGES.notEnoughVotersToClose);
     }
 
-    const everyParticipantHasDeviceKeys = participants.every(
-        (participant) =>
-            parseParticipantDeviceRecord(participant.publicKeyShare) !== null,
+    const everyVoterHasDeviceKeys = registeredVoters.every(
+        (voter) => parseVoterDeviceRecord(voter.publicKeyShare) !== null,
     );
 
-    if (!everyParticipantHasDeviceKeys) {
-        throw createError(400, ERROR_MESSAGES.participantDeviceKeysRequired);
+    if (!everyVoterHasDeviceKeys) {
+        throw createError(400, ERROR_MESSAGES.voterDeviceKeysRequired);
     }
 
-    return participants.map((participant) => participant.voterIndex);
+    return registeredVoters.map((voter) => voter.voterIndex);
 };
 
 export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
@@ -121,7 +120,7 @@ export const closeVoting = async (fastify: FastifyInstance): Promise<void> => {
                     }
 
                     const activeParticipantIndices =
-                        await validateParticipantDeviceReadiness(
+                        await validateVoterDeviceReadiness(
                             client,
                             request.params.pollId,
                         );

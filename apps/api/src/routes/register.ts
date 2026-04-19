@@ -11,12 +11,12 @@ import createError from 'http-errors';
 import type { DatabaseTransaction } from '../database/client.js';
 import { publicKeyShares, voters } from '../database/schema.js';
 import { isConstraintViolation, withTransaction } from '../utils/database.js';
-import { maxPollParticipants } from '../utils/poll-limits.js';
+import { maximumPollVoterCount } from '../utils/poll-limits.js';
 import { lockPollById } from '../utils/poll-locks.js';
 import {
-    parseParticipantDeviceRecord,
-    serializeParticipantDeviceRecord,
-} from '../utils/participant-devices.js';
+    parseVoterDeviceRecord,
+    serializeVoterDeviceRecord,
+} from '../utils/voter-device-records.js';
 import { maybeDropTestResponseAfterCommit } from '../utils/testing.js';
 import { hashSecureToken } from '../utils/voter-auth.js';
 
@@ -110,7 +110,7 @@ const getExistingRegistration = async ({
         },
     });
 
-const hasMatchingParticipantDeviceRecord = ({
+const hasMatchingVoterDeviceRecord = ({
     authPublicKey,
     deviceRecord,
     transportPublicKey,
@@ -129,7 +129,7 @@ const hasMatchingParticipantDeviceRecord = ({
     deviceRecord.transportPublicKey === transportPublicKey &&
     deviceRecord.transportSuite === transportSuite;
 
-const reconcileExistingParticipantDeviceRecord = async ({
+const reconcileExistingVoterDeviceRecord = async ({
     authPublicKey,
     existingRegistration,
     pollId,
@@ -147,13 +147,13 @@ const reconcileExistingParticipantDeviceRecord = async ({
     databaseTransaction: DatabaseTransaction;
 }): Promise<void> => {
     const existingPublicKeyShare = existingRegistration.publicKeyShares[0];
-    const existingDeviceRecord = parseParticipantDeviceRecord(
+    const existingDeviceRecord = parseVoterDeviceRecord(
         existingPublicKeyShare?.publicKeyShare,
     );
 
     if (existingDeviceRecord) {
         if (
-            !hasMatchingParticipantDeviceRecord({
+            !hasMatchingVoterDeviceRecord({
                 authPublicKey,
                 deviceRecord: existingDeviceRecord,
                 transportPublicKey,
@@ -199,7 +199,7 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
             const voterName = request.body.voterName.trim();
             const { voterToken } = request.body;
             const { pollId } = request.params;
-            const serializedDeviceRecord = serializeParticipantDeviceRecord({
+            const serializedDeviceRecord = serializeVoterDeviceRecord({
                 authPublicKey,
                 transportPublicKey,
                 transportSuite,
@@ -252,7 +252,7 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                                 );
                             }
 
-                            await reconcileExistingParticipantDeviceRecord({
+                            await reconcileExistingVoterDeviceRecord({
                                 authPublicKey,
                                 existingRegistration,
                                 pollId,
@@ -280,10 +280,10 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                             pollId,
                         );
 
-                        if (voterCount >= maxPollParticipants) {
+                        if (voterCount >= maximumPollVoterCount) {
                             throw createError(
                                 400,
-                                ERROR_MESSAGES.maxParticipantsReached,
+                                ERROR_MESSAGES.maximumVoterCountReached,
                             );
                         }
 
@@ -364,7 +364,7 @@ export const register = async (fastify: FastifyInstance): Promise<void> => {
                                 );
                             }
 
-                            await reconcileExistingParticipantDeviceRecord({
+                            await reconcileExistingVoterDeviceRecord({
                                 authPublicKey,
                                 existingRegistration,
                                 pollId,

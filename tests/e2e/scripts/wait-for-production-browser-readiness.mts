@@ -29,7 +29,10 @@ const firefoxHomeOwnershipFailureMessage =
     'Firefox cannot launch in the Playwright container because HOME is not owned by the current user. Set HOME=/root or run the container as a non-root user.';
 const currentFilePath = fileURLToPath(import.meta.url);
 const pnpmExecPath = process.env.npm_execpath;
-const repoRoot = path.resolve(path.dirname(currentFilePath), '../../..');
+const repositoryRoot = path.resolve(
+    path.dirname(currentFilePath),
+    '../../..',
+);
 
 export type ReadinessCheckResult =
     | {
@@ -285,7 +288,7 @@ const runReadinessCheck = async (
                 ...forwardedCliArgs,
             ],
             {
-                cwd: repoRoot,
+                cwd: repositoryRoot,
                 env: {
                     ...process.env,
                     PLAYWRIGHT_CONFIG_PROFILE: 'production',

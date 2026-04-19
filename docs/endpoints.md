@@ -17,14 +17,14 @@ The backend routes live under `/api`. The payloads below match the shared contra
 ```
 
 - notes:
-  - the hard participant cap is `51`
+  - the hard voter cap is `51`
   - the current validated target is `15`
   - `protocolVersion` currently accepts only `v1`
 
 ## Fetch poll
 
-- `GET /api/polls/:pollRef`
-- `pollRef` accepts either the poll UUID or the canonical public slug
+- `GET /api/polls/:pollReference`
+- `pollReference` accepts either the poll UUID or the canonical public slug
 - response highlights:
   - public submitted roster
   - manifest and manifest hash after close
@@ -64,8 +64,8 @@ Example response:
     "manifestHash": null,
     "sessionId": null,
     "sessionFingerprint": null,
-    "submittedParticipantCount": 2,
-    "minimumCloseParticipantCount": 3,
+    "submittedVoterCount": 2,
+    "minimumCloseVoterCount": 3,
     "boardAudit": {
         "acceptedCount": 0,
         "duplicateCount": 0,
@@ -83,7 +83,7 @@ Example response:
     "thresholds": {
         "reconstructionThreshold": null,
         "minimumPublishedVoterCount": null,
-        "maxParticipants": 51,
+        "maximumVoterCount": 51,
         "validationTarget": 15
     },
     "ceremony": {
@@ -91,7 +91,7 @@ Example response:
         "acceptedEncryptedBallotCount": 0,
         "acceptedDecryptionShareCount": 0,
         "activeParticipantCount": 2,
-        "blockingParticipantIndices": [],
+        "blockingVoterIndices": [],
         "completeEncryptedBallotParticipantCount": 0,
         "revealReady": false,
         "restartCount": 0
@@ -129,7 +129,7 @@ Closed-poll manifest shape:
 }
 ```
 
-Optional creator-participant registration:
+Optional creator registration as a voter:
 
 ```json
 {
@@ -145,9 +145,9 @@ Optional creator-participant registration:
 - notes:
   - voter names are unique within a poll
   - registration is token-only in this version; there is no strong identity binding
-  - the app uses this route when a participant submits their final pre-close vote
+  - the app uses this route when a voter submits their final pre-close vote
   - registration closes permanently once the organizer closes voting
-  - the app stores the participant auth and transport public keys during submit so the post-close board ceremony can verify the frozen roster
+  - the app stores the voter auth and transport public keys during submit so the post-close board ceremony can verify the frozen roster
 
 ## Close voting
 
@@ -161,8 +161,8 @@ Optional creator-participant registration:
 ```
 
 - notes:
-  - the poll requires at least three submitted participants before it can be closed
-  - closing freezes the submitted roster
+  - the poll requires at least three submitted voters before it can be closed
+  - closing freezes the submitted voter roster
   - the app derives the honest-majority reconstruction threshold from the frozen roster; the UI does not expose a threshold picker
 
 ## List board messages

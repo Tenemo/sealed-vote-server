@@ -10,14 +10,14 @@ import { getPollFetchReadModel } from '../utils/poll-read-model.js';
 
 import {
     BoardMessageRecordSchema,
-    PollRefParamsSchema,
-    type PollRefParams,
+    PollReferenceParamsSchema,
+    type PollReferenceParams,
 } from './schemas.js';
 
 const nonNegativeIntegerSchema = Type.Integer({ minimum: 0 });
 const positiveIntegerSchema = Type.Integer({ minimum: 1 });
 
-const PollRosterParticipantSchema = Type.Object({
+const PollRosterVoterSchema = Type.Object({
     ceremonyState: Type.Union([
         Type.Literal('active'),
         Type.Literal('blocking'),
@@ -57,7 +57,7 @@ export const PollResponseSchema = Type.Object({
     pollName: Type.String(),
     createdAt: Type.String(),
     choices: Type.Array(Type.String()),
-    voters: Type.Array(PollRosterParticipantSchema),
+    voters: Type.Array(PollRosterVoterSchema),
     isOpen: Type.Boolean(),
     manifest: Type.Union([ElectionManifestSchema, Type.Null()]),
     manifestHash: Type.Union([Type.String(), Type.Null()]),
@@ -71,14 +71,14 @@ export const PollResponseSchema = Type.Object({
         Type.Literal('complete'),
         Type.Literal('aborted'),
     ]),
-    submittedParticipantCount: nonNegativeIntegerSchema,
-    minimumCloseParticipantCount: positiveIntegerSchema,
+    submittedVoterCount: nonNegativeIntegerSchema,
+    minimumCloseVoterCount: positiveIntegerSchema,
     ceremony: Type.Object({
         acceptedDecryptionShareCount: nonNegativeIntegerSchema,
         acceptedEncryptedBallotCount: nonNegativeIntegerSchema,
         acceptedRegistrationCount: nonNegativeIntegerSchema,
         activeParticipantCount: nonNegativeIntegerSchema,
-        blockingParticipantIndices: Type.Array(Type.Integer({ minimum: 1 })),
+        blockingVoterIndices: Type.Array(Type.Integer({ minimum: 1 })),
         completeEncryptedBallotParticipantCount: nonNegativeIntegerSchema,
         revealReady: Type.Boolean(),
         restartCount: nonNegativeIntegerSchema,
@@ -123,13 +123,13 @@ export const PollResponseSchema = Type.Object({
             positiveIntegerSchema,
             Type.Null(),
         ]),
-        maxParticipants: positiveIntegerSchema,
+        maximumVoterCount: positiveIntegerSchema,
         validationTarget: positiveIntegerSchema,
     }),
 });
 
 const schema = {
-    params: PollRefParamsSchema,
+    params: PollReferenceParamsSchema,
     response: {
         200: PollResponseSchema,
     },
@@ -139,20 +139,20 @@ type PollResponse = PollResponseContract;
 
 export const fetch = async (fastify: FastifyInstance): Promise<void> => {
     fastify.get(
-        '/polls/:pollRef',
+        '/polls/:pollReference',
         { schema },
         async (
-            request: FastifyRequest<{ Params: PollRefParams }>,
+            request: FastifyRequest<{ Params: PollReferenceParams }>,
         ): Promise<PollResponse> => {
             const poll = await getPollFetchReadModel(
                 fastify.database,
-                request.params.pollRef,
+                request.params.pollReference,
             );
 
             if (!poll) {
                 throw createError(
                     404,
-                    `Poll ${request.params.pollRef} does not exist.`,
+                    `Poll ${request.params.pollReference} does not exist.`,
                 );
             }
 
