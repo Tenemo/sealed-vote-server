@@ -1199,7 +1199,8 @@ const PollPage = (): React.JSX.Element => {
                                                 blocking devices would still
                                                 leave at least{' '}
                                                 {poll.minimumCloseVoterCount}{' '}
-                                                active voters in the ceremony.
+                                                active participants in the
+                                                ceremony.
                                             </p>
                                         ) : null}
                                         {canRestartCeremony ? (

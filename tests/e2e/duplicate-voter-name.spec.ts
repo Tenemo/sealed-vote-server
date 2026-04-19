@@ -90,7 +90,7 @@ test('shows the duplicate voter-name error and still allows a unique retry', asy
 
         await expect(
             participant.page.getByText(
-                'Voter name is already taken for this vote.',
+                'Voter name is already taken for this poll.',
             ),
         ).toBeVisible();
         await expectNoAccessibilityViolations(

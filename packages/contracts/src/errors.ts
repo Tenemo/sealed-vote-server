@@ -4,7 +4,7 @@ export type MessageResponse = {
 
 export const ERROR_MESSAGES = {
     invalidPollId: 'Invalid poll ID.',
-    duplicateVoterName: 'Voter name is already taken for this vote.',
+    duplicateVoterName: 'Voter name is already taken for this poll.',
     pollClosed: 'Poll is closed for new registrations.',
     pollAlreadyClosed: 'Poll is already closed.',
     notEnoughVotersToClose:
@@ -12,7 +12,7 @@ export const ERROR_MESSAGES = {
     invalidCreatorToken: 'Invalid creator token.',
     invalidVoterToken: 'Invalid voter token.',
     creatorTokenConflict:
-        'Creator token was already used for a different vote.',
+        'Creator token was already used for a different poll.',
     voterTokenConflict:
         'Voter token was already used for a different voter name.',
     voterDeviceKeysRequired:

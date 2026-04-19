@@ -111,7 +111,7 @@ describe('Register voter endpoint', () => {
         );
         expect(secondRegistrationResult.success).toBeFalsy();
         expect(secondRegistrationResult.message).toBe(
-            'Voter name is already taken for this vote.',
+            'Voter name is already taken for this poll.',
         );
 
         const deleteResult = await deletePoll(fastify, pollId, creatorToken);
