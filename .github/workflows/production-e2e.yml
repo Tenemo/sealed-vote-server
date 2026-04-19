@@ -4,8 +4,12 @@ on:
     push:
         branches: [master, main]
     workflow_dispatch:
-        # Intentional: we use manual production runs from test-fix branches to
-        # validate the live-production suite itself.
+        inputs:
+            skip_deploy_validation:
+                description: Skip waiting for the selected commit to reach production and run the checked-out suite against the currently live site.
+                required: false
+                type: boolean
+                default: false
 
 permissions:
     contents: read
@@ -15,9 +19,44 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
+    validate-manual-production-mode:
+        name: validate manual production mode
+        if: github.event_name == 'workflow_dispatch'
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: reject misleading feature-branch production runs
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  skip_deploy_validation="${{ github.event.inputs.skip_deploy_validation }}"
+                  selected_ref_name="${{ github.ref_name }}"
+
+                  if [ "$skip_deploy_validation" = "true" ]; then
+                    echo "Skipping deploy validation and running the checked-out suite against the currently live production site."
+                    exit 0
+                  fi
+
+                  if [ "$selected_ref_name" != "main" ] && [ "$selected_ref_name" != "master" ]; then
+                    echo "Manual production e2e runs from non-production branches must set skip_deploy_validation=true. The selected ref ${selected_ref_name} is not deployed to https://sealed.vote, so waiting for commit ${{ github.sha }} would only time out." >&2
+                    exit 1
+                  fi
+
     wait-for-production-deploy:
         name: wait for production deploy
-        if: github.event_name != 'workflow_dispatch'
+        needs: [validate-manual-production-mode]
+        if: >-
+            ${{
+                always() &&
+                (
+                    github.event_name != 'workflow_dispatch' ||
+                    (
+                        needs.validate-manual-production-mode.result == 'success' &&
+                        github.event.inputs.skip_deploy_validation != 'true'
+                    )
+                )
+            }}
         runs-on: ubuntu-latest
         timeout-minutes: 40
 
@@ -43,12 +82,16 @@ jobs:
 
     production-e2e-matrix:
         name: production e2e (${{ matrix.project.name }})
-        needs: [wait-for-production-deploy]
+        needs: [validate-manual-production-mode, wait-for-production-deploy]
         if: >-
             ${{
                 always() &&
                 (
-                    github.event_name == 'workflow_dispatch' ||
+                    (
+                        github.event_name == 'workflow_dispatch' &&
+                        needs.validate-manual-production-mode.result == 'success' &&
+                        github.event.inputs.skip_deploy_validation == 'true'
+                    ) ||
                     needs.wait-for-production-deploy.result == 'success'
                 )
             }}
@@ -157,6 +200,7 @@ jobs:
         if: always()
         needs:
             [
+                validate-manual-production-mode,
                 wait-for-production-deploy,
                 production-e2e-matrix,
             ]
@@ -165,7 +209,12 @@ jobs:
         steps:
             - name: assert production e2e jobs passed
               run: |
-                  if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ needs.validate-manual-production-mode.result }}" != "success" ]; then
+                    echo "validate-manual-production-mode result: ${{ needs.validate-manual-production-mode.result }}"
+                    exit 1
+                  fi
+
+                  if { [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ github.event.inputs.skip_deploy_validation }}" != "true" ]; } && [ "${{ needs.wait-for-production-deploy.result }}" != "success" ]; then
                     echo "wait-for-production-deploy result: ${{ needs.wait-for-production-deploy.result }}"
                     exit 1
                   fi
