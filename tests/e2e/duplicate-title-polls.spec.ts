@@ -33,16 +33,10 @@ test('keeps duplicate-title polls on distinct slug URLs with isolated rosters', 
     const secondPollVoterName = createVoterName('bob', namespace);
     const attachFirstPollTracking = createErrorTrackingAttacher({
         label: 'first-poll',
-        options: {
-            allowedConsoleErrors: [/^Error$/],
-        },
         tracker,
     });
     const attachSecondPollTracking = createErrorTrackingAttacher({
         label: 'second-poll',
-        options: {
-            allowedConsoleErrors: [/^Error$/],
-        },
         tracker,
     });
 

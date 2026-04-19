@@ -17,6 +17,7 @@ import {
 
 const demoOnlySpecs = ['**/readme-demo.demo.ts'];
 const productionOnlySpecs = ['**/00-production-browser-readiness.spec.ts'];
+const localOnlySpecs = [...productionOnlySpecs, ...demoOnlySpecs];
 
 // The main e2e matrix runs WebKit on Linux, where Ed25519 and X25519 WebCrypto
 // support still lags the latest Apple WebKit stack. We probe that support on
@@ -194,6 +195,29 @@ const projects: Project[] = [
     },
 ];
 
+type TestIgnorePattern = string | RegExp;
+
+const toTestIgnoreList = (
+    testIgnore: Project['testIgnore'],
+): TestIgnorePattern[] => {
+    if (!testIgnore) {
+        return [];
+    }
+
+    return Array.isArray(testIgnore) ? [...testIgnore] : [testIgnore];
+};
+
+const mergeProjectTestIgnores = (
+    project: Project,
+    additionalTestIgnores: readonly TestIgnorePattern[],
+): Project => ({
+    ...project,
+    testIgnore: [
+        ...toTestIgnoreList(project.testIgnore),
+        ...additionalTestIgnores,
+    ],
+});
+
 const getCommonConfig = (
     baseURL: string,
     outputDir: string,
@@ -239,12 +263,14 @@ const createLocalWebServers = (): NonNullable<PlaywrightTestConfig['webServer']>
         ? [
               {
                   command: 'pnpm e2e:ci:serve:api',
+                  cwd: repositoryRoot,
                   timeout: 120_000,
                   url: `${localApiBaseUrl}/api/health-check`,
                   reuseExistingServer: false,
               },
               {
                   command: 'pnpm e2e:ci:serve:web',
+                  cwd: repositoryRoot,
                   timeout: 120_000,
                   url: localWebBaseUrl,
                   reuseExistingServer: false,
@@ -254,12 +280,14 @@ const createLocalWebServers = (): NonNullable<PlaywrightTestConfig['webServer']>
               {
                   command:
                       'pnpm exec node --experimental-strip-types tests/e2e/scripts/run-e2e-backend.mts',
+                  cwd: repositoryRoot,
                   timeout: 120_000,
                   url: `${localApiBaseUrl}/api/health-check`,
                   reuseExistingServer: false,
               },
               {
                   command: `pnpm --filter @sealed-vote/web dev -- --host ${resolvedLocalWebServer.host} --port ${resolvedLocalWebServer.port}`,
+                  cwd: repositoryRoot,
                   timeout: 120_000,
                   url: localWebBaseUrl,
                   reuseExistingServer: false,
@@ -283,7 +311,9 @@ export const createLocalE2EConfig = (): PlaywrightTestConfig => ({
               }
             : undefined,
     ),
-    testIgnore: [...productionOnlySpecs, ...demoOnlySpecs],
+    projects: projects.map((project) =>
+        mergeProjectTestIgnores(project, localOnlySpecs),
+    ),
     webServer: createLocalWebServers(),
 });
 
@@ -341,6 +371,8 @@ export const createProductionE2EConfig = (): PlaywrightTestConfig => {
             'test-results/playwright-production',
             { fullyParallel: true },
         ),
-        testIgnore: demoOnlySpecs,
+        projects: projects.map((project) =>
+            mergeProjectTestIgnores(project, demoOnlySpecs),
+        ),
     };
 };

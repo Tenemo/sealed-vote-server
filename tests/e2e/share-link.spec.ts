@@ -91,10 +91,22 @@ test('keeps the copy-link button vertically stable while copy feedback is visibl
 
     await page.setViewportSize({ height: 900, width: 1280 });
     await page.addInitScript(() => {
+        (
+            window as typeof window & {
+                __copiedShareUrls?: string[];
+            }
+        ).__copiedShareUrls = [];
+
         Object.defineProperty(window.navigator, 'clipboard', {
             configurable: true,
             value: {
-                writeText: async () => undefined,
+                writeText: async (value: string) => {
+                    (
+                        window as typeof window & {
+                            __copiedShareUrls?: string[];
+                        }
+                    ).__copiedShareUrls?.push(value);
+                },
             },
         });
     });
@@ -116,8 +128,19 @@ test('keeps the copy-link button vertically stable while copy feedback is visibl
         const beforeBox = await copyButton.boundingBox();
         expect(beforeBox).not.toBeNull();
 
+        const expectedShareUrl = page.url();
         await copyButton.click();
         await expect(page.getByText('Link copied.', { exact: true })).toBeVisible();
+        const copiedShareUrls = await page.evaluate(
+            () =>
+                (
+                    window as typeof window & {
+                        __copiedShareUrls?: string[];
+                    }
+                ).__copiedShareUrls ?? [],
+        );
+
+        expect(copiedShareUrls).toEqual([expectedShareUrl]);
 
         const afterBox = await copyButton.boundingBox();
         expect(afterBox).not.toBeNull();

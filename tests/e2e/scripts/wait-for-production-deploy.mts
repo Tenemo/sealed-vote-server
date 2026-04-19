@@ -28,7 +28,6 @@ type HtmlProbeStatus = {
 
 type ReadinessStatus = {
     apiHealth: JsonProbeStatus;
-    browserApiHealth: JsonProbeStatus;
     homepage: HtmlProbeStatus;
     pollPage: HtmlProbeStatus;
     webVersion: JsonProbeStatus;
@@ -372,16 +371,10 @@ export const loadReadinessStatus = async (
         options.expectedCommitSha,
     );
 
-    const [webVersion, apiHealth, browserApiHealth, homepage, pollPage] =
-        await Promise.all([
+    const [webVersion, apiHealth, homepage, pollPage] = await Promise.all([
             loadJsonProbeStatus(
                 options.webBaseUrl,
                 '/version.json',
-                options.requestTimeoutMs,
-            ),
-            loadJsonProbeStatus(
-                options.apiBaseUrl,
-                '/api/health-check',
                 options.requestTimeoutMs,
             ),
             loadJsonProbeStatus(
@@ -405,7 +398,6 @@ export const loadReadinessStatus = async (
 
     return {
         apiHealth,
-        browserApiHealth,
         homepage,
         pollPage,
         webVersion,
@@ -418,12 +410,10 @@ export const isReadinessStatusSuccessful = (
 ): boolean =>
     status.webVersion.ok &&
     status.apiHealth.ok &&
-    status.browserApiHealth.ok &&
     status.homepage.ok &&
     status.pollPage.ok &&
     status.webVersion.commitSha === expectedCommitSha &&
-    status.apiHealth.commitSha === expectedCommitSha &&
-    status.browserApiHealth.commitSha === expectedCommitSha;
+    status.apiHealth.commitSha === expectedCommitSha;
 
 const sleep = async (delayMs: number): Promise<void> => {
     await new Promise((resolve) => {
@@ -452,7 +442,6 @@ export const formatReadinessStatus = (status: ReadinessStatus): string =>
     [
         formatJsonStatus('web version', status.webVersion),
         formatJsonStatus('api health', status.apiHealth),
-        formatJsonStatus('browser api health', status.browserApiHealth),
         formatHtmlStatus('homepage', status.homepage),
         formatHtmlStatus('poll page', status.pollPage),
     ].join(' ');

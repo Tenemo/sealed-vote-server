@@ -45,16 +45,12 @@ const createHtmlStatus = (
 const createReadinessStatus = (
     overrides: Partial<{
         apiHealth: ReturnType<typeof createJsonStatus>;
-        browserApiHealth: ReturnType<typeof createJsonStatus>;
         homepage: ReturnType<typeof createHtmlStatus>;
-    pollPage: ReturnType<typeof createHtmlStatus>;
+        pollPage: ReturnType<typeof createHtmlStatus>;
         webVersion: ReturnType<typeof createJsonStatus>;
     }> = {},
 ) => ({
     apiHealth: createJsonStatus({
-        url: 'https://api.sealed.vote/api/health-check?t=1',
-    }),
-    browserApiHealth: createJsonStatus({
         url: 'https://api.sealed.vote/api/health-check?t=1',
     }),
     homepage: createHtmlStatus({
@@ -97,7 +93,7 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
     assert.equal(
         isReadinessStatusSuccessful(
             createReadinessStatus({
-                browserApiHealth: createJsonStatus({
+                apiHealth: createJsonStatus({
                     commitSha: 'e715a02987075c168f6e88c54488a3708096664a',
                     url: 'https://api.sealed.vote/api/health-check?t=1',
                 }),
@@ -110,8 +106,8 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
     assert.equal(
         isReadinessStatusSuccessful(
             createReadinessStatus({
-        pollPage: createHtmlStatus({
-            missingSnippetLabel: 'poll page canonical',
+                pollPage: createHtmlStatus({
+                    missingSnippetLabel: 'poll page canonical',
                     ok: false,
                 }),
             }),
@@ -125,7 +121,7 @@ test('formatReadinessStatus reports unreachable, missing, and unknown HTML marke
     assert.match(
         formatReadinessStatus(
             createReadinessStatus({
-                browserApiHealth: createJsonStatus({
+                apiHealth: createJsonStatus({
                     commitSha: null,
                     ok: false,
                     statusCode: null,
@@ -133,7 +129,7 @@ test('formatReadinessStatus reports unreachable, missing, and unknown HTML marke
                 }),
             }),
         ),
-        /browser api health: status=unreachable, commitSha=missing/u,
+        /api health: status=unreachable, commitSha=missing/u,
     );
 
     assert.match(
@@ -152,8 +148,8 @@ test('formatReadinessStatus reports unreachable, missing, and unknown HTML marke
     assert.match(
         formatReadinessStatus(
             createReadinessStatus({
-        pollPage: createHtmlStatus({
-            missingSnippetLabel: 'poll page canonical',
+                pollPage: createHtmlStatus({
+                    missingSnippetLabel: 'poll page canonical',
                     ok: false,
                     statusCode: 200,
                 }),
@@ -251,8 +247,8 @@ test('waitForProductionDeploy times out when readiness never stabilizes', async 
                 {
                     loadReadinessStatus: async () =>
                         createReadinessStatus({
-        pollPage: createHtmlStatus({
-            missingSnippetLabel: 'poll page canonical',
+                            pollPage: createHtmlStatus({
+                                missingSnippetLabel: 'poll page canonical',
                                 ok: false,
                             }),
                         }),
