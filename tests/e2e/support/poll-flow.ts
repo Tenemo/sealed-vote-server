@@ -3,6 +3,8 @@ import {
     type APIRequestContext,
     type Locator,
     type Page,
+    type Request,
+    type Response,
 } from '@playwright/test';
 
 import {
@@ -13,6 +15,9 @@ import {
 
 const pollSlugPattern = /\/polls\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';
+const createPollResponseTimeoutMs = 60_000;
+const createPollRetryReadinessTimeoutMs = 30_000;
+const creatorSessionsStorageKey = 'sealed-vote.creator-sessions.v2';
 const postClosePhaseLabels = [
     'Securing the election',
     'Starting reveal',
@@ -31,6 +36,20 @@ type CreatePollResponse = {
     id: string;
     slug: string;
 };
+
+type CreatePollAttemptOutcome =
+    | {
+          response: Response;
+          type: 'response';
+      }
+    | {
+          error: unknown;
+          type: 'response-timeout';
+      }
+    | {
+          request: Request;
+          type: 'request-failed';
+      };
 
 export type ExpectedVerifiedResult = {
     acceptedBallotCount: number;
@@ -84,6 +103,212 @@ const attachPollFlowPage = (
     page: Page,
     attachPage?: PageAttacher,
 ): Page => (attachPage ? attachPage(page) : page);
+
+const isCreatePollRequest = (request: Request): boolean =>
+    request.method() === 'POST' && request.url().endsWith(createPollApiPath);
+
+const isCreatePollResponse = (response: Response): boolean =>
+    isCreatePollRequest(response.request());
+
+const inferApiBaseUrlFromPollPageUrl = (pageUrl: string): string => {
+    const parsedPageUrl = new URL(pageUrl);
+
+    if (isLocalLoopbackHostname(parsedPageUrl.hostname)) {
+        return parsedPageUrl.origin;
+    }
+
+    return `${parsedPageUrl.protocol}//api.${parsedPageUrl.host}`;
+};
+
+const recoverCreatedPollFromClientState = async (
+    page: Page,
+): Promise<CreatedPoll | null> => {
+    const currentPageUrl = page.url();
+    const parsedPageUrl = new URL(currentPageUrl);
+
+    if (!pollSlugPattern.test(parsedPageUrl.pathname)) {
+        return null;
+    }
+
+    const storedCreatorSession = await page.evaluate(
+        ({
+            currentPollSlug,
+            storageKey,
+        }: {
+            currentPollSlug: string;
+            storageKey: string;
+        }) => {
+            try {
+                const rawCreatorSessions =
+                    window.localStorage.getItem(storageKey);
+
+                if (!rawCreatorSessions) {
+                    return null;
+                }
+
+                const parsedCreatorSessions = JSON.parse(rawCreatorSessions);
+
+                if (
+                    typeof parsedCreatorSessions !== 'object' ||
+                    parsedCreatorSessions === null ||
+                    Array.isArray(parsedCreatorSessions)
+                ) {
+                    return null;
+                }
+
+                const matchingCreatorSession = Object.values(
+                    parsedCreatorSessions,
+                ).find((candidate) => {
+                    if (typeof candidate !== 'object' || candidate === null) {
+                        return false;
+                    }
+
+                    const possibleCreatorSession = candidate as Partial<{
+                        creatorToken: string;
+                        pollId: string;
+                        pollSlug: string;
+                    }>;
+
+                    return (
+                        possibleCreatorSession.pollSlug === currentPollSlug &&
+                        typeof possibleCreatorSession.creatorToken ===
+                            'string' &&
+                        typeof possibleCreatorSession.pollId === 'string'
+                    );
+                });
+
+                if (!matchingCreatorSession) {
+                    return null;
+                }
+
+                return matchingCreatorSession as {
+                    creatorToken: string;
+                    pollId: string;
+                    pollSlug: string;
+                };
+            } catch {
+                return null;
+            }
+        },
+        {
+            currentPollSlug: parsedPageUrl.pathname.split('/').at(-1) ?? '',
+            storageKey: creatorSessionsStorageKey,
+        },
+    );
+
+    if (!storedCreatorSession) {
+        return null;
+    }
+
+    return {
+        apiBaseUrl: inferApiBaseUrlFromPollPageUrl(currentPageUrl),
+        creatorToken: storedCreatorSession.creatorToken,
+        pollId: storedCreatorSession.pollId,
+        pollSlug: storedCreatorSession.pollSlug,
+        pollUrl: currentPageUrl,
+    };
+};
+
+const waitForCreatePollAttemptOutcome = async (
+    page: Page,
+): Promise<CreatePollAttemptOutcome> => {
+    return await new Promise<CreatePollAttemptOutcome>(
+        async (resolve, reject) => {
+            let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+            let isSettled = false;
+
+            const cleanup = (): void => {
+                page.off('response', onResponse);
+                page.off('requestfailed', onRequestFailed);
+
+                if (timeoutHandle !== null) {
+                    clearTimeout(timeoutHandle);
+                    timeoutHandle = null;
+                }
+            };
+
+            const settle = (outcome: CreatePollAttemptOutcome): void => {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                cleanup();
+                resolve(outcome);
+            };
+
+            const onResponse = (response: Response): void => {
+                if (!isCreatePollResponse(response)) {
+                    return;
+                }
+
+                settle({
+                    response,
+                    type: 'response',
+                });
+            };
+
+            const onRequestFailed = (request: Request): void => {
+                if (!isCreatePollRequest(request)) {
+                    return;
+                }
+
+                settle({
+                    request,
+                    type: 'request-failed',
+                });
+            };
+
+            page.on('response', onResponse);
+            page.on('requestfailed', onRequestFailed);
+            timeoutHandle = setTimeout(() => {
+                settle({
+                    error: new Error(
+                        `Timed out after ${createPollResponseTimeoutMs}ms waiting for ${createPollApiPath}.`,
+                    ),
+                    type: 'response-timeout',
+                });
+            }, createPollResponseTimeoutMs);
+
+            try {
+                await page.getByRole('button', { name: 'Create poll' }).click();
+            } catch (error) {
+                cleanup();
+                reject(error);
+            }
+        },
+    );
+};
+
+const waitForRetryableCreatePollState = async (
+    page: Page,
+): Promise<boolean> => {
+    try {
+        await expect(
+            page.getByRole('button', { name: 'Create poll' }),
+        ).toBeEnabled({
+            timeout: createPollRetryReadinessTimeoutMs,
+        });
+        return await page.getByLabel('Poll name').isVisible();
+    } catch {
+        return false;
+    }
+};
+
+const formatCreatePollAttemptFailure = (
+    createPollAttemptOutcome: Exclude<CreatePollAttemptOutcome, { type: 'response'; response: Response }>,
+): string => {
+    if (createPollAttemptOutcome.type === 'request-failed') {
+        return (
+            createPollAttemptOutcome.request.failure()?.errorText ??
+            'unknown request failure'
+        );
+    }
+
+    return createPollAttemptOutcome.error instanceof Error
+        ? createPollAttemptOutcome.error.message
+        : 'unknown create poll timeout';
+};
 
 const getCeremonyMetricRow = (page: Page, label: string): Locator =>
     page
@@ -344,14 +569,51 @@ export const createPoll = async ({
         await page.getByRole('button', { name: 'Add new choice' }).click();
     }
 
-    const createPollResponsePromise = page.waitForResponse(
-        (response) =>
-            response.request().method() === 'POST' &&
-            response.url().endsWith(createPollApiPath),
-    );
+    let createPollAttemptOutcome = await waitForCreatePollAttemptOutcome(page);
 
-    await page.getByRole('button', { name: 'Create poll' }).click();
-    const createPollResponse = await createPollResponsePromise;
+    if (createPollAttemptOutcome.type !== 'response') {
+        const recoveredCreatedPoll =
+            await recoverCreatedPollFromClientState(page);
+
+        if (recoveredCreatedPoll) {
+            return {
+                createdPoll: recoveredCreatedPoll,
+                page,
+            };
+        }
+
+        // Poll creation is idempotent per creator token. If the first transport
+        // fails after the server commits, the page remains on the form and a
+        // second click safely replays the same request.
+        const canRetryCreatePoll =
+            await waitForRetryableCreatePollState(page);
+
+        if (!canRetryCreatePoll) {
+            throw new Error(
+                `Create poll did not produce a response and could not be retried: ${formatCreatePollAttemptFailure(createPollAttemptOutcome)}`,
+            );
+        }
+
+        createPollAttemptOutcome = await waitForCreatePollAttemptOutcome(page);
+
+        if (createPollAttemptOutcome.type !== 'response') {
+            const recoveredCreatedPollAfterRetry =
+                await recoverCreatedPollFromClientState(page);
+
+            if (recoveredCreatedPollAfterRetry) {
+                return {
+                    createdPoll: recoveredCreatedPollAfterRetry,
+                    page,
+                };
+            }
+
+            throw new Error(
+                `Retrying create poll did not produce a response: ${formatCreatePollAttemptFailure(createPollAttemptOutcome)}`,
+            );
+        }
+    }
+
+    const createPollResponse = createPollAttemptOutcome.response;
     const createPollResponseText = await createPollResponse.text();
 
     if (!createPollResponse.ok()) {
