@@ -6,9 +6,6 @@ const reactHelmetAttributeName = 'data-rh';
 const reactHelmetAttributeValue = 'true';
 
 export const siteAuthor = 'piotr@piech.dev';
-export const siteLegacyDeploymentLabel = 'ElGamal research prototype';
-export const siteLegacyDeploymentSummary =
-    'This deployment preserves the current threshold-elgamal research prototype while the post-quantum line is developed separately.';
 export const siteName = 'sealed.vote ElGamal';
 export const siteOrigin = 'https://elgamal.sealed.vote';
 export const siteThemeColor = '#121212';

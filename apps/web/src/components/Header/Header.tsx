@@ -1,10 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-import {
-    siteLegacyDeploymentLabel,
-    siteName,
-} from '../../../config/seo-metadata.mts';
+import { siteName } from '../../../config/seo-metadata.mts';
 
 const GitHubIcon = ({
     className,
@@ -31,9 +28,6 @@ const Header = (): React.JSX.Element => {
                 >
                     <span className="block text-2xl font-semibold sm:text-[2rem]">
                         {siteName}
-                    </span>
-                    <span className="block text-xs text-secondary sm:text-sm">
-                        {siteLegacyDeploymentLabel}
                     </span>
                 </Link>
             </div>
