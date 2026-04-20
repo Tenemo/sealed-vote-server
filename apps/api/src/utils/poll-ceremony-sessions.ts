@@ -16,7 +16,7 @@ import { pollCeremonySessions } from '../database/schema.js';
 import { normalizeDatabaseTimestamp } from './database.js';
 import { parseVoterDeviceRecord } from './voter-device-records.js';
 
-export type PollCeremonySessionRow = typeof pollCeremonySessions.$inferSelect;
+type PollCeremonySessionRow = typeof pollCeremonySessions.$inferSelect;
 type PollCeremonySessionSnapshot = Pick<
     PollCeremonySessionRow,
     'activeParticipantIndices' | 'createdAt' | 'sequence'
@@ -42,7 +42,7 @@ type ActiveCeremonyParticipant = {
     voterName: string;
 };
 
-export type DerivedPollCeremonySession = {
+type DerivedPollCeremonySession = {
     activeParticipantCount: number;
     activeParticipantIndices: number[];
     activeParticipants: ActiveCeremonyParticipant[];

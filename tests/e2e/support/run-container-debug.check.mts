@@ -5,7 +5,7 @@ import {
     buildDebugContainerCommand,
     defaultProductionDebugArgs,
     parseDebugContainerCliArgs,
-} from '../debugging/run-container-debug-helpers.mts';
+} from '../debugging/run-container-debug.mts';
 
 test('parseDebugContainerCliArgs defaults to production mode when no mode is passed', () => {
     assert.deepEqual(parseDebugContainerCliArgs([]), {

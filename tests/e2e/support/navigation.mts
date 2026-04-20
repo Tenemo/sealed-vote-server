@@ -1,5 +1,3 @@
-import { isLocalLoopbackHostname } from './local-origin.mts';
-
 type NavigationWaitUntil =
     | 'commit'
     | 'domcontentloaded'
@@ -73,6 +71,13 @@ const loadingNavigationTitlePatterns = [
     /^connecting\s+to\s+/iu,
     /^waiting\s+for\s+/iu,
 ] as const;
+const loopbackIpv4HostnamePattern = /^127(?:\.\d{1,3}){3}$/u;
+
+export const isLocalLoopbackHostname = (hostname: string): boolean =>
+    hostname === 'localhost' ||
+    hostname === '::1' ||
+    hostname === '[::1]' ||
+    loopbackIpv4HostnamePattern.test(hostname);
 
 export const resolveNavigationTimeoutMs = (
     rawTimeout = process.env.PLAYWRIGHT_NAVIGATION_TIMEOUT_MS,

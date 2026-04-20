@@ -12,7 +12,7 @@ type SeedManifestVoter = {
     voterToken: string;
 };
 
-export type SeedManifestPoll = {
+type SeedManifestPoll = {
     name: string;
     phase: SeedPhase;
     pollId: string;

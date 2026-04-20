@@ -3,7 +3,7 @@ type PublishedPollResultsInput = {
     resultScores: readonly number[];
 };
 
-export type OrderedPublishedPollResult = {
+type OrderedPublishedPollResult = {
     choiceIndex: number;
     choiceName: string;
     score: number;

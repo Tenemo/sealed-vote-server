@@ -1,4 +1,4 @@
-export type VoterDeviceRecord = {
+type VoterDeviceRecord = {
     authPublicKey: string;
     transportPublicKey: string;
     transportSuite: 'X25519';

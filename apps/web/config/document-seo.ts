@@ -22,7 +22,7 @@ type PollSeoPayloadCacheEntry = {
     payload: SeoPollPayload;
 };
 
-export type PollSeoPayloadCache = Map<string, PollSeoPayloadCacheEntry>;
+type PollSeoPayloadCache = Map<string, PollSeoPayloadCacheEntry>;
 
 const normalizePathname = (pathname: string): string =>
     pathname.startsWith('/') ? pathname : `/${pathname}`;

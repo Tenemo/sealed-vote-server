@@ -12,13 +12,16 @@ import {
     type RestartCeremonyRequest,
 } from '@sealed-vote/contracts';
 
-const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') || '/';
+import { resolveBrowserApiBaseUrl } from './api-base-url';
+
+const apiBaseUrl = resolveBrowserApiBaseUrl({
+    configuredApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+});
 // Production ceremony pages keep polling in the background. A wedged poll
 // fetch must time out so later polls can recover instead of stalling the
 // participant indefinitely.
-export const pollQueryTimeoutMs = 10_000;
-export const buildFetchPollQuery = (
+const pollQueryTimeoutMs = 10_000;
+const buildFetchPollQuery = (
     pollReference: string,
 ): {
     method: 'GET';
