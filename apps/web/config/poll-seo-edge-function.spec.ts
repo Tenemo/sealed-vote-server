@@ -7,7 +7,7 @@ const {
 } = vi.hoisted(() => ({
     mockCreatePollSeoPayloadCache: vi.fn(() => new Map()),
     mockRenderDocumentHtml: vi.fn(),
-    mockResolveSeoApiBaseUrl: vi.fn(() => 'https://api.sealed.vote'),
+    mockResolveSeoApiBaseUrl: vi.fn(() => 'https://api.elgamal.sealed.vote'),
 }));
 
 vi.mock('./document-seo.ts', () => ({
@@ -38,7 +38,7 @@ describe('poll SEO edge function', () => {
         const originalHtml =
             '<!doctype html><html><head><title>sealed.vote</title></head><body>home</body></html>';
         const response = await edgeFunctionModule.default(
-            new Request('https://sealed.vote/'),
+            new Request('https://elgamal.sealed.vote/'),
             {
                 next: async () =>
                     new Response(originalHtml, {
@@ -51,11 +51,11 @@ describe('poll SEO edge function', () => {
         );
 
         expect(mockRenderDocumentHtml).toHaveBeenCalledWith({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             baseHtml: originalHtml,
             pollPayloadCache: expect.any(Map),
             requestUserAgent: null,
-            requestUrl: new URL('https://sealed.vote/'),
+            requestUrl: new URL('https://elgamal.sealed.vote/'),
             signal: expect.any(AbortSignal),
         });
         await expect(response.text()).resolves.toBe(originalHtml);
@@ -83,11 +83,11 @@ describe('poll SEO edge function', () => {
         });
 
         await edgeFunctionModule.default(
-            new Request('https://sealed.vote/polls/team-sync'),
+            new Request('https://elgamal.sealed.vote/polls/team-sync'),
             createContext(),
         );
         await edgeFunctionModule.default(
-            new Request('https://sealed.vote/polls/team-sync'),
+            new Request('https://elgamal.sealed.vote/polls/team-sync'),
             createContext(),
         );
 

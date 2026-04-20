@@ -46,6 +46,7 @@ import {
     useRestartCeremonyMutation,
 } from 'features/polls/polls-api';
 import { renderError } from 'utils/network-errors';
+import { siteOrigin } from '../../../../config/seo-metadata.mts';
 
 const minimumScore = fixedScoreRange.min;
 const maximumScore = fixedScoreRange.max;
@@ -835,7 +836,7 @@ const PollPage = (): React.JSX.Element => {
     });
     const shareUrl =
         typeof window === 'undefined'
-            ? `https://sealed.vote/polls/${poll.slug}`
+            ? new URL(`/polls/${poll.slug}`, siteOrigin).toString()
             : window.location.href;
     const localVoter = isPollVoterLocal({
         devicePollId: deviceState?.pollId,

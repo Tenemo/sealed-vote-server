@@ -33,11 +33,11 @@ const productionLogger = {
 };
 
 const allowedProductionOrigins = new Set([
-    'https://sealed.vote',
-    'https://www.sealed.vote',
+    'https://elgamal.sealed.vote',
+    'https://www.elgamal.sealed.vote',
 ]);
 const netlifyDeployPreviewOriginPattern =
-    /^https:\/\/deploy-preview-\d+--sealed-vote\.netlify\.app$/;
+    /^https:\/\/deploy-preview-\d+--[a-z0-9-]+\.netlify\.app$/;
 
 const isAllowedLocalOrigin = (origin: string): boolean => {
     try {

@@ -9,6 +9,10 @@ import Header from 'components/Header/Header';
 import NotFound from 'components/NotFound/NotFound';
 import PollPage from 'features/polls/PollPage/PollPage';
 import PollCreationPage from 'features/polls/PollCreationPage/PollCreationPage';
+import {
+    siteLegacyDeploymentLabel,
+    siteLegacyDeploymentSummary,
+} from '../../config/seo-metadata.mts';
 
 const App = (): React.JSX.Element => {
     const mainContentReference = React.useRef<HTMLElement>(null);
@@ -73,6 +77,16 @@ const App = (): React.JSX.Element => {
                 onError={(error) => console.error(error)}
             >
                 <Header />
+                <div className="border-b border-border/70 bg-accent/25">
+                    <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-1 px-4 py-3 text-sm sm:px-6">
+                        <p className="font-medium text-foreground">
+                            {siteLegacyDeploymentLabel}
+                        </p>
+                        <p className="text-secondary">
+                            {siteLegacyDeploymentSummary}
+                        </p>
+                    </div>
+                </div>
                 <main
                     className="flex flex-1 justify-center px-4 pb-10 pt-6 focus:outline-none focus-visible:outline-none sm:px-6 sm:pb-14 sm:pt-8"
                     id="main-content"

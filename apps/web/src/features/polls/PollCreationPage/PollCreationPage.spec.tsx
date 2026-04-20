@@ -165,16 +165,18 @@ describe('PollCreation', () => {
             </HelmetProvider>,
         );
 
-        expect(document.title).toBe('Create a poll');
+        expect(document.title).toBe('Create a poll | sealed.vote legacy');
         expect(
             document.head
                 .querySelector('meta[name="description"]')
                 ?.getAttribute('content'),
-        ).toBe('Create polls, collect responses, and reveal results.');
+        ).toBe(
+            'Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.',
+        );
         expect(
             document.head
                 .querySelector('meta[property="og:title"]')
                 ?.getAttribute('content'),
-        ).toBe('Create a poll');
+        ).toBe('Create a poll | sealed.vote legacy');
     });
 });

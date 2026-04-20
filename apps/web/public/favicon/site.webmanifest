@@ -1,7 +1,7 @@
 {
-    "name": "sealed.vote",
-    "short_name": "SV",
-    "description": "Create votes, collect responses, and reveal results.",
+    "name": "sealed.vote legacy",
+    "short_name": "SV legacy",
+    "description": "Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.",
     "icons": [
         {
             "src": "/favicon/web-app-manifest-192x192.png",

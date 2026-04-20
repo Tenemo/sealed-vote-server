@@ -24,7 +24,7 @@ const baseHtml = `<!doctype html>
 
 describe('resolveSeoApiBaseUrl', () => {
     test('falls back to the production API origin', () => {
-        expect(resolveSeoApiBaseUrl()).toBe('https://api.sealed.vote');
+        expect(resolveSeoApiBaseUrl()).toBe('https://api.elgamal.sealed.vote');
     });
 
     test('normalizes valid origins', () => {
@@ -35,13 +35,13 @@ describe('resolveSeoApiBaseUrl', () => {
 
     test('falls back to the production API origin for malformed urls', () => {
         expect(resolveSeoApiBaseUrl('api.example.com')).toBe(
-            'https://api.sealed.vote',
+            'https://api.elgamal.sealed.vote',
         );
     });
 
     test('falls back to the production API origin for unsupported protocols', () => {
         expect(resolveSeoApiBaseUrl('ftp://api.example.com')).toBe(
-            'https://api.sealed.vote',
+            'https://api.elgamal.sealed.vote',
         );
     });
 });
@@ -94,22 +94,24 @@ describe('shouldFetchPollSeoPayloadForRequest', () => {
 describe('resolveDocumentSeoMetadata', () => {
     test('returns poll-specific SEO with the exact poll title', async () => {
         const metadata = await resolveDocumentSeoMetadata({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async () =>
                 Response.json({
                     pollName: 'Budget & roadmap',
                 }),
             ),
-            requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+            requestUrl: new URL(
+                'https://elgamal.sealed.vote/polls/budget-roadmap',
+            ),
         });
 
         expect(metadata.title).toBe('Budget & roadmap');
         expect(metadata.description).toBe('Score options from 1 to 10.');
         expect(metadata.canonicalUrl).toBe(
-            'https://sealed.vote/polls/budget-roadmap',
+            'https://elgamal.sealed.vote/polls/budget-roadmap',
         );
         expect(metadata.imageUrl).toBe(
-            'https://sealed.vote/social/polls/budget-roadmap.png',
+            'https://elgamal.sealed.vote/social/polls/budget-roadmap.png',
         );
         expect(metadata.robots).toBe(
             'noindex, nofollow, noarchive, max-image-preview:large',
@@ -118,7 +120,7 @@ describe('resolveDocumentSeoMetadata', () => {
 
     test('uses the completed image url for completed polls', async () => {
         const metadata = await resolveDocumentSeoMetadata({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async () =>
                 Response.json({
                     pollName: 'Budget & roadmap',
@@ -126,45 +128,51 @@ describe('resolveDocumentSeoMetadata', () => {
                     resultTallies: ['17', '11'],
                 }),
             ),
-            requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+            requestUrl: new URL(
+                'https://elgamal.sealed.vote/polls/budget-roadmap',
+            ),
         });
 
         expect(metadata.title).toBe('Budget & roadmap');
         expect(metadata.description).toBe('Poll results');
         expect(metadata.imageUrl).toBe(
-            'https://sealed.vote/social/polls/budget-roadmap.png?v=complete',
+            'https://elgamal.sealed.vote/social/polls/budget-roadmap.png?v=complete',
         );
         expect(metadata.imageAlt).toBe(
-            'Final results preview for Budget & roadmap on sealed.vote.',
+            'Final results preview for Budget & roadmap on sealed.vote legacy.',
         );
     });
 
     test('returns create-page SEO for the root route', async () => {
         const metadata = await resolveDocumentSeoMetadata({
-            requestUrl: new URL('https://sealed.vote/'),
+            requestUrl: new URL('https://elgamal.sealed.vote/'),
         });
 
-        expect(metadata.title).toBe('Create a poll');
+        expect(metadata.title).toBe('Create a poll | sealed.vote legacy');
         expect(metadata.imageUrl).toBe(
-            'https://sealed.vote/social/og-home.png',
+            'https://elgamal.sealed.vote/social/og-home.png',
         );
         expect(metadata.robots).toBe('index, follow, max-image-preview:large');
-        expect(metadata.canonicalUrl).toBe('https://sealed.vote/');
+        expect(metadata.canonicalUrl).toBe('https://elgamal.sealed.vote/');
         expect(metadata.description).toBe(
-            'Create polls, collect responses, and reveal results.',
+            'Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.',
         );
     });
 
     test('returns site SEO for non-root non-poll routes', async () => {
         const metadata = await resolveDocumentSeoMetadata({
-            requestUrl: new URL('https://sealed.vote/missing'),
+            requestUrl: new URL('https://elgamal.sealed.vote/missing'),
         });
 
-        expect(metadata.title).toBe('sealed.vote | 1-10 score voting app');
-        expect(metadata.description).toBe(
-            'Create polls, collect responses, and reveal results.',
+        expect(metadata.title).toBe(
+            'sealed.vote legacy | ElGamal research prototype',
         );
-        expect(metadata.canonicalUrl).toBe('https://sealed.vote/missing');
+        expect(metadata.description).toBe(
+            'Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.',
+        );
+        expect(metadata.canonicalUrl).toBe(
+            'https://elgamal.sealed.vote/missing',
+        );
     });
 
     test('skips poll lookups for normal browser navigations and returns generic poll metadata', async () => {
@@ -175,26 +183,30 @@ describe('resolveDocumentSeoMetadata', () => {
         );
 
         const metadata = await resolveDocumentSeoMetadata({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl,
-            requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+            requestUrl: new URL(
+                'https://elgamal.sealed.vote/polls/budget-roadmap',
+            ),
             requestUserAgent:
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
         });
 
-        expect(metadata.title).toBe('Poll | sealed.vote');
+        expect(metadata.title).toBe('Poll | sealed.vote legacy');
         expect(fetchImpl).not.toHaveBeenCalled();
     });
 
     test('still enriches poll metadata for crawler requests', async () => {
         const metadata = await resolveDocumentSeoMetadata({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async () =>
                 Response.json({
                     pollName: 'Budget & roadmap',
                 }),
             ),
-            requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+            requestUrl: new URL(
+                'https://elgamal.sealed.vote/polls/budget-roadmap',
+            ),
             requestUserAgent:
                 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
         });
@@ -206,7 +218,7 @@ describe('resolveDocumentSeoMetadata', () => {
         let lookupSignal: AbortSignal | undefined;
 
         const metadata = await resolveDocumentSeoMetadata({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async (_input, init) => {
                 lookupSignal = init?.signal;
 
@@ -216,12 +228,14 @@ describe('resolveDocumentSeoMetadata', () => {
                 });
             }),
             pollPayloadLookupTimeoutMs: 1,
-            requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+            requestUrl: new URL(
+                'https://elgamal.sealed.vote/polls/budget-roadmap',
+            ),
             requestUserAgent:
                 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
         });
 
-        expect(metadata.title).toBe('Poll | sealed.vote');
+        expect(metadata.title).toBe('Poll | sealed.vote legacy');
         expect(metadata.description).toBe('Score options from 1 to 10.');
         expect(lookupSignal?.aborted).toBe(true);
     });
@@ -237,11 +251,13 @@ describe('resolveDocumentSeoMetadata', () => {
         );
         const resolveMetadata = async (): Promise<void> => {
             await resolveDocumentSeoMetadata({
-                apiBaseUrl: 'https://api.sealed.vote',
+                apiBaseUrl: 'https://api.elgamal.sealed.vote',
                 fetchImpl,
                 now: () => nowMs,
                 pollPayloadCache,
-                requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+                requestUrl: new URL(
+                    'https://elgamal.sealed.vote/polls/budget-roadmap',
+                ),
             });
         };
 
@@ -265,11 +281,13 @@ describe('resolveDocumentSeoMetadata', () => {
         );
         const resolveMetadata = async (): Promise<void> => {
             await resolveDocumentSeoMetadata({
-                apiBaseUrl: 'https://api.sealed.vote',
+                apiBaseUrl: 'https://api.elgamal.sealed.vote',
                 fetchImpl,
                 now: () => nowMs,
                 pollPayloadCache,
-                requestUrl: new URL('https://sealed.vote/polls/budget-roadmap'),
+                requestUrl: new URL(
+                    'https://elgamal.sealed.vote/polls/budget-roadmap',
+                ),
             });
         };
 
@@ -301,11 +319,11 @@ describe('resolveDocumentSeoMetadata', () => {
 
         for (let index = 0; index < 140; index += 1) {
             await resolveDocumentSeoMetadata({
-                apiBaseUrl: 'https://api.sealed.vote',
+                apiBaseUrl: 'https://api.elgamal.sealed.vote',
                 fetchImpl,
                 pollPayloadCache,
                 requestUrl: new URL(
-                    `https://sealed.vote/polls/cache-test-${index}`,
+                    `https://elgamal.sealed.vote/polls/cache-test-${index}`,
                 ),
             });
         }
@@ -318,7 +336,7 @@ describe('resolveDocumentSeoMetadata', () => {
 describe('renderDocumentHtml', () => {
     test('injects poll metadata into the HTML document', async () => {
         const html = await renderDocumentHtml({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             baseHtml,
             fetchImpl: vi.fn(async () =>
                 Response.json({
@@ -326,18 +344,20 @@ describe('renderDocumentHtml', () => {
                     resultScores: [9.25],
                 }),
             ),
-            requestUrl: new URL('https://sealed.vote/polls/team-sync'),
+            requestUrl: new URL('https://elgamal.sealed.vote/polls/team-sync'),
         });
 
         expect(html).toContain(
             '<title data-rh="true">Team &lt;sync&gt; &quot;Q2&quot;</title>',
         );
-        expect(html).toContain('content="https://sealed.vote/polls/team-sync"');
         expect(html).toContain(
-            'content="https://sealed.vote/social/polls/team-sync.png?v=complete"',
+            'content="https://elgamal.sealed.vote/polls/team-sync"',
         );
         expect(html).toContain(
-            '<link data-rh="true" rel="canonical" href="https://sealed.vote/polls/team-sync"',
+            'content="https://elgamal.sealed.vote/social/polls/team-sync.png?v=complete"',
+        );
+        expect(html).toContain(
+            '<link data-rh="true" rel="canonical" href="https://elgamal.sealed.vote/polls/team-sync"',
         );
         expect(html).toContain('Team \\u003csync\\u003e \\"Q2\\"');
         expect(html).not.toContain('<title>placeholder</title>');
@@ -345,16 +365,16 @@ describe('renderDocumentHtml', () => {
 
     test('falls back to generic poll metadata when poll lookup fails', async () => {
         const html = await renderDocumentHtml({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             baseHtml,
             fetchImpl: vi.fn(async () => {
                 throw new Error('offline');
             }),
-            requestUrl: new URL('https://sealed.vote/polls/team-sync'),
+            requestUrl: new URL('https://elgamal.sealed.vote/polls/team-sync'),
         });
 
         expect(html).toContain(
-            '<title data-rh="true">Poll | sealed.vote</title>',
+            '<title data-rh="true">Poll | sealed.vote legacy</title>',
         );
         expect(html).toContain('content="Score options from 1 to 10."');
     });
@@ -370,13 +390,15 @@ describe('renderDocumentHtml', () => {
         expect(html).toContain(
             '<link data-rh="true" rel="canonical" href="https://deploy-preview-11--sealed-vote.netlify.app/"',
         );
-        expect(html).toContain('<title data-rh="true">Create a poll</title>');
         expect(html).toContain(
-            'content="Create polls, collect responses, and reveal results."',
+            '<title data-rh="true">Create a poll | sealed.vote legacy</title>',
+        );
+        expect(html).toContain(
+            'content="Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results."',
         );
         expect(html).toContain(
             'content="https://deploy-preview-11--sealed-vote.netlify.app/"',
         );
-        expect(html).not.toContain('href="https://sealed.vote/"');
+        expect(html).not.toContain('href="https://elgamal.sealed.vote/"');
     });
 });

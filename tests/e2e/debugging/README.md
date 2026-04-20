@@ -2,7 +2,7 @@
 
 This directory packages the production-only Playwright debugging workflow into a repeatable container setup.
 
-Use it when a production e2e failure reproduces only on GitHub-hosted Linux or only against `https://sealed.vote`.
+Use it when a production e2e failure reproduces only on GitHub-hosted Linux or only against `https://elgamal.sealed.vote`.
 
 ## What it does
 
@@ -52,7 +52,7 @@ The compose setup defaults to:
 
 - `CI=true`
 - `HOME=/root`
-- `PLAYWRIGHT_BASE_URL=https://sealed.vote`
+- `PLAYWRIGHT_BASE_URL=https://elgamal.sealed.vote`
 - `PLAYWRIGHT_BLOB_REPORT=true`
 - `PLAYWRIGHT_CI_WORKERS=1`
 - `PLAYWRIGHT_PRODUCTION_ISOLATE_BY_FILE=true`
@@ -62,7 +62,7 @@ Override them from the host shell if needed before running the debug command.
 
 The diagnostics script records:
 
-- repeated GET and OPTIONS probes for `sealed.vote` and `api.sealed.vote`
+- repeated GET and OPTIONS probes for `elgamal.sealed.vote` and `api.elgamal.sealed.vote`
 - response headers and truncated response bodies
 - DNS lookup results for the production hosts
 - best-effort public IP discovery from common external echo services

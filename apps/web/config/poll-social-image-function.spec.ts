@@ -18,7 +18,7 @@ const {
     mockCreatePollSocialImageResponse: vi.fn(),
     mockExtractPollSocialImageSlugFromPathname: vi.fn(),
     mockExtractPollSocialImageVariantFromSearchParams: vi.fn(() => 'open'),
-    mockResolveSeoApiBaseUrl: vi.fn(() => 'https://api.sealed.vote'),
+    mockResolveSeoApiBaseUrl: vi.fn(() => 'https://api.elgamal.sealed.vote'),
 }));
 
 vi.mock('./poll-social-image.ts', () => ({
@@ -74,7 +74,9 @@ describe('poll social image Netlify function', () => {
         );
 
         const response = await pollSocialImageModule.default(
-            new Request('https://sealed.vote/social/polls/test--4a39.png'),
+            new Request(
+                'https://elgamal.sealed.vote/social/polls/test--4a39.png',
+            ),
             {
                 params: {
                     slug: 'test--4a39',
@@ -83,7 +85,7 @@ describe('poll social image Netlify function', () => {
         );
 
         expect(mockCreatePollSocialImageResponse).toHaveBeenCalledWith({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             pollSlug: 'test--4a39',
             signal: expect.any(AbortSignal),
             variant: 'open',
@@ -116,7 +118,7 @@ describe('poll social image Netlify function', () => {
             await import('../../../netlify/functions/poll-social-image');
         const response = await pollSocialImageModule.default(
             new Request(
-                'https://sealed.vote/social/polls/budget-roadmap.png?v=complete',
+                'https://elgamal.sealed.vote/social/polls/budget-roadmap.png?v=complete',
                 {
                     method: 'HEAD',
                 },
@@ -131,7 +133,7 @@ describe('poll social image Netlify function', () => {
             mockExtractPollSocialImageVariantFromSearchParams,
         ).toHaveBeenCalled();
         expect(mockCreatePollSocialImageResponse).toHaveBeenCalledWith({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             pollSlug: 'budget-roadmap',
             signal: expect.any(AbortSignal),
             variant: 'complete',
@@ -145,9 +147,12 @@ describe('poll social image Netlify function', () => {
         const pollSocialImageModule =
             await import('../../../netlify/functions/poll-social-image');
         const response = await pollSocialImageModule.default(
-            new Request('https://sealed.vote/social/polls/test--4a39.png', {
-                method: 'POST',
-            }),
+            new Request(
+                'https://elgamal.sealed.vote/social/polls/test--4a39.png',
+                {
+                    method: 'POST',
+                },
+            ),
             {
                 params: {
                     slug: 'test--4a39',
@@ -167,7 +172,9 @@ describe('poll social image Netlify function', () => {
         const pollSocialImageModule =
             await import('../../../netlify/functions/poll-social-image');
         const response = await pollSocialImageModule.default(
-            new Request('https://sealed.vote/social/polls/test--4a39.png'),
+            new Request(
+                'https://elgamal.sealed.vote/social/polls/test--4a39.png',
+            ),
             {
                 params: {
                     slug: 'test--4a39',

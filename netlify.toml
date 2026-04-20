@@ -6,17 +6,13 @@
 [build.environment]
   NODE_VERSION = "24.14.1"
   PNPM_VERSION = "10.33.0"
-  VITE_API_BASE_URL = "https://api.sealed.vote"
+  VITE_API_BASE_URL = "https://api.elgamal.sealed.vote"
 
 [context.deploy-preview.environment]
-  VITE_API_BASE_URL = "https://api.sealed.vote"
+  VITE_API_BASE_URL = "https://api.elgamal.sealed.vote"
 
 [functions]
   included_files = ["netlify/functions/assets/fonts/**"]
-
-[[edge_functions]]
-  function = "poll-seo"
-  path = "/polls/*"
 
 [[headers]]
   for = "/*"
@@ -25,7 +21,7 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Cross-Origin-Opener-Policy = "same-origin"
-    Content-Security-Policy = "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.sealed.vote; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; manifest-src 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:;"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; connect-src 'self' https://api.elgamal.sealed.vote; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; manifest-src 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:;"
 
 [[headers]]
   for = "/index.html"

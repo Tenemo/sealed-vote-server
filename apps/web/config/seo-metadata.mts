@@ -5,23 +5,26 @@ const seoMarkerEndName = 'sealed-vote-seo-end';
 const reactHelmetAttributeName = 'data-rh';
 const reactHelmetAttributeValue = 'true';
 
-export const siteName = 'sealed.vote';
 export const siteAuthor = 'piotr@piech.dev';
-const siteOrigin = 'https://sealed.vote';
+export const siteLegacyDeploymentLabel = 'Legacy ElGamal research prototype';
+export const siteLegacyDeploymentSummary =
+    'This deployment preserves the current threshold-elgamal research prototype while the post-quantum line is developed separately.';
+export const siteName = 'sealed.vote legacy';
+export const siteOrigin = 'https://elgamal.sealed.vote';
 export const siteThemeColor = '#121212';
 export const siteLocale = 'en_US';
-const defaultSeoTitle = `${siteName} | 1-10 score voting app`;
-const createPollSeoTitle = 'Create a poll';
+const defaultSeoTitle = `${siteName} | ElGamal research prototype`;
+const createPollSeoTitle = `Create a poll | ${siteName}`;
 const defaultKeywords =
     'confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification';
 const socialImagePath = '/social/og-home.png';
 const socialImageAlt =
-    'Screenshot of the sealed.vote app showing a 1-10 score poll ready to share.';
+    'Screenshot of the sealed.vote legacy app showing a 1-10 score poll ready to share.';
 export const pollSocialImagePathPrefix = '/social/polls/';
 export const socialImageWidth = 1200;
 const socialImageHeight = 630;
 const defaultSeoDescription =
-    'Create polls, collect responses, and reveal results.';
+    'Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.';
 const pollPageFallbackDescription = 'Score options from 1 to 10.';
 const pollResultsFallbackDescription = 'Poll results';
 
@@ -75,13 +78,13 @@ const createPollSocialImageAlt = (
 
     if (!normalizedPollTitle) {
         return options.isComplete
-            ? 'Final results preview on sealed.vote.'
-            : 'Preview image on sealed.vote.';
+            ? `Final results preview on ${siteName}.`
+            : `Preview image on ${siteName}.`;
     }
 
     return options.isComplete
-        ? `Final results preview for ${normalizedPollTitle} on sealed.vote.`
-        : `Preview image for ${normalizedPollTitle} on sealed.vote.`;
+        ? `Final results preview for ${normalizedPollTitle} on ${siteName}.`
+        : `Preview image for ${normalizedPollTitle} on ${siteName}.`;
 };
 
 const normalizeOrigin = (origin: string | undefined): string => {

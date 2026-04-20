@@ -9,6 +9,21 @@ import {
 } from '../scripts/wait-for-production-deploy.mts';
 
 const expectedCommitSha = 'ac15a2795b5344ab921a1790288a3572219e2f28';
+const defaultHomepageSiteName = 'sealed.vote legacy';
+const defaultHomepageTitle = 'Create a poll | sealed.vote legacy';
+const defaultPollPageTitle = 'Poll | sealed.vote legacy';
+const createWaitOptions = () => ({
+    apiBaseUrl: 'https://api.elgamal.sealed.vote',
+    expectedCommitSha,
+    homepageSiteName: defaultHomepageSiteName,
+    homepageTitle: defaultHomepageTitle,
+    intervalMs: 5,
+    pollPageTitle: defaultPollPageTitle,
+    requestTimeoutMs: 5_000,
+    requiredStableChecks: 2,
+    timeoutMs: 100,
+    webBaseUrl: 'https://elgamal.sealed.vote',
+});
 
 const createJsonStatus = (
     overrides: Partial<{
@@ -21,7 +36,7 @@ const createJsonStatus = (
     commitSha: expectedCommitSha,
     ok: true,
     statusCode: 200,
-    url: 'https://sealed.vote/version.json?t=1',
+    url: 'https://elgamal.sealed.vote/version.json?t=1',
     ...overrides,
 });
 
@@ -38,7 +53,7 @@ const createHtmlStatus = (
     missingSnippetLabel: null,
     ok: true,
     statusCode: 200,
-    url: 'https://sealed.vote/?t=1',
+    url: 'https://elgamal.sealed.vote/?t=1',
     ...overrides,
 });
 
@@ -51,16 +66,16 @@ const createReadinessStatus = (
     }> = {},
 ) => ({
     apiHealth: createJsonStatus({
-        url: 'https://api.sealed.vote/api/health-check?t=1',
+        url: 'https://api.elgamal.sealed.vote/api/health-check?t=1',
     }),
     homepage: createHtmlStatus({
-        url: 'https://sealed.vote/?t=1',
+        url: 'https://elgamal.sealed.vote/?t=1',
     }),
     pollPage: createHtmlStatus({
-        url: 'https://sealed.vote/polls/production-readiness-ac15a2795b53?t=1',
+        url: 'https://elgamal.sealed.vote/polls/production-readiness-ac15a2795b53?t=1',
     }),
     webVersion: createJsonStatus({
-        url: 'https://sealed.vote/version.json?t=1',
+        url: 'https://elgamal.sealed.vote/version.json?t=1',
     }),
     ...overrides,
 });
@@ -95,7 +110,7 @@ test('isReadinessStatusSuccessful requires matching commits and successful HTML 
             createReadinessStatus({
                 apiHealth: createJsonStatus({
                     commitSha: 'e715a02987075c168f6e88c54488a3708096664a',
-                    url: 'https://api.sealed.vote/api/health-check?t=1',
+                    url: 'https://api.elgamal.sealed.vote/api/health-check?t=1',
                 }),
             }),
             expectedCommitSha,
@@ -125,7 +140,7 @@ test('formatReadinessStatus reports unreachable, missing, and unknown HTML marke
                     commitSha: null,
                     ok: false,
                     statusCode: null,
-                    url: 'https://api.sealed.vote/api/health-check?t=1',
+                    url: 'https://api.elgamal.sealed.vote/api/health-check?t=1',
                 }),
             }),
         ),
@@ -194,15 +209,7 @@ test('waitForProductionDeploy requires consecutive stable checks before returnin
     let callCount = 0;
 
     await waitForProductionDeploy(
-        {
-            apiBaseUrl: 'https://api.sealed.vote',
-            expectedCommitSha,
-            intervalMs: 5,
-            requestTimeoutMs: 5_000,
-            requiredStableChecks: 2,
-            timeoutMs: 100,
-            webBaseUrl: 'https://sealed.vote',
-        },
+        createWaitOptions(),
         {
             loadReadinessStatus: async () => {
                 const status =
@@ -236,13 +243,9 @@ test('waitForProductionDeploy times out when readiness never stabilizes', async 
         async () =>
             await waitForProductionDeploy(
                 {
-                    apiBaseUrl: 'https://api.sealed.vote',
-                    expectedCommitSha,
+                    ...createWaitOptions(),
                     intervalMs: 10,
-                    requestTimeoutMs: 5_000,
-                    requiredStableChecks: 2,
                     timeoutMs: 30,
-                    webBaseUrl: 'https://sealed.vote',
                 },
                 {
                     loadReadinessStatus: async () =>

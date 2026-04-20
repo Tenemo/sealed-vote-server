@@ -6,9 +6,9 @@ describe('resolveBrowserApiBaseUrl', () => {
     test('uses the configured API origin on production hosts', () => {
         expect(
             resolveBrowserApiBaseUrl({
-                configuredApiBaseUrl: 'https://api.sealed.vote/',
+                configuredApiBaseUrl: 'https://api.elgamal.sealed.vote/',
             }),
-        ).toBe('https://api.sealed.vote');
+        ).toBe('https://api.elgamal.sealed.vote');
     });
 
     test('keeps local and custom deployments on their configured API origin', () => {

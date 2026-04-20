@@ -169,7 +169,7 @@ describe('extractPollSocialImageVariantFromSearchParams', () => {
 describe('createPollSocialImageResponse', () => {
     test('returns a PNG with revalidated browser cache headers for a real poll image', async () => {
         const response = await createPollSocialImageResponse({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async () =>
                 Response.json({
                     choices: ['Alpha', 'Beta', 'Gamma', 'Delta'],
@@ -195,7 +195,7 @@ describe('createPollSocialImageResponse', () => {
 
     test('returns a generic PNG with shorter cache headers when the poll is not found', async () => {
         const response = await createPollSocialImageResponse({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async () => new Response(null, { status: 404 })),
             pollSlug: 'missing-vote',
             variant: 'open',
@@ -213,7 +213,7 @@ describe('createPollSocialImageResponse', () => {
 
     test('returns a no-store image and 503 when the poll data is unavailable', async () => {
         const response = await createPollSocialImageResponse({
-            apiBaseUrl: 'https://api.sealed.vote',
+            apiBaseUrl: 'https://api.elgamal.sealed.vote',
             fetchImpl: vi.fn(async () => new Response(null, { status: 500 })),
             pollSlug: 'unavailable-vote',
             variant: 'complete',

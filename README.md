@@ -1,7 +1,7 @@
 # sealed.vote
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/431089b8-8373-4038-8b80-fb3a7aa02c6e/deploy-status)](https://app.netlify.com/projects/sealed-vote/deploys)
-[![API status](https://img.shields.io/website?url=https%3A%2F%2Fapi.sealed.vote%2Fapi%2Fhealth-check&label=api%20status&style=flat&labelColor=545A61&color=BEF9C6)](https://api.sealed.vote/api/health-check)
+[![API status](https://img.shields.io/website?url=https%3A%2F%2Fapi.elgamal.sealed.vote%2Fapi%2Fhealth-check&label=api%20status&style=flat&labelColor=545A61&color=BEF9C6)](https://api.elgamal.sealed.vote/api/health-check)
 
 ---
 
@@ -16,7 +16,9 @@
 
 ---
 
-[sealed.vote](https://sealed.vote) is a browser-based 1-10 score voting application built around `threshold-elgamal`. It uses a public roster, an append-only bulletin-board-style log, and local verification so that voters can audit who is participating while keeping ballot contents confidential.
+[elgamal.sealed.vote](https://elgamal.sealed.vote) is the intended live host for this branch, which preserves the browser-based 1-10 score voting application built around `threshold-elgamal`. It uses a public roster, an append-only bulletin-board-style log, and local verification so that voters can audit who is participating while keeping ballot contents confidential.
+
+The `legacy/elgamal` branch is the maintenance line for the legacy ElGamal research prototype. It is intended to deploy the web app at `https://elgamal.sealed.vote` and the API at `https://api.elgamal.sealed.vote`.
 
 https://github.com/user-attachments/assets/30dd0e13-7511-4bd5-a6fc-55a058dc94b6
 

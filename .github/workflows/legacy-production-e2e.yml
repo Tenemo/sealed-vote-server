@@ -1,0 +1,216 @@
+name: legacy production e2e
+
+on:
+    push:
+        branches:
+            - 'legacy/elgamal'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: legacy-production-e2e-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    validate-manual-legacy-production-mode:
+        name: validate manual legacy production mode
+        if: >-
+            ${{
+                github.event_name == 'workflow_dispatch'
+            }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: reject misleading non-legacy manual runs
+              run: |
+                  case "${{ github.ref_name }}" in
+                    legacy/elgamal)
+                      echo "Manual legacy production e2e is allowed for branch '${{ github.ref_name }}'."
+                      ;;
+                    *)
+                      echo "Manual legacy production e2e always targets https://elgamal.sealed.vote and https://api.elgamal.sealed.vote."
+                      echo "Branch '${{ github.ref_name }}' is not the legacy production branch, so its tests can disagree with the live legacy deployment."
+                      echo "Run this workflow from legacy/elgamal after the deploy you want to verify."
+                      exit 1
+                      ;;
+                  esac
+
+    wait-for-legacy-production-deploy:
+        name: wait for legacy production deploy
+        if: >-
+            ${{
+                github.event_name != 'workflow_dispatch' ||
+                github.ref_name == 'legacy/elgamal'
+            }}
+        runs-on: ubuntu-latest
+        timeout-minutes: 40
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+
+            - name: wait for stable legacy production readiness
+              run: >-
+                  node --experimental-strip-types tests/e2e/scripts/wait-for-production-deploy.mts
+                  --commit ${{ github.sha }}
+                  --web https://elgamal.sealed.vote
+                  --api https://api.elgamal.sealed.vote
+                  --homepage-site-name "sealed.vote legacy"
+                  --homepage-title "Create a poll | sealed.vote legacy"
+                  --poll-page-title "Poll | sealed.vote legacy"
+                  --timeout-ms 1800000
+                  --interval-ms 15000
+                  --request-timeout-ms 10000
+                  --required-stable-checks 2
+
+    legacy-production-e2e-matrix:
+        name: legacy production e2e (${{ matrix.project.name }})
+        needs:
+            [
+                validate-manual-legacy-production-mode,
+                wait-for-legacy-production-deploy,
+            ]
+        if: >-
+            ${{
+                always() &&
+                (
+                    (
+                        github.event_name != 'workflow_dispatch' &&
+                        needs.wait-for-legacy-production-deploy.result == 'success'
+                    ) ||
+                    (
+                        github.event_name == 'workflow_dispatch' &&
+                        needs.validate-manual-legacy-production-mode.result == 'success' &&
+                        needs.wait-for-legacy-production-deploy.result == 'success'
+                    )
+                )
+            }}
+        runs-on: ubuntu-latest
+        container:
+            image: mcr.microsoft.com/playwright:v1.59.1-noble
+            options: --ipc=host
+        timeout-minutes: 30
+        strategy:
+            fail-fast: false
+            max-parallel: 2
+            matrix:
+                project:
+                    - name: chromium-desktop
+                      slug: chromium-desktop
+                      ci_workers: '1'
+                    - name: firefox-desktop
+                      slug: firefox-desktop
+                      ci_workers: '1'
+                    - name: webkit-desktop
+                      slug: webkit-desktop
+                      ci_workers: '1'
+                    - name: mobile-firefox-android
+                      slug: mobile-firefox-android
+                      ci_workers: '1'
+
+        env:
+            HOME: /root
+            PLAYWRIGHT_BASE_URL: https://elgamal.sealed.vote
+            PLAYWRIGHT_BLOB_REPORT: 'true'
+            PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
+            PLAYWRIGHT_PRODUCTION_ISOLATE_BY_FILE: 'true'
+            PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: 10.33.0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: pnpm
+
+            - name: install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: wait for browser legacy production readiness
+              run: >-
+                  node --experimental-strip-types tests/e2e/scripts/wait-for-production-browser-readiness.mts
+                  --timeout-ms 1200000
+                  --interval-ms 15000
+                  --required-stable-checks 2
+                  --
+                  --project ${{ matrix.project.name }}
+
+            - name: run legacy production browser e2e
+              run: pnpm e2e:production:test -- --project ${{ matrix.project.name }}
+
+            - name: capture same-container endpoint diagnostics
+              if: failure()
+              run: >-
+                  pnpm e2e:production:diagnostics --
+                  --output-dir production-diagnostics
+                  --web-base-url https://elgamal.sealed.vote
+                  --api-base-url https://api.elgamal.sealed.vote
+                  --repeat 3
+                  --interval-ms 5000
+                  --request-timeout-ms 15000
+
+            - name: upload legacy production diagnostics
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: legacy-production-endpoint-diagnostics-${{ matrix.project.slug }}
+                  path: production-diagnostics
+                  if-no-files-found: ignore
+
+            - name: upload Playwright blob report
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: legacy-production-playwright-blob-report-${{ matrix.project.slug }}
+                  path: blob-report
+                  if-no-files-found: ignore
+
+            - name: upload Playwright raw results
+              if: failure()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: legacy-production-playwright-test-results-${{ matrix.project.slug }}
+                  path: test-results
+                  if-no-files-found: ignore
+
+    legacy-production-e2e:
+        name: legacy production e2e
+        if: always()
+        needs:
+            [
+                validate-manual-legacy-production-mode,
+                wait-for-legacy-production-deploy,
+                legacy-production-e2e-matrix,
+            ]
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: assert legacy production e2e jobs passed
+              run: |
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ needs.validate-manual-legacy-production-mode.result }}" != "success" ]; then
+                    echo "validate-manual-legacy-production-mode result: ${{ needs.validate-manual-legacy-production-mode.result }}"
+                    exit 1
+                  fi
+
+                  if [ "${{ needs.wait-for-legacy-production-deploy.result }}" != "success" ]; then
+                    echo "wait-for-legacy-production-deploy result: ${{ needs.wait-for-legacy-production-deploy.result }}"
+                    exit 1
+                  fi
+
+                  if [ "${{ needs.legacy-production-e2e-matrix.result }}" != "success" ]; then
+                    echo "legacy-production-e2e-matrix result: ${{ needs.legacy-production-e2e-matrix.result }}"
+                    exit 1
+                  fi

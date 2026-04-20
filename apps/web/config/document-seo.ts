@@ -7,7 +7,7 @@ import {
     type SeoMetadata,
 } from './seo-metadata.mts';
 
-const defaultSeoApiBaseUrl = 'https://api.sealed.vote';
+const defaultSeoApiBaseUrl = 'https://api.elgamal.sealed.vote';
 const defaultPollSeoPayloadLookupTimeoutMs = 1_500;
 const seoCrawlerUserAgentPattern =
     /bot|crawler|spider|facebookexternalhit|slackbot|discordbot|twitterbot|linkedinbot|whatsapp|telegrambot|googlebot|bingbot|duckduckbot|applebot|embedly|quora link preview|pinterest|skypeuripreview/i;

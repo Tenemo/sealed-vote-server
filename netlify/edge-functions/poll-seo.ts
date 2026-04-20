@@ -7,17 +7,45 @@ import {
 type EdgeContext = {
     next: () => Promise<Response>;
 };
+type NetlifyGlobal = {
+    env?: {
+        get?: (key: string) => string | undefined;
+    };
+};
 
-const edgeProcessEnv = (
-    globalThis as {
-        process?: {
-            env?: Record<string, string | undefined>;
-        };
+const readRuntimeEnvironmentValue = (key: string): string | undefined => {
+    const runtimeNetlify = (globalThis as { Netlify?: NetlifyGlobal }).Netlify;
+    const runtimeValue = runtimeNetlify?.env?.get?.(key);
+
+    if (runtimeValue !== undefined) {
+        return runtimeValue;
     }
-).process?.env;
 
-const seoApiBaseUrl = resolveSeoApiBaseUrl(edgeProcessEnv?.VITE_API_BASE_URL);
-const pollPayloadCache = createPollSeoPayloadCache();
+    return (
+        globalThis as {
+            process?: {
+                env?: Record<string, string | undefined>;
+            };
+        }
+    ).process?.env?.[key];
+};
+
+const getPollPayloadCache = (() => {
+    let pollPayloadCache: ReturnType<typeof createPollSeoPayloadCache> | null =
+        null;
+
+    return (): ReturnType<typeof createPollSeoPayloadCache> => {
+        if (pollPayloadCache === null) {
+            pollPayloadCache = createPollSeoPayloadCache();
+        }
+
+        return pollPayloadCache;
+    };
+})();
+
+export const config = {
+    path: '/*',
+};
 
 const isHtmlResponse = (response: Response): boolean =>
     (response.headers.get('content-type') || '').includes('text/html');
@@ -39,9 +67,11 @@ export default async (
     try {
         const html = await response.clone().text();
         const updatedHtml = await renderDocumentHtml({
-            apiBaseUrl: seoApiBaseUrl,
+            apiBaseUrl: resolveSeoApiBaseUrl(
+                readRuntimeEnvironmentValue('VITE_API_BASE_URL'),
+            ),
             baseHtml: html,
-            pollPayloadCache,
+            pollPayloadCache: getPollPayloadCache(),
             requestUserAgent: request.headers.get('user-agent'),
             requestUrl: new URL(request.url),
             signal: AbortSignal.timeout(5000),

@@ -62,12 +62,12 @@ type DnsLookupResult = {
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(currentFilePath), '../../..');
-const defaultApiBaseUrl = 'https://api.sealed.vote';
+const defaultApiBaseUrl = 'https://api.elgamal.sealed.vote';
 const defaultIntervalMs = 5_000;
 const defaultOutputDir = 'production-diagnostics';
 const defaultRepeat = 3;
 const defaultRequestTimeoutMs = 15_000;
-const defaultWebBaseUrl = 'https://sealed.vote';
+const defaultWebBaseUrl = 'https://elgamal.sealed.vote';
 const bodyPreviewMaxLength = 4_000;
 const browserUserAgent =
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
