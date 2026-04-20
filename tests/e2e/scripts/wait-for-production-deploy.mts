@@ -50,9 +50,9 @@ type HtmlProbeExpectation = {
 
 const commitShaPattern = /^[0-9a-f]{7,40}$/i;
 const defaultIntervalMs = 15_000;
-const defaultHomepageSiteName = 'sealed.vote legacy';
-const defaultHomepageTitle = 'Create a poll | sealed.vote legacy';
-const defaultPollPageTitle = 'Poll | sealed.vote legacy';
+const defaultHomepageSiteName = 'sealed.vote ElGamal';
+const defaultHomepageTitle = 'Create a poll | sealed.vote ElGamal';
+const defaultPollPageTitle = 'Poll | sealed.vote ElGamal';
 const defaultRequestTimeoutMs = 10_000;
 const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 30 * 60 * 1000;

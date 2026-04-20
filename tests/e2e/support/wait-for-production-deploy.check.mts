@@ -9,9 +9,9 @@ import {
 } from '../scripts/wait-for-production-deploy.mts';
 
 const expectedCommitSha = 'ac15a2795b5344ab921a1790288a3572219e2f28';
-const defaultHomepageSiteName = 'sealed.vote legacy';
-const defaultHomepageTitle = 'Create a poll | sealed.vote legacy';
-const defaultPollPageTitle = 'Poll | sealed.vote legacy';
+const defaultHomepageSiteName = 'sealed.vote ElGamal';
+const defaultHomepageTitle = 'Create a poll | sealed.vote ElGamal';
+const defaultPollPageTitle = 'Poll | sealed.vote ElGamal';
 const createWaitOptions = () => ({
     apiBaseUrl: 'https://api.elgamal.sealed.vote',
     expectedCommitSha,

@@ -1,102 +1,67 @@
 <!doctype html>
 <html lang="en" style="background-color: #121212; color-scheme: dark">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <base href="/" />
-        <link
-            rel="icon"
-            type="image/png"
-            href="/favicon/favicon-96x96.png"
-            sizes="96x96"
-        />
-        <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-        <link rel="shortcut icon" href="/favicon/favicon.ico" />
-        <link
-            rel="apple-touch-icon"
-            sizes="180x180"
-            href="/favicon/apple-touch-icon.png"
-        />
-        <link rel="manifest" href="/favicon/site.webmanifest" />
-        <meta name="sealed-vote-seo-start" content="1" />
-        <meta name="author" content="piotr@piech.dev" />
-        <meta name="application-name" content="sealed.vote legacy" />
-        <meta name="apple-mobile-web-app-title" content="sealed.vote legacy" />
-        <meta name="color-scheme" content="dark" />
-        <meta
-            name="description"
-            content="Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results."
-        />
-        <meta name="format-detection" content="telephone=no" />
-        <meta
-            name="keywords"
-            content="confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification"
-        />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
-        <meta name="theme-color" content="#121212" />
-        <meta property="og:site_name" content="sealed.vote legacy" />
-        <meta
-            property="og:title"
-            content="sealed.vote legacy | ElGamal research prototype"
-        />
-        <meta
-            property="og:description"
-            content="Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results."
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://elgamal.sealed.vote/" />
-        <meta
-            property="og:image"
-            content="https://elgamal.sealed.vote/social/og-home.png"
-        />
-        <meta
-            property="og:image:secure_url"
-            content="https://elgamal.sealed.vote/social/og-home.png"
-        />
-        <meta property="og:image:type" content="image/png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta
-            property="og:image:alt"
-            content="Screenshot of the sealed.vote legacy app showing a 1-10 score vote ready to share."
-        />
-        <meta property="og:locale" content="en_US" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta
-            name="twitter:title"
-            content="sealed.vote legacy | ElGamal research prototype"
-        />
-        <meta
-            name="twitter:description"
-            content="Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results."
-        />
-        <meta name="twitter:url" content="https://elgamal.sealed.vote/" />
-        <meta
-            name="twitter:image"
-            content="https://elgamal.sealed.vote/social/og-home.png"
-        />
-        <meta
-            name="twitter:image:alt"
-            content="Screenshot of the sealed.vote legacy app showing a 1-10 score vote ready to share."
-        />
-        <link rel="canonical" href="https://elgamal.sealed.vote/" />
-        <title>sealed.vote legacy | ElGamal research prototype</title>
-        <script type="application/ld+json">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="/" />
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
+    <meta name="sealed-vote-seo-start" content="1" />
+    <meta name="author" content="piotr@piech.dev" />
+    <meta name="application-name" content="sealed.vote ElGamal" />
+    <meta name="apple-mobile-web-app-title" content="sealed.vote ElGamal" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description"
+        content="ElGamal research prototype for creating polls, collecting responses, and revealing results." />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="keywords"
+        content="confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#121212" />
+    <meta property="og:site_name" content="sealed.vote ElGamal" />
+    <meta property="og:title" content="sealed.vote ElGamal | research prototype" />
+    <meta property="og:description"
+        content="ElGamal research prototype for creating polls, collecting responses, and revealing results." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://elgamal.sealed.vote/" />
+    <meta property="og:image" content="https://elgamal.sealed.vote/social/og-home.png" />
+    <meta property="og:image:secure_url" content="https://elgamal.sealed.vote/social/og-home.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"
+        content="Screenshot of the sealed.vote ElGamal app showing a 1-10 score vote ready to share." />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="sealed.vote ElGamal | research prototype" />
+    <meta name="twitter:description"
+        content="ElGamal research prototype for creating polls, collecting responses, and revealing results." />
+    <meta name="twitter:url" content="https://elgamal.sealed.vote/" />
+    <meta name="twitter:image" content="https://elgamal.sealed.vote/social/og-home.png" />
+    <meta name="twitter:image:alt"
+        content="Screenshot of the sealed.vote ElGamal app showing a 1-10 score vote ready to share." />
+    <link rel="canonical" href="https://elgamal.sealed.vote/" />
+    <title>sealed.vote ElGamal | research prototype</title>
+    <script type="application/ld+json">
             {
                 "@context": "https://schema.org",
                 "@graph": [
                     {
                         "@type": "WebSite",
                         "@id": "https://elgamal.sealed.vote/#website",
-                        "description": "Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.",
+                        "description": "ElGamal research prototype for creating polls, collecting responses, and revealing results.",
                         "inLanguage": "en",
-                        "name": "sealed.vote legacy",
+                        "name": "sealed.vote ElGamal",
                         "url": "https://elgamal.sealed.vote/"
                     },
                     {
                         "@type": "WebPage",
                         "@id": "https://elgamal.sealed.vote/#webpage",
-                        "description": "Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.",
+                        "description": "ElGamal research prototype for creating polls, collecting responses, and revealing results.",
                         "image": {
                             "@id": "https://elgamal.sealed.vote/#social-image"
                         },
@@ -104,7 +69,7 @@
                         "isPartOf": {
                             "@id": "https://elgamal.sealed.vote/#website"
                         },
-                        "name": "sealed.vote legacy | ElGamal research prototype",
+                        "name": "sealed.vote ElGamal | research prototype",
                         "primaryImageOfPage": {
                             "@id": "https://elgamal.sealed.vote/#social-image"
                         },
@@ -115,19 +80,19 @@
                         "@id": "https://elgamal.sealed.vote/#webapp",
                         "applicationCategory": "SecurityApplication",
                         "browserRequirements": "JavaScript required",
-                        "description": "Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.",
+                        "description": "ElGamal research prototype for creating polls, collecting responses, and revealing results.",
                         "image": "https://elgamal.sealed.vote/social/og-home.png",
                         "isPartOf": {
                             "@id": "https://elgamal.sealed.vote/#website"
                         },
-                        "name": "sealed.vote legacy",
+                        "name": "sealed.vote ElGamal",
                         "operatingSystem": "Any",
                         "url": "https://elgamal.sealed.vote/"
                     },
                     {
                         "@type": "ImageObject",
                         "@id": "https://elgamal.sealed.vote/#social-image",
-                        "caption": "Screenshot of the sealed.vote legacy app showing a 1-10 score vote ready to share.",
+                        "caption": "Screenshot of the sealed.vote ElGamal app showing a 1-10 score vote ready to share.",
                         "contentUrl": "https://elgamal.sealed.vote/social/og-home.png",
                         "height": {
                             "@type": "QuantitativeValue",
@@ -144,11 +109,13 @@
                 ]
             }
         </script>
-        <meta name="sealed-vote-seo-end" content="1" />
-    </head>
-    <body style="background-color: #121212; color: #ffffff">
-        <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
-        <script type="module" src="/src/main.tsx"></script>
-    </body>
+    <meta name="sealed-vote-seo-end" content="1" />
+</head>
+
+<body style="background-color: #121212; color: #ffffff">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

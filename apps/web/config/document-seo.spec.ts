@@ -139,7 +139,7 @@ describe('resolveDocumentSeoMetadata', () => {
             'https://elgamal.sealed.vote/social/polls/budget-roadmap.png?v=complete',
         );
         expect(metadata.imageAlt).toBe(
-            'Final results preview for Budget & roadmap on sealed.vote legacy.',
+            'Final results preview for Budget & roadmap on sealed.vote ElGamal.',
         );
     });
 
@@ -148,14 +148,14 @@ describe('resolveDocumentSeoMetadata', () => {
             requestUrl: new URL('https://elgamal.sealed.vote/'),
         });
 
-        expect(metadata.title).toBe('Create a poll | sealed.vote legacy');
+        expect(metadata.title).toBe('Create a poll | sealed.vote ElGamal');
         expect(metadata.imageUrl).toBe(
             'https://elgamal.sealed.vote/social/og-home.png',
         );
         expect(metadata.robots).toBe('index, follow, max-image-preview:large');
         expect(metadata.canonicalUrl).toBe('https://elgamal.sealed.vote/');
         expect(metadata.description).toBe(
-            'Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.',
+            'ElGamal research prototype for creating polls, collecting responses, and revealing results.',
         );
     });
 
@@ -165,10 +165,10 @@ describe('resolveDocumentSeoMetadata', () => {
         });
 
         expect(metadata.title).toBe(
-            'sealed.vote legacy | ElGamal research prototype',
+            'sealed.vote ElGamal | ElGamal research prototype',
         );
         expect(metadata.description).toBe(
-            'Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results.',
+            'ElGamal research prototype for creating polls, collecting responses, and revealing results.',
         );
         expect(metadata.canonicalUrl).toBe(
             'https://elgamal.sealed.vote/missing',
@@ -192,7 +192,7 @@ describe('resolveDocumentSeoMetadata', () => {
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
         });
 
-        expect(metadata.title).toBe('Poll | sealed.vote legacy');
+        expect(metadata.title).toBe('Poll | sealed.vote ElGamal');
         expect(fetchImpl).not.toHaveBeenCalled();
     });
 
@@ -235,7 +235,7 @@ describe('resolveDocumentSeoMetadata', () => {
                 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
         });
 
-        expect(metadata.title).toBe('Poll | sealed.vote legacy');
+        expect(metadata.title).toBe('Poll | sealed.vote ElGamal');
         expect(metadata.description).toBe('Score options from 1 to 10.');
         expect(lookupSignal?.aborted).toBe(true);
     });
@@ -374,7 +374,7 @@ describe('renderDocumentHtml', () => {
         });
 
         expect(html).toContain(
-            '<title data-rh="true">Poll | sealed.vote legacy</title>',
+            '<title data-rh="true">Poll | sealed.vote ElGamal</title>',
         );
         expect(html).toContain('content="Score options from 1 to 10."');
     });
@@ -391,10 +391,10 @@ describe('renderDocumentHtml', () => {
             '<link data-rh="true" rel="canonical" href="https://deploy-preview-11--sealed-vote.netlify.app/"',
         );
         expect(html).toContain(
-            '<title data-rh="true">Create a poll | sealed.vote legacy</title>',
+            '<title data-rh="true">Create a poll | sealed.vote ElGamal</title>',
         );
         expect(html).toContain(
-            'content="Legacy ElGamal research prototype for creating polls, collecting responses, and revealing results."',
+            'content="ElGamal research prototype for creating polls, collecting responses, and revealing results."',
         );
         expect(html).toContain(
             'content="https://deploy-preview-11--sealed-vote.netlify.app/"',
