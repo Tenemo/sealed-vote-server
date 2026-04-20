@@ -61,9 +61,9 @@ jobs:
                   --commit ${{ github.sha }}
                   --web https://elgamal.sealed.vote
                   --api https://api.elgamal.sealed.vote
-                  --homepage-site-name "sealed.vote legacy"
-                  --homepage-title "Create a poll | sealed.vote legacy"
-                  --poll-page-title "Poll | sealed.vote legacy"
+                  --homepage-site-name "sealed.vote ElGamal"
+                  --homepage-title "Create a poll | sealed.vote ElGamal"
+                  --poll-page-title "Poll | sealed.vote ElGamal"
                   --timeout-ms 1800000
                   --interval-ms 15000
                   --request-timeout-ms 10000
