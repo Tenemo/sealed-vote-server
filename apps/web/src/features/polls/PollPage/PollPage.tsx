@@ -1105,32 +1105,37 @@ const PollPage = (): React.JSX.Element => {
                             </div>
                         </div>
 
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                            <div className="space-y-2">
-                                <div className="text-sm font-medium text-foreground">
-                                    Shareable poll link
+                        <div className="space-y-2">
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                                <div className="space-y-2">
+                                    <div className="text-sm font-medium text-foreground">
+                                        Shareable poll link
+                                    </div>
+                                    <div
+                                        className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm break-all"
+                                        data-testid="share-url-value"
+                                    >
+                                        {shareUrl}
+                                    </div>
                                 </div>
-                                <div className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm break-all">
-                                    {shareUrl}
-                                </div>
-                                <p
-                                    aria-live="polite"
-                                    className="field-note min-h-6"
+                                <Button
+                                    data-testid="copy-link-button"
+                                    disabled={!canCopyShareUrl}
+                                    onClick={() => {
+                                        void onCopyShareUrl();
+                                    }}
+                                    size="lg"
+                                    variant="outline"
                                 >
-                                    {copyNotice}
-                                </p>
+                                    Copy link
+                                </Button>
                             </div>
-                            <Button
-                                data-testid="copy-link-button"
-                                disabled={!canCopyShareUrl}
-                                onClick={() => {
-                                    void onCopyShareUrl();
-                                }}
-                                size="lg"
-                                variant="outline"
+                            <p
+                                aria-live="polite"
+                                className="field-note min-h-6"
                             >
-                                Copy link
-                            </Button>
+                                {copyNotice}
+                            </p>
                         </div>
                     </Panel>
 
