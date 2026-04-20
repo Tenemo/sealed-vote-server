@@ -19,11 +19,12 @@ export const protocolMessageTypes = [
 
 type AssertTrue<T extends true> = T;
 
-export type ProtocolMessageTypesAreExhaustive = AssertTrue<
+const protocolMessageTypesAreExhaustive: AssertTrue<
     ProtocolMessageType extends (typeof protocolMessageTypes)[number]
         ? true
         : false
->;
+> = true;
+void protocolMessageTypesAreExhaustive;
 
 const protocolMessageTypeSet = new Set<string>(protocolMessageTypes);
 

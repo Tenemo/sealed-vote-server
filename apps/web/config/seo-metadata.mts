@@ -1,29 +1,29 @@
 import { hasPublishedResultScores } from './poll-results.mts';
 
-export const seoMarkerStartName = 'sealed-vote-seo-start';
-export const seoMarkerEndName = 'sealed-vote-seo-end';
-export const reactHelmetAttributeName = 'data-rh';
-export const reactHelmetAttributeValue = 'true';
+const seoMarkerStartName = 'sealed-vote-seo-start';
+const seoMarkerEndName = 'sealed-vote-seo-end';
+const reactHelmetAttributeName = 'data-rh';
+const reactHelmetAttributeValue = 'true';
 
 export const siteName = 'sealed.vote';
 export const siteAuthor = 'piotr@piech.dev';
-export const siteOrigin = 'https://sealed.vote';
+const siteOrigin = 'https://sealed.vote';
 export const siteThemeColor = '#121212';
 export const siteLocale = 'en_US';
-export const defaultSeoTitle = `${siteName} | 1-10 score voting app`;
-export const createPollSeoTitle = 'Create a poll';
-export const defaultKeywords =
+const defaultSeoTitle = `${siteName} | 1-10 score voting app`;
+const createPollSeoTitle = 'Create a poll';
+const defaultKeywords =
     'confidential voting, secure voting, score voting, homomorphic encryption, threshold cryptography, elgamal, offline recovery, public verification';
-export const socialImagePath = '/social/og-home.png';
-export const socialImageAlt =
+const socialImagePath = '/social/og-home.png';
+const socialImageAlt =
     'Screenshot of the sealed.vote app showing a 1-10 score poll ready to share.';
 export const pollSocialImagePathPrefix = '/social/polls/';
 export const socialImageWidth = 1200;
-export const socialImageHeight = 630;
-export const defaultSeoDescription =
+const socialImageHeight = 630;
+const defaultSeoDescription =
     'Create polls, collect responses, and reveal results.';
-export const pollPageFallbackDescription = 'Score options from 1 to 10.';
-export const pollResultsFallbackDescription = 'Poll results';
+const pollPageFallbackDescription = 'Score options from 1 to 10.';
+const pollResultsFallbackDescription = 'Poll results';
 
 type StructuredData = Record<string, unknown>;
 
@@ -50,7 +50,7 @@ export type SeoMetadata = {
     url: string;
 };
 
-export const createPollSocialImagePath = (
+const createPollSocialImagePath = (
     pollSlug: string,
     options: {
         isComplete?: boolean;
@@ -65,7 +65,7 @@ export const createPollSocialImagePath = (
     return `${pathname}?v=complete`;
 };
 
-export const createPollSocialImageAlt = (
+const createPollSocialImageAlt = (
     pollTitle: string | null | undefined,
     options: {
         isComplete?: boolean;

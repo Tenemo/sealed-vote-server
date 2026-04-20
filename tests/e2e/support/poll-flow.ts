@@ -5,8 +5,11 @@ import {
     type Page,
 } from '@playwright/test';
 
-import { gotoInteractablePage, reloadInteractablePage } from './navigation.mts';
-import { isLocalLoopbackHostname } from './local-origin.mts';
+import {
+    gotoInteractablePage,
+    isLocalLoopbackHostname,
+    reloadInteractablePage,
+} from './navigation.mts';
 
 const pollSlugPattern = /\/polls\/[a-z0-9-]+--[0-9a-f]{4}$/;
 const createPollApiPath = '/api/polls/create';

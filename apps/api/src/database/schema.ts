@@ -184,7 +184,7 @@ export const publicKeyShares = pgTable(
     ],
 );
 
-export const pollsRelations = relations(polls, ({ many }) => ({
+const pollsRelations = relations(polls, ({ many }) => ({
     choices: many(choices),
     voters: many(voters),
     boardMessages: many(boardMessages),
@@ -192,14 +192,14 @@ export const pollsRelations = relations(polls, ({ many }) => ({
     publicKeyShares: many(publicKeyShares),
 }));
 
-export const choicesRelations = relations(choices, ({ one }) => ({
+const choicesRelations = relations(choices, ({ one }) => ({
     poll: one(polls, {
         fields: [choices.pollId],
         references: [polls.id],
     }),
 }));
 
-export const votersRelations = relations(voters, ({ many, one }) => ({
+const votersRelations = relations(voters, ({ many, one }) => ({
     poll: one(polls, {
         fields: [voters.pollId],
         references: [polls.id],
@@ -207,14 +207,14 @@ export const votersRelations = relations(voters, ({ many, one }) => ({
     publicKeyShares: many(publicKeyShares),
 }));
 
-export const boardMessagesRelations = relations(boardMessages, ({ one }) => ({
+const boardMessagesRelations = relations(boardMessages, ({ one }) => ({
     poll: one(polls, {
         fields: [boardMessages.pollId],
         references: [polls.id],
     }),
 }));
 
-export const pollCeremonySessionsRelations = relations(
+const pollCeremonySessionsRelations = relations(
     pollCeremonySessions,
     ({ one }) => ({
         poll: one(polls, {
@@ -224,19 +224,16 @@ export const pollCeremonySessionsRelations = relations(
     }),
 );
 
-export const publicKeySharesRelations = relations(
-    publicKeyShares,
-    ({ one }) => ({
-        poll: one(polls, {
-            fields: [publicKeyShares.pollId],
-            references: [polls.id],
-        }),
-        voter: one(voters, {
-            fields: [publicKeyShares.voterId],
-            references: [voters.id],
-        }),
+const publicKeySharesRelations = relations(publicKeyShares, ({ one }) => ({
+    poll: one(polls, {
+        fields: [publicKeyShares.pollId],
+        references: [polls.id],
     }),
-);
+    voter: one(voters, {
+        fields: [publicKeyShares.voterId],
+        references: [voters.id],
+    }),
+}));
 
 export const schema = {
     polls,
