@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 type WaitOptions = {
     apiBaseUrl: string;
     expectedCommitSha: string;
+    homepageSiteName: string;
+    homepageTitle: string;
     intervalMs: number;
+    pollPageTitle: string;
     requestTimeoutMs: number;
     requiredStableChecks: number;
     timeoutMs: number;
@@ -47,14 +50,13 @@ type HtmlProbeExpectation = {
 
 const commitShaPattern = /^[0-9a-f]{7,40}$/i;
 const defaultIntervalMs = 15_000;
+const defaultHomepageSiteName = 'sealed.vote';
+const defaultHomepageTitle = 'sealed.vote | 1-10 score voting app';
+const defaultPollPageTitle = 'Poll | sealed.vote';
 const defaultRequestTimeoutMs = 10_000;
 const defaultRequiredStableChecks = 2;
 const defaultTimeoutMs = 30 * 60 * 1000;
 const syntheticPollSlugPrefix = 'production-readiness-';
-const homepageExpectedTitle =
-    '<title>sealed.vote | 1-10 score voting app</title>';
-const homepageExpectedSiteName =
-    '<meta property="og:site_name" content="sealed.vote" />';
 const now = (): number => Date.now();
 const currentFilePath = fileURLToPath(import.meta.url);
 
@@ -119,27 +121,33 @@ export const createSyntheticPollPath = (expectedCommitSha: string): string => {
 };
 
 const createHtmlProbeExpectations = (
-    webBaseUrl: string,
-    expectedCommitSha: string,
+    options: Pick<
+        WaitOptions,
+        | 'expectedCommitSha'
+        | 'homepageSiteName'
+        | 'homepageTitle'
+        | 'pollPageTitle'
+        | 'webBaseUrl'
+    >,
 ): {
     homepage: HtmlProbeExpectation[];
     pollPage: HtmlProbeExpectation[];
 } => {
-    const syntheticPollPath = createSyntheticPollPath(expectedCommitSha);
+    const syntheticPollPath = createSyntheticPollPath(options.expectedCommitSha);
     const syntheticPollCanonicalUrl = new URL(
         syntheticPollPath,
-        webBaseUrl,
+        options.webBaseUrl,
     ).toString();
 
     return {
         homepage: [
             {
                 label: 'homepage title',
-                snippet: homepageExpectedTitle,
+                snippet: `<title>${options.homepageTitle}</title>`,
             },
             {
                 label: 'homepage og site name',
-                snippet: homepageExpectedSiteName,
+                snippet: `<meta property="og:site_name" content="${options.homepageSiteName}" />`,
             },
         ],
         pollPage: [
@@ -154,7 +162,7 @@ const createHtmlProbeExpectations = (
             },
             {
                 label: 'poll page title',
-                snippet: '<title data-rh="true">Poll | sealed.vote</title>',
+                snippet: `<title data-rh="true">${options.pollPageTitle}</title>`,
             },
         ],
     };
@@ -173,8 +181,11 @@ const parseArgs = (): WaitOptions => {
     };
 
     const rawExpectedCommitSha = getArgValue('--commit');
+    const rawHomepageSiteName = getArgValue('--homepage-site-name');
+    const rawHomepageTitle = getArgValue('--homepage-title');
     const rawWebBaseUrl = getArgValue('--web');
     const rawApiBaseUrl = getArgValue('--api');
+    const rawPollPageTitle = getArgValue('--poll-page-title');
 
     if (!rawExpectedCommitSha) {
         fail('Missing required --commit argument.');
@@ -195,11 +206,15 @@ const parseArgs = (): WaitOptions => {
     return {
         apiBaseUrl,
         expectedCommitSha,
+        homepageSiteName:
+            rawHomepageSiteName?.trim() || defaultHomepageSiteName,
+        homepageTitle: rawHomepageTitle?.trim() || defaultHomepageTitle,
         intervalMs: parsePositiveInteger(
             getArgValue('--interval-ms'),
             defaultIntervalMs,
             '--interval-ms',
         ),
+        pollPageTitle: rawPollPageTitle?.trim() || defaultPollPageTitle,
         requestTimeoutMs: parsePositiveInteger(
             getArgValue('--request-timeout-ms'),
             defaultRequestTimeoutMs,
@@ -363,10 +378,7 @@ const loadHtmlProbeStatus = async (
 export const loadReadinessStatus = async (
     options: WaitOptions,
 ): Promise<ReadinessStatus> => {
-    const expectations = createHtmlProbeExpectations(
-        options.webBaseUrl,
-        options.expectedCommitSha,
-    );
+    const expectations = createHtmlProbeExpectations(options);
     const syntheticPollPath = createSyntheticPollPath(
         options.expectedCommitSha,
     );

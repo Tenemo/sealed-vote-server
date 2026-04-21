@@ -7,7 +7,7 @@ const reactHelmetAttributeValue = 'true';
 
 export const siteName = 'sealed.vote';
 export const siteAuthor = 'piotr@piech.dev';
-const siteOrigin = 'https://sealed.vote';
+export const siteOrigin = 'https://sealed.vote';
 export const siteThemeColor = '#121212';
 export const siteLocale = 'en_US';
 const defaultSeoTitle = `${siteName} | 1-10 score voting app`;

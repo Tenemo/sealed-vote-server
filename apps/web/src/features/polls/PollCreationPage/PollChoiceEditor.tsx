@@ -21,6 +21,7 @@ const PollChoiceEditor = ({
     onAddChoice,
     onRemoveChoice,
 }: PollChoiceEditorProps): React.JSX.Element => {
+    const choiceNameErrorId = 'choice-name-error';
     const [choiceName, setChoiceName] = useState('');
     const normalizedChoiceName = normalizeTrimmedString(choiceName);
     const normalizedChoices = normalizeTrimmedStrings(choices);
@@ -55,34 +56,43 @@ const PollChoiceEditor = ({
                     Each participant will score every option from 1 to 10.
                 </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <OutlinedInputField
-                    aria-invalid={isChoiceDuplicate}
-                    autoComplete="off"
-                    errorText={
-                        isChoiceDuplicate
-                            ? 'This choice already exists'
-                            : undefined
-                    }
-                    id="choiceName"
-                    inputClassName="text-base"
-                    label="Choice name"
-                    maxLength={64}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    value={choiceName}
-                />
-                <Button
-                    className={cn('w-full sm:w-auto', 'justify-center')}
-                    disabled={!isChoiceNameValid}
-                    onClick={handleAddChoice}
-                    size="lg"
-                    type="button"
-                    variant={isChoiceNameValid ? 'default' : 'outline'}
-                >
-                    <Plus aria-hidden="true" className="size-4" />
-                    Add new choice
-                </Button>
+            <div className="space-y-2">
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <OutlinedInputField
+                        aria-describedby={
+                            isChoiceDuplicate ? choiceNameErrorId : undefined
+                        }
+                        aria-invalid={isChoiceDuplicate}
+                        autoComplete="off"
+                        id="choiceName"
+                        inputClassName="text-base"
+                        label="Choice name"
+                        maxLength={64}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        value={choiceName}
+                    />
+                    <Button
+                        className={cn('w-full sm:w-auto', 'justify-center')}
+                        disabled={!isChoiceNameValid}
+                        onClick={handleAddChoice}
+                        size="lg"
+                        type="button"
+                        variant={isChoiceNameValid ? 'default' : 'outline'}
+                    >
+                        <Plus aria-hidden="true" className="size-4" />
+                        Add new choice
+                    </Button>
+                </div>
+                {isChoiceDuplicate ? (
+                    <p
+                        className="text-sm font-normal text-destructive"
+                        id={choiceNameErrorId}
+                        role="alert"
+                    >
+                        This choice already exists
+                    </p>
+                ) : null}
             </div>
             {choices.length === 0 && (
                 <p className="empty-state">

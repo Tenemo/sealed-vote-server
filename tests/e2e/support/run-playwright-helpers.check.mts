@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
     collectListedSpecFiles,
+    hasProductionGotoTimeout,
     isProductionNavigationStall,
     resolveProductionIsolatedInvocationArgs,
     runProductionIsolatedInvocations,
@@ -151,6 +152,19 @@ F
     Error: page.goto: Timeout 45000ms exceeded.
 `),
         false,
+    );
+});
+
+test('hasProductionGotoTimeout matches goto timeouts outside the readiness spec', () => {
+    assert.equal(
+        hasProductionGotoTimeout(`Running 1 test using 1 worker
+F
+
+  1) [firefox-desktop] ${listedSpecSeparator} tests/e2e/share-link.spec.ts:12:5 ${listedSpecSeparator} copies the share link
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`),
+        true,
     );
 });
 
@@ -320,5 +334,128 @@ test('runProductionIsolatedInvocations keeps going after a generic goto timeout 
         exitCode: 1,
         failedFiles: ['ceremony-persistence.spec.ts', 'share-link.spec.ts'],
         stalledFile: null,
+    });
+});
+
+test('runProductionIsolatedInvocations continues after shared navigation recovery succeeds', async () => {
+    const startedFiles: string[] = [];
+    const attemptedFiles: string[] = [];
+    let recoveryAttempts = 0;
+
+    const result = await runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'firefox-desktop'],
+        listedFiles: [
+            '00-production-browser-readiness.spec.ts',
+            'share-link.spec.ts',
+            'voting-flow.spec.ts',
+        ],
+        onInvocationStart: (listedFile) => {
+            startedFiles.push(listedFile);
+        },
+        recoverNavigationTimeout: async ({ listedFile, output }) => {
+            recoveryAttempts += 1;
+            assert.equal(listedFile, 'share-link.spec.ts');
+            assert.equal(hasProductionGotoTimeout(output), true);
+
+            return {
+                kind: 'recovered',
+            };
+        },
+        runInvocation: async (args) => {
+            const targetedFile = args[0]!;
+            attemptedFiles.push(targetedFile);
+
+            if (
+                targetedFile === 'share-link.spec.ts' &&
+                attemptedFiles.filter((file) => file === targetedFile).length ===
+                    1
+            ) {
+                return {
+                    exitCode: 1,
+                    output: `  1) [firefox-desktop] ${listedSpecSeparator} tests/e2e/share-link.spec.ts:12:5 ${listedSpecSeparator} copies the share link
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+                };
+            }
+
+            return {
+                exitCode: 0,
+                output: '',
+            };
+        },
+    });
+
+    assert.deepEqual(startedFiles, [
+        '00-production-browser-readiness.spec.ts',
+        'share-link.spec.ts',
+        'voting-flow.spec.ts',
+    ]);
+    assert.deepEqual(attemptedFiles, [
+        '00-production-browser-readiness.spec.ts',
+        'share-link.spec.ts',
+        'voting-flow.spec.ts',
+    ]);
+    assert.equal(recoveryAttempts, 1);
+    assert.deepEqual(result, {
+        exitCode: 0,
+        failedFiles: [],
+        stalledFile: null,
+    });
+});
+
+test('runProductionIsolatedInvocations stops after shared navigation recovery reports a stalled frontend', async () => {
+    const startedFiles: string[] = [];
+    const stalledFiles: string[] = [];
+
+    const result = await runProductionIsolatedInvocations({
+        forwardedCliArgs: ['--project', 'firefox-desktop'],
+        listedFiles: [
+            '00-production-browser-readiness.spec.ts',
+            'ceremony-persistence.spec.ts',
+            'share-link.spec.ts',
+        ],
+        onInvocationStart: (listedFile) => {
+            startedFiles.push(listedFile);
+        },
+        onNavigationStall: (listedFile) => {
+            stalledFiles.push(listedFile);
+        },
+        recoverNavigationTimeout: async ({ listedFile }) => {
+            assert.equal(listedFile, 'ceremony-persistence.spec.ts');
+
+            return {
+                kind: 'stalled',
+            };
+        },
+        runInvocation: async (args) => {
+            if (args.includes('ceremony-persistence.spec.ts')) {
+                return {
+                    exitCode: 1,
+                    output: `  1) [firefox-desktop] ${listedSpecSeparator} tests/e2e/ceremony-persistence.spec.ts:12:5 ${listedSpecSeparator} rejoins after close
+
+    Error: page.goto: Timeout 45000ms exceeded.
+`,
+                };
+            }
+
+            return {
+                exitCode: 0,
+                output: '',
+            };
+        },
+    });
+
+    assert.deepEqual(startedFiles, [
+        '00-production-browser-readiness.spec.ts',
+        'ceremony-persistence.spec.ts',
+    ]);
+    assert.deepEqual(stalledFiles, [
+        'ceremony-persistence.spec.ts',
+    ]);
+    assert.deepEqual(result, {
+        exitCode: 1,
+        failedFiles: ['ceremony-persistence.spec.ts'],
+        stalledFile: 'ceremony-persistence.spec.ts',
     });
 });

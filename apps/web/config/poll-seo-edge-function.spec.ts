@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const {
     mockCreatePollSeoPayloadCache,
@@ -17,15 +17,39 @@ vi.mock('./document-seo.ts', () => ({
 }));
 
 describe('poll SEO edge function', () => {
+    const originalNetlifyGlobal = (globalThis as { Netlify?: unknown }).Netlify;
+
     // These tests focus on edge-runtime behavior rather than page rendering.
     // They guard module-scope caching and safe HTML passthrough in the Netlify
     // edge environment, which are both easy to break with refactors.
     beforeEach(() => {
         vi.resetModules();
+        (
+            globalThis as {
+                Netlify?: {
+                    env?: {
+                        get?: (key: string) => string | undefined;
+                    };
+                };
+            }
+        ).Netlify = {
+            env: {
+                get: vi.fn(() => 'https://api.preview.sealed.vote'),
+            },
+        };
         mockCreatePollSeoPayloadCache.mockReset();
         mockCreatePollSeoPayloadCache.mockImplementation(() => new Map());
         mockRenderDocumentHtml.mockReset();
         mockResolveSeoApiBaseUrl.mockClear();
+    });
+
+    afterEach(() => {
+        if (originalNetlifyGlobal === undefined) {
+            delete (globalThis as { Netlify?: unknown }).Netlify;
+            return;
+        }
+
+        (globalThis as { Netlify?: unknown }).Netlify = originalNetlifyGlobal;
     });
 
     test('returns the original HTML response body when SEO injection fails', async () => {
@@ -58,6 +82,9 @@ describe('poll SEO edge function', () => {
             requestUrl: new URL('https://sealed.vote/'),
             signal: expect.any(AbortSignal),
         });
+        expect(mockResolveSeoApiBaseUrl).toHaveBeenCalledWith(
+            'https://api.preview.sealed.vote',
+        );
         await expect(response.text()).resolves.toBe(originalHtml);
     });
 

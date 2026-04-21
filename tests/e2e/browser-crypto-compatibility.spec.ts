@@ -1,21 +1,29 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 const browserCompatibilityProbeUrl = 'https://compat.sealed.vote/';
 const nonMacOsWebKitCryptoSkipReason =
     'Non-macOS Playwright WebKit does not expose the latest Apple WebKit WebCrypto support for Ed25519 and X25519. Run these checks on macOS.';
 
 const openSecureProbePage = async (page: Page): Promise<void> => {
-    await page.route(browserCompatibilityProbeUrl, async (route) => {
+    const fulfillProbePage = async (route: Route): Promise<void> => {
         await route.fulfill({
             body: '<!doctype html><title>browser crypto compatibility</title><main>browser crypto compatibility</main>',
             contentType: 'text/html',
             status: 200,
         });
-    });
+    };
 
-    await page.goto(browserCompatibilityProbeUrl, {
-        waitUntil: 'domcontentloaded',
-    });
+    await page.route(browserCompatibilityProbeUrl, fulfillProbePage);
+
+    try {
+        await page.goto(browserCompatibilityProbeUrl, {
+            waitUntil: 'domcontentloaded',
+        });
+    } finally {
+        // Firefox intermittently fails to tear down the first reused context in
+        // this file when the top-level route handler is still registered.
+        await page.unroute(browserCompatibilityProbeUrl, fulfillProbePage);
+    }
 };
 
 const shouldSkipModernWebKitCryptoProbe = (browserName: string): boolean =>
