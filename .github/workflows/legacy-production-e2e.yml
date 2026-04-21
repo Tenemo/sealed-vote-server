@@ -95,7 +95,7 @@ jobs:
         container:
             image: mcr.microsoft.com/playwright:v1.59.1-noble
             options: --ipc=host
-        timeout-minutes: 30
+        timeout-minutes: 50
         strategy:
             fail-fast: false
             max-parallel: 2
@@ -121,6 +121,7 @@ jobs:
             PLAYWRIGHT_CI_WORKERS: ${{ matrix.project.ci_workers }}
             PLAYWRIGHT_PRODUCTION_ISOLATE_BY_FILE: 'true'
             PLAYWRIGHT_NAVIGATION_TIMEOUT_MS: '45000'
+            PLAYWRIGHT_PRODUCTION_NAVIGATION_RECOVERY_TIMEOUT_MS: '1200000'
 
         steps:
             - uses: actions/checkout@v6

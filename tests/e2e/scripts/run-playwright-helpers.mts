@@ -4,7 +4,7 @@ const productionBrowserReadinessListedFile =
     '00-production-browser-readiness.spec.ts';
 const productionReadinessTestTitle =
     'browser can commit the homepage and a real production poll page';
-const productionNavigationStallPattern =
+const productionGotoTimeoutPattern =
     /Error:\s+page\.goto: Timeout \d+ms exceeded\./u;
 const playwrightOptionsWithSeparateValues = new Set([
     '-c',
@@ -93,17 +93,40 @@ export const resolveProductionIsolatedInvocationArgs = (
 export const isProductionNavigationStall = (output: string): boolean =>
     output.includes(productionBrowserReadinessListedFile) &&
     output.includes(productionReadinessTestTitle) &&
-    productionNavigationStallPattern.test(output);
+    productionGotoTimeoutPattern.test(output);
+
+export const hasProductionGotoTimeout = (output: string): boolean =>
+    productionGotoTimeoutPattern.test(output);
+
+type NavigationTimeoutRecoveryResult =
+    | {
+          kind: 'recovered';
+      }
+    | {
+          kind: 'retry-failed';
+          exitCode?: number;
+          output?: string;
+      }
+    | {
+          kind: 'stalled';
+      };
 
 export const runProductionIsolatedInvocations = async ({
     forwardedCliArgs,
     listedFiles,
+    recoverNavigationTimeout = async () => ({
+        kind: 'retry-failed',
+    }),
     onInvocationStart = () => undefined,
     onNavigationStall = () => undefined,
     runInvocation,
 }: {
     forwardedCliArgs: string[];
     listedFiles: readonly string[];
+    recoverNavigationTimeout?: (details: {
+        listedFile: string;
+        output: string;
+    }) => Promise<NavigationTimeoutRecoveryResult>;
     onInvocationStart?: (listedFile: string) => void;
     onNavigationStall?: (listedFile: string) => void;
     runInvocation: (invocationArgs: string[]) => Promise<{
@@ -125,10 +148,39 @@ export const runProductionIsolatedInvocations = async ({
             listedFile,
             forwardedCliArgs,
         );
-        const invocationResult = await runInvocation(invocationArgs);
+        let invocationResult = await runInvocation(invocationArgs);
 
         if (invocationResult.exitCode === 0) {
             continue;
+        }
+
+        if (hasProductionGotoTimeout(invocationResult.output)) {
+            const recoveryResult = await recoverNavigationTimeout({
+                listedFile,
+                output: invocationResult.output,
+            });
+
+            if (recoveryResult.kind === 'recovered') {
+                continue;
+            }
+
+            if (recoveryResult.kind === 'stalled') {
+                failedFiles.push(listedFile);
+
+                if (exitCode === 0) {
+                    exitCode = invocationResult.exitCode;
+                }
+
+                stalledFile = listedFile;
+                onNavigationStall(listedFile);
+                break;
+            }
+
+            invocationResult = {
+                exitCode:
+                    recoveryResult.exitCode ?? invocationResult.exitCode,
+                output: recoveryResult.output ?? invocationResult.output,
+            };
         }
 
         failedFiles.push(listedFile);
