@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { HelmetProvider } from 'react-helmet-async';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 
-import PollCreation from './PollCreationPage';
+import PollCreationPage from './PollCreationPage';
 
 const mockedCreatePoll = vi.fn();
 const mockedGenerateClientToken = vi.fn();
@@ -24,7 +24,7 @@ const PollLocation = (): React.JSX.Element => {
     return <div>{pollSlug}</div>;
 };
 
-describe('PollCreation', () => {
+describe('PollCreationPage', () => {
     beforeEach(() => {
         mockedCreatePoll.mockReset();
         mockedGenerateClientToken.mockReset();
@@ -46,7 +46,7 @@ describe('PollCreation', () => {
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
                     <Routes>
-                        <Route element={<PollCreation />} path="/" />
+                        <Route element={<PollCreationPage />} path="/" />
                         <Route
                             element={<PollLocation />}
                             path="/polls/:pollSlug"
@@ -93,7 +93,7 @@ describe('PollCreation', () => {
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
                     <Routes>
-                        <Route element={<PollCreation />} path="/" />
+                        <Route element={<PollCreationPage />} path="/" />
                     </Routes>
                 </MemoryRouter>
             </HelmetProvider>,
@@ -141,7 +141,7 @@ describe('PollCreation', () => {
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
                     <Routes>
-                        <Route element={<PollCreation />} path="/" />
+                        <Route element={<PollCreationPage />} path="/" />
                     </Routes>
                 </MemoryRouter>
             </HelmetProvider>,
@@ -159,7 +159,7 @@ describe('PollCreation', () => {
             <HelmetProvider>
                 <MemoryRouter initialEntries={['/']}>
                     <Routes>
-                        <Route element={<PollCreation />} path="/" />
+                        <Route element={<PollCreationPage />} path="/" />
                     </Routes>
                 </MemoryRouter>
             </HelmetProvider>,

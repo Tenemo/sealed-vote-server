@@ -7,7 +7,6 @@ import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
-import { Panel } from '@/components/ui/panel';
 import { cn } from '@/lib/utils';
 
 type PollChoiceEditorProps = {
@@ -107,31 +106,26 @@ const PollChoiceEditor = ({
                     </p>
                     <ul className="space-y-2">
                         {choices.map((choice) => (
-                            <Panel
-                                asChild
-                                className="flex items-center justify-between gap-3"
+                            <li
+                                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3"
                                 key={choice}
-                                padding="row"
-                                radius="compact"
                             >
-                                <li>
-                                    <span className="block min-w-0 flex-1 text-base font-medium [overflow-wrap:anywhere]">
-                                        {choice}
-                                    </span>
-                                    <Button
-                                        aria-label={`Remove choice ${choice}`}
-                                        onClick={() => onRemoveChoice(choice)}
-                                        size="icon-sm"
-                                        type="button"
-                                        variant="ghost"
-                                    >
-                                        <Trash2
-                                            aria-hidden="true"
-                                            className="size-4"
-                                        />
-                                    </Button>
-                                </li>
-                            </Panel>
+                                <span className="block min-w-0 flex-1 text-base font-medium [overflow-wrap:anywhere]">
+                                    {choice}
+                                </span>
+                                <Button
+                                    aria-label={`Remove choice ${choice}`}
+                                    onClick={() => onRemoveChoice(choice)}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    <Trash2
+                                        aria-hidden="true"
+                                        className="size-4"
+                                    />
+                                </Button>
+                            </li>
                         ))}
                     </ul>
                 </div>

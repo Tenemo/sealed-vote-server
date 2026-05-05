@@ -1,5 +1,11 @@
 import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 import {
+    countSignedPayloadsOfType,
+    getSignedPayloadsOfType,
+    isSignedPayloadOfType,
+    type TypedSignedPayload,
+} from '@sealed-vote/protocol';
+import {
     combineDecryptionShares,
     createBallotClosePayload,
     createBallotSubmissionPayload,
@@ -169,22 +175,11 @@ const findLocalCeremonyParticipant = ({
     };
 };
 
-const isSignedPayloadOfType = <
-    TPayload extends SignedPayload['payload']['messageType'],
->(
-    signedPayload: SignedPayload,
-    messageType: TPayload,
-): signedPayload is SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: TPayload }>
-> => signedPayload.payload.messageType === messageType;
-
 const countAcceptedMessages = (
     poll: PollResponse,
     messageType: SignedPayload['payload']['messageType'],
 ): number =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, messageType),
-    ).length;
+    countSignedPayloadsOfType(acceptedBoardPayloads(poll), messageType);
 
 const getAcceptedPayloadBySlotKey = (
     poll: PollResponse,
@@ -407,61 +402,32 @@ const getOrCreatePreparedAction = async ({
 
 const getAcceptedBallotPayloads = (
     poll: PollResponse,
-): readonly SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
->[] =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-submission'),
-    ) as readonly SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
-    >[];
+): readonly TypedSignedPayload<'ballot-submission'>[] =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'ballot-submission');
 
 const getAcceptedDecryptionSharePayloads = (
     poll: PollResponse,
-): readonly SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'decryption-share' }>
->[] =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, 'decryption-share'),
-    ) as readonly SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'decryption-share' }>
-    >[];
+): readonly TypedSignedPayload<'decryption-share'>[] =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'decryption-share');
 
 const getAcceptedTallyPayloads = (
     poll: PollResponse,
-): readonly SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'tally-publication' }>
->[] =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, 'tally-publication'),
-    ) as readonly SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'tally-publication' }>
-    >[];
+): readonly TypedSignedPayload<'tally-publication'>[] =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'tally-publication');
 
 const getAcceptedManifestPublication = (
     poll: PollResponse,
-): SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'manifest-publication' }>
-> | null =>
-    acceptedBoardPayloads(poll).find((payload) =>
-        isSignedPayloadOfType(payload, 'manifest-publication'),
-    ) as SignedPayload<
-        Extract<
-            SignedPayload['payload'],
-            { messageType: 'manifest-publication' }
-        >
-    > | null;
+): TypedSignedPayload<'manifest-publication'> | null =>
+    getSignedPayloadsOfType(
+        acceptedBoardPayloads(poll),
+        'manifest-publication',
+    )[0] ?? null;
 
 const getAcceptedBallotClose = (
     poll: PollResponse,
-): SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'ballot-close' }>
-> | null =>
-    acceptedBoardPayloads(poll).find((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-close'),
-    ) as SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'ballot-close' }>
-    > | null;
+): TypedSignedPayload<'ballot-close'> | null =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'ballot-close')[0] ??
+    null;
 
 const buildEncryptedShareEnvelopeId = (
     dealerIndex: number,

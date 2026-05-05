@@ -4,6 +4,7 @@ import { fixedScoreRange } from '@sealed-vote/contracts';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { OutlinedInputField } from '@/components/ui/outlined-input-field';
 import { Panel } from '@/components/ui/panel';
 import { Spinner } from '@/components/ui/spinner';
 import LoadingButton from 'components/LoadingButton/LoadingButton';
@@ -48,6 +49,15 @@ import {
 import { renderError } from 'utils/network-errors';
 import { siteOrigin } from '../../../../config/seo-metadata.mts';
 
+import PollAuditRail from './PollAuditRail';
+import PollHeaderPanel from './PollHeaderPanel';
+import PollResultsPanel from './PollResultsPanel';
+import {
+    buildSubmittedVoterSummary,
+    countAcceptedMessages,
+} from './poll-page-formatters';
+import type { PollBoardEntry, PollData } from './poll-page-types';
+
 const minimumScore = fixedScoreRange.min;
 const maximumScore = fixedScoreRange.max;
 const automaticActionRecoverableRetryLimit = 2;
@@ -62,8 +72,6 @@ const scoreOptions = Array.from(
     (_value, offset) => minimumScore + offset,
 );
 
-type PollData = NonNullable<ReturnType<typeof useFetchPollQuery>['data']>;
-type PollBoardEntry = PollData['boardEntries'][number];
 const activeCeremonyPhases = new Set<PollData['phase']>([
     'ready-to-reveal',
     'revealing',
@@ -100,18 +108,6 @@ const findBoardEntryForPreparedAction = ({
     );
 };
 
-const phaseLabel = (phase: string): string =>
-    (
-        ({
-            aborted: 'Ceremony aborted',
-            complete: 'Verified results',
-            open: 'Voting open',
-            'ready-to-reveal': 'Starting reveal',
-            revealing: 'Revealing results',
-            securing: 'Securing the election',
-        }) satisfies Record<string, string>
-    )[phase] ?? phase;
-
 const createEmptyScores = (choiceCount: number): (number | null)[] =>
     Array.from({ length: choiceCount }, () => null);
 
@@ -122,89 +118,6 @@ const getPollRefreshInterval = (
         ? activeCeremonyPollingIntervalMs
         : steadyStatePollingIntervalMs;
 
-const formatDateTime = (value: string): string =>
-    new Date(value).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-
-const countAcceptedMessages = (poll: PollData, messageType: string): number =>
-    poll.boardEntries.filter(
-        (entry: PollBoardEntry) =>
-            entry.classification === 'accepted' &&
-            entry.signedPayload.payload.sessionId === poll.sessionId &&
-            entry.messageType === messageType,
-    ).length;
-
-const humanizeBoardMessageType = (messageType: string): string =>
-    messageType.replaceAll('-', ' ');
-
-const formatBoardEntryTitle = (
-    entry: PollBoardEntry,
-    poll: PollData,
-): string => {
-    const payload = entry.signedPayload.payload as Record<string, unknown>;
-    const baseTitle = `Participant ${entry.participantIndex}. ${humanizeBoardMessageType(entry.messageType)}`;
-
-    if (
-        typeof payload.optionIndex === 'number' &&
-        Number.isInteger(payload.optionIndex)
-    ) {
-        const choiceName = poll.choices[payload.optionIndex - 1];
-
-        return choiceName
-            ? `${baseTitle} for ${choiceName}`
-            : `${baseTitle} for choice ${payload.optionIndex}`;
-    }
-
-    if (
-        typeof payload.recipientIndex === 'number' &&
-        Number.isInteger(payload.recipientIndex)
-    ) {
-        return `${baseTitle} for voter ${payload.recipientIndex}`;
-    }
-
-    if (Array.isArray(payload.countedParticipantIndices)) {
-        return `${baseTitle} counting ${payload.countedParticipantIndices.length} participants`;
-    }
-
-    return baseTitle;
-};
-
-const formatBoardEntryStatus = (entry: PollBoardEntry): string => {
-    const classification =
-        entry.classification.charAt(0).toUpperCase() +
-        entry.classification.slice(1);
-
-    return `${classification} | ${formatDateTime(entry.createdAt)}`;
-};
-
-const formatRevealStatus = (poll: PollData): string => {
-    if (poll.phase === 'aborted') {
-        return 'Aborted';
-    }
-
-    if (poll.phase === 'complete') {
-        return 'Complete';
-    }
-
-    if (poll.phase === 'revealing') {
-        return 'Started';
-    }
-
-    if (poll.phase === 'ready-to-reveal') {
-        return 'Starting';
-    }
-
-    if (poll.ceremony.revealReady) {
-        return 'Ready';
-    }
-
-    return poll.phase === 'open'
-        ? 'Pending close'
-        : 'Waiting for complete ballots';
-};
-
 const isPollVoterLocal = ({
     devicePollId,
     pollId,
@@ -214,17 +127,6 @@ const isPollVoterLocal = ({
     pollId: string;
     voterPollId: string | null | undefined;
 }): boolean => devicePollId === pollId && voterPollId === pollId;
-
-const buildSubmittedVoterSummary = ({
-    count,
-    minimum,
-}: {
-    count: number;
-    minimum: number;
-}): string =>
-    count >= minimum
-        ? `${count} submitted before close`
-        : `${count} submitted, ${minimum - count} more needed before close`;
 
 const PollPage = (): React.JSX.Element => {
     const { pollSlug } = useParams();
@@ -1078,66 +980,17 @@ const PollPage = (): React.JSX.Element => {
         <section className="mx-auto w-full max-w-[96rem] space-y-6">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.9fr)_minmax(21rem,1fr)]">
                 <div className="space-y-6">
-                    <Panel className="space-y-5">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="space-y-3">
-                                <p className="text-sm text-secondary">
-                                    {phaseLabel(poll.phase)}
-                                </p>
-                                <h1 className="page-title">{poll.pollName}</h1>
-                                <p className="page-lead max-w-3xl">
-                                    {primaryExplanation}
-                                </p>
-                            </div>
-                            <div className="grid gap-2 text-sm text-secondary sm:grid-cols-2 lg:grid-cols-1">
-                                <div>
-                                    <div className="font-medium text-foreground">
-                                        Created
-                                    </div>
-                                    <div>{formatDateTime(poll.createdAt)}</div>
-                                </div>
-                                <div>
-                                    <div className="font-medium text-foreground">
-                                        Submitted voters
-                                    </div>
-                                    <div>{submittedVoterSummary}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                                <div className="space-y-2">
-                                    <div className="text-sm font-medium text-foreground">
-                                        Shareable poll link
-                                    </div>
-                                    <div
-                                        className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm break-all"
-                                        data-testid="share-url-value"
-                                    >
-                                        {shareUrl}
-                                    </div>
-                                </div>
-                                <Button
-                                    data-testid="copy-link-button"
-                                    disabled={!canCopyShareUrl}
-                                    onClick={() => {
-                                        void onCopyShareUrl();
-                                    }}
-                                    size="lg"
-                                    variant="outline"
-                                >
-                                    Copy link
-                                </Button>
-                            </div>
-                            <p
-                                aria-live="polite"
-                                className="field-note min-h-6"
-                            >
-                                {copyNotice}
-                            </p>
-                        </div>
-                    </Panel>
+                    <PollHeaderPanel
+                        canCopyShareUrl={canCopyShareUrl}
+                        copyNotice={copyNotice}
+                        onCopyShareUrl={() => {
+                            void onCopyShareUrl();
+                        }}
+                        poll={poll}
+                        primaryExplanation={primaryExplanation}
+                        shareUrl={shareUrl}
+                        submittedVoterSummary={submittedVoterSummary}
+                    />
 
                     {(localError || automationError || localNotice) && (
                         <div className="space-y-3">
@@ -1239,25 +1092,17 @@ const PollPage = (): React.JSX.Element => {
                                     void onSubmitVote(event);
                                 }}
                             >
-                                <div className="space-y-2">
-                                    <label
-                                        className="text-sm font-medium"
-                                        htmlFor="poll-voter-name"
-                                    >
-                                        Your public name
-                                    </label>
-                                    <input
-                                        autoComplete="nickname"
-                                        className="flex h-10 w-full rounded-[var(--radius-md)] border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                                        id="poll-voter-name"
-                                        maxLength={32}
-                                        onChange={(event) => {
-                                            setVoterName(event.target.value);
-                                        }}
-                                        placeholder="How should the roster show you?"
-                                        value={voterName}
-                                    />
-                                </div>
+                                <OutlinedInputField
+                                    autoComplete="nickname"
+                                    id="poll-voter-name"
+                                    label="Your public name"
+                                    maxLength={32}
+                                    onChange={(event) => {
+                                        setVoterName(event.target.value);
+                                    }}
+                                    placeholder="How should the roster show you?"
+                                    value={voterName}
+                                />
 
                                 <div className="space-y-4">
                                     <div className="space-y-2">
@@ -1414,338 +1259,15 @@ const PollPage = (): React.JSX.Element => {
                         )}
                     </Panel>
 
-                    {poll.verification.status === 'verified' ? (
-                        <Panel
-                            className="space-y-4"
-                            data-testid="verified-results-panel"
-                        >
-                            <div className="space-y-2">
-                                <h2 className="text-xl font-semibold">
-                                    Results
-                                </h2>
-                                <p className="field-note">
-                                    Arithmetic means are shown in the same 1.0
-                                    to 10.0 range that each voter used.
-                                </p>
-                            </div>
-                            <div className="grid gap-3">
-                                {poll.verification.verifiedOptionTallies.map(
-                                    (result) => (
-                                        <div
-                                            className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4"
-                                            data-testid="verified-result-card"
-                                            key={result.optionIndex}
-                                        >
-                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                                                <div className="space-y-1">
-                                                    <div
-                                                        className="text-sm font-medium text-foreground"
-                                                        data-testid="verified-result-choice"
-                                                    >
-                                                        {
-                                                            poll.choices[
-                                                                result.optionIndex -
-                                                                    1
-                                                            ]
-                                                        }
-                                                    </div>
-                                                    <div className="text-sm text-secondary">
-                                                        {
-                                                            result.acceptedBallotCount
-                                                        }{' '}
-                                                        accepted ballots
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-3xl font-semibold">
-                                                        {result.mean.toFixed(2)}
-                                                    </div>
-                                                    <div className="text-sm text-secondary">
-                                                        Tally {result.tally}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ),
-                                )}
-                            </div>
-                        </Panel>
-                    ) : null}
+                    <PollResultsPanel poll={poll} />
                 </div>
 
-                <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
-                    <Panel className="space-y-4">
-                        <div className="space-y-2">
-                            <h2 className="text-xl font-semibold">
-                                Audit and verification
-                            </h2>
-                            <p className="field-note">
-                                The main flow hides the cryptography. This rail
-                                shows what the board currently proves.
-                            </p>
-                        </div>
-
-                        <div className="space-y-3 text-sm">
-                            <div>
-                                <div className="font-medium text-foreground">
-                                    Verification
-                                </div>
-                                <div className="text-secondary">
-                                    {poll.verification.status === 'verified'
-                                        ? 'Verified from the public board log.'
-                                        : (poll.verification.reason ??
-                                          'Waiting for enough public data to verify the full ceremony.')}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="font-medium text-foreground">
-                                    Reconstruction threshold
-                                </div>
-                                <div className="text-secondary">
-                                    {poll.thresholds.reconstructionThreshold ??
-                                        'Pending close'}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="font-medium text-foreground">
-                                    Minimum published voter count
-                                </div>
-                                <div className="text-secondary">
-                                    {poll.thresholds
-                                        .minimumPublishedVoterCount ??
-                                        'Pending close'}
-                                </div>
-                            </div>
-                            {poll.sessionFingerprint ? (
-                                <div>
-                                    <div className="font-medium text-foreground">
-                                        Session fingerprint
-                                    </div>
-                                    <div className="text-secondary break-all">
-                                        {poll.sessionFingerprint}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
-                    </Panel>
-
-                    <Panel className="space-y-4">
-                        <div className="space-y-2">
-                            <h2 className="text-xl font-semibold">
-                                Ceremony progress
-                            </h2>
-                            <p className="field-note">
-                                Counts are derived from the accepted board log.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-3 text-sm">
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Submitted voters
-                                </span>
-                                <span>{poll.submittedVoterCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Active ceremony roster
-                                </span>
-                                <span>
-                                    {poll.ceremony.activeParticipantCount}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Board registrations
-                                </span>
-                                <span>
-                                    {acceptedRegistrations}/
-                                    {poll.ceremony.activeParticipantCount}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Manifest acceptances
-                                </span>
-                                <span>
-                                    {acceptedManifestAcceptances}/
-                                    {poll.ceremony.activeParticipantCount}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Key confirmations
-                                </span>
-                                <span>
-                                    {acceptedKeyConfirmations}/
-                                    {poll.ceremony.activeParticipantCount}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Complete encrypted ballots
-                                </span>
-                                <span>
-                                    {
-                                        poll.ceremony
-                                            .completeEncryptedBallotParticipantCount
-                                    }
-                                    /{poll.ceremony.activeParticipantCount}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Decryption shares
-                                </span>
-                                <span>
-                                    {poll.ceremony.acceptedDecryptionShareCount}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Reveal status
-                                </span>
-                                <span>{formatRevealStatus(poll)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Ceremony restarts
-                                </span>
-                                <span>{poll.ceremony.restartCount}</span>
-                            </div>
-                        </div>
-                    </Panel>
-
-                    <Panel className="space-y-4">
-                        <div className="space-y-2">
-                            <h2 className="text-xl font-semibold">Voters</h2>
-                            <p className="field-note">
-                                The pre-close roster is public and auditable.
-                            </p>
-                        </div>
-
-                        <ul aria-label="Voters roster" className="space-y-2">
-                            {poll.voters.map((participant) => (
-                                <li
-                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm"
-                                    key={participant.voterIndex}
-                                >
-                                    <div className="font-medium text-foreground">
-                                        {participant.voterIndex}.{' '}
-                                        {participant.voterName}
-                                    </div>
-                                    <div className="text-secondary">
-                                        {participant.deviceReady
-                                            ? 'Device keys submitted'
-                                            : 'Device keys pending'}
-                                        {participant.ceremonyState ===
-                                        'blocking'
-                                            ? ' | currently blocking the active ceremony'
-                                            : participant.ceremonyState ===
-                                                'skipped'
-                                              ? ' | skipped from the active ceremony'
-                                              : ''}
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </Panel>
-
-                    <Panel className="space-y-4">
-                        <div className="space-y-2">
-                            <h2 className="text-xl font-semibold">
-                                Board activity
-                            </h2>
-                            <p className="field-note">
-                                Digests and message counts come from the
-                                accepted bulletin board log.
-                            </p>
-                        </div>
-
-                        <div className="space-y-3 text-sm">
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">Accepted</span>
-                                <span>{poll.boardAudit.acceptedCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Duplicates
-                                </span>
-                                <span>{poll.boardAudit.duplicateCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                                <span className="text-secondary">
-                                    Equivocations
-                                </span>
-                                <span>{poll.boardAudit.equivocationCount}</span>
-                            </div>
-                            {poll.boardAudit.ceremonyDigest ? (
-                                <div>
-                                    <div className="font-medium text-foreground">
-                                        Ceremony digest
-                                    </div>
-                                    <div className="text-secondary break-all">
-                                        {poll.boardAudit.ceremonyDigest}
-                                    </div>
-                                </div>
-                            ) : null}
-                            {poll.boardAudit.phaseDigests.length ? (
-                                <div className="space-y-2">
-                                    <div className="font-medium text-foreground">
-                                        Phase digests
-                                    </div>
-                                    <ul className="space-y-2">
-                                        {poll.boardAudit.phaseDigests.map(
-                                            (digest) => (
-                                                <li
-                                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-3 py-3"
-                                                    key={`${digest.phase}-${digest.digest}`}
-                                                >
-                                                    <div className="font-medium text-foreground">
-                                                        Phase {digest.phase}
-                                                    </div>
-                                                    <div className="text-secondary break-all">
-                                                        {digest.digest}
-                                                    </div>
-                                                </li>
-                                            ),
-                                        )}
-                                    </ul>
-                                </div>
-                            ) : null}
-                            {poll.boardEntries.length ? (
-                                <div className="space-y-2">
-                                    <div className="font-medium text-foreground">
-                                        Latest entries
-                                    </div>
-                                    <div className="space-y-2">
-                                        {poll.boardEntries
-                                            .slice(-8)
-                                            .reverse()
-                                            .map((entry) => (
-                                                <div
-                                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-3 py-3 text-sm"
-                                                    key={entry.id}
-                                                >
-                                                    <div className="font-medium text-foreground">
-                                                        {formatBoardEntryTitle(
-                                                            entry,
-                                                            poll,
-                                                        )}
-                                                    </div>
-                                                    <div className="text-secondary">
-                                                        {formatBoardEntryStatus(
-                                                            entry,
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
-                    </Panel>
-                </div>
+                <PollAuditRail
+                    acceptedKeyConfirmations={acceptedKeyConfirmations}
+                    acceptedManifestAcceptances={acceptedManifestAcceptances}
+                    acceptedRegistrations={acceptedRegistrations}
+                    poll={poll}
+                />
             </div>
 
             {(isLoading || isFetching) && (
