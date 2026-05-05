@@ -1,10 +1,15 @@
-import type { ProtocolPayload } from 'threshold-elgamal';
+import type { ProtocolPayload, SignedPayload } from 'threshold-elgamal';
 import { describe, expect, test } from 'vitest';
 
 import {
     canonicalUnsignedPayloadBytes,
+    countSignedPayloadsOfType,
+    filterSignedPayloadsBySession,
+    getSignedPayloadsOfType,
+    isSignedPayloadOfType,
     isProtocolMessageType,
     protocolPayloadSlotKey,
+    protocolSlotKey,
     signedProtocolPayloadBytes,
     sortProtocolPayloads,
 } from '../src/index.js';
@@ -34,9 +39,11 @@ const createRegistrationPayload = (
 const createBallotPayload = ({
     optionIndex,
     participantIndex,
+    sessionId = 'c'.repeat(64),
 }: {
     optionIndex: number;
     participantIndex: number;
+    sessionId?: string;
 }): ProtocolPayload =>
     ({
         ciphertext: {
@@ -52,8 +59,17 @@ const createBallotPayload = ({
         proof: {
             branches: [],
         } as never,
-        sessionId: 'c'.repeat(64),
+        sessionId,
     }) as ProtocolPayload;
+
+const createSignedPayload = (
+    payload: ProtocolPayload,
+    signatureSeed: string,
+): SignedPayload =>
+    ({
+        payload,
+        signature: signatureSeed.repeat(128),
+    }) as SignedPayload;
 
 describe('protocol payload helpers', () => {
     test('canonicalUnsignedPayloadBytes is stable across object key ordering', () => {
@@ -135,6 +151,59 @@ describe('protocol payload helpers', () => {
         ).toBe('session-2:6:ballot-close');
     });
 
+    test('protocolSlotKey matches payload-derived slot keys before a payload is built', () => {
+        const ballotPayload = createBallotPayload({
+            optionIndex: 3,
+            participantIndex: 4,
+        });
+
+        expect(
+            protocolSlotKey({
+                messageType: 'ballot-submission',
+                optionIndex: 3,
+                participantIndex: 4,
+                phase: 5,
+                sessionId: ballotPayload.sessionId,
+            }),
+        ).toBe(protocolPayloadSlotKey(ballotPayload));
+        expect(
+            protocolSlotKey({
+                messageType: 'encrypted-dual-share',
+                participantIndex: 2,
+                phase: 1,
+                recipientIndex: 5,
+                sessionId: 'session-3',
+            }),
+        ).toBe('session-3:1:2:encrypted-dual-share:5');
+        expect(
+            protocolSlotKey({
+                messageType: 'ballot-close',
+                phase: 6,
+                sessionId: 'session-4',
+            }),
+        ).toBe('session-4:6:ballot-close');
+    });
+
+    test('protocolSlotKey rejects incomplete indexed slot descriptors', () => {
+        expect(() =>
+            protocolSlotKey({
+                messageType: 'ballot-submission',
+                participantIndex: 4,
+                phase: 5,
+                sessionId: 'session-5',
+            }),
+        ).toThrow(/optionIndex/u);
+
+        expect(() =>
+            protocolSlotKey({
+                messageType: 'encrypted-dual-share',
+                participantIndex: 4,
+                phase: 1,
+                sessionId: 'session-5',
+            }),
+        ).toThrow(/recipientIndex/u);
+    });
+
     test('sortProtocolPayloads orders payloads by slot before canonical payload bytes', () => {
         const sortedPayloads = sortProtocolPayloads([
             createBallotPayload({
@@ -180,5 +249,99 @@ describe('protocol payload helpers', () => {
         expect(isProtocolMessageType('tally-publication')).toBe(true);
         expect(isProtocolMessageType('recover-session')).toBe(false);
         expect(isProtocolMessageType(null)).toBe(false);
+    });
+
+    test('signed payload selectors filter by message type without changing order', () => {
+        const registrationPayload = createSignedPayload(
+            createRegistrationPayload({
+                participantIndex: 1,
+            }),
+            'a',
+        );
+        const firstBallotPayload = createSignedPayload(
+            createBallotPayload({
+                optionIndex: 2,
+                participantIndex: 3,
+            }),
+            'b',
+        );
+        const secondBallotPayload = createSignedPayload(
+            createBallotPayload({
+                optionIndex: 1,
+                participantIndex: 2,
+            }),
+            'c',
+        );
+        const signedPayloads = [
+            registrationPayload,
+            firstBallotPayload,
+            secondBallotPayload,
+        ];
+
+        expect(
+            getSignedPayloadsOfType(signedPayloads, 'ballot-submission').map(
+                (signedPayload) => [
+                    signedPayload.payload.participantIndex,
+                    signedPayload.payload.optionIndex,
+                ],
+            ),
+        ).toEqual([
+            [3, 2],
+            [2, 1],
+        ]);
+        expect(countSignedPayloadsOfType(signedPayloads, 'registration')).toBe(
+            1,
+        );
+        expect(
+            countSignedPayloadsOfType(signedPayloads, 'decryption-share'),
+        ).toBe(0);
+        expect(isSignedPayloadOfType(registrationPayload, 'registration')).toBe(
+            true,
+        );
+        expect(
+            isSignedPayloadOfType(registrationPayload, 'ballot-submission'),
+        ).toBe(false);
+    });
+
+    test('filterSignedPayloadsBySession keeps only the active session and rejects missing sessions', () => {
+        const firstSessionId = '1'.repeat(64);
+        const secondSessionId = '2'.repeat(64);
+        const signedPayloads = [
+            createSignedPayload(
+                createRegistrationPayload({
+                    participantIndex: 1,
+                    sessionId: firstSessionId,
+                }),
+                'a',
+            ),
+            createSignedPayload(
+                createBallotPayload({
+                    optionIndex: 0,
+                    participantIndex: 2,
+                    sessionId: secondSessionId,
+                }),
+                'b',
+            ),
+            createSignedPayload(
+                createRegistrationPayload({
+                    participantIndex: 3,
+                    sessionId: firstSessionId,
+                }),
+                'c',
+            ),
+        ];
+
+        expect(
+            filterSignedPayloadsBySession({
+                sessionId: firstSessionId,
+                signedPayloads,
+            }).map((signedPayload) => signedPayload.payload.participantIndex),
+        ).toEqual([1, 3]);
+        expect(
+            filterSignedPayloadsBySession({
+                sessionId: null,
+                signedPayloads,
+            }),
+        ).toEqual([]);
     });
 });

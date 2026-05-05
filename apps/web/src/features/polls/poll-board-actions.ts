@@ -1,5 +1,12 @@
 import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
 import {
+    countSignedPayloadsOfType,
+    getSignedPayloadsOfType,
+    isSignedPayloadOfType,
+    protocolSlotKey,
+    type TypedSignedPayload,
+} from '@sealed-vote/protocol';
+import {
     combineDecryptionShares,
     createBallotClosePayload,
     createBallotSubmissionPayload,
@@ -169,22 +176,11 @@ const findLocalCeremonyParticipant = ({
     };
 };
 
-const isSignedPayloadOfType = <
-    TPayload extends SignedPayload['payload']['messageType'],
->(
-    signedPayload: SignedPayload,
-    messageType: TPayload,
-): signedPayload is SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: TPayload }>
-> => signedPayload.payload.messageType === messageType;
-
 const countAcceptedMessages = (
     poll: PollResponse,
     messageType: SignedPayload['payload']['messageType'],
 ): number =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, messageType),
-    ).length;
+    countSignedPayloadsOfType(acceptedBoardPayloads(poll), messageType);
 
 const getAcceptedPayloadBySlotKey = (
     poll: PollResponse,
@@ -407,61 +403,32 @@ const getOrCreatePreparedAction = async ({
 
 const getAcceptedBallotPayloads = (
     poll: PollResponse,
-): readonly SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
->[] =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-submission'),
-    ) as readonly SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'ballot-submission' }>
-    >[];
+): readonly TypedSignedPayload<'ballot-submission'>[] =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'ballot-submission');
 
 const getAcceptedDecryptionSharePayloads = (
     poll: PollResponse,
-): readonly SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'decryption-share' }>
->[] =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, 'decryption-share'),
-    ) as readonly SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'decryption-share' }>
-    >[];
+): readonly TypedSignedPayload<'decryption-share'>[] =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'decryption-share');
 
 const getAcceptedTallyPayloads = (
     poll: PollResponse,
-): readonly SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'tally-publication' }>
->[] =>
-    acceptedBoardPayloads(poll).filter((payload) =>
-        isSignedPayloadOfType(payload, 'tally-publication'),
-    ) as readonly SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'tally-publication' }>
-    >[];
+): readonly TypedSignedPayload<'tally-publication'>[] =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'tally-publication');
 
 const getAcceptedManifestPublication = (
     poll: PollResponse,
-): SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'manifest-publication' }>
-> | null =>
-    acceptedBoardPayloads(poll).find((payload) =>
-        isSignedPayloadOfType(payload, 'manifest-publication'),
-    ) as SignedPayload<
-        Extract<
-            SignedPayload['payload'],
-            { messageType: 'manifest-publication' }
-        >
-    > | null;
+): TypedSignedPayload<'manifest-publication'> | null =>
+    getSignedPayloadsOfType(
+        acceptedBoardPayloads(poll),
+        'manifest-publication',
+    )[0] ?? null;
 
 const getAcceptedBallotClose = (
     poll: PollResponse,
-): SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: 'ballot-close' }>
-> | null =>
-    acceptedBoardPayloads(poll).find((payload) =>
-        isSignedPayloadOfType(payload, 'ballot-close'),
-    ) as SignedPayload<
-        Extract<SignedPayload['payload'], { messageType: 'ballot-close' }>
-    > | null;
+): TypedSignedPayload<'ballot-close'> | null =>
+    getSignedPayloadsOfType(acceptedBoardPayloads(poll), 'ballot-close')[0] ??
+    null;
 
 const buildEncryptedShareEnvelopeId = (
     dealerIndex: number,
@@ -483,29 +450,85 @@ const getLocalPayloadSlotKey = ({
 }): string => {
     switch (kind) {
         case 'publish-registration':
-            return `${sessionId}:0:${participantIndex}:registration`;
+            return protocolSlotKey({
+                messageType: 'registration',
+                participantIndex,
+                phase: 0,
+                sessionId,
+            });
         case 'publish-manifest':
-            return `${sessionId}:0:${participantIndex}:manifest-publication`;
+            return protocolSlotKey({
+                messageType: 'manifest-publication',
+                participantIndex,
+                phase: 0,
+                sessionId,
+            });
         case 'accept-manifest':
-            return `${sessionId}:0:${participantIndex}:manifest-acceptance`;
+            return protocolSlotKey({
+                messageType: 'manifest-acceptance',
+                participantIndex,
+                phase: 0,
+                sessionId,
+            });
         case 'publish-pedersen-commitment':
-            return `${sessionId}:1:${participantIndex}:pedersen-commitment`;
+            return protocolSlotKey({
+                messageType: 'pedersen-commitment',
+                participantIndex,
+                phase: 1,
+                sessionId,
+            });
         case 'publish-encrypted-share':
-            return `${sessionId}:1:${participantIndex}:encrypted-dual-share:${recipientIndex}`;
+            return protocolSlotKey({
+                messageType: 'encrypted-dual-share',
+                participantIndex,
+                phase: 1,
+                recipientIndex,
+                sessionId,
+            });
         case 'publish-feldman-commitment':
-            return `${sessionId}:3:${participantIndex}:feldman-commitment`;
+            return protocolSlotKey({
+                messageType: 'feldman-commitment',
+                participantIndex,
+                phase: 3,
+                sessionId,
+            });
         case 'publish-key-confirmation':
-            return `${sessionId}:4:${participantIndex}:key-derivation-confirmation`;
+            return protocolSlotKey({
+                messageType: 'key-derivation-confirmation',
+                participantIndex,
+                phase: 4,
+                sessionId,
+            });
         case 'publish-ballot':
-            return `${sessionId}:5:${participantIndex}:ballot-submission:${optionIndex}`;
+            return protocolSlotKey({
+                messageType: 'ballot-submission',
+                optionIndex,
+                participantIndex,
+                phase: 5,
+                sessionId,
+            });
         case 'publish-ballot-close':
-            return `${sessionId}:6:ballot-close`;
+            return protocolSlotKey({
+                messageType: 'ballot-close',
+                phase: 6,
+                sessionId,
+            });
         case 'publish-decryption-share':
-            return `${sessionId}:7:${participantIndex}:decryption-share:${optionIndex}`;
+            return protocolSlotKey({
+                messageType: 'decryption-share',
+                optionIndex,
+                participantIndex,
+                phase: 7,
+                sessionId,
+            });
         case 'publish-tally':
-            return `${sessionId}:8:${participantIndex}:tally-publication:${optionIndex}`;
-        default:
-            return `${sessionId}:${participantIndex}:${kind}`;
+            return protocolSlotKey({
+                messageType: 'tally-publication',
+                optionIndex,
+                participantIndex,
+                phase: 8,
+                sessionId,
+            });
     }
 };
 
@@ -1637,7 +1660,7 @@ export const describeAutomaticCeremonyAction = (
         case 'publish-decryption-share':
             return 'Publishing your threshold decryption share for the reveal.';
         case 'publish-tally':
-            return 'Publishing the final verified tally for one option.';
+            return 'Publishing the final verified tally for one choice.';
         case 'publish-ballot-close':
             return 'Closing the counted ballot set so the results can be opened.';
         default:

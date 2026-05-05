@@ -72,28 +72,79 @@ const encodeForChallenge = (...elements: readonly Uint8Array[]): Uint8Array =>
         ),
     );
 
-export const protocolPayloadSlotKey = (payload: ProtocolPayload): string => {
-    const prefix = `${payload.sessionId}:${payload.phase}:${payload.participantIndex}:${payload.messageType}`;
+export type ProtocolSlotKeyInput = {
+    checkpointPhase?: number;
+    complainantIndex?: number;
+    dealerIndex?: number;
+    envelopeId?: string;
+    messageType: ProtocolPayload['messageType'];
+    optionIndex?: number;
+    participantIndex?: number;
+    phase: number;
+    recipientIndex?: number;
+    sessionId: string;
+};
 
-    switch (payload.messageType) {
-        case 'ballot-close':
-            return `${payload.sessionId}:${payload.phase}:${payload.messageType}`;
+const requireSlotValue = <TValue>(
+    value: TValue | null | undefined,
+    fieldName: string,
+): TValue => {
+    if (value === null || value === undefined) {
+        throw new TypeError(`Protocol slot key requires ${fieldName}.`);
+    }
+
+    return value;
+};
+
+export const protocolSlotKey = (slot: ProtocolSlotKeyInput): string => {
+    if (slot.messageType === 'ballot-close') {
+        return `${slot.sessionId}:${slot.phase}:${slot.messageType}`;
+    }
+
+    const participantIndex = requireSlotValue(
+        slot.participantIndex,
+        'participantIndex',
+    );
+    const prefix = `${slot.sessionId}:${slot.phase}:${participantIndex}:${slot.messageType}`;
+
+    switch (slot.messageType) {
         case 'encrypted-dual-share':
-            return `${prefix}:${payload.recipientIndex}`;
+            return `${prefix}:${requireSlotValue(
+                slot.recipientIndex,
+                'recipientIndex',
+            )}`;
         case 'complaint':
-            return `${prefix}:${payload.dealerIndex}:${payload.envelopeId}`;
+            return `${prefix}:${requireSlotValue(
+                slot.dealerIndex,
+                'dealerIndex',
+            )}:${requireSlotValue(slot.envelopeId, 'envelopeId')}`;
         case 'complaint-resolution':
-            return `${prefix}:${payload.dealerIndex}:${payload.complainantIndex}:${payload.envelopeId}`;
+            return `${prefix}:${requireSlotValue(
+                slot.dealerIndex,
+                'dealerIndex',
+            )}:${requireSlotValue(
+                slot.complainantIndex,
+                'complainantIndex',
+            )}:${requireSlotValue(slot.envelopeId, 'envelopeId')}`;
         case 'phase-checkpoint':
-            return `${prefix}:${payload.checkpointPhase}`;
+            return `${prefix}:${requireSlotValue(
+                slot.checkpointPhase,
+                'checkpointPhase',
+            )}`;
         case 'ballot-submission':
         case 'decryption-share':
         case 'tally-publication':
-            return `${prefix}:${payload.optionIndex}`;
+            return `${prefix}:${requireSlotValue(
+                slot.optionIndex,
+                'optionIndex',
+            )}`;
         default:
             return prefix;
     }
 };
+
+export const protocolPayloadSlotKey = (payload: ProtocolPayload): string =>
+    protocolSlotKey(payload);
 
 export const canonicalUnsignedPayloadBytes = (
     payload: ProtocolPayload,

@@ -1,15 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import ChoiceAdding from './PollChoiceEditor';
+import PollChoiceEditor from './PollChoiceEditor';
 
-describe('ChoiceAdding', () => {
+describe('PollChoiceEditor', () => {
     it('does not add a duplicate choice through the keyboard path', async () => {
         const user = userEvent.setup();
         const onAddChoice = vi.fn();
 
         render(
-            <ChoiceAdding
+            <PollChoiceEditor
                 choices={['Apples']}
                 onAddChoice={onAddChoice}
                 onRemoveChoice={vi.fn()}
@@ -32,7 +32,7 @@ describe('ChoiceAdding', () => {
         const onAddChoice = vi.fn();
 
         render(
-            <ChoiceAdding
+            <PollChoiceEditor
                 choices={['Apples']}
                 onAddChoice={onAddChoice}
                 onRemoveChoice={vi.fn()}

@@ -6,6 +6,7 @@ import {
     createExpectedVerifiedResults,
     parseCeremonyMetricValue,
     parseSubmittedVoterCount,
+    resolveRecoveredPollApiBaseUrl,
     syncPollPagesForSharedState,
     syncPollPageForSharedState,
     waitForPollPageState,
@@ -80,6 +81,26 @@ test('parseCeremonyMetricValue ignores unrelated text', () => {
             rowText: 'Submitted voters 16',
         }),
         null,
+    );
+});
+
+test('resolveRecoveredPollApiBaseUrl prefers the configured api origin for local recovered polls', () => {
+    assert.equal(
+        resolveRecoveredPollApiBaseUrl(
+            'http://127.0.0.1:4173/polls/example--1234',
+            'http://127.0.0.1:4000/api/ignored',
+        ),
+        'http://127.0.0.1:4000',
+    );
+});
+
+test('resolveRecoveredPollApiBaseUrl infers the production api origin when no override is configured', () => {
+    assert.equal(
+        resolveRecoveredPollApiBaseUrl(
+            'https://sealed.vote/polls/example--1234',
+            undefined,
+        ),
+        'https://api.sealed.vote',
     );
 });
 

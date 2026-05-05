@@ -19,6 +19,7 @@
     "include": [
         ".github/**/*.ts",
         ".github/**/*.mts",
+        "eslint.config.ts",
         "netlify/**/*.ts",
         "tests/config/**/*.ts",
         "tests/config/**/*.mts",

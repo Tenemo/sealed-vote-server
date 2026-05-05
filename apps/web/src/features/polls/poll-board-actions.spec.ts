@@ -1,4 +1,9 @@
-import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
+import {
+    fixedScoreRange,
+    maximumPollVoterCount,
+    pollValidationTarget,
+    type PollResponse,
+} from '@sealed-vote/contracts';
 import { RISTRETTO_GROUP } from 'threshold-elgamal';
 
 import {
@@ -102,8 +107,8 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     thresholds: {
         reconstructionThreshold: 2,
         minimumPublishedVoterCount: 2,
-        maximumVoterCount: 51,
-        validationTarget: 15,
+        maximumVoterCount: maximumPollVoterCount,
+        validationTarget: pollValidationTarget,
     },
     ...overrides,
 });

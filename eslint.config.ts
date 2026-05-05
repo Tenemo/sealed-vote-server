@@ -1,19 +1,33 @@
-const { fixupConfigRules, fixupPluginRules } = require('@eslint/compat');
-const eslint = require('@eslint/js');
-const { defineConfig } = require('eslint/config');
-const { flatConfigs: importConfigs } = require('eslint-plugin-import');
-const jsxAccessibilityPlugin = require('eslint-plugin-jsx-a11y');
-const prettierPlugin = require('eslint-plugin-prettier');
-const prettierRecommended = require('eslint-plugin-prettier/recommended');
-const reactPlugin = require('eslint-plugin-react');
-const reactHooksPlugin = require('eslint-plugin-react-hooks');
-const securityPlugin = require('eslint-plugin-security');
-const sqlPlugin = require('eslint-plugin-sql').default;
-const globals = require('globals');
-const tseslint = require('typescript-eslint');
+import { createRequire } from 'node:module';
 
-const ERROR = 2;
-const OFF = 0;
+import { fixupConfigRules, fixupPluginRules } from '@eslint/compat';
+import eslint from '@eslint/js';
+import type { ESLint, Linter } from 'eslint';
+import { defineConfig } from 'eslint/config';
+import importPlugin from 'eslint-plugin-import';
+import prettierPlugin from 'eslint-plugin-prettier';
+import prettierRecommended from 'eslint-plugin-prettier/recommended';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import sqlPlugin from 'eslint-plugin-sql';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+const require = createRequire(import.meta.url);
+const { flatConfigs: importConfigs } = importPlugin;
+const jsxAccessibilityPlugin = require('eslint-plugin-jsx-a11y') as {
+    flatConfigs: {
+        strict: Linter.Config;
+    };
+};
+const securityPlugin = require('eslint-plugin-security') as {
+    configs: {
+        recommended: Linter.Config;
+    };
+};
+
+const ERROR = 2 as const;
+const OFF = 0 as const;
 
 const allSourceFiles = ['**/*.{js,jsx,cjs,mjs,ts,tsx}'];
 const allTestFiles = ['**/*.spec.{js,jsx,ts,tsx}', '**/*.test.{js,jsx,ts,tsx}'];
@@ -30,7 +44,7 @@ const sharedProjects = [
     './packages/testkit/tsconfig.json',
 ];
 
-const prettierRule = [
+const prettierRule: Linter.RuleEntry = [
     ERROR,
     {
         tabWidth: 4,
@@ -45,7 +59,7 @@ const prettierRule = [
     },
 ];
 
-const sharedRules = {
+const sharedRules: Linter.RulesRecord = {
     'prettier/prettier': prettierRule,
     'arrow-parens': [ERROR, 'always', { requireForBlockBody: false }],
     'no-restricted-exports': OFF,
@@ -78,7 +92,7 @@ const sharedRules = {
     'security/detect-object-injection': OFF,
 };
 
-const frontendRules = {
+const frontendRules: Linter.RulesRecord = {
     'react/jsx-uses-vars': ERROR,
     'react/destructuring-assignment': [ERROR, 'always'],
     'react/jsx-filename-extension': [
@@ -110,7 +124,7 @@ const frontendRules = {
 
 const reactCompatPlugin = fixupPluginRules(reactPlugin);
 
-module.exports = defineConfig(
+export default defineConfig(
     {
         ignores: [
             '**/node_modules/*',
@@ -122,7 +136,7 @@ module.exports = defineConfig(
             'apps/web/temp/*',
             'packages/*/src/**/*.d.ts',
             'packages/*/src/**/*.js',
-            'eslint.config.js',
+            'eslint.config.ts',
         ],
     },
     eslint.configs.recommended,
@@ -175,14 +189,14 @@ module.exports = defineConfig(
         files: frontendFiles,
     }),
     {
-    ...jsxAccessibilityPlugin.flatConfigs.strict,
+        ...jsxAccessibilityPlugin.flatConfigs.strict,
         files: frontendFiles,
     },
     {
         files: frontendFiles,
         plugins: {
             react: reactCompatPlugin,
-            'react-hooks': reactHooksPlugin,
+            'react-hooks': reactHooksPlugin as unknown as ESLint.Plugin,
         },
         languageOptions: {
             globals: {
@@ -200,7 +214,7 @@ module.exports = defineConfig(
     {
         files: apiFiles,
         plugins: {
-            sql: sqlPlugin,
+            sql: sqlPlugin as unknown as ESLint.Plugin,
         },
         rules: {
             'sql/no-unsafe-query': [
@@ -219,6 +233,18 @@ module.exports = defineConfig(
                 'ignorePackages',
                 {
                     js: 'never',
+                    ts: 'always',
+                },
+            ],
+        },
+    },
+    {
+        files: ['packages/testkit/tests/**/*.ts'],
+        rules: {
+            'import/extensions': [
+                ERROR,
+                'ignorePackages',
+                {
                     ts: 'always',
                 },
             ],

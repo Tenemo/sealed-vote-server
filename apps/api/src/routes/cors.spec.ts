@@ -134,4 +134,17 @@ describe('CORS configuration', () => {
         expect(response.statusCode).toBe(200);
         expect(response.headers['access-control-allow-origin']).toBeUndefined();
     });
+
+    test('does not allow unrelated Netlify deploy preview origins', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/health-check',
+            headers: {
+                origin: 'https://deploy-preview-3--other-site.netlify.app',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    });
 });

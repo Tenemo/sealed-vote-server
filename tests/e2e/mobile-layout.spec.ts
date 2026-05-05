@@ -1,14 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoAccessibilityViolations } from './support/accessibility';
+import { expectNoAccessibilityViolations } from './support/accessibility.ts';
 import { gotoInteractablePage } from './support/navigation.mts';
-import { createPoll, deletePolls, type CreatedPoll } from './support/poll-flow';
+import {
+    createPoll,
+    deletePolls,
+    type CreatedPoll,
+} from './support/poll-flow.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
-import { createPollName, createTestNamespace } from './support/test-data';
+} from './support/error-tracking.ts';
+import { createPollName, createTestNamespace } from './support/test-data.ts';
 
 const mobileViewport = {
     width: 320,

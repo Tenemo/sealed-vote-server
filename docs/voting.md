@@ -19,7 +19,7 @@ The API read model derives them in `apps/api/src/utils/poll-read-model.ts`.
 ## Product flow
 
 1. The creator creates a poll and lands on the live public page immediately.
-2. Each voter opens the link, scores every option from `1` to `10`, and submits one final vote.
+2. Each voter opens the link, scores every choice from `1` to `10`, and submits one final vote.
 3. The browser stores those plaintext scores locally on-device and registers the voter with the backend for the later ceremony.
 4. The creator closes voting once at least three submitted voters exist. That freezes the roster.
 5. After close, the app derives a frozen manifest `{ rosterHash, optionList, scoreRange }`, where `scoreRange` is fixed to `{ min: 1, max: 10 }` in this product, then automatically runs manifest publication, board registrations, manifest acceptances, DKG, ballot encryption, and ballot publication in the background.
@@ -40,9 +40,9 @@ The API read model derives them in `apps/api/src/utils/poll-read-model.ts`.
 ## Privacy model
 
 - The pre-close roster is public.
-- Plaintext scores stay only on the submitting device until voting closes.
-- Once encrypted ballot payloads are accepted on the board, the local plaintext ballot is deleted.
-- The browser stores only narrow reconnect metadata in local storage. Private device state and post-close ceremony state live in indexed storage.
+- Plaintext scores stay only on the submitting device and are persisted locally so the same browser can finish the post-close ceremony after a refresh or reconnect.
+- The local plaintext ballot is cleared after the poll completes, the ceremony aborts, or the creator restarts the ceremony without that voter.
+- The browser stores reconnect metadata, private device state, pending board payloads, and the local plaintext ballot in local storage.
 - The UI does not expose protocol JSON or manual board posting in the normal flow.
 
 ## Shared helpers

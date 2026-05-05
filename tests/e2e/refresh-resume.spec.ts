@@ -7,7 +7,7 @@ import {
     expectPostCloseVisible,
     submitVote,
     type CreatedPoll,
-} from './support/poll-flow';
+} from './support/poll-flow.ts';
 import {
     gotoInteractablePage,
     reloadInteractablePage,
@@ -16,17 +16,17 @@ import {
     closeParticipant,
     getProjectContextOptions,
     openProjectParticipant,
-} from './support/participants';
+} from './support/participants.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
+} from './support/error-tracking.ts';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/test-data';
+} from './support/test-data.ts';
 
 test('keeps creator controls after reopening the shared link in a new browser session', async ({
     browser,

@@ -3,9 +3,17 @@ import {
     maximumPollVoterCount,
     minimumPollVotersToClose,
     orderVerifiedOptionTallies,
+    pollValidationTarget,
     type PollResponse,
 } from '@sealed-vote/contracts';
-import { sortProtocolPayloads } from '@sealed-vote/protocol';
+import {
+    countSignedPayloadsOfType as countAcceptedMessages,
+    filterSignedPayloadsBySession as filterAcceptedPayloadsBySession,
+    getSignedPayloadsOfType as getAcceptedPayloadsOfType,
+    isSignedPayloadOfType,
+    sortProtocolPayloads,
+    type TypedSignedPayload,
+} from '@sealed-vote/protocol';
 import {
     hashProtocolTranscript,
     majorityThreshold,
@@ -32,31 +40,12 @@ type PollRow = Pick<
     'createdAt' | 'id' | 'isOpen' | 'pollName' | 'protocolVersion' | 'slug'
 >;
 
-const validationTarget = 15;
-
 const formatSessionFingerprint = (value: string): string =>
     value
         .slice(0, 32)
         .toUpperCase()
         .match(/.{1,4}/g)
         ?.join('-') ?? value.slice(0, 32).toUpperCase();
-
-const isSignedPayloadOfType = <
-    TPayload extends SignedPayload['payload']['messageType'],
->(
-    signedPayload: SignedPayload,
-    messageType: TPayload,
-): signedPayload is SignedPayload<
-    Extract<SignedPayload['payload'], { messageType: TPayload }>
-> => signedPayload.payload.messageType === messageType;
-
-const countAcceptedMessages = (
-    acceptedPayloads: readonly SignedPayload[],
-    messageType: SignedPayload['payload']['messageType'],
-): number =>
-    acceptedPayloads.filter((payload) =>
-        isSignedPayloadOfType(payload, messageType),
-    ).length;
 
 const countCompleteBallotParticipants = ({
     acceptedPayloads,
@@ -87,19 +76,6 @@ const countCompleteBallotParticipants = ({
     ).length;
 };
 
-const filterAcceptedPayloadsBySession = ({
-    acceptedPayloads,
-    sessionId,
-}: {
-    acceptedPayloads: readonly SignedPayload[];
-    sessionId: string | null;
-}): SignedPayload[] =>
-    sessionId
-        ? acceptedPayloads.filter(
-              (payload) => payload.payload.sessionId === sessionId,
-          )
-        : [];
-
 const filterBoardRecordsBySession = ({
     records,
     sessionId,
@@ -113,32 +89,16 @@ const filterBoardRecordsBySession = ({
           )
         : [];
 
-type TypedSignedPayload<
-    TPayload extends SignedPayload['payload']['messageType'],
-> = SignedPayload<Extract<SignedPayload['payload'], { messageType: TPayload }>>;
-
-const getAcceptedPayloadsOfType = <
-    TPayload extends SignedPayload['payload']['messageType'],
->(
-    acceptedPayloads: readonly SignedPayload[],
-    messageType: TPayload,
-): readonly TypedSignedPayload<TPayload>[] =>
-    acceptedPayloads.filter((payload) =>
-        isSignedPayloadOfType(payload, messageType),
-    ) as unknown as readonly TypedSignedPayload<TPayload>[];
-
 const getRecordPayloadsOfType = <
     TPayload extends SignedPayload['payload']['messageType'],
 >(
     records: PollResponse['boardEntries'],
     messageType: TPayload,
-): readonly TypedSignedPayload<TPayload>[] => {
-    return records
-        .filter((record) => record.messageType === messageType)
-        .map(
-            (record) => record.signedPayload,
-        ) as unknown as readonly TypedSignedPayload<TPayload>[];
-};
+): readonly TypedSignedPayload<TPayload>[] =>
+    getAcceptedPayloadsOfType(
+        records.map((record) => record.signedPayload),
+        messageType,
+    );
 
 type BallotCloseSlotState = {
     acceptedPayload: TypedSignedPayload<'ballot-close'> | null;
@@ -399,7 +359,7 @@ const buildThresholdSummary = ({
         reconstructionThreshold,
         minimumPublishedVoterCount: reconstructionThreshold,
         maximumVoterCount: maximumPollVoterCount,
-        validationTarget,
+        validationTarget: pollValidationTarget,
     };
 };
 
@@ -846,8 +806,8 @@ export const getPollFetchReadModel = async (
     const rosterEntries = ceremonySession.rosterEntries;
 
     const acceptedPayloads = filterAcceptedPayloadsBySession({
-        acceptedPayloads: classifiedBoard.acceptedPayloads,
         sessionId,
+        signedPayloads: classifiedBoard.acceptedPayloads,
     });
     const currentSessionRecords = filterBoardRecordsBySession({
         records: classifiedBoard.records,

@@ -47,7 +47,7 @@ jobs:
                   cp pnpm-workspace.yaml release/pnpm-workspace.yaml
                   cp .npmrc release/.npmrc
                   cp apps/api/package.json release/apps/api/package.json
-                  cp apps/api/.env.sample release/apps/api/.env.sample
+                  cp apps/api/.env.example release/apps/api/.env.example
                   cp apps/api/Procfile release/apps/api/Procfile
                   cp -r apps/api/dist release/apps/api/dist
                   cp packages/contracts/package.json release/packages/contracts/package.json

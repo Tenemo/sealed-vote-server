@@ -9,6 +9,21 @@ import {
 } from '../scripts/wait-for-production-deploy.mts';
 
 const expectedCommitSha = 'ac15a2795b5344ab921a1790288a3572219e2f28';
+const defaultHomepageSiteName = 'sealed.vote';
+const defaultHomepageTitle = 'sealed.vote | 1-10 score voting app';
+const defaultPollPageTitle = 'Poll | sealed.vote';
+const createWaitOptions = () => ({
+    apiBaseUrl: 'https://api.sealed.vote',
+    expectedCommitSha,
+    homepageSiteName: defaultHomepageSiteName,
+    homepageTitle: defaultHomepageTitle,
+    intervalMs: 5,
+    pollPageTitle: defaultPollPageTitle,
+    requestTimeoutMs: 5_000,
+    requiredStableChecks: 2,
+    timeoutMs: 100,
+    webBaseUrl: 'https://sealed.vote',
+});
 
 const createJsonStatus = (
     overrides: Partial<{
@@ -194,15 +209,7 @@ test('waitForProductionDeploy requires consecutive stable checks before returnin
     let callCount = 0;
 
     await waitForProductionDeploy(
-        {
-            apiBaseUrl: 'https://api.sealed.vote',
-            expectedCommitSha,
-            intervalMs: 5,
-            requestTimeoutMs: 5_000,
-            requiredStableChecks: 2,
-            timeoutMs: 100,
-            webBaseUrl: 'https://sealed.vote',
-        },
+        createWaitOptions(),
         {
             loadReadinessStatus: async () => {
                 const status =
@@ -236,13 +243,9 @@ test('waitForProductionDeploy times out when readiness never stabilizes', async 
         async () =>
             await waitForProductionDeploy(
                 {
-                    apiBaseUrl: 'https://api.sealed.vote',
-                    expectedCommitSha,
+                    ...createWaitOptions(),
                     intervalMs: 10,
-                    requestTimeoutMs: 5_000,
-                    requiredStableChecks: 2,
                     timeoutMs: 30,
-                    webBaseUrl: 'https://sealed.vote',
                 },
                 {
                     loadReadinessStatus: async () =>

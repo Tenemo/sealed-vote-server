@@ -51,7 +51,7 @@ export const createPoll = async (
     pollName: string;
     choices: string[];
 }> => {
-    const requestedChoices = choices ?? ['Option 1', 'Option 2'];
+    const requestedChoices = choices ?? ['Choice 1', 'Choice 2'];
     const requestedPollName = pollName ?? getUniquePollName();
     const creatorToken = generateClientToken();
     const createResponse = await fastify.inject({
@@ -236,13 +236,17 @@ export const restartPollCeremony = async (
 export class TestPollBuilder {
     private pollName: string | undefined;
 
-    private choices: string[] = ['Option 1', 'Option 2'];
+    private choices: string[] = ['Choice 1', 'Choice 2'];
 
     private voterNames: string[] = ['Alice', 'Bob', 'Charlie'];
 
     private context: TestPollContext | null = null;
 
-    public constructor(private readonly fastify: FastifyInstance) {}
+    private readonly fastify: FastifyInstance;
+
+    public constructor(fastify: FastifyInstance) {
+        this.fastify = fastify;
+    }
 
     public withPollName(pollName: string): TestPollBuilder {
         this.pollName = pollName;
@@ -347,7 +351,7 @@ export class TestPollBuilder {
         if (!response.success) {
             throw new Error(
                 response.message ??
-                    `Failed to post board message for participant ${voterIndex}.`,
+                    `Failed to post board message for voter ${voterIndex}.`,
             );
         }
 

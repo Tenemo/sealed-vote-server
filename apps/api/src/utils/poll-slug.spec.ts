@@ -113,12 +113,12 @@ describe('poll slug backfill', () => {
     test('backfills missing slugs deterministically and restores the not-null invariant', async () => {
         const pollName = getUniquePollName('Legacy duplicate title');
         const firstPoll = await createPoll(fastify, pollName, [
-            'Option 1',
-            'Option 2',
+            'Choice 1',
+            'Choice 2',
         ]);
         const secondPoll = await createPoll(fastify, pollName, [
-            'Option 1',
-            'Option 2',
+            'Choice 1',
+            'Choice 2',
         ]);
 
         await fastify.pgPool.query(

@@ -21,13 +21,14 @@
         "clean": "rimraf dist",
         "lint": "pnpm --workspace-root exec eslint packages/contracts",
         "lint:fix": "pnpm --workspace-root exec eslint packages/contracts --fix",
-        "test": "pnpm build && node --experimental-strip-types --test tests/*.spec.ts"
+        "test": "vitest run --reporter verbose"
     },
     "dependencies": {
         "threshold-elgamal": "catalog:"
     },
     "devDependencies": {
         "rimraf": "catalog:",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "catalog:"
     }
 }

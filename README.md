@@ -61,7 +61,7 @@ Offline and reconnect recovery is a core feature of the app, not a best-effort e
 - The browser persists only narrow local session state: creator tokens, voter tokens, voter indices, and poll references needed to reconnect to the same ceremony.
 - On reopen, the app refetches the public read model and board log from the API instead of restoring cached poll snapshots from a service worker.
 - Board message retransmissions are safe because the backend classifies identical unsigned payloads as idempotent, even when the signatures differ.
-- The current UI does not persist plaintext ballots or scores at rest.
+- Plaintext scores are intentionally persisted in local browser storage so the same device can finish the post-close ceremony after a refresh or reconnect. They are cleared only after that local vote can no longer participate in the active ceremony.
 
 ## Local development
 

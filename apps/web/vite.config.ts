@@ -81,8 +81,6 @@ export default defineConfig({
             app: resolveFromSrc('app'),
             components: resolveFromSrc('components'),
             features: resolveFromSrc('features'),
-            fonts: resolveFromSrc('fonts'),
-            typings: resolveFromSrc('typings'),
             utils: resolveFromSrc('utils'),
         },
     },
