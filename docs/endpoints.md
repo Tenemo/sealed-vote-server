@@ -18,7 +18,7 @@ The backend routes live under `/api`. The payloads below match the shared contra
 
 - notes:
   - the hard voter cap is `51`
-  - the current validated target is `15`
+  - the current validation target is `15`
   - `protocolVersion` currently accepts only `v1`
 
 ## Fetch poll

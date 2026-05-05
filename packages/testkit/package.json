@@ -21,7 +21,7 @@
         "clean": "rimraf dist",
         "lint": "pnpm --workspace-root exec eslint packages/testkit",
         "lint:fix": "pnpm --workspace-root exec eslint packages/testkit --fix",
-        "test": "echo \"No standalone tests for testkit\""
+        "test": "node --experimental-strip-types --test tests/*.spec.ts"
     },
     "dependencies": {
         "@sealed-vote/contracts": "workspace:*",

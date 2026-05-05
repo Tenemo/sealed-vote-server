@@ -175,7 +175,7 @@ module.exports = defineConfig(
         files: frontendFiles,
     }),
     {
-    ...jsxAccessibilityPlugin.flatConfigs.strict,
+        ...jsxAccessibilityPlugin.flatConfigs.strict,
         files: frontendFiles,
     },
     {
@@ -219,6 +219,18 @@ module.exports = defineConfig(
                 'ignorePackages',
                 {
                     js: 'never',
+                    ts: 'always',
+                },
+            ],
+        },
+    },
+    {
+        files: ['packages/testkit/tests/**/*.ts'],
+        rules: {
+            'import/extensions': [
+                ERROR,
+                'ignorePackages',
+                {
                     ts: 'always',
                 },
             ],

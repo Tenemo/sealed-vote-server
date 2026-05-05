@@ -21,7 +21,7 @@
         "clean": "rimraf dist",
         "lint": "pnpm --workspace-root exec eslint packages/contracts",
         "lint:fix": "pnpm --workspace-root exec eslint packages/contracts --fix",
-        "test": "pnpm build && node --experimental-strip-types --test tests/*.spec.ts"
+        "test": "node --experimental-strip-types --test tests/*.spec.ts"
     },
     "dependencies": {
         "threshold-elgamal": "catalog:"

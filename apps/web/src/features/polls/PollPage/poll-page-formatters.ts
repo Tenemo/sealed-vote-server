@@ -44,7 +44,7 @@ export const formatBoardEntryTitle = (
     poll: PollData,
 ): string => {
     const payload = entry.signedPayload.payload as Record<string, unknown>;
-    const baseTitle = `Participant ${entry.participantIndex}. ${humanizeBoardMessageType(entry.messageType)}`;
+    const baseTitle = `Ceremony participant ${entry.participantIndex}. ${humanizeBoardMessageType(entry.messageType)}`;
 
     if (
         typeof payload.optionIndex === 'number' &&
@@ -54,7 +54,7 @@ export const formatBoardEntryTitle = (
 
         return choiceName
             ? `${baseTitle} for ${choiceName}`
-            : `${baseTitle} for choice ${payload.optionIndex}`;
+            : `${baseTitle} for protocol choice ${payload.optionIndex}`;
     }
 
     if (
@@ -65,7 +65,7 @@ export const formatBoardEntryTitle = (
     }
 
     if (Array.isArray(payload.countedParticipantIndices)) {
-        return `${baseTitle} counting ${payload.countedParticipantIndices.length} participants`;
+        return `${baseTitle} counting ${payload.countedParticipantIndices.length} ceremony participants`;
     }
 
     return baseTitle;

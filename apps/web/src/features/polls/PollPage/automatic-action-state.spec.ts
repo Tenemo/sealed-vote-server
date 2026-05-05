@@ -1,4 +1,9 @@
-import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
+import {
+    fixedScoreRange,
+    maximumPollVoterCount,
+    pollValidationTarget,
+    type PollResponse,
+} from '@sealed-vote/contracts';
 
 import {
     createEmptyRecoverableAutomaticActionRetryState,
@@ -100,8 +105,8 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     thresholds: {
         reconstructionThreshold: 2,
         minimumPublishedVoterCount: 2,
-        maximumVoterCount: 51,
-        validationTarget: 15,
+        maximumVoterCount: maximumPollVoterCount,
+        validationTarget: pollValidationTarget,
     },
     ...overrides,
 });
@@ -258,6 +263,7 @@ describe('automaticActionState', () => {
     it('reads the local ceremony state from the current poll roster', () => {
         expect(
             getLocalCeremonyState({
+                deviceState: createDeviceState(),
                 poll: createPoll({
                     voters: [
                         {
@@ -269,6 +275,25 @@ describe('automaticActionState', () => {
                     ],
                 }),
                 voterSession: createVoterSession(),
+            }),
+        ).toBe('skipped');
+    });
+
+    it('uses durable device state to read the local ceremony state when the voter session is missing', () => {
+        expect(
+            getLocalCeremonyState({
+                deviceState: createDeviceState(),
+                poll: createPoll({
+                    voters: [
+                        {
+                            ceremonyState: 'skipped',
+                            deviceReady: true,
+                            voterIndex: 4,
+                            voterName: 'Dora',
+                        },
+                    ],
+                }),
+                voterSession: null,
             }),
         ).toBe('skipped');
     });

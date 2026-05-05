@@ -9,6 +9,7 @@ import {
     isSignedPayloadOfType,
     isProtocolMessageType,
     protocolPayloadSlotKey,
+    protocolSlotKey,
     signedProtocolPayloadBytes,
     sortProtocolPayloads,
 } from '../src/index.js';
@@ -148,6 +149,59 @@ describe('protocol payload helpers', () => {
                 sessionId: 'session-2',
             } as ProtocolPayload),
         ).toBe('session-2:6:ballot-close');
+    });
+
+    test('protocolSlotKey matches payload-derived slot keys before a payload is built', () => {
+        const ballotPayload = createBallotPayload({
+            optionIndex: 3,
+            participantIndex: 4,
+        });
+
+        expect(
+            protocolSlotKey({
+                messageType: 'ballot-submission',
+                optionIndex: 3,
+                participantIndex: 4,
+                phase: 5,
+                sessionId: ballotPayload.sessionId,
+            }),
+        ).toBe(protocolPayloadSlotKey(ballotPayload));
+        expect(
+            protocolSlotKey({
+                messageType: 'encrypted-dual-share',
+                participantIndex: 2,
+                phase: 1,
+                recipientIndex: 5,
+                sessionId: 'session-3',
+            }),
+        ).toBe('session-3:1:2:encrypted-dual-share:5');
+        expect(
+            protocolSlotKey({
+                messageType: 'ballot-close',
+                phase: 6,
+                sessionId: 'session-4',
+            }),
+        ).toBe('session-4:6:ballot-close');
+    });
+
+    test('protocolSlotKey rejects incomplete indexed slot descriptors', () => {
+        expect(() =>
+            protocolSlotKey({
+                messageType: 'ballot-submission',
+                participantIndex: 4,
+                phase: 5,
+                sessionId: 'session-5',
+            }),
+        ).toThrow(/optionIndex/u);
+
+        expect(() =>
+            protocolSlotKey({
+                messageType: 'encrypted-dual-share',
+                participantIndex: 4,
+                phase: 1,
+                sessionId: 'session-5',
+            }),
+        ).toThrow(/recipientIndex/u);
     });
 
     test('sortProtocolPayloads orders payloads by slot before canonical payload bytes', () => {

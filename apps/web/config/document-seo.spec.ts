@@ -104,7 +104,7 @@ describe('resolveDocumentSeoMetadata', () => {
         });
 
         expect(metadata.title).toBe('Budget & roadmap');
-        expect(metadata.description).toBe('Score options from 1 to 10.');
+        expect(metadata.description).toBe('Score choices from 1 to 10.');
         expect(metadata.canonicalUrl).toBe(
             'https://sealed.vote/polls/budget-roadmap',
         );
@@ -222,7 +222,7 @@ describe('resolveDocumentSeoMetadata', () => {
         });
 
         expect(metadata.title).toBe('Poll | sealed.vote');
-        expect(metadata.description).toBe('Score options from 1 to 10.');
+        expect(metadata.description).toBe('Score choices from 1 to 10.');
         expect(lookupSignal?.aborted).toBe(true);
     });
 
@@ -356,7 +356,7 @@ describe('renderDocumentHtml', () => {
         expect(html).toContain(
             '<title data-rh="true">Poll | sealed.vote</title>',
         );
-        expect(html).toContain('content="Score options from 1 to 10."');
+        expect(html).toContain('content="Score choices from 1 to 10."');
     });
 
     test('injects request-origin create-page metadata for preview domains', async () => {

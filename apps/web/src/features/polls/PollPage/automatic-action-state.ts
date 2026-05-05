@@ -37,20 +37,32 @@ const findRosterEntryForDevice = ({
 };
 
 export const getLocalCeremonyState = ({
+    deviceState,
     poll,
     voterSession,
 }: {
+    deviceState: StoredPollDeviceState | null;
     poll: PollResponse | undefined;
     voterSession: StoredVoterSession | null;
 }): PollResponse['voters'][number]['ceremonyState'] | null => {
-    if (!poll || !voterSession) {
+    if (!poll) {
+        return null;
+    }
+
+    const localVoterIndex =
+        deviceState?.pollId === poll.id
+            ? deviceState.voterIndex
+            : voterSession?.pollId === poll.id
+              ? voterSession.voterIndex
+              : null;
+
+    if (localVoterIndex === null) {
         return null;
     }
 
     return (
-        poll.voters.find(
-            (participant) => participant.voterIndex === voterSession.voterIndex,
-        )?.ceremonyState ?? null
+        poll.voters.find((voter) => voter.voterIndex === localVoterIndex)
+            ?.ceremonyState ?? null
     );
 };
 

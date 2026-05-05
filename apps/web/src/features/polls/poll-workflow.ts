@@ -40,6 +40,17 @@ const isLocalVoter = (
     deviceState.pollId === voterSession.pollId &&
     deviceState.voterIndex === voterSession.voterIndex;
 
+const getLocalVoterIndex = (
+    poll: PollResponse,
+    deviceState: StoredPollDeviceState | null,
+    voterSession: StoredVoterSession | null,
+): number | null =>
+    deviceState?.pollId === poll.id
+        ? deviceState.voterIndex
+        : voterSession?.pollId === poll.id
+          ? voterSession.voterIndex
+          : null;
+
 export const derivePollWorkflow = ({
     creatorSessionPollId,
     deviceState,
@@ -67,12 +78,12 @@ export const derivePollWorkflow = ({
         storedBallotScores.length === poll.choices.length;
     const missingRecoverableLocalVote = localVoter && !hasLocalVote;
     const missingLocalState = !!voterSession && !localVoter;
-    const localCeremonyState = voterSession
-        ? (poll.voters.find(
-              (participant) =>
-                  participant.voterIndex === voterSession.voterIndex,
-          )?.ceremonyState ?? null)
-        : null;
+    const localVoterIndex = getLocalVoterIndex(poll, deviceState, voterSession);
+    const localCeremonyState =
+        localVoterIndex === null
+            ? null
+            : (poll.voters.find((voter) => voter.voterIndex === localVoterIndex)
+                  ?.ceremonyState ?? null);
     const creatorHasLocalVoter =
         isCreator && localVoter && deviceState?.isCreatorParticipant === true;
 

@@ -18,8 +18,8 @@ const apiBaseUrl = resolveBrowserApiBaseUrl({
     configuredApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
 });
 // Production ceremony pages keep polling in the background. A wedged poll
-// fetch must time out so later polls can recover instead of stalling the
-// participant indefinitely.
+// fetch must time out so later polls can recover instead of stalling the voter
+// indefinitely.
 const pollQueryTimeoutMs = 10_000;
 const buildFetchPollQuery = (
     pollReference: string,

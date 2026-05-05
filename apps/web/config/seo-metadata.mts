@@ -22,7 +22,7 @@ export const socialImageWidth = 1200;
 const socialImageHeight = 630;
 const defaultSeoDescription =
     'Create polls, collect responses, and reveal results.';
-const pollPageFallbackDescription = 'Score options from 1 to 10.';
+const pollPageFallbackDescription = 'Score choices from 1 to 10.';
 const pollResultsFallbackDescription = 'Poll results';
 
 type StructuredData = Record<string, unknown>;

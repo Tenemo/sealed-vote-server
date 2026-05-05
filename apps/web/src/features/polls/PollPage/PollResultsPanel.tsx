@@ -1,15 +1,16 @@
 import type React from 'react';
 
 import { Panel } from '@/components/ui/panel';
+import { Surface } from '@/components/ui/surface';
 
-import type { PollData } from './poll-page-types';
+import type { PollPageResultsViewModel } from './poll-page-view-models';
 
 type PollResultsPanelProps = {
-    poll: PollData;
+    results: PollPageResultsViewModel;
 };
 
 const PollResultsPanel = ({
-    poll,
+    results: { poll },
 }: PollResultsPanelProps): React.JSX.Element | null => {
     if (poll.verification.status !== 'verified') {
         return null;
@@ -26,8 +27,7 @@ const PollResultsPanel = ({
             </div>
             <div className="grid gap-3">
                 {poll.verification.verifiedOptionTallies.map((result) => (
-                    <div
-                        className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-4"
+                    <Surface
                         data-testid="verified-result-card"
                         key={result.optionIndex}
                     >
@@ -53,7 +53,7 @@ const PollResultsPanel = ({
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </Surface>
                 ))}
             </div>
         </Panel>

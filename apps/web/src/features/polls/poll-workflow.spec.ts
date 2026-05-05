@@ -1,4 +1,9 @@
-import { fixedScoreRange, type PollResponse } from '@sealed-vote/contracts';
+import {
+    fixedScoreRange,
+    maximumPollVoterCount,
+    pollValidationTarget,
+    type PollResponse,
+} from '@sealed-vote/contracts';
 
 import { derivePollWorkflow } from './poll-workflow';
 
@@ -48,8 +53,8 @@ const createPoll = (overrides: Partial<PollResponse> = {}): PollResponse => ({
     thresholds: {
         reconstructionThreshold: null,
         minimumPublishedVoterCount: null,
-        maximumVoterCount: 51,
-        validationTarget: 15,
+        maximumVoterCount: maximumPollVoterCount,
+        validationTarget: pollValidationTarget,
     },
     ...overrides,
 });
@@ -188,7 +193,7 @@ describe('pollWorkflow', () => {
         });
     });
 
-    it('enables close only for the creator participant once at least three votes are submitted', () => {
+    it('enables close only for the creator voter once at least three votes are submitted', () => {
         expect(
             derivePollWorkflow({
                 creatorSessionPollId: 'poll-1',
@@ -217,7 +222,7 @@ describe('pollWorkflow', () => {
         });
     });
 
-    it('flags a participant whose local ballot scores are no longer recoverable', () => {
+    it('flags a voter whose local ballot scores are no longer recoverable', () => {
         expect(
             derivePollWorkflow({
                 creatorSessionPollId: null,
@@ -330,7 +335,7 @@ describe('pollWorkflow', () => {
         });
     });
 
-    it('flags missing local state after close when the participant session exists', () => {
+    it('flags missing local state after close when the voter session exists', () => {
         expect(
             derivePollWorkflow({
                 creatorSessionPollId: null,
@@ -373,8 +378,8 @@ describe('pollWorkflow', () => {
                     thresholds: {
                         reconstructionThreshold: 2,
                         minimumPublishedVoterCount: 2,
-                        maximumVoterCount: 51,
-                        validationTarget: 15,
+                        maximumVoterCount: maximumPollVoterCount,
+                        validationTarget: pollValidationTarget,
                     },
                 }),
                 voterSession: createVoterSession(),
@@ -537,6 +542,34 @@ describe('pollWorkflow', () => {
                     ],
                 }),
                 voterSession: createVoterSession(),
+            }),
+        ).toMatchObject({
+            currentStep: 'skipped',
+            missingLocalState: false,
+        });
+    });
+
+    it('keeps showing skipped after completion when only durable device state remains', () => {
+        expect(
+            derivePollWorkflow({
+                creatorSessionPollId: null,
+                deviceState: createDeviceState(),
+                hasAutomaticCeremonyAction: false,
+                hasAutomationFailure: false,
+                isSubmittingVote: false,
+                poll: createPoll({
+                    isOpen: false,
+                    phase: 'complete',
+                    voters: [
+                        {
+                            ceremonyState: 'skipped',
+                            deviceReady: true,
+                            voterIndex: 1,
+                            voterName: 'Alice',
+                        },
+                    ],
+                }),
+                voterSession: null,
             }),
         ).toMatchObject({
             currentStep: 'skipped',

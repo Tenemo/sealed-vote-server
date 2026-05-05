@@ -7,6 +7,7 @@ import React, { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { OutlinedInputField } from '@/components/ui/outlined-input-field';
+import { Surface } from '@/components/ui/surface';
 import { cn } from '@/lib/utils';
 
 type PollChoiceEditorProps = {
@@ -52,7 +53,7 @@ const PollChoiceEditor = ({
             <div className="space-y-2 text-center">
                 <h2 className="text-xl font-semibold">Choices</h2>
                 <p className="field-note">
-                    Each participant will score every option from 1 to 10.
+                    Each voter will score every choice from 1 to 10.
                 </p>
             </div>
             <div className="space-y-2">
@@ -95,8 +96,8 @@ const PollChoiceEditor = ({
             </div>
             {choices.length === 0 && (
                 <p className="empty-state">
-                    To create a poll, add choices that each participant will be
-                    able to score from 1 to 10.
+                    To create a poll, add choices that each voter will be able
+                    to score from 1 to 10.
                 </p>
             )}
             {!!choices.length && (
@@ -106,9 +107,11 @@ const PollChoiceEditor = ({
                     </p>
                     <ul className="space-y-2">
                         {choices.map((choice) => (
-                            <li
-                                className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3"
+                            <Surface
+                                as="li"
+                                className="flex items-center justify-between gap-3"
                                 key={choice}
+                                padding="row"
                             >
                                 <span className="block min-w-0 flex-1 text-base font-medium [overflow-wrap:anywhere]">
                                     {choice}
@@ -125,7 +128,7 @@ const PollChoiceEditor = ({
                                         className="size-4"
                                     />
                                 </Button>
-                            </li>
+                            </Surface>
                         ))}
                     </ul>
                 </div>

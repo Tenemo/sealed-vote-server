@@ -9,6 +9,7 @@ export const fixedScoreRange = {
 
 export const minimumPollVotersToClose = 3;
 export const maximumPollVoterCount = 51;
+export const pollValidationTarget = 15;
 
 export type CreatePollRequest = {
     choices: string[];

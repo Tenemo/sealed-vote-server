@@ -2,28 +2,25 @@ import type React from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
+import { Surface } from '@/components/ui/surface';
 
 import { formatDateTime, phaseLabel } from './poll-page-formatters';
-import type { PollData } from './poll-page-types';
+import type { PollPageHeaderViewModel } from './poll-page-view-models';
 
 type PollHeaderPanelProps = {
-    canCopyShareUrl: boolean;
-    copyNotice: string | null;
-    onCopyShareUrl: () => void;
-    poll: PollData;
-    primaryExplanation: string;
-    shareUrl: string;
-    submittedVoterSummary: string;
+    header: PollPageHeaderViewModel;
 };
 
 const PollHeaderPanel = ({
-    canCopyShareUrl,
-    copyNotice,
-    onCopyShareUrl,
-    poll,
-    primaryExplanation,
-    shareUrl,
-    submittedVoterSummary,
+    header: {
+        canCopyShareUrl,
+        copyNotice,
+        onCopyShareUrl,
+        poll,
+        primaryExplanation,
+        shareUrl,
+        submittedVoterSummary,
+    },
 }: PollHeaderPanelProps): React.JSX.Element => (
     <Panel className="space-y-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -54,12 +51,13 @@ const PollHeaderPanel = ({
                     <div className="text-sm font-medium text-foreground">
                         Shareable poll link
                     </div>
-                    <div
-                        className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm break-all"
+                    <Surface
+                        className="text-sm break-all"
                         data-testid="share-url-value"
+                        padding="row"
                     >
                         {shareUrl}
-                    </div>
+                    </Surface>
                 </div>
                 <Button
                     data-testid="copy-link-button"

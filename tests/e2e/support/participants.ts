@@ -152,6 +152,11 @@ export const closeParticipant = async (
             return;
         }
 
+        if (participant.closeMode !== 'page-only') {
+            await participant.context.close();
+            return;
+        }
+
         for (const openPage of participant.context.pages()) {
             if (!openPage.isClosed()) {
                 await openPage.close({
@@ -159,12 +164,6 @@ export const closeParticipant = async (
                 });
             }
         }
-
-        if (participant.closeMode === 'page-only') {
-            return;
-        }
-
-        await participant.context.close();
     })();
 
     try {

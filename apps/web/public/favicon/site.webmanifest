@@ -1,7 +1,7 @@
 {
     "name": "sealed.vote",
     "short_name": "SV",
-    "description": "Create votes, collect responses, and reveal results.",
+    "description": "Create polls, collect responses, and reveal results.",
     "icons": [
         {
             "src": "/favicon/web-app-manifest-192x192.png",

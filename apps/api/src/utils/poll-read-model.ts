@@ -3,6 +3,7 @@ import {
     maximumPollVoterCount,
     minimumPollVotersToClose,
     orderVerifiedOptionTallies,
+    pollValidationTarget,
     type PollResponse,
 } from '@sealed-vote/contracts';
 import {
@@ -38,8 +39,6 @@ type PollRow = Pick<
     typeof polls.$inferSelect,
     'createdAt' | 'id' | 'isOpen' | 'pollName' | 'protocolVersion' | 'slug'
 >;
-
-const validationTarget = 15;
 
 const formatSessionFingerprint = (value: string): string =>
     value
@@ -360,7 +359,7 @@ const buildThresholdSummary = ({
         reconstructionThreshold,
         minimumPublishedVoterCount: reconstructionThreshold,
         maximumVoterCount: maximumPollVoterCount,
-        validationTarget,
+        validationTarget: pollValidationTarget,
     };
 };
 

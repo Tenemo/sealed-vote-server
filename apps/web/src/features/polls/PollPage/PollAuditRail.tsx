@@ -1,26 +1,26 @@
 import type React from 'react';
 
 import { Panel } from '@/components/ui/panel';
+import { Surface } from '@/components/ui/surface';
 
 import {
     formatBoardEntryStatus,
     formatBoardEntryTitle,
     formatRevealStatus,
 } from './poll-page-formatters';
-import type { PollData } from './poll-page-types';
+import type { PollPageAuditViewModel } from './poll-page-view-models';
 
 type PollAuditRailProps = {
-    acceptedKeyConfirmations: number;
-    acceptedManifestAcceptances: number;
-    acceptedRegistrations: number;
-    poll: PollData;
+    audit: PollPageAuditViewModel;
 };
 
 const PollAuditRail = ({
-    acceptedKeyConfirmations,
-    acceptedManifestAcceptances,
-    acceptedRegistrations,
-    poll,
+    audit: {
+        acceptedKeyConfirmations,
+        acceptedManifestAcceptances,
+        acceptedRegistrations,
+        poll,
+    },
 }: PollAuditRailProps): React.JSX.Element => (
     <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
         <Panel className="space-y-4">
@@ -151,9 +151,11 @@ const PollAuditRail = ({
 
             <ul aria-label="Voters roster" className="space-y-2">
                 {poll.voters.map((voter) => (
-                    <li
-                        className="rounded-[var(--radius-md)] border border-border/70 bg-background px-4 py-3 text-sm"
+                    <Surface
+                        as="li"
+                        className="text-sm"
                         key={voter.voterIndex}
+                        padding="row"
                     >
                         <div className="font-medium text-foreground">
                             {voter.voterIndex}. {voter.voterName}
@@ -168,7 +170,7 @@ const PollAuditRail = ({
                                   ? ' | skipped from the active ceremony'
                                   : ''}
                         </div>
-                    </li>
+                    </Surface>
                 ))}
             </ul>
         </Panel>
@@ -212,9 +214,10 @@ const PollAuditRail = ({
                         </div>
                         <ul className="space-y-2">
                             {poll.boardAudit.phaseDigests.map((digest) => (
-                                <li
-                                    className="rounded-[var(--radius-md)] border border-border/70 bg-background px-3 py-3"
+                                <Surface
+                                    as="li"
                                     key={`${digest.phase}-${digest.digest}`}
+                                    padding="compact"
                                 >
                                     <div className="font-medium text-foreground">
                                         Phase {digest.phase}
@@ -222,7 +225,7 @@ const PollAuditRail = ({
                                     <div className="text-secondary break-all">
                                         {digest.digest}
                                     </div>
-                                </li>
+                                </Surface>
                             ))}
                         </ul>
                     </div>
@@ -237,9 +240,10 @@ const PollAuditRail = ({
                                 .slice(-8)
                                 .reverse()
                                 .map((entry) => (
-                                    <div
-                                        className="rounded-[var(--radius-md)] border border-border/70 bg-background px-3 py-3 text-sm"
+                                    <Surface
+                                        className="text-sm"
                                         key={entry.id}
+                                        padding="compact"
                                     >
                                         <div className="font-medium text-foreground">
                                             {formatBoardEntryTitle(entry, poll)}
@@ -247,7 +251,7 @@ const PollAuditRail = ({
                                         <div className="text-secondary">
                                             {formatBoardEntryStatus(entry)}
                                         </div>
-                                    </div>
+                                    </Surface>
                                 ))}
                         </div>
                     </div>

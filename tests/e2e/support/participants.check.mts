@@ -46,12 +46,12 @@ const createParticipantDouble = (): {
     };
 };
 
-test('closeParticipant closes open pages before closing the context', async () => {
+test('closeParticipant closes context-owned participants through the context', async () => {
     const participantDouble = createParticipantDouble();
 
     await closeParticipant(participantDouble.participant);
 
-    assert.equal(participantDouble.pageCloseCalls, 1);
+    assert.equal(participantDouble.pageCloseCalls, 0);
     assert.equal(participantDouble.contextCloseCalls, 1);
     assert.equal(participantDouble.participant.isClosed, true);
 });
@@ -62,7 +62,7 @@ test('closeParticipant is idempotent for already-closed participants', async () 
     await closeParticipant(participantDouble.participant);
     await closeParticipant(participantDouble.participant);
 
-    assert.equal(participantDouble.pageCloseCalls, 1);
+    assert.equal(participantDouble.pageCloseCalls, 0);
     assert.equal(participantDouble.contextCloseCalls, 1);
 });
 
