@@ -107,42 +107,46 @@ const PollVoteForm = ({
                 </p>
             </div>
 
-            {poll.choices.map((choice, choiceIndex) => (
-                <Surface className="space-y-3" key={choice}>
-                    <div className="flex items-center justify-between gap-4">
-                        <div>
-                            <div className="text-sm font-medium text-foreground">
-                                {choice}
-                            </div>
-                            <div className="text-sm text-secondary">
-                                {draftScores[choiceIndex] === null
-                                    ? 'Pick a score'
-                                    : `Selected score: ${draftScores[choiceIndex]}`}
+            {poll.choices.map((choice, choiceIndex) => {
+                const selectedScore = draftScores[choiceIndex] ?? null;
+
+                return (
+                    <Surface className="space-y-3" key={choice}>
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <div className="text-sm font-medium text-foreground">
+                                    {choice}
+                                </div>
+                                <div className="text-sm text-secondary">
+                                    {selectedScore === null
+                                        ? 'Pick a score'
+                                        : `Selected score: ${selectedScore}`}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
-                        {scoreOptions.map((score) => (
-                            <Button
-                                aria-label={`Score ${choice} as ${score}`}
-                                className="w-full"
-                                key={score}
-                                onClick={() => {
-                                    onScoreChange(choiceIndex, score);
-                                }}
-                                type="button"
-                                variant={
-                                    draftScores[choiceIndex] === score
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                            >
-                                {score}
-                            </Button>
-                        ))}
-                    </div>
-                </Surface>
-            ))}
+                        <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+                            {scoreOptions.map((score) => (
+                                <Button
+                                    aria-label={`Score ${choice} as ${score}`}
+                                    className="w-full"
+                                    key={score}
+                                    onClick={() => {
+                                        onScoreChange(choiceIndex, score);
+                                    }}
+                                    type="button"
+                                    variant={
+                                        selectedScore === score
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                >
+                                    {score}
+                                </Button>
+                            ))}
+                        </div>
+                    </Surface>
+                );
+            })}
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">

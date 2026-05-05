@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { createEmptyScores } from './poll-page-helpers';
+import { createEmptyScores, hasCompleteDraftScores } from './poll-page-helpers';
 import type { PollData } from './poll-page-types';
 
 import { generateClientToken } from 'features/polls/client-token';
@@ -54,7 +54,10 @@ export const usePollVoteForm = ({
         );
     }, [poll]);
 
-    const hasCompleteDraft = draftScores.every((score) => score !== null);
+    const hasCompleteDraft = hasCompleteDraftScores({
+        choiceCount: poll?.choices.length ?? 0,
+        draftScores,
+    });
     const canSubmitCompleteDraft =
         !registerState.isLoading && !!voterName.trim() && hasCompleteDraft;
 

@@ -25,6 +25,17 @@ export const steadyStatePollingIntervalMs = 5_000;
 export const createEmptyScores = (choiceCount: number): (number | null)[] =>
     Array.from({ length: choiceCount }, () => null);
 
+export const hasCompleteDraftScores = ({
+    choiceCount,
+    draftScores,
+}: {
+    choiceCount: number;
+    draftScores: readonly (number | null)[];
+}): boolean =>
+    choiceCount > 0 &&
+    draftScores.length === choiceCount &&
+    draftScores.every((score) => score !== null);
+
 export const getPollRefreshInterval = (
     poll: Pick<PollData, 'phase'> | null | undefined,
 ): number =>

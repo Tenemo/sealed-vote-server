@@ -75,7 +75,7 @@ describe('CORS configuration', () => {
         'https://sealed.vote',
         'http://localhost:3000',
         'http://127.0.0.1:4173',
-        'https://deploy-preview-3--sealed-vote-lattice.netlify.app',
+        'https://deploy-preview-3--sealed-vote.netlify.app',
     ]) {
         test(`allows ${origin} origins`, async () => {
             await expectAllowedOrigin({
@@ -99,7 +99,7 @@ describe('CORS configuration', () => {
     for (const origin of [
         'https://sealed.vote',
         'https://www.sealed.vote',
-        'https://deploy-preview-42--sealed-vote-lattice.netlify.app',
+        'https://deploy-preview-42--sealed-vote.netlify.app',
     ]) {
         test(`handles ${origin} preflight requests`, async () => {
             await expectAllowedPreflight({
@@ -127,7 +127,20 @@ describe('CORS configuration', () => {
             method: 'GET',
             url: '/api/health-check',
             headers: {
-                origin: 'https://deploy-preview-3--sealed-vote-lattice.netlify.app.evil.example',
+                origin: 'https://deploy-preview-3--sealed-vote.netlify.app.evil.example',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['access-control-allow-origin']).toBeUndefined();
+    });
+
+    test('does not allow unrelated Netlify deploy preview origins', async () => {
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/health-check',
+            headers: {
+                origin: 'https://deploy-preview-3--other-site.netlify.app',
             },
         });
 
