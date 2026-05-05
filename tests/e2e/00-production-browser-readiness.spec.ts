@@ -1,12 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { gotoInteractablePage } from './support/navigation.mts';
-import { createPoll, deletePolls, type CreatedPoll } from './support/poll-flow';
+import {
+    createPoll,
+    deletePolls,
+    type CreatedPoll,
+} from './support/poll-flow.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
+} from './support/error-tracking.ts';
 
 // Keep this file first in the production suite so browser-commit failures show
 // up before the heavier multi-page ceremony specs start.
@@ -17,30 +21,30 @@ const expectHomepageReady = async (page: Page): Promise<void> => {
     await expect(page.getByLabel('Poll name')).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
-    await expect(
-        page.getByLabel('Choice name'),
-    ).toBeVisible({
+    await expect(page.getByLabel('Choice name')).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
-    await expect(
-        page.getByRole('button', { name: 'Create poll' }),
-    ).toBeVisible({
-        timeout: readinessUiTimeoutMs,
-    });
+    await expect(page.getByRole('button', { name: 'Create poll' })).toBeVisible(
+        {
+            timeout: readinessUiTimeoutMs,
+        },
+    );
 };
 
 const expectPollPageReady = async (page: Page): Promise<void> => {
     await expect(page.getByLabel('Your public name')).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
-    await expect(page.getByText(readinessChoices[0], { exact: true })).toBeVisible({
-        timeout: readinessUiTimeoutMs,
-    });
     await expect(
-        page.getByRole('button', { name: 'Submit vote' }),
+        page.getByText(readinessChoices[0], { exact: true }),
     ).toBeVisible({
         timeout: readinessUiTimeoutMs,
     });
+    await expect(page.getByRole('button', { name: 'Submit vote' })).toBeVisible(
+        {
+            timeout: readinessUiTimeoutMs,
+        },
+    );
 };
 
 test('browser can commit the homepage and a real production poll page', async ({

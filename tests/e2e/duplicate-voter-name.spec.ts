@@ -1,27 +1,27 @@
 import { expect, test } from '@playwright/test';
 
-import { expectNoAccessibilityViolations } from './support/accessibility';
+import { expectNoAccessibilityViolations } from './support/accessibility.ts';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     closeParticipant,
     openProjectParticipant,
-} from './support/participants';
+} from './support/participants.ts';
 import {
     createPoll,
     deletePolls,
     submitVote,
     type CreatedPoll,
-} from './support/poll-flow';
+} from './support/poll-flow.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
+} from './support/error-tracking.ts';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/test-data';
+} from './support/test-data.ts';
 
 test('shows the duplicate voter-name error and still allows a unique retry', async ({
     browser,

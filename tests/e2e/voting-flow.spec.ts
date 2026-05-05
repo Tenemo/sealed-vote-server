@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
 
-import { expectNoAccessibilityViolations } from './support/accessibility';
+import { expectNoAccessibilityViolations } from './support/accessibility.ts';
 import {
     closeVoting,
     createExpectedVerifiedResults,
@@ -13,21 +13,21 @@ import {
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
-} from './support/poll-flow';
+} from './support/poll-flow.ts';
 import {
     closeParticipant,
     openProjectParticipant,
-} from './support/participants';
+} from './support/participants.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
+} from './support/error-tracking.ts';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/test-data';
+} from './support/test-data.ts';
 
 test('completes the full vote-to-results ceremony across three live sessions', async ({
     browser,

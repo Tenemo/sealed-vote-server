@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { AxeBuilder } from '@axe-core/playwright';
 import { expect, type Page } from '@playwright/test';
 
 const wcagTags = [

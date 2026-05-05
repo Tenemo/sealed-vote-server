@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
     closeParticipant,
     openProjectParticipant,
-} from './support/participants';
+} from './support/participants.ts';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createPoll,
@@ -12,13 +12,13 @@ import {
     expectVotersVisible,
     registerParticipant,
     type CreatedPoll,
-} from './support/poll-flow';
+} from './support/poll-flow.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
-import { createTestNamespace, createVoterName } from './support/test-data';
+} from './support/error-tracking.ts';
+import { createTestNamespace, createVoterName } from './support/test-data.ts';
 
 test('keeps duplicate poll names on distinct slug URLs with isolated rosters', async ({
     browser,
@@ -82,9 +82,7 @@ test('keeps duplicate poll names on distinct slug URLs with isolated rosters', a
             }),
         );
 
-        await expectVotersVisible(participant.page, [
-            secondPollVoterName,
-        ]);
+        await expectVotersVisible(participant.page, [secondPollVoterName]);
         await expectVotersVisible(page, [firstPollVoterName]);
         await expectVotersHidden(page, [secondPollVoterName]);
         await expectVotersHidden(participant.page, [firstPollVoterName]);

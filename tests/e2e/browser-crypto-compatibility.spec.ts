@@ -189,7 +189,9 @@ test('supports X25519 generation, export, import, and shared-secret derivation',
         const aliceSharedSecretBytes = Array.from(
             new Uint8Array(aliceSharedSecret),
         );
-        const bobSharedSecretBytes = Array.from(new Uint8Array(bobSharedSecret));
+        const bobSharedSecretBytes = Array.from(
+            new Uint8Array(bobSharedSecret),
+        );
 
         return {
             alicePrivateKeyAlgorithm: importedAlicePrivateKey.algorithm.name,

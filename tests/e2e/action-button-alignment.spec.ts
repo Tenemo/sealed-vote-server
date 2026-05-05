@@ -1,8 +1,12 @@
 import { expect, test, type Locator } from '@playwright/test';
 
 import { gotoInteractablePage } from './support/navigation.mts';
-import { createPoll, deletePolls, type CreatedPoll } from './support/poll-flow';
-import { createPollName, createTestNamespace } from './support/test-data';
+import {
+    createPoll,
+    deletePolls,
+    type CreatedPoll,
+} from './support/poll-flow.ts';
+import { createPollName, createTestNamespace } from './support/test-data.ts';
 
 const desktopViewport = {
     width: 1280,

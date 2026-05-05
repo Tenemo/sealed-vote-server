@@ -14,7 +14,7 @@ import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
+} from './support/error-tracking.ts';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createExpectedVerifiedResults,
@@ -24,12 +24,12 @@ import {
     waitForAutomaticReveal,
     waitForVerifiedResults,
     type CreatedPoll,
-} from './support/poll-flow';
+} from './support/poll-flow.ts';
 import {
     closeParticipant,
     openProjectParticipant,
     type ManagedParticipant,
-} from './support/participants';
+} from './support/participants.ts';
 import {
     readmeDemoManifestPath,
     readmeDemoPanelViewport,
@@ -607,9 +607,8 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         participantOne.page = attachParticipantOneTracking(
             await submitVoteWithDemoMotion({
                 onPollPageReady: () => {
-                    participantOneJoinedAtMs = getElapsedMs(
-                        recordingStartedAtMs,
-                    );
+                    participantOneJoinedAtMs =
+                        getElapsedMs(recordingStartedAtMs);
                 },
                 page: participantOne.page,
                 pollUrl: createdPoll.pollUrl,
@@ -623,9 +622,8 @@ test('records a three-panel readme demo of the full happy-path ceremony', async 
         participantTwo.page = attachParticipantTwoTracking(
             await submitVoteWithDemoMotion({
                 onPollPageReady: () => {
-                    participantTwoJoinedAtMs = getElapsedMs(
-                        recordingStartedAtMs,
-                    );
+                    participantTwoJoinedAtMs =
+                        getElapsedMs(recordingStartedAtMs);
                 },
                 page: participantTwo.page,
                 pollUrl: createdPoll.pollUrl,

@@ -3,24 +3,24 @@ import { expect, test } from '@playwright/test';
 import {
     closeParticipant,
     openProjectParticipant,
-} from './support/participants';
+} from './support/participants.ts';
 import { gotoInteractablePage } from './support/navigation.mts';
 import {
     createPoll,
     deletePolls,
     submitVote,
     type CreatedPoll,
-} from './support/poll-flow';
+} from './support/poll-flow.ts';
 import {
     createErrorTrackingAttacher,
     createUnexpectedErrorTracker,
     expectNoUnexpectedErrors,
-} from './support/error-tracking';
+} from './support/error-tracking.ts';
 import {
     createPollName,
     createTestNamespace,
     createVoterName,
-} from './support/test-data';
+} from './support/test-data.ts';
 
 test('keeps slug-based poll links shareable in a separate participant context', async ({
     browser,

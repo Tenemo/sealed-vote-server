@@ -5,9 +5,9 @@ import {
     createPoll,
     deletePolls,
     type CreatedPoll,
-} from './support/poll-flow';
-import { dropNextPostResponseAfterServerCommit } from './support/network';
-import { createPollName, createTestNamespace } from './support/test-data';
+} from './support/poll-flow.ts';
+import { dropNextPostResponseAfterServerCommit } from './support/network.ts';
+import { createPollName, createTestNamespace } from './support/test-data.ts';
 
 const localSyntheticDropHosts = new Set(['127.0.0.1', 'localhost']);
 const createPollApiPath = '/api/polls/create';
@@ -32,7 +32,8 @@ type PollResponse = {
     slug: string;
 };
 
-const getPollApiPath = (pollReference: string): string => `/api/polls/${pollReference}`;
+const getPollApiPath = (pollReference: string): string =>
+    `/api/polls/${pollReference}`;
 
 const supportsSyntheticPostCommitDrops = (testInfo: TestInfo): boolean => {
     const baseUrl = testInfo.project.use.baseURL;
@@ -84,9 +85,9 @@ test('retries poll creation safely after the initial response is lost', async ({
         );
     };
 
-    let droppedCreate:
-        | Awaited<ReturnType<typeof dropNextPostResponseAfterServerCommit>>
-        | null = null;
+    let droppedCreate: Awaited<
+        ReturnType<typeof dropNextPostResponseAfterServerCommit>
+    > | null = null;
 
     try {
         page = await gotoInteractablePage(page, '/');
@@ -118,7 +119,8 @@ test('retries poll creation safely after the initial response is lost', async ({
         await page.getByRole('button', { name: 'Create poll' }).click();
 
         const createPollResponse = await createPollResponsePromise;
-        const createdPoll = (await createPollResponse.json()) as CreatePollResponse;
+        const createdPoll =
+            (await createPollResponse.json()) as CreatePollResponse;
         const apiBaseUrl = new URL(createPollResponse.url()).origin;
 
         createdPolls.push({
@@ -201,9 +203,9 @@ test('createPoll helper retries idempotently after the initial response is lost'
         );
     };
 
-    let droppedCreate:
-        | Awaited<ReturnType<typeof dropNextPostResponseAfterServerCommit>>
-        | null = null;
+    let droppedCreate: Awaited<
+        ReturnType<typeof dropNextPostResponseAfterServerCommit>
+    > | null = null;
 
     try {
         page = await gotoInteractablePage(page, '/');
@@ -225,7 +227,9 @@ test('createPoll helper retries idempotently after the initial response is lost'
         createdPolls.push(createdPoll);
 
         await droppedCreate.waitForDrop();
-        await expect(page).toHaveURL(new RegExp(`/polls/${createdPoll.pollSlug}$`));
+        await expect(page).toHaveURL(
+            new RegExp(`/polls/${createdPoll.pollSlug}$`),
+        );
         expect(capturedCreateRequests).toHaveLength(2);
         expect(capturedCreateRequests[0]).toEqual(capturedCreateRequests[1]);
 
